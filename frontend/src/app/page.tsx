@@ -1,5 +1,5 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 "use client";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 import { useState, useEffect, useRef } from 'react';
 import { Send, Plus, Layout, Edit, Sparkles, Target, Check, ChevronRight, Trash2 } from 'lucide-react';
