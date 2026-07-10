@@ -17,8 +17,8 @@ const prisma = new PrismaClient();
 // --- TRACKER ROUTES ---
 app.get('/api/tracker', async (req, res) => {
   try {
-    const records = await prisma.readingTracker.findMany({
-      orderBy: { book: 'asc' }
+    const records = await prisma.tracker.findMany({
+      orderBy: { chapterId: 'asc' }
     });
     res.json(records);
   } catch (error) {
@@ -28,28 +28,24 @@ app.get('/api/tracker', async (req, res) => {
 
 app.post('/api/tracker', async (req, res) => {
   try {
-    const { book, chapter, isRead } = req.body;
+    const { chapterId } = req.body;
     
     // Check if record exists
-    const existing = await prisma.readingTracker.findUnique({
-      where: {
-        book_chapter: { book, chapter }
-      }
+    const existing = await prisma.tracker.findUnique({
+      where: { chapterId }
     });
     
-    let record;
     if (existing) {
-      record = await prisma.readingTracker.update({
-        where: { id: existing.id },
-        data: { isRead }
-      });
+      // Toggle off (delete)
+      await prisma.tracker.delete({ where: { chapterId } });
+      res.status(200).json({ deleted: true });
     } else {
-      record = await prisma.readingTracker.create({
-        data: { book, chapter, isRead }
+      // Toggle on (create)
+      const record = await prisma.tracker.create({
+        data: { chapterId }
       });
+      res.status(201).json(record);
     }
-    
-    res.status(201).json(record);
   } catch (error) {
     res.status(500).json({ error: 'Failed to update tracker record' });
   }
@@ -66,7 +62,7 @@ app.get('/api/notes', async (req, res) => {
 
     const notes = await prisma.note.findMany({
       where: whereClause,
-      orderBy: { updatedAt: 'desc' },
+      orderBy: { createdAt: 'desc' },
     });
     res.json(notes);
   } catch (error) {
@@ -125,7 +121,7 @@ app.get('/api/chats', async (req, res) => {
         messages: true,
       },
       orderBy: {
-        updatedAt: 'desc',
+        createdAt: 'desc',
       },
     });
     res.json(chats);
