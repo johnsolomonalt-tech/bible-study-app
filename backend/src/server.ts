@@ -239,9 +239,9 @@ app.post('/api/chats/:id/messages', async (req, res) => {
     });
 
     res.status(201).json({ userMessage, aiMessage });
-  } catch (error) {
+  } catch (error: any) {
     console.error('AI Chat Error:', error);
-    res.status(500).json({ error: 'Failed to process message' });
+    res.status(500).json({ error: 'Failed to process message', details: error.message || String(error) });
   }
 });
 
