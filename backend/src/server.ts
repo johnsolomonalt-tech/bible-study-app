@@ -245,6 +245,6 @@ app.post('/api/chats/:id/messages', async (req, res) => {
   }
 });
 
-app.listen(port, () => {
+app.listen(port as number, '0.0.0.0', () => {
   console.log(`Backend server running on port ${port}`);
 });
