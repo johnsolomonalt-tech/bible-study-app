@@ -4,7 +4,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "start": "node dist/server.js",
+    "start": "node --dns-result-order=ipv4first dist/server.js",
     "build": "tsc"
   },
   "keywords": [],
