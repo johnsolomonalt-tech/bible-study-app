@@ -72,12 +72,11 @@ app.get('/api/notes', async (req, res) => {
 
 app.post('/api/notes', async (req, res) => {
   try {
-    const { title, content, chapterId } = req.body;
+    const { title, content } = req.body;
     const note = await prisma.note.create({
       data: {
         title: title || 'Untitled Note',
         content: content || '',
-        chapterId: chapterId || null,
       },
     });
     res.status(201).json(note);
