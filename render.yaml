@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: bible-study-backend
+    env: docker
+    rootDir: backend
+    envVars:
+      - key: DATABASE_URL
+        value: file:/data/prod.db
+      - key: GEMINI_API_KEY
+        sync: false
+    disk:
+      name: sqlite-data
+      mountPath: /data
+      sizeGB: 1
