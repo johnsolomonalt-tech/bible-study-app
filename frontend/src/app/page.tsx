@@ -25,7 +25,8 @@ export default function App() {
   // Notes State
   const [notes, setNotes] = useState<{id: number, title: string, content: string}[]>([]);
   const [activeNoteId, setActiveNoteId] = useState<number | null>(null);
-  const [isCreatingNote, setIsCreatingNote] = useState(false);
+  const tempNoteIdRef = useRef<number | null>(null);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Chats State
   const [chats, setChats] = useState<{id: number, title: string, messages: any[]}[]>([]);
@@ -94,11 +95,18 @@ export default function App() {
 
   const updateNote = async (id: number, title: string, content: string) => {
     setNotes(prev => prev.map(n => n.id === id ? { ...n, title, content } : n));
-    await fetch(`${API_URL}/api/notes/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, content })
-    });
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(async () => {
+      try {
+        await fetch(`${API_URL}/api/notes/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, content })
+        });
+      } catch (err) {
+        console.error('Failed to update note', err);
+      }
+    }, 1000);
   };
 
   const handleNewChat = async () => {
@@ -214,35 +222,37 @@ export default function App() {
       } else {
         updateNote(chapterNote.id, chapterNote.title, newContent);
       }
+    } else if (tempNoteIdRef.current !== null) {
+      const tempId = tempNoteIdRef.current;
+      setNotes(prev => prev.map(n => n.id === tempId ? { ...n, content: newContent } : n));
     } else {
-      if (isCreatingNote) return;
-      setIsCreatingNote(true);
-      
-      const tempId = -Date.now();
+      tempNoteIdRef.current = -Date.now();
+      const tempId = tempNoteIdRef.current;
       const optimisticNote = { id: tempId, title: chapterTitle, content: newContent };
       setNotes(prev => [optimisticNote, ...prev]);
       
-      const res = await fetch(`${API_URL}/api/notes`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: chapterTitle, content: newContent })
-      });
-      const newNote = await res.json();
-      
-      setNotes(prev => {
-        const latestTemp = prev.find(n => n.id === tempId);
-        const finalContent = latestTemp ? latestTemp.content : newContent;
+      try {
+        const res = await fetch(`${API_URL}/api/notes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: chapterTitle, content: newContent })
+        });
+        const newNote = await res.json();
         
-        if (finalContent !== newContent) {
-          fetch(`${API_URL}/api/notes/${newNote.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: chapterTitle, content: finalContent })
-          });
-        }
-        return prev.map(n => n.id === tempId ? { ...newNote, content: finalContent } : n);
-      });
-      setIsCreatingNote(false);
+        setNotes(prev => {
+          const latestTemp = prev.find(n => n.id === tempId);
+          const finalContent = latestTemp ? latestTemp.content : newContent;
+          
+          if (finalContent !== newContent) {
+            updateNote(newNote.id, chapterTitle, finalContent);
+          }
+          return prev.map(n => n.id === tempId ? { ...newNote, content: finalContent } : n);
+        });
+      } catch (err) {
+        console.error('Failed to create note', err);
+      } finally {
+        tempNoteIdRef.current = null;
+      }
     }
   };
 
