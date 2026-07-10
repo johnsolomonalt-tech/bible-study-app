@@ -1,7 +1,8 @@
 "use client";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useAuth, UserButton, SignedIn, SignedOut, SignIn } from '@clerk/nextjs';
 import { Send, Plus, Layout, Edit, Sparkles, Target, Check, ChevronRight, Trash2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
@@ -13,6 +14,18 @@ const OT_BOOKS = otStr.split(',').map(s => { const [n, c] = s.split(':'); return
 const NT_BOOKS = ntStr.split(',').map(s => { const [n, c] = s.split(':'); return { name: n, chapters: parseInt(c) }; });
 
 export default function App() {
+  const { getToken } = useAuth();
+  
+  const fetchWithAuth = useCallback(async (url: string, options: any = {}) => {
+    const token = await getToken();
+    return fetch(url, {
+      ...options,
+      headers: {
+        ...options.headers,
+        Authorization: `Bearer ${token}`
+      }
+    });
+  }, [getToken]);
   const [activeTab, setActiveTab] = useState('study'); // study, notes, chats, tracker
   
   // Bible State
@@ -38,15 +51,15 @@ export default function App() {
 
   // Load Data
   useEffect(() => {
-    fetch(`${API_URL}/api/notes`).then(r => r.json()).then(data => {
+    fetchWithAuth(`${API_URL}/api/notes`).then(r => r.json()).then(data => {
       setNotes(data);
       if (data.length > 0) setActiveNoteId(data[0].id);
     });
-    fetch(`${API_URL}/api/chats`).then(r => r.json()).then(data => {
+    fetchWithAuth(`${API_URL}/api/chats`).then(r => r.json()).then(data => {
       setChats(data);
       setActiveChatId(null); // Fresh session on reload
     });
-    fetch(`${API_URL}/api/tracker`).then(r => r.json()).then(data => {
+    fetchWithAuth(`${API_URL}/api/tracker`).then(r => r.json()).then(data => {
       setCompletedChapters(data.map((item: any) => item.chapterId));
     });
   }, []);
@@ -98,7 +111,7 @@ export default function App() {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     debounceTimerRef.current = setTimeout(async () => {
       try {
-        await fetch(`${API_URL}/api/notes/${id}`, {
+        await fetchWithAuth(`${API_URL}/api/notes/${id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title, content })
@@ -110,7 +123,7 @@ export default function App() {
   };
 
   const handleNewChat = async () => {
-    const res = await fetch(`${API_URL}/api/chats`, {
+    const res = await fetchWithAuth(`${API_URL}/api/chats`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: 'New Conversation' })
@@ -125,7 +138,7 @@ export default function App() {
     if (activeChatId === id) {
       setActiveChatId(null);
     }
-    await fetch(`${API_URL}/api/chats/${id}`, {
+    await fetchWithAuth(`${API_URL}/api/chats/${id}`, {
       method: 'DELETE'
     });
   };
@@ -135,7 +148,7 @@ export default function App() {
     if (activeNoteId === id) {
       setActiveNoteId(null);
     }
-    await fetch(`${API_URL}/api/notes/${id}`, {
+    await fetchWithAuth(`${API_URL}/api/notes/${id}`, {
       method: 'DELETE'
     });
   };
@@ -148,7 +161,7 @@ export default function App() {
 
     // Create a new chat automatically if none exists
     if (!targetChatId) {
-      const res = await fetch(`${API_URL}/api/chats`, {
+      const res = await fetchWithAuth(`${API_URL}/api/chats`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: 'New Conversation' })
@@ -176,7 +189,7 @@ export default function App() {
     setCooldown(30); // 30s cooldown
     setIsAiTyping(true);
 
-    const res = await fetch(`${API_URL}/api/chats/${targetChatId}/messages`, {
+    const res = await fetchWithAuth(`${API_URL}/api/chats/${targetChatId}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content: currentInput })
@@ -232,7 +245,7 @@ export default function App() {
       setNotes(prev => [optimisticNote, ...prev]);
       
       try {
-        const res = await fetch(`${API_URL}/api/notes`, {
+        const res = await fetchWithAuth(`${API_URL}/api/notes`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title: chapterTitle, content: newContent })
@@ -262,7 +275,7 @@ export default function App() {
     setCompletedChapters(prev => 
       isCompleted ? prev.filter(id => id !== currentChapterId) : [...prev, currentChapterId]
     );
-    await fetch(`${API_URL}/api/tracker`, {
+    await fetchWithAuth(`${API_URL}/api/tracker`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chapterId: currentChapterId })
@@ -272,7 +285,7 @@ export default function App() {
   const toggleAnyChapter = async (id: string) => {
     const checked = completedChapters.includes(id);
     setCompletedChapters(prev => checked ? prev.filter(c => c !== id) : [...prev, id]);
-    await fetch(`${API_URL}/api/tracker`, {
+    await fetchWithAuth(`${API_URL}/api/tracker`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chapterId: id })
@@ -280,12 +293,22 @@ export default function App() {
   };
 
   return (
-    <div className="h-full flex flex-col bg-[#141413] text-[#faf9f5]">
+    <>
+      <SignedOut>
+        <div className="h-screen w-full flex items-center justify-center bg-[#141413]">
+          <SignIn routing="hash" />
+        </div>
+      </SignedOut>
+      <SignedIn>
+        <div className="h-full flex flex-col bg-[#141413] text-[#faf9f5]">
       {/* Top Navbar */}
       <header className="h-14 border-b border-[#30302e] flex items-center justify-between px-6 bg-[#141413] z-10 shrink-0">
         <div className="font-display text-[22px] tracking-tight text-[#c96442] flex items-center gap-3">
           <img src="/logo.png" alt="Theologica Logo" className="w-8 h-8 object-contain drop-shadow-md" />
           Theologica
+        </div>
+        <div className="flex gap-4 items-center">
+          <UserButton afterSignOutUrl="/" />
         </div>
         <div className="flex gap-1.5 p-1.5 bg-[#30302e] rounded-xl ring-shadow">
           {['study', 'notes', 'chats', 'tracker'].map(tab => (
@@ -664,7 +687,7 @@ export default function App() {
                 <span className="text-[15px] font-medium text-[#faf9f5]">Notebooks</span>
                 <button 
                   onClick={async () => {
-                    const res = await fetch(`${API_URL}/api/notes`, {
+                    const res = await fetchWithAuth(`${API_URL}/api/notes`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ title: 'New Note', content: '' })
@@ -730,5 +753,7 @@ export default function App() {
         )}
       </main>
     </div>
+      </SignedIn>
+    </>
   );
 }

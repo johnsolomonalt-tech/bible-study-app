@@ -3,8 +3,15 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { ClerkExpressRequireAuth, StrictAuthProp } from '@clerk/clerk-sdk-node';
 
 dotenv.config();
+
+declare global {
+  namespace Express {
+    interface Request extends StrictAuthProp {}
+  }
+}
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -12,12 +19,17 @@ const port = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
+// Apply Clerk authentication to all API routes
+app.use('/api', ClerkExpressRequireAuth());
+
 const prisma = new PrismaClient();
 
 // --- TRACKER ROUTES ---
 app.get('/api/tracker', async (req, res) => {
   try {
+    const userId = req.auth.userId;
     const records = await prisma.tracker.findMany({
+      where: { userId },
       orderBy: { chapterId: 'asc' }
     });
     res.json(records);
@@ -28,21 +40,19 @@ app.get('/api/tracker', async (req, res) => {
 
 app.post('/api/tracker', async (req, res) => {
   try {
+    const userId = req.auth.userId;
     const { chapterId } = req.body;
     
-    // Check if record exists
     const existing = await prisma.tracker.findUnique({
-      where: { chapterId }
+      where: { userId_chapterId: { userId, chapterId } }
     });
     
     if (existing) {
-      // Toggle off (delete)
-      await prisma.tracker.delete({ where: { chapterId } });
+      await prisma.tracker.delete({ where: { userId_chapterId: { userId, chapterId } } });
       res.status(200).json({ deleted: true });
     } else {
-      // Toggle on (create)
       const record = await prisma.tracker.create({
-        data: { chapterId }
+        data: { userId, chapterId }
       });
       res.status(201).json(record);
     }
@@ -54,14 +64,9 @@ app.post('/api/tracker', async (req, res) => {
 // --- NOTES ROUTES ---
 app.get('/api/notes', async (req, res) => {
   try {
-    const { chapterId } = req.query;
-    let whereClause = {};
-    if (chapterId) {
-      whereClause = { chapterId: String(chapterId) };
-    }
-
+    const userId = req.auth.userId;
     const notes = await prisma.note.findMany({
-      where: whereClause,
+      where: { userId },
       orderBy: { createdAt: 'desc' },
     });
     res.json(notes);
@@ -72,9 +77,11 @@ app.get('/api/notes', async (req, res) => {
 
 app.post('/api/notes', async (req, res) => {
   try {
+    const userId = req.auth.userId;
     const { title, content } = req.body;
     const note = await prisma.note.create({
       data: {
+        userId,
         title: title || 'Untitled Note',
         content: content || '',
       },
@@ -87,11 +94,12 @@ app.post('/api/notes', async (req, res) => {
 
 app.put('/api/notes/:id', async (req, res) => {
   try {
+    const userId = req.auth.userId;
     const { title, content } = req.body;
     const { id } = req.params;
 
     const note = await prisma.note.update({
-      where: { id: parseInt(id) },
+      where: { id: parseInt(id), userId },
       data: { title, content },
     });
     res.json(note);
@@ -102,9 +110,10 @@ app.put('/api/notes/:id', async (req, res) => {
 
 app.delete('/api/notes/:id', async (req, res) => {
   try {
+    const userId = req.auth.userId;
     const { id } = req.params;
     await prisma.note.delete({
-      where: { id: parseInt(id) },
+      where: { id: parseInt(id), userId },
     });
     res.json({ success: true });
   } catch (error) {
@@ -115,7 +124,9 @@ app.delete('/api/notes/:id', async (req, res) => {
 // --- CHATS ROUTES ---
 app.get('/api/chats', async (req, res) => {
   try {
+    const userId = req.auth.userId;
     const chats = await prisma.chat.findMany({
+      where: { userId },
       include: {
         messages: true,
       },
@@ -131,9 +142,11 @@ app.get('/api/chats', async (req, res) => {
 
 app.post('/api/chats', async (req, res) => {
   try {
+    const userId = req.auth.userId;
     const { title } = req.body;
     const chat = await prisma.chat.create({
       data: {
+        userId,
         title: title || 'New Chat',
       },
       include: {
@@ -148,15 +161,22 @@ app.post('/api/chats', async (req, res) => {
 
 app.delete('/api/chats/:id', async (req, res) => {
   try {
+    const userId = req.auth.userId;
     const { id } = req.params;
     
+    // Validate ownership
+    const chat = await prisma.chat.findUnique({
+      where: { id: parseInt(id), userId }
+    });
+    if (!chat) return res.status(403).json({ error: 'Forbidden' });
+
     // Delete associated messages first
     await prisma.message.deleteMany({
       where: { chatId: parseInt(id) },
     });
 
     await prisma.chat.delete({
-      where: { id: parseInt(id) },
+      where: { id: parseInt(id), userId },
     });
     res.json({ success: true });
   } catch (error) {
@@ -167,7 +187,15 @@ app.delete('/api/chats/:id', async (req, res) => {
 // AI Chat endpoint
 app.get('/api/chats/:id/messages', async (req, res) => {
   try {
+    const userId = req.auth.userId;
     const { id } = req.params;
+    
+    // Validate ownership
+    const chat = await prisma.chat.findUnique({
+      where: { id: parseInt(id), userId }
+    });
+    if (!chat) return res.status(403).json({ error: 'Forbidden' });
+
     const messages = await prisma.message.findMany({
       where: { chatId: parseInt(id) },
       orderBy: { createdAt: 'asc' }
@@ -180,9 +208,16 @@ app.get('/api/chats/:id/messages', async (req, res) => {
 
 app.post('/api/chats/:id/messages', async (req, res) => {
   try {
+    const userId = req.auth.userId;
     const { id } = req.params;
     const chatId = parseInt(id);
     const { content } = req.body;
+
+    // Validate ownership
+    const chat = await prisma.chat.findUnique({
+      where: { id: chatId, userId }
+    });
+    if (!chat) return res.status(403).json({ error: 'Forbidden' });
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -232,7 +267,7 @@ app.post('/api/chats/:id/messages', async (req, res) => {
     const aiMessage = await prisma.message.create({
       data: {
         content: aiResponseText,
-        role: 'model', // Use 'model' to match what frontend expects and past enum usage
+        role: 'model',
         chatId: chatId,
       },
     });
@@ -242,6 +277,11 @@ app.post('/api/chats/:id/messages', async (req, res) => {
     console.error('AI Chat Error:', error);
     res.status(500).json({ error: 'Failed to process message', details: error.message || String(error) });
   }
+});
+
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error(err.stack);
+  res.status(401).send('Unauthenticated!');
 });
 
 app.listen(port as number, '0.0.0.0', () => {

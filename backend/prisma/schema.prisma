@@ -12,6 +12,7 @@ datasource db {
 
 model Note {
   id        Int      @id @default(autoincrement())
+  userId    String
   title     String
   content   String
   createdAt DateTime @default(now())
@@ -20,6 +21,7 @@ model Note {
 
 model Chat {
   id        Int       @id @default(autoincrement())
+  userId    String
   title     String
   createdAt DateTime  @default(now())
   messages  Message[]
@@ -36,6 +38,9 @@ model Message {
 
 model Tracker {
   id               Int      @id @default(autoincrement())
-  chapterId        String   @unique // Format: "{BookName}-{ChapterNumber}", e.g., "Genesis-1"
+  userId           String
+  chapterId        String   // Format: "{BookName}-{ChapterNumber}", e.g., "Genesis-1"
   completedAt      DateTime @default(now())
+  
+  @@unique([userId, chapterId])
 }

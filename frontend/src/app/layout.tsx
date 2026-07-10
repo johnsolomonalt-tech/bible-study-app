@@ -19,16 +19,20 @@ export const metadata: Metadata = {
   description: "Bible app with AI chat and notes",
 };
 
+import { ClerkProvider } from '@clerk/nextjs'
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body className={`${inter.variable} ${merriweather.variable} antialiased`}>
-        {children}
-      </body>
-    </html>
+    <ClerkProvider>
+      <html lang="en" className="dark">
+        <body className={`${inter.variable} ${merriweather.variable} antialiased`}>
+          {children}
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
