@@ -47,7 +47,7 @@ export default function App() {
       setActiveChatId(null); // Fresh session on reload
     });
     fetch(`${API_URL}/api/tracker`).then(r => r.json()).then(data => {
-      setCompletedChapters(data);
+      setCompletedChapters(data.map((item: any) => item.chapterId));
     });
   }, []);
 
