@@ -182,6 +182,20 @@ export default function App() {
         }
         return c;
       }));
+    } else {
+      const errorData = await res.json().catch(() => null);
+      const errorMsg = { 
+        id: Date.now(), 
+        chatId: targetChatId, 
+        role: 'model', 
+        content: `**Error:** ${errorData?.details || errorData?.error || 'Failed to get response from AI'}` 
+      };
+      setChats(prev => prev.map(c => {
+        if (c.id === targetChatId) {
+          return { ...c, messages: [...c.messages, errorMsg] };
+        }
+        return c;
+      }));
     }
     
     setIsAiTyping(false);
