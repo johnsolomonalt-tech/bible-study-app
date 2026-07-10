@@ -5,10 +5,6 @@ services:
     rootDir: backend
     envVars:
       - key: DATABASE_URL
-        value: file:/data/prod.db
+        sync: false
       - key: GEMINI_API_KEY
         sync: false
-    disk:
-      name: sqlite-data
-      mountPath: /data
-      sizeGB: 1
