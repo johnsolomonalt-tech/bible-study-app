@@ -2,6 +2,7 @@ services:
   - type: web
     name: bible-study-backend
     env: docker
+    plan: free
     rootDir: backend
     envVars:
       - key: DATABASE_URL
