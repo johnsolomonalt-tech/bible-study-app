@@ -6,27 +6,29 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const { userId } = await auth();
   if (!userId) return new NextResponse('Unauthorized', { status: 401 });
 
   const chat = await prisma.chat.findUnique({
-    where: { id: parseInt(params.id), userId }
+    where: { id: parseInt(id), userId }
   });
   if (!chat) return new NextResponse('Forbidden', { status: 403 });
 
   const messages = await prisma.message.findMany({
-    where: { chatId: parseInt(params.id) },
+    where: { chatId: parseInt(id) },
     orderBy: { createdAt: 'asc' },
   });
   return NextResponse.json(messages);
 }
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const { userId } = await auth();
   if (!userId) return new NextResponse('Unauthorized', { status: 401 });
 
-  const chatId = parseInt(params.id);
+  const chatId = parseInt(id);
   const { content } = await req.json();
 
   const chat = await prisma.chat.findUnique({
