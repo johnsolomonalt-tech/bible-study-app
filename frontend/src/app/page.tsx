@@ -2,7 +2,7 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useAuth, UserButton, SignedIn, SignedOut, SignIn } from '@clerk/nextjs';
+import { useAuth, UserButton, SignIn } from '@clerk/nextjs';
 import { Send, Plus, Layout, Edit, Sparkles, Target, Check, ChevronRight, Trash2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
@@ -292,14 +292,20 @@ export default function App() {
     });
   };
 
+  const { isLoaded, userId } = useAuth();
+  
+  if (!isLoaded) return <div className="h-screen w-full flex items-center justify-center bg-[#141413] text-white">Loading...</div>;
+  
+  if (!userId) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-[#141413]">
+        <SignIn routing="hash" />
+      </div>
+    );
+  }
+
   return (
     <>
-      <SignedOut>
-        <div className="h-screen w-full flex items-center justify-center bg-[#141413]">
-          <SignIn routing="hash" />
-        </div>
-      </SignedOut>
-      <SignedIn>
         <div className="h-full flex flex-col bg-[#141413] text-[#faf9f5]">
       {/* Top Navbar */}
       <header className="h-14 border-b border-[#30302e] flex items-center justify-between px-6 bg-[#141413] z-10 shrink-0">
@@ -308,7 +314,7 @@ export default function App() {
           Theologica
         </div>
         <div className="flex gap-4 items-center">
-          <UserButton afterSignOutUrl="/" />
+          <UserButton />
         </div>
         <div className="flex gap-1.5 p-1.5 bg-[#30302e] rounded-xl ring-shadow">
           {['study', 'notes', 'chats', 'tracker'].map(tab => (
@@ -753,7 +759,6 @@ export default function App() {
         )}
       </main>
     </div>
-      </SignedIn>
     </>
   );
 }
