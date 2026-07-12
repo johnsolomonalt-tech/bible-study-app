@@ -1,5 +1,5 @@
 "use client";
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/$/, '');
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth, UserButton, SignIn } from '@clerk/nextjs';
