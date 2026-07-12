@@ -5,6 +5,8 @@ export async function GET() {
   try {
     const hasDbUrl = !!process.env.DATABASE_URL;
     const dbUrlPrefix = process.env.DATABASE_URL ? process.env.DATABASE_URL.substring(0, 15) : null;
+    const hasGemini = !!process.env.GEMINI_API_KEY;
+    const hasClerk = !!process.env.CLERK_SECRET_KEY;
     
     // Don't even try to query if it's missing to avoid Prisma crash
     if (!hasDbUrl) {
@@ -12,7 +14,7 @@ export async function GET() {
     }
 
     const result = await prisma.$queryRaw`SELECT 1`;
-    return NextResponse.json({ success: true, result, hasDbUrl, dbUrlPrefix });
+    return NextResponse.json({ success: true, result, hasDbUrl, dbUrlPrefix, hasGemini, hasClerk });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message, hasDbUrl: !!process.env.DATABASE_URL });
   }
