@@ -1,21 +1,27 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
 export async function GET() {
   try {
     const hasDbUrl = !!process.env.DATABASE_URL;
-    const dbUrlPrefix = process.env.DATABASE_URL ? process.env.DATABASE_URL.substring(0, 15) : null;
     const hasGemini = !!process.env.GEMINI_API_KEY;
-    const hasClerk = !!process.env.CLERK_SECRET_KEY;
     
-    // Don't even try to query if it's missing to avoid Prisma crash
-    if (!hasDbUrl) {
-       return NextResponse.json({ success: false, error: "Node.js process.env.DATABASE_URL is undefined!" });
+    const result = await prisma.$queryRaw`SELECT 1`;
+    
+    let geminiTest = "Not tested";
+    try {
+      const response = await model.generateContent("Say 'hello'");
+      geminiTest = response.response.text();
+    } catch (e: any) {
+      geminiTest = "Gemini Error: " + e.message;
     }
 
-    const result = await prisma.$queryRaw`SELECT 1`;
-    return NextResponse.json({ success: true, result, hasDbUrl, dbUrlPrefix, hasGemini, hasClerk });
+    return NextResponse.json({ success: true, result, hasDbUrl, hasGemini, geminiTest });
   } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message, hasDbUrl: !!process.env.DATABASE_URL });
+    return NextResponse.json({ success: false, error: error.message });
   }
 }
