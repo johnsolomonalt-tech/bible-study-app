@@ -171,24 +171,12 @@ export default function App() {
     const textToSpeak = bibleVerses[index].text;
     
     try {
-      const hfUrl = 'https://api-inference.huggingface.co/models/facebook/mms-tts-eng';
-      const hfKey = process.env.NEXT_PUBLIC_HF_API_KEY;
-      
-      if (!hfKey) {
-        alert("Missing NEXT_PUBLIC_HF_API_KEY! Please add it to Vercel and redeploy.");
-        setIsSpeaking(false);
-        isSpeakingRef.current = false;
-        setCurrentSpeakingVerseIndex(null);
-        return;
-      }
-
-      let res = await fetch(hfUrl, {
+      let res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${hfKey}`
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ inputs: textToSpeak })
+        body: JSON.stringify({ text: textToSpeak })
       });
       
       // Handle Hugging Face model loading (503)
@@ -198,13 +186,12 @@ export default function App() {
         console.log("Model loading, waiting 5 seconds...");
         await new Promise(resolve => setTimeout(resolve, 5000));
         if (!isSpeakingRef.current) return;
-        res = await fetch(hfUrl, {
+        res = await fetch('/api/tts', {
           method: 'POST',
           headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${hfKey}`
+            'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ inputs: textToSpeak })
+          body: JSON.stringify({ text: textToSpeak })
         });
         retries--;
       }
