@@ -433,16 +433,19 @@ export default function App() {
     <>
         <div className="h-full flex flex-col bg-[#141413] text-[#faf9f5]">
       {/* Top Navbar */}
-      <header className="h-14 border-b border-[#30302e] flex items-center justify-between px-6 bg-[#141413] z-10 shrink-0">
-        <div className="font-display text-[22px] tracking-tight text-[#c96442] flex items-center gap-3">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="Theologica Logo" className="w-8 h-8 object-contain drop-shadow-md" />
-          Theologica
+      <header className="relative h-14 border-b border-[#30302e] flex items-center justify-between px-6 bg-[#141413] z-10 shrink-0">
+        
+        {/* Left: Logo */}
+        <div className="flex-1 flex items-center">
+          <div className="font-display text-[22px] tracking-tight text-[#c96442] flex items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/icon.png" alt="Theologica Logo" className="w-8 h-8 object-contain drop-shadow-md rounded-md" />
+            <span className="hidden sm:inline">Theologica</span>
+          </div>
         </div>
-        <div className="flex gap-4 items-center">
-          <UserButton />
-        </div>
-        <div className="hidden lg:flex gap-1.5 p-1.5 bg-[#30302e] rounded-xl ring-shadow">
+
+        {/* Center: Tabs (Desktop) */}
+        <div className="hidden lg:flex absolute left-1/2 -translate-x-1/2 gap-1.5 p-1.5 bg-[#30302e] rounded-xl ring-shadow">
           {['study', 'notes', 'chats', 'tracker'].map(tab => (
             <button 
               key={tab} 
@@ -457,7 +460,12 @@ export default function App() {
             </button>
           ))}
         </div>
-        <div className="w-[100px]"></div> {/* Spacer for center alignment */}
+        
+        {/* Right: Clerk UserButton */}
+        <div className="flex-1 flex justify-end items-center gap-4">
+          <UserButton />
+        </div>
+        
       </header>
       
       {/* Main Viewport */}
