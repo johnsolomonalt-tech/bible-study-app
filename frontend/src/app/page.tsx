@@ -3,7 +3,7 @@ const API_URL = '';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth, UserButton, SignIn } from '@clerk/nextjs';
-import { Send, Plus, Layout, Edit, Sparkles, Target, Check, ChevronRight, ChevronLeft, Trash2 } from 'lucide-react';
+import { Send, Plus, Layout, Edit, Sparkles, Target, Check, ChevronRight, ChevronLeft, Trash2, Volume2, VolumeX } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import PWAInstallPrompt from './PWAInstallPrompt';
 
@@ -36,6 +36,7 @@ export default function App() {
   const [bibleVerses, setBibleVerses] = useState<{verse: number, text: string}[]>([]);
   const [completedChapters, setCompletedChapters] = useState<string[]>([]);
   const [mobileStudyView, setMobileStudyView] = useState<'reader' | 'chapters' | 'ai'>('reader');
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
   // Notes State
   const [notes, setNotes] = useState<{id: number, title: string, content: string}[]>([]);
@@ -105,8 +106,27 @@ export default function App() {
       .catch(() => {
         if (isMounted) setBibleVerses([{verse: 1, text: "Error loading text from bible-api.com."}]);
       });
+      
+    // Cancel any ongoing speech when chapter changes
+    window.speechSynthesis.cancel();
+    setIsSpeaking(false);
     return () => { isMounted = false; };
   }, [activeBook, activeChapter, translation]);
+
+  // Audio Reader Toggle
+  const toggleSpeech = () => {
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    } else {
+      const textToSpeak = bibleVerses.map(v => v.text).join(' ');
+      if (!textToSpeak) return;
+      const utterance = new SpeechSynthesisUtterance(textToSpeak);
+      utterance.onend = () => setIsSpeaking(false);
+      window.speechSynthesis.speak(utterance);
+      setIsSpeaking(true);
+    }
+  };
 
   const updateNote = async (id: number, title: string, content: string) => {
     setNotes(prev => prev.map(n => n.id === id ? { ...n, title, content } : n));
@@ -356,7 +376,7 @@ export default function App() {
       </header>
       
       {/* Main Viewport */}
-      <main className="flex-1 overflow-hidden flex pb-[calc(64px+env(safe-area-inset-bottom))] lg:pb-0 relative">
+      <main className="flex-1 overflow-hidden flex relative">
         
         {/* STUDY TAB */}
         {activeTab === 'study' && (
@@ -383,7 +403,7 @@ export default function App() {
                         return (
                           <button 
                             key={i} 
-                            onClick={() => { setActiveBook(b); setActiveChapter(i + 1); }}
+                            onClick={() => { setActiveBook(b); setActiveChapter(i + 1); setMobileStudyView('reader'); }}
                             className={`text-xs min-h-[44px] lg:min-h-0 py-2 lg:py-1.5 rounded-md transition-colors ${isActive ? 'bg-[#c96442] text-white shadow-sm' : 'text-[#87867f] hover:bg-[#4d4c48] hover:text-[#faf9f5]'}`}
                           >
                             {i + 1}
@@ -406,7 +426,7 @@ export default function App() {
                         return (
                           <button 
                             key={i} 
-                            onClick={() => { setActiveBook(b); setActiveChapter(i + 1); }}
+                            onClick={() => { setActiveBook(b); setActiveChapter(i + 1); setMobileStudyView('reader'); }}
                             className={`text-xs min-h-[44px] lg:min-h-0 py-2 lg:py-1.5 rounded-md transition-colors ${isActive ? 'bg-[#c96442] text-white shadow-sm' : 'text-[#87867f] hover:bg-[#4d4c48] hover:text-[#faf9f5]'}`}
                           >
                             {i + 1}
@@ -438,6 +458,9 @@ export default function App() {
                   </button>
                   <button onClick={toggleCompleted} className="lg:hidden flex items-center justify-center p-2 rounded-lg bg-[#30302e] text-[#faf9f5]">
                     <Check size={20} className={isCompleted ? "text-[#c96442]" : "text-[#5e5d59]"} /> 
+                  </button>
+                  <button onClick={toggleSpeech} className="flex items-center justify-center p-2 lg:p-2 rounded-lg text-[#b0aea5] hover:text-[#faf9f5] hover:bg-[#30302e] transition-colors" title="Read chapter aloud">
+                    {isSpeaking ? <VolumeX size={20} /> : <Volume2 size={20} />}
                   </button>
                   <div className="hidden lg:block h-6 w-px bg-[#30302e]"></div>
                   <select value={translation} onChange={(e) => setTranslation(e.target.value)} className="bg-transparent text-sm font-medium text-[#b0aea5] hover:text-[#faf9f5] focus:outline-none cursor-pointer transition-colors max-w-[60px] lg:max-w-none">
@@ -831,7 +854,7 @@ export default function App() {
       </main>
         {/* Mobile Bottom Navigation */}
         <div 
-          className="lg:hidden fixed bottom-0 left-0 right-0 h-[calc(64px+env(safe-area-inset-bottom))] bg-[#141413] border-t border-[#30302e] flex items-center justify-around px-2 z-50"
+          className="lg:hidden shrink-0 h-[calc(64px+env(safe-area-inset-bottom))] bg-[#141413] border-t border-[#30302e] flex items-center justify-around px-2 z-50 w-full"
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
           {['study', 'notes', 'chats', 'tracker'].map(tab => (
