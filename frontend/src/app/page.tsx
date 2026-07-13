@@ -135,6 +135,17 @@ export default function App() {
       setCurrentSpeakingVerseIndex(null);
     } else {
       if (bibleVerses.length === 0) return;
+      
+      // Unlock Audio context for mobile browsers (Safari/Chrome autoplay policy)
+      if (!audioRef.current) {
+        audioRef.current = new Audio();
+      }
+      // A silent base64 MP3 to trick the browser into allowing future programmatic play() calls
+      audioRef.current.src = 'data:audio/mp3;base64,//OwgAAAAAAAAAAAAA//NwgAAAAAAAAAAAAA';
+      audioRef.current.play().then(() => {
+        if (audioRef.current) audioRef.current.pause();
+      }).catch(e => console.log("Audio unlock silently failed", e));
+
       setIsSpeaking(true);
       isSpeakingRef.current = true;
       playVerse(0);
@@ -225,6 +236,7 @@ export default function App() {
       
       audioRef.current.play().catch(err => {
         console.error("Audio playback failed", err);
+        alert(`Audio cannot play! Browser error: ${err.message}. If you are on an older browser, it might not support the audio format.`);
         setIsSpeaking(false);
         isSpeakingRef.current = false;
         setCurrentSpeakingVerseIndex(null);
