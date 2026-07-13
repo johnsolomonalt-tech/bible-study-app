@@ -37,6 +37,9 @@ export default function App() {
   const [completedChapters, setCompletedChapters] = useState<string[]>([]);
   const [mobileStudyView, setMobileStudyView] = useState<'reader' | 'chapters' | 'ai'>('reader');
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const isSpeakingRef = useRef(false);
+  const [currentSpeakingVerseIndex, setCurrentSpeakingVerseIndex] = useState<number | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Notes State
   const [notes, setNotes] = useState<{id: number, title: string, content: string}[]>([]);
@@ -108,63 +111,83 @@ export default function App() {
       });
       
     // Cancel any ongoing speech when chapter changes
-    window.speechSynthesis.cancel();
-    setTimeout(() => setIsSpeaking(false), 0);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = '';
+    }
+    setTimeout(() => {
+      setIsSpeaking(false);
+      isSpeakingRef.current = false;
+      setCurrentSpeakingVerseIndex(null);
+    }, 0);
     return () => { isMounted = false; };
   }, [activeBook, activeChapter, translation]);
 
   // Audio Reader Toggle
   const toggleSpeech = () => {
     if (isSpeaking) {
-      window.speechSynthesis.cancel();
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+      }
       setIsSpeaking(false);
+      isSpeakingRef.current = false;
+      setCurrentSpeakingVerseIndex(null);
     } else {
-      const textToSpeak = bibleVerses.map(v => v.text).join(' ');
-      if (!textToSpeak) return;
-      const utterance = new SpeechSynthesisUtterance(textToSpeak);
-      
-      // Select a better voice
-      const voices = window.speechSynthesis.getVoices();
-      const preferredVoices = [
-        "Google UK English Male",
-        "Google UK English Female",
-        "Samantha",
-        "Daniel",
-        "Alex",
-        "Fiona",
-        "Moira",
-        "Karen"
-      ];
-      
-      // Try to find a premium/enhanced voice first, then fall back to preferred list
-      let selectedVoice = voices.find(v => v.name.includes('Premium') || v.name.includes('Enhanced') && v.lang.startsWith('en'));
-      
-      if (!selectedVoice) {
-        for (const pv of preferredVoices) {
-          const match = voices.find(v => v.name.includes(pv) && v.lang.startsWith('en'));
-          if (match) {
-            selectedVoice = match;
-            break;
-          }
-        }
-      }
-      
-      if (!selectedVoice) {
-         // Fallback to first English voice
-         selectedVoice = voices.find(v => v.lang.startsWith('en'));
-      }
-
-      if (selectedVoice) {
-        utterance.voice = selectedVoice;
-      }
-      
-      // Tweak pitch and rate to sound more natural/elegant and less robotic
-      utterance.pitch = 0.95;
-      utterance.rate = 0.9;
-      
-      utterance.onend = () => setIsSpeaking(false);
-      window.speechSynthesis.speak(utterance);
+      if (bibleVerses.length === 0) return;
       setIsSpeaking(true);
+      isSpeakingRef.current = true;
+      playVerse(0);
+    }
+  };
+
+  const playVerse = async (index: number) => {
+    // Check if we were stopped while playing
+    if (!isSpeakingRef.current && index !== 0) return;
+
+    if (index >= bibleVerses.length) {
+      setIsSpeaking(false);
+      isSpeakingRef.current = false;
+      setCurrentSpeakingVerseIndex(null);
+      return;
+    }
+    
+    setCurrentSpeakingVerseIndex(index);
+    const textToSpeak = bibleVerses[index].text;
+    
+    try {
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: textToSpeak })
+      });
+      
+      if (!res.ok) throw new Error('TTS failed');
+      
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      
+      if (!audioRef.current) {
+        audioRef.current = new Audio();
+      }
+      
+      audioRef.current.src = url;
+      audioRef.current.onended = () => {
+        playVerse(index + 1);
+      };
+      
+      audioRef.current.play().catch(err => {
+        console.error("Audio playback failed", err);
+        setIsSpeaking(false);
+        isSpeakingRef.current = false;
+        setCurrentSpeakingVerseIndex(null);
+      });
+      
+    } catch (err) {
+      console.error("TTS fetch error", err);
+      setIsSpeaking(false);
+      isSpeakingRef.current = false;
+      setCurrentSpeakingVerseIndex(null);
     }
   };
 
@@ -516,9 +539,9 @@ export default function App() {
                 <article className="max-w-3xl mx-auto">
                   <p className="font-serif text-[18px] leading-[1.8] text-[#faf9f5] whitespace-pre-wrap">
                     {bibleVerses.length > 0 ? (
-                      bibleVerses.map(v => (
-                        <span key={v.verse}>
-                          <sup className="text-[10px] font-sans font-semibold text-[#87867f] mr-1.5 opacity-80">{v.verse}</sup>
+                      bibleVerses.map((v, index) => (
+                        <span key={v.verse} className={`transition-colors duration-300 ${currentSpeakingVerseIndex === index ? 'text-[#c96442]' : ''}`}>
+                          <sup className={`text-[10px] font-sans font-semibold mr-1.5 opacity-80 ${currentSpeakingVerseIndex === index ? 'text-[#c96442]' : 'text-[#87867f]'}`}>{v.verse}</sup>
                           {v.text}
                         </span>
                       ))
