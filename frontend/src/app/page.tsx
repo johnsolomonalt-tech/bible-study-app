@@ -167,7 +167,7 @@ export default function App() {
     const textToSpeak = bibleVerses[index].text;
     
     try {
-      const hfUrl = 'https://api-inference.huggingface.co/models/espnet/kan-bayashi_ljspeech_vits';
+      const hfUrl = 'https://api-inference.huggingface.co/models/facebook/mms-tts-eng';
       const hfKey = process.env.NEXT_PUBLIC_HF_API_KEY;
       
       if (!hfKey) {
@@ -223,6 +223,16 @@ export default function App() {
       }
       
       const blob = await res.blob();
+      
+      if (blob.size < 1000 || blob.type.includes('json')) {
+        const text = await blob.text();
+        alert(`HF API returned weird data (size: ${blob.size}, type: ${blob.type}): ${text.substring(0, 100)}`);
+        setIsSpeaking(false);
+        isSpeakingRef.current = false;
+        setCurrentSpeakingVerseIndex(null);
+        return;
+      }
+
       const url = URL.createObjectURL(blob);
       
       if (!audioRef.current) {
