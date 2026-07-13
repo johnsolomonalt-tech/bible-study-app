@@ -126,24 +126,22 @@ export default function App() {
       });
       
     // Cancel any ongoing speech when chapter changes
+    setIsSpeaking(false);
+    isSpeakingRef.current = false;
+    setCurrentSpeakingVerseIndex(null);
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
-    setTimeout(() => {
-      setIsSpeaking(false);
-      isSpeakingRef.current = false;
-      setCurrentSpeakingVerseIndex(null);
-    }, 0);
     return () => { isMounted = false; };
   }, [activeBook, activeChapter, translation]);
 
   // Audio Reader Toggle
   const toggleSpeech = () => {
     if (isSpeaking) {
-      window.speechSynthesis.cancel();
       setIsSpeaking(false);
       isSpeakingRef.current = false;
       setCurrentSpeakingVerseIndex(null);
+      window.speechSynthesis.cancel();
     } else {
       if (bibleVerses.length === 0) return;
       window.speechSynthesis.cancel();
