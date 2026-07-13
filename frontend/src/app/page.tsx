@@ -156,13 +156,33 @@ export default function App() {
     const textToSpeak = bibleVerses[index].text;
     
     try {
-      const res = await fetch('/api/tts', {
+      let res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: textToSpeak })
       });
       
-      if (!res.ok) throw new Error('TTS failed');
+      // Handle Hugging Face model loading (503)
+      let retries = 4;
+      while (res.status === 503 && retries > 0) {
+        if (!isSpeakingRef.current) return;
+        console.log("Model loading, waiting 5 seconds...");
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        if (!isSpeakingRef.current) return;
+        res = await fetch('/api/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: textToSpeak })
+        });
+        retries--;
+      }
+      
+      if (res.status === 500) {
+        alert("Server Error! If you just added your API key, you MUST trigger a new deployment on Vercel for it to take effect.");
+        throw new Error('API Key missing or Server 500');
+      }
+
+      if (!res.ok) throw new Error(`TTS failed with status: ${res.status}`);
       
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
