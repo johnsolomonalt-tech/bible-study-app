@@ -165,6 +165,13 @@ export default function App() {
     });
   };
 
+  const handleRenameNoteSidebar = (id: number, oldTitle: string, content: string) => {
+    const newTitle = window.prompt('Rename note:', oldTitle);
+    if (!newTitle || newTitle === oldTitle) return;
+    updateNote(id, newTitle, content);
+  };
+
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim() || cooldown > 0) return;
@@ -739,16 +746,28 @@ export default function App() {
                     className={`group flex items-center justify-between w-full px-4 py-3 rounded-lg text-[14px] transition-colors mb-1 cursor-pointer ${activeNoteId === n.id ? 'bg-[#30302e] text-[#faf9f5] ring-shadow' : 'text-[#87867f] hover:bg-[#30302e] hover:text-[#faf9f5]'}`}
                   >
                     <span className="truncate pr-2">{n.title || 'Untitled Note'}</span>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteNote(n.id);
-                      }}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-[#5e5d59] hover:text-[#c96442] transition-colors shrink-0"
-                      title="Delete Note"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRenameNoteSidebar(n.id, n.title, n.content);
+                        }}
+                        className="p-1 text-[#5e5d59] hover:text-[#e4e1cf] transition-colors"
+                        title="Rename Note"
+                      >
+                        <Edit size={14} />
+                      </button>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteNote(n.id);
+                        }}
+                        className="p-1 text-[#5e5d59] hover:text-[#c96442] transition-colors"
+                        title="Delete Note"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
