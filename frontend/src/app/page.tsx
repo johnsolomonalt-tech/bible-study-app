@@ -3,7 +3,7 @@ const API_URL = '';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth, UserButton, SignIn } from '@clerk/nextjs';
-import { Send, Plus, Layout, Edit, Sparkles, Target, Check, ChevronRight, Trash2 } from 'lucide-react';
+import { Send, Plus, Layout, Edit, Sparkles, Target, Check, ChevronRight, ChevronLeft, Trash2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 // --- All 66 Books ---
@@ -34,6 +34,7 @@ export default function App() {
   const [translation, setTranslation] = useState("kjv");
   const [bibleVerses, setBibleVerses] = useState<{verse: number, text: string}[]>([]);
   const [completedChapters, setCompletedChapters] = useState<string[]>([]);
+  const [mobileStudyView, setMobileStudyView] = useState<'reader' | 'chapters' | 'ai'>('reader');
 
   // Notes State
   const [notes, setNotes] = useState<{id: number, title: string, content: string}[]>([]);
@@ -335,7 +336,7 @@ export default function App() {
         <div className="flex gap-4 items-center">
           <UserButton />
         </div>
-        <div className="flex gap-1.5 p-1.5 bg-[#30302e] rounded-xl ring-shadow">
+        <div className="hidden lg:flex gap-1.5 p-1.5 bg-[#30302e] rounded-xl ring-shadow">
           {['study', 'notes', 'chats', 'tracker'].map(tab => (
             <button 
               key={tab} 
@@ -354,13 +355,19 @@ export default function App() {
       </header>
       
       {/* Main Viewport */}
-      <main className="flex-1 overflow-hidden flex">
+      <main className="flex-1 overflow-hidden flex pb-[64px] lg:pb-0 relative">
         
         {/* STUDY TAB */}
         {activeTab === 'study' && (
           <div className="flex w-full h-full">
             {/* Left Sidebar: Navigation */}
-            <aside className="hidden md:flex flex-col w-[260px] border-r border-[#30302e] bg-[#141413]">
+            <aside className={`w-full lg:w-[260px] border-r border-[#30302e] bg-[#141413] flex-col ${mobileStudyView === 'chapters' ? 'flex' : 'hidden lg:flex'}`}>
+              <header className="lg:hidden h-[60px] border-b border-[#30302e] flex items-center px-4 shrink-0">
+                <button onClick={() => setMobileStudyView('reader')} className="p-2 mr-2 text-[#b0aea5] hover:text-[#faf9f5]">
+                  <ChevronLeft size={20} />
+                </button>
+                <span className="font-medium text-[#faf9f5]">Books</span>
+              </header>
               <div className="flex-1 overflow-y-auto custom-scroll p-3">
                 <div className="text-[11px] font-bold tracking-widest text-[#87867f] uppercase mb-3 ml-2 mt-2">Old Testament</div>
                 {OT_BOOKS.map(b => (
@@ -376,7 +383,7 @@ export default function App() {
                           <button 
                             key={i} 
                             onClick={() => { setActiveBook(b); setActiveChapter(i + 1); }}
-                            className={`text-xs py-1.5 rounded-md transition-colors ${isActive ? 'bg-[#c96442] text-white shadow-sm' : 'text-[#87867f] hover:bg-[#4d4c48] hover:text-[#faf9f5]'}`}
+                            className={`text-xs min-h-[44px] lg:min-h-0 py-2 lg:py-1.5 rounded-md transition-colors ${isActive ? 'bg-[#c96442] text-white shadow-sm' : 'text-[#87867f] hover:bg-[#4d4c48] hover:text-[#faf9f5]'}`}
                           >
                             {i + 1}
                           </button>
@@ -399,7 +406,7 @@ export default function App() {
                           <button 
                             key={i} 
                             onClick={() => { setActiveBook(b); setActiveChapter(i + 1); }}
-                            className={`text-xs py-1.5 rounded-md transition-colors ${isActive ? 'bg-[#c96442] text-white shadow-sm' : 'text-[#87867f] hover:bg-[#4d4c48] hover:text-[#faf9f5]'}`}
+                            className={`text-xs min-h-[44px] lg:min-h-0 py-2 lg:py-1.5 rounded-md transition-colors ${isActive ? 'bg-[#c96442] text-white shadow-sm' : 'text-[#87867f] hover:bg-[#4d4c48] hover:text-[#faf9f5]'}`}
                           >
                             {i + 1}
                           </button>
@@ -412,16 +419,27 @@ export default function App() {
             </aside>
 
             {/* Center: Bible Reader */}
-            <section className="flex-1 flex flex-col h-full bg-[#141413]">
-              <header className="h-[60px] border-b border-[#30302e] flex items-center justify-between px-6 bg-[#141413] shrink-0">
-                <div className="font-display text-[22px]">{activeBook.name} {activeChapter}</div>
-                <div className="flex items-center gap-4">
-                  <button onClick={toggleCompleted} className="flex items-center gap-2 text-[13px] font-medium px-3.5 py-2 rounded-lg bg-[#30302e] text-[#faf9f5] hover:bg-[#4d4c48] ring-shadow ring-shadow-hover transition-all">
+            <section className={`flex-1 flex-col h-full bg-[#141413] ${mobileStudyView === 'reader' ? 'flex' : 'hidden lg:flex'}`}>
+              <header className="h-[60px] border-b border-[#30302e] flex items-center justify-between px-4 lg:px-6 bg-[#141413] shrink-0">
+                <div className="flex items-center gap-1 lg:gap-2">
+                  <button onClick={() => setMobileStudyView('chapters')} className="lg:hidden p-2 text-[#b0aea5] hover:text-[#faf9f5]">
+                    <Layout size={20} />
+                  </button>
+                  <div className="font-display text-[18px] lg:text-[22px]">{activeBook.name} {activeChapter}</div>
+                </div>
+                <div className="flex items-center gap-2 lg:gap-4">
+                  <button onClick={() => setMobileStudyView('ai')} className="lg:hidden p-2 text-[#b0aea5] hover:text-[#faf9f5]">
+                    <Sparkles size={20} />
+                  </button>
+                  <button onClick={toggleCompleted} className="hidden lg:flex items-center gap-2 text-[13px] font-medium px-3.5 py-2 rounded-lg bg-[#30302e] text-[#faf9f5] hover:bg-[#4d4c48] ring-shadow ring-shadow-hover transition-all">
                     <Check size={16} className={isCompleted ? "text-[#c96442]" : "text-[#5e5d59]"} /> 
                     {isCompleted ? "Completed" : "Mark Complete"}
                   </button>
-                  <div className="h-6 w-px bg-[#30302e]"></div>
-                  <select value={translation} onChange={(e) => setTranslation(e.target.value)} className="bg-transparent text-sm font-medium text-[#b0aea5] hover:text-[#faf9f5] focus:outline-none cursor-pointer transition-colors">
+                  <button onClick={toggleCompleted} className="lg:hidden flex items-center justify-center p-2 rounded-lg bg-[#30302e] text-[#faf9f5]">
+                    <Check size={20} className={isCompleted ? "text-[#c96442]" : "text-[#5e5d59]"} /> 
+                  </button>
+                  <div className="hidden lg:block h-6 w-px bg-[#30302e]"></div>
+                  <select value={translation} onChange={(e) => setTranslation(e.target.value)} className="bg-transparent text-sm font-medium text-[#b0aea5] hover:text-[#faf9f5] focus:outline-none cursor-pointer transition-colors max-w-[60px] lg:max-w-none">
                     <option value="kjv" className="bg-[#30302e]">KJV</option>
                     <option value="web" className="bg-[#30302e]">WEB</option>
                     <option value="bbe" className="bg-[#30302e]">BBE</option>
@@ -459,9 +477,12 @@ export default function App() {
             </section>
 
             {/* Right Sidebar: Study AI */}
-            <aside className="hidden lg:flex flex-col w-[360px] border-l border-[#30302e] bg-[#141413]">
-              <header className="h-[60px] border-b border-[#30302e] flex items-center px-6 gap-2 text-[15px] font-medium text-[#faf9f5] shrink-0">
-                <Sparkles size={16} /> Study AI
+            <aside className={`w-full lg:w-[360px] border-l border-[#30302e] bg-[#141413] flex-col ${mobileStudyView === 'ai' ? 'flex' : 'hidden lg:flex'}`}>
+              <header className="h-[60px] border-b border-[#30302e] flex items-center px-4 lg:px-6 gap-2 text-[15px] font-medium text-[#faf9f5] shrink-0">
+                <button onClick={() => setMobileStudyView('reader')} className="lg:hidden p-2 mr-1 text-[#b0aea5] hover:text-[#faf9f5]">
+                  <ChevronLeft size={20} />
+                </button>
+                <Sparkles size={16} className="hidden lg:block" /> Study AI
               </header>
               <div className="flex-1 overflow-y-auto custom-scroll p-5 space-y-6">
                 {activeChat.messages.length === 0 ? (
@@ -521,7 +542,7 @@ export default function App() {
         {/* AI CHATS TAB */}
         {activeTab === 'chats' && (
           <div className="flex w-full h-full">
-            <aside className="w-[280px] border-r border-[#30302e] bg-[#141413] flex flex-col shrink-0">
+            <aside className={`w-full lg:w-[280px] border-r border-[#30302e] bg-[#141413] flex-col shrink-0 ${activeChatId ? 'hidden lg:flex' : 'flex'}`}>
               <header className="h-[60px] border-b border-[#30302e] flex items-center justify-between px-5 shrink-0">
                 <span className="text-[15px] font-medium text-[#faf9f5]">Conversations</span>
                 <button onClick={handleNewChat} className="p-2 text-[#b0aea5] hover:text-[#faf9f5] hover:bg-[#30302e] rounded-lg transition-colors"><Plus size={16} /></button>
@@ -540,7 +561,7 @@ export default function App() {
                           e.stopPropagation();
                           handleRenameChat(c.id, c.title);
                         }}
-                        className="p-1 text-[#5e5d59] hover:text-[#e4e1cf] transition-colors"
+                        className="p-2 lg:p-1 min-w-[44px] min-h-[44px] lg:min-w-0 lg:min-h-0 text-[#5e5d59] hover:text-[#e4e1cf] transition-colors"
                         title="Rename Conversation"
                       >
                         <Edit size={14} />
@@ -550,7 +571,7 @@ export default function App() {
                           e.stopPropagation();
                           handleDeleteChat(c.id);
                         }}
-                        className="p-1 text-[#5e5d59] hover:text-[#c96442] transition-colors"
+                        className="p-2 lg:p-1 min-w-[44px] min-h-[44px] lg:min-w-0 lg:min-h-0 text-[#5e5d59] hover:text-[#c96442] transition-colors"
                         title="Delete Conversation"
                       >
                         <Trash2 size={14} />
@@ -561,10 +582,13 @@ export default function App() {
               </div>
             </aside>
             
-            <section className="flex-1 flex flex-col bg-[#141413]">
+            <section className={`flex-1 flex-col bg-[#141413] ${activeChatId ? 'flex' : 'hidden lg:flex'}`}>
               {activeChatId ? (
                 <>
-                  <header className="h-[60px] border-b border-[#30302e] flex items-center px-8 shrink-0">
+                  <header className="h-[60px] border-b border-[#30302e] flex items-center px-4 lg:px-8 shrink-0">
+                    <button onClick={() => setActiveChatId(null)} className="lg:hidden p-2 mr-2 text-[#b0aea5] hover:text-[#faf9f5]">
+                      <ChevronLeft size={20} />
+                    </button>
                     <h2 className="text-[18px] font-medium">{activeChat.title}</h2>
                   </header>
                   <div className="flex-1 overflow-y-auto custom-scroll p-8 lg:p-12 space-y-8 flex flex-col">
@@ -669,7 +693,7 @@ export default function App() {
                             <button
                               key={i}
                               onClick={() => toggleAnyChapter(id)}
-                              className={`w-9 h-9 rounded-xl text-xs font-semibold flex items-center justify-center transition-all ${
+                              className={`w-11 h-11 lg:w-9 lg:h-9 rounded-xl text-xs font-semibold flex items-center justify-center transition-all ${
                                 isChecked 
                                   ? 'bg-[#c96442] text-white shadow-sm' 
                                   : 'bg-[#141413] text-[#87867f] hover:text-[#faf9f5] hover:bg-[#4d4c48]'
@@ -697,7 +721,7 @@ export default function App() {
                             <button
                               key={i}
                               onClick={() => toggleAnyChapter(id)}
-                              className={`w-9 h-9 rounded-xl text-xs font-semibold flex items-center justify-center transition-all ${
+                              className={`w-11 h-11 lg:w-9 lg:h-9 rounded-xl text-xs font-semibold flex items-center justify-center transition-all ${
                                 isChecked 
                                   ? 'bg-[#c96442] text-white shadow-sm' 
                                   : 'bg-[#141413] text-[#87867f] hover:text-[#faf9f5] hover:bg-[#4d4c48]'
@@ -719,7 +743,7 @@ export default function App() {
         {/* NOTES TAB */}
         {activeTab === 'notes' && (
           <div className="flex w-full h-full">
-            <aside className="w-[280px] border-r border-[#30302e] bg-[#141413] flex flex-col shrink-0">
+            <aside className={`w-full lg:w-[280px] border-r border-[#30302e] bg-[#141413] flex-col shrink-0 ${activeNoteId ? 'hidden lg:flex' : 'flex'}`}>
               <header className="h-[60px] border-b border-[#30302e] flex items-center justify-between px-5 shrink-0">
                 <span className="text-[15px] font-medium text-[#faf9f5]">Notebooks</span>
                 <button 
@@ -752,7 +776,7 @@ export default function App() {
                           e.stopPropagation();
                           handleRenameNoteSidebar(n.id, n.title, n.content);
                         }}
-                        className="p-1 text-[#5e5d59] hover:text-[#e4e1cf] transition-colors"
+                        className="p-2 lg:p-1 min-w-[44px] min-h-[44px] lg:min-w-0 lg:min-h-0 text-[#5e5d59] hover:text-[#e4e1cf] transition-colors"
                         title="Rename Note"
                       >
                         <Edit size={14} />
@@ -762,7 +786,7 @@ export default function App() {
                           e.stopPropagation();
                           handleDeleteNote(n.id);
                         }}
-                        className="p-1 text-[#5e5d59] hover:text-[#c96442] transition-colors"
+                        className="p-2 lg:p-1 min-w-[44px] min-h-[44px] lg:min-w-0 lg:min-h-0 text-[#5e5d59] hover:text-[#c96442] transition-colors"
                         title="Delete Note"
                       >
                         <Trash2 size={14} />
@@ -772,10 +796,13 @@ export default function App() {
                 ))}
               </div>
             </aside>
-            <section className="flex-1 flex flex-col bg-[#141413]">
+            <section className={`flex-1 flex-col bg-[#141413] ${activeNoteId ? 'flex' : 'hidden lg:flex'}`}>
               {activeNoteId ? (
                 <>
-                  <header className="h-[60px] border-b border-[#30302e] flex items-center px-8 shrink-0">
+                  <header className="h-[60px] border-b border-[#30302e] flex items-center px-4 lg:px-8 shrink-0">
+                    <button onClick={() => setActiveNoteId(null)} className="lg:hidden p-2 mr-2 text-[#b0aea5] hover:text-[#faf9f5]">
+                      <ChevronLeft size={20} />
+                    </button>
                     <input 
                       type="text" 
                       value={activeNote.title} 
@@ -801,7 +828,24 @@ export default function App() {
           </div>
         )}
       </main>
-    </div>
+        {/* Mobile Bottom Navigation */}
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 h-[64px] bg-[#141413] border-t border-[#30302e] flex items-center justify-around px-2 z-50 pb-safe">
+          {['study', 'notes', 'chats', 'tracker'].map(tab => (
+            <button 
+              key={tab} 
+              onClick={() => setActiveTab(tab)}
+              className={`flex flex-col items-center justify-center w-full h-full min-h-[44px] transition-colors ${activeTab === tab ? 'text-[#c96442]' : 'text-[#87867f] hover:text-[#faf9f5]'}`}
+            >
+              {tab === 'study' && <Layout size={20} className="mb-1" />}
+              {tab === 'notes' && <Edit size={20} className="mb-1" />}
+              {tab === 'chats' && <Sparkles size={20} className="mb-1" />}
+              {tab === 'tracker' && <Target size={20} className="mb-1" />}
+              <span className="text-[10px] font-medium capitalize">{tab === 'chats' ? 'AI Chats' : tab}</span>
+            </button>
+          ))}
+        </div>
+
+      </div>
     </>
   );
 }
