@@ -122,6 +122,46 @@ export default function App() {
       const textToSpeak = bibleVerses.map(v => v.text).join(' ');
       if (!textToSpeak) return;
       const utterance = new SpeechSynthesisUtterance(textToSpeak);
+      
+      // Select a better voice
+      const voices = window.speechSynthesis.getVoices();
+      const preferredVoices = [
+        "Google UK English Male",
+        "Google UK English Female",
+        "Samantha",
+        "Daniel",
+        "Alex",
+        "Fiona",
+        "Moira",
+        "Karen"
+      ];
+      
+      // Try to find a premium/enhanced voice first, then fall back to preferred list
+      let selectedVoice = voices.find(v => v.name.includes('Premium') || v.name.includes('Enhanced') && v.lang.startsWith('en'));
+      
+      if (!selectedVoice) {
+        for (const pv of preferredVoices) {
+          const match = voices.find(v => v.name.includes(pv) && v.lang.startsWith('en'));
+          if (match) {
+            selectedVoice = match;
+            break;
+          }
+        }
+      }
+      
+      if (!selectedVoice) {
+         // Fallback to first English voice
+         selectedVoice = voices.find(v => v.lang.startsWith('en'));
+      }
+
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+      }
+      
+      // Tweak pitch and rate to sound more natural/elegant and less robotic
+      utterance.pitch = 0.95;
+      utterance.rate = 0.9;
+      
       utterance.onend = () => setIsSpeaking(false);
       window.speechSynthesis.speak(utterance);
       setIsSpeaking(true);
