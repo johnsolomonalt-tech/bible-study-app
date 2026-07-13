@@ -17,6 +17,13 @@ const merriweather = Merriweather({
 export const metadata: Metadata = {
   title: "Theologica Study Workspace",
   description: "Bible app with AI chat and notes",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Theologica",
+  },
+  applicationName: "Theologica",
 };
 
 import type { Viewport } from 'next';
@@ -25,6 +32,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  themeColor: '#141413',
 };
 
 import { ClerkProvider } from '@clerk/nextjs'

@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth, UserButton, SignIn } from '@clerk/nextjs';
 import { Send, Plus, Layout, Edit, Sparkles, Target, Check, ChevronRight, ChevronLeft, Trash2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import PWAInstallPrompt from './PWAInstallPrompt';
 
 // --- All 66 Books ---
 const otStr = "Genesis:50,Exodus:40,Leviticus:27,Numbers:36,Deuteronomy:34,Joshua:24,Judges:21,Ruth:4,1 Samuel:31,2 Samuel:24,1 Kings:22,2 Kings:25,1 Chronicles:29,2 Chronicles:36,Ezra:10,Nehemiah:13,Esther:10,Job:42,Psalms:150,Proverbs:31,Ecclesiastes:12,Song of Solomon:8,Isaiah:66,Jeremiah:52,Lamentations:5,Ezekiel:48,Daniel:12,Hosea:14,Joel:3,Amos:9,Obadiah:1,Jonah:4,Micah:7,Nahum:3,Habakkuk:3,Zephaniah:3,Haggai:2,Zechariah:14,Malachi:4";
@@ -355,7 +356,7 @@ export default function App() {
       </header>
       
       {/* Main Viewport */}
-      <main className="flex-1 overflow-hidden flex pb-[64px] lg:pb-0 relative">
+      <main className="flex-1 overflow-hidden flex pb-[calc(64px+env(safe-area-inset-bottom))] lg:pb-0 relative">
         
         {/* STUDY TAB */}
         {activeTab === 'study' && (
@@ -829,7 +830,10 @@ export default function App() {
         )}
       </main>
         {/* Mobile Bottom Navigation */}
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 h-[64px] bg-[#141413] border-t border-[#30302e] flex items-center justify-around px-2 z-50 pb-safe">
+        <div 
+          className="lg:hidden fixed bottom-0 left-0 right-0 h-[calc(64px+env(safe-area-inset-bottom))] bg-[#141413] border-t border-[#30302e] flex items-center justify-around px-2 z-50"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        >
           {['study', 'notes', 'chats', 'tracker'].map(tab => (
             <button 
               key={tab} 
@@ -845,6 +849,7 @@ export default function App() {
           ))}
         </div>
 
+        <PWAInstallPrompt />
       </div>
     </>
   );
