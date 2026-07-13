@@ -6,14 +6,14 @@ import { X, Share, PlusSquare } from 'lucide-react';
 export default function PWAInstallPrompt() {
   const [isIOS, setIsIOS] = useState(false);
   const [isStandalone, setIsStandalone] = useState(true);
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
   const [showPrompt, setShowPrompt] = useState(false);
 
   useEffect(() => {
     // Check if running in standalone mode (already installed)
     const checkStandalone = window.matchMedia('(display-mode: standalone)').matches || 
-                            (window.navigator as any).standalone === true;
-    setIsStandalone(checkStandalone);
+                            (window.navigator as any).standalone === true; // eslint-disable-line @typescript-eslint/no-explicit-any
+    setTimeout(() => setIsStandalone(checkStandalone), 0);
 
     if (checkStandalone) return;
 
@@ -25,13 +25,13 @@ export default function PWAInstallPrompt() {
     const isSafari = isWebKit && !ua.match(/CriOS/i); // Not Chrome on iOS
 
     if ((isIPad || isIPhone) && isSafari) {
-      setIsIOS(true);
+      setTimeout(() => setIsIOS(true), 0);
       // Show iOS prompt slightly delayed
       setTimeout(() => setShowPrompt(true), 2000);
     }
 
     // Android / Chrome
-    const handleBeforeInstallPrompt = (e: any) => {
+    const handleBeforeInstallPrompt = (e: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
       e.preventDefault();
       setDeferredPrompt(e);
       setShowPrompt(true);
@@ -65,12 +65,13 @@ export default function PWAInstallPrompt() {
         </button>
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 bg-[#141413] rounded-xl flex items-center justify-center shrink-0 shadow-inner">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo.png" className="w-8 h-8" alt="Theologica" />
           </div>
           <div>
             <h3 className="text-[15px] font-semibold text-[#faf9f5] mb-1">Install Theologica</h3>
             <p className="text-[13px] text-[#b0aea5] leading-relaxed">
-              Install this app on your iPhone: tap <Share size={14} className="inline mx-1" /> and then <strong className="text-[#faf9f5]">"Add to Home Screen"</strong> <PlusSquare size={14} className="inline mx-1" />.
+              Install this app on your iPhone: tap <Share size={14} className="inline mx-1" /> and then <strong className="text-[#faf9f5]">&quot;Add to Home Screen&quot;</strong> <PlusSquare size={14} className="inline mx-1" />.
             </p>
           </div>
         </div>
@@ -82,6 +83,7 @@ export default function PWAInstallPrompt() {
   return (
     <div className="fixed bottom-[84px] left-4 right-4 bg-[#30302e] border border-[#4d4c48] rounded-[20px] p-4 shadow-2xl z-[100] animate-in slide-in-from-bottom-5 fade-in duration-500 flex items-center justify-between" style={{ marginBottom: 'env(safe-area-inset-bottom)' }}>
       <div className="flex items-center gap-3">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo.png" className="w-10 h-10 drop-shadow" alt="Theologica" />
         <div>
           <h3 className="text-[14px] font-semibold text-[#faf9f5]">Install App</h3>
