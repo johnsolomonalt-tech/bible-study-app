@@ -39,7 +39,8 @@ export default function App() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const isSpeakingRef = useRef(false);
   const [currentSpeakingVerseIndex, setCurrentSpeakingVerseIndex] = useState<number | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
 
   // Notes State
   const [notes, setNotes] = useState<{id: number, title: string, content: string}[]>([]);
@@ -111,9 +112,10 @@ export default function App() {
       });
       
     // Cancel any ongoing speech when chapter changes
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = '';
+    if (audioSourceRef.current) {
+      audioSourceRef.current.stop();
+      audioSourceRef.current.disconnect();
+      audioSourceRef.current = null;
     }
     setTimeout(() => {
       setIsSpeaking(false);
@@ -126,9 +128,10 @@ export default function App() {
   // Audio Reader Toggle
   const toggleSpeech = () => {
     if (isSpeaking) {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.src = '';
+      if (audioSourceRef.current) {
+        audioSourceRef.current.stop();
+        audioSourceRef.current.disconnect();
+        audioSourceRef.current = null;
       }
       setIsSpeaking(false);
       isSpeakingRef.current = false;
@@ -136,15 +139,16 @@ export default function App() {
     } else {
       if (bibleVerses.length === 0) return;
       
-      // Unlock Audio context for mobile browsers (Safari/Chrome autoplay policy)
-      if (!audioRef.current) {
-        audioRef.current = new Audio();
+      // Initialize AudioContext if not already created
+      if (!audioCtxRef.current) {
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        audioCtxRef.current = new AudioContextClass();
       }
-      // A silent base64 MP3 to trick the browser into allowing future programmatic play() calls
-      audioRef.current.src = 'data:audio/mp3;base64,//OwgAAAAAAAAAAAAA//NwgAAAAAAAAAAAAA';
-      audioRef.current.play().then(() => {
-        if (audioRef.current) audioRef.current.pause();
-      }).catch(e => console.log("Audio unlock silently failed", e));
+      
+      // Resume AudioContext inside the user interaction to unlock it
+      if (audioCtxRef.current.state === 'suspended') {
+        audioCtxRef.current.resume();
+      }
 
       setIsSpeaking(true);
       isSpeakingRef.current = true;
@@ -222,38 +226,34 @@ export default function App() {
         throw new Error(`TTS failed: ${errText}`);
       }
       
-      const blob = await res.blob();
+      const arrayBuffer = await res.arrayBuffer();
       
-      if (blob.size < 1000 || blob.type.includes('json')) {
-        const text = await blob.text();
-        alert(`HF API returned weird data (size: ${blob.size}, type: ${blob.type}): ${text.substring(0, 100)}`);
+      if (arrayBuffer.byteLength < 1000) {
+        const text = new TextDecoder().decode(arrayBuffer);
+        alert(`HF API returned weird data (size: ${arrayBuffer.byteLength}): ${text.substring(0, 100)}`);
         setIsSpeaking(false);
         isSpeakingRef.current = false;
         setCurrentSpeakingVerseIndex(null);
         return;
       }
 
-      const url = URL.createObjectURL(blob);
+      const audioBuffer = await audioCtxRef.current!.decodeAudioData(arrayBuffer);
+      const source = audioCtxRef.current!.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioCtxRef.current!.destination);
       
-      if (!audioRef.current) {
-        audioRef.current = new Audio();
-      }
-      
-      audioRef.current.src = url;
-      audioRef.current.onended = () => {
-        playVerse(index + 1);
+      source.onended = () => {
+        if (isSpeakingRef.current) {
+          playVerse(index + 1);
+        }
       };
       
-      audioRef.current.play().catch(err => {
-        console.error("Audio playback failed", err);
-        alert(`Audio cannot play! Browser error: ${err.message}. If you are on an older browser, it might not support the audio format.`);
-        setIsSpeaking(false);
-        isSpeakingRef.current = false;
-        setCurrentSpeakingVerseIndex(null);
-      });
+      audioSourceRef.current = source;
+      source.start(0);
       
-    } catch (err) {
-      console.error("TTS fetch error", err);
+    } catch (err: any) {
+      console.error("TTS fetch/decode error", err);
+      alert(`Audio decode failed! Browser error: ${err.message}.`);
       setIsSpeaking(false);
       isSpeakingRef.current = false;
       setCurrentSpeakingVerseIndex(null);
