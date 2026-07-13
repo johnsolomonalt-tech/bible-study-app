@@ -21,3 +21,23 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   });
   return NextResponse.json({ success: true });
 }
+
+export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const { userId } = await auth();
+  if (!userId) return new NextResponse('Unauthorized', { status: 401 });
+
+  const { title } = await req.json();
+
+  const chat = await prisma.chat.findUnique({
+    where: { id: parseInt(id), userId }
+  });
+  if (!chat) return new NextResponse('Forbidden', { status: 403 });
+
+  const updatedChat = await prisma.chat.update({
+    where: { id: parseInt(id), userId },
+    data: { title },
+  });
+
+  return NextResponse.json(updatedChat);
+}

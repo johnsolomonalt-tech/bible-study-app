@@ -143,6 +143,18 @@ export default function App() {
     });
   };
 
+  const handleRenameChat = async (id: number, oldTitle: string) => {
+    const newTitle = window.prompt('Rename conversation:', oldTitle);
+    if (!newTitle || newTitle === oldTitle) return;
+    setChats(prev => prev.map(c => c.id === id ? { ...c, title: newTitle } : c));
+    await fetchWithAuth(`${API_URL}/api/chats/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: newTitle })
+    });
+  };
+
+
   const handleDeleteNote = async (id: number) => {
     setNotes(prev => prev.filter(n => n.id !== id));
     if (activeNoteId === id) {
@@ -515,16 +527,28 @@ export default function App() {
                     className={`group flex items-center justify-between w-full px-4 py-3 rounded-lg text-[14px] transition-colors cursor-pointer ${activeChatId === c.id ? 'bg-[#30302e] text-[#faf9f5] ring-shadow' : 'text-[#87867f] hover:bg-[#30302e] hover:text-[#faf9f5]'}`}
                   >
                     <span className="truncate pr-2">{c.title}</span>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteChat(c.id);
-                      }}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-[#5e5d59] hover:text-[#c96442] transition-colors shrink-0"
-                      title="Delete Conversation"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRenameChat(c.id, c.title);
+                        }}
+                        className="p-1 text-[#5e5d59] hover:text-[#e4e1cf] transition-colors"
+                        title="Rename Conversation"
+                      >
+                        <Edit size={14} />
+                      </button>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteChat(c.id);
+                        }}
+                        className="p-1 text-[#5e5d59] hover:text-[#c96442] transition-colors"
+                        title="Delete Conversation"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
