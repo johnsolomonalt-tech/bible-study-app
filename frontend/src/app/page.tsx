@@ -39,8 +39,7 @@ export default function App() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const isSpeakingRef = useRef(false);
   const [currentSpeakingVerseIndex, setCurrentSpeakingVerseIndex] = useState<number | null>(null);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 
   // Notes State
   const [notes, setNotes] = useState<{id: number, title: string, content: string}[]>([]);
@@ -93,7 +92,22 @@ export default function App() {
     }
   }, [cooldown]);
 
-  // Fetch live Bible text
+  // Preload Voices for High-Quality TTS
+  useEffect(() => {
+    const loadVoices = () => {
+      const loadedVoices = window.speechSynthesis.getVoices();
+      if (loadedVoices.length > 0) {
+        setVoices(loadedVoices);
+      }
+    };
+    
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      loadVoices();
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+    }
+  }, []);
+
+  // Fetch Verses on Chapter Change
   useEffect(() => {
     let isMounted = true;
     fetch(`https://bible-api.com/${activeBook.name.toLowerCase().replace(/ /g, '')}+${activeChapter}?translation=${translation}`)
@@ -112,10 +126,8 @@ export default function App() {
       });
       
     // Cancel any ongoing speech when chapter changes
-    if (audioSourceRef.current) {
-      audioSourceRef.current.stop();
-      audioSourceRef.current.disconnect();
-      audioSourceRef.current = null;
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
     }
     setTimeout(() => {
       setIsSpeaking(false);
@@ -128,28 +140,13 @@ export default function App() {
   // Audio Reader Toggle
   const toggleSpeech = () => {
     if (isSpeaking) {
-      if (audioSourceRef.current) {
-        audioSourceRef.current.stop();
-        audioSourceRef.current.disconnect();
-        audioSourceRef.current = null;
-      }
+      window.speechSynthesis.cancel();
       setIsSpeaking(false);
       isSpeakingRef.current = false;
       setCurrentSpeakingVerseIndex(null);
     } else {
       if (bibleVerses.length === 0) return;
-      
-      // Initialize AudioContext if not already created
-      if (!audioCtxRef.current) {
-        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-        audioCtxRef.current = new AudioContextClass();
-      }
-      
-      // Resume AudioContext inside the user interaction to unlock it
-      if (audioCtxRef.current.state === 'suspended') {
-        audioCtxRef.current.resume();
-      }
-
+      window.speechSynthesis.cancel();
       setIsSpeaking(true);
       isSpeakingRef.current = true;
       playVerse(0);
@@ -170,81 +167,50 @@ export default function App() {
     setCurrentSpeakingVerseIndex(index);
     const textToSpeak = bibleVerses[index].text;
     
-    try {
-      let res = await fetch('/api/tts', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ text: textToSpeak })
-      });
-      
-      // Handle Hugging Face model loading (503)
-      let retries = 4;
-      while (res.status === 503 && retries > 0) {
-        if (!isSpeakingRef.current) return;
-        console.log("Model loading, waiting 5 seconds...");
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        if (!isSpeakingRef.current) return;
-        res = await fetch('/api/tts', {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ text: textToSpeak })
-        });
-        retries--;
-      }
-      
-      if (res.status === 500 || !res.ok) {
-        let errText = `Status: ${res.status}`;
-        try {
-          const errJson = await res.json();
-          errText = errJson.error || errText;
-        } catch(e) {
-          errText = await res.text().catch(() => errText);
-        }
-        
-        if (errText === 'VERCEL_ENV_MISSING') {
-          alert("Vercel definitely does NOT have your HF_API_KEY. Please double check that you saved it and hit Redeploy.");
-        } else {
-          alert(`TTS Error: ${errText}`);
-        }
-        throw new Error(`TTS failed: ${errText}`);
-      }
-      
-      const arrayBuffer = await res.arrayBuffer();
-      
-      if (arrayBuffer.byteLength < 1000) {
-        const text = new TextDecoder().decode(arrayBuffer);
-        alert(`HF API returned weird data (size: ${arrayBuffer.byteLength}): ${text.substring(0, 100)}`);
-        setIsSpeaking(false);
-        isSpeakingRef.current = false;
-        setCurrentSpeakingVerseIndex(null);
-        return;
-      }
-
-      const audioBuffer = await audioCtxRef.current!.decodeAudioData(arrayBuffer);
-      const source = audioCtxRef.current!.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(audioCtxRef.current!.destination);
-      
-      source.onended = () => {
-        if (isSpeakingRef.current) {
-          playVerse(index + 1);
-        }
-      };
-      
-      audioSourceRef.current = source;
-      source.start(0);
-      
-    } catch (err: any) {
-      console.error("TTS fetch/decode error", err);
-      alert(`Audio decode failed! Browser error: ${err.message}.`);
-      setIsSpeaking(false);
-      isSpeakingRef.current = false;
-      setCurrentSpeakingVerseIndex(null);
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    utterance.rate = 0.9; // Slightly slower for reverence
+    
+    // Select the best available premium voice
+    const preferredVoices = [
+      'Samantha',                 // macOS / iOS (excellent female voice)
+      'Siri Female',              // macOS / iOS
+      'Siri',                     // macOS / iOS
+      'Google UK English Female', // Android / Chrome
+      'Google US English',        // Android / Chrome
+      'Microsoft Zira',           // Windows Female
+      'Microsoft Mark'            // Windows Male
+    ];
+    
+    let selectedVoice = null;
+    for (const voiceName of preferredVoices) {
+      selectedVoice = voices.find(v => v.name.includes(voiceName) && v.lang.startsWith('en'));
+      if (selectedVoice) break;
     }
+    
+    // Fallback to any english voice if no premium voice is found
+    if (!selectedVoice) {
+      selectedVoice = voices.find(v => v.lang.startsWith('en')) || null;
+    }
+    
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+    }
+
+    utterance.onend = () => {
+      if (isSpeakingRef.current) {
+        playVerse(index + 1);
+      }
+    };
+    
+    utterance.onerror = (e) => {
+      console.error("Speech Synthesis Error", e);
+      // Try to gracefully continue on minor errors
+      if (isSpeakingRef.current) {
+         playVerse(index + 1);
+      }
+    };
+    
+    window.speechSynthesis.speak(utterance);
   };
 
   const updateNote = async (id: number, title: string, content: string) => {
