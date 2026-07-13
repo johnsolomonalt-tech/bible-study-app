@@ -156,10 +156,24 @@ export default function App() {
     const textToSpeak = bibleVerses[index].text;
     
     try {
-      let res = await fetch('/api/tts', {
+      const hfUrl = 'https://api-inference.huggingface.co/models/espnet/kan-bayashi_ljspeech_vits';
+      const hfKey = process.env.NEXT_PUBLIC_HF_API_KEY;
+      
+      if (!hfKey) {
+        alert("Missing NEXT_PUBLIC_HF_API_KEY! Please add it to Vercel and redeploy.");
+        setIsSpeaking(false);
+        isSpeakingRef.current = false;
+        setCurrentSpeakingVerseIndex(null);
+        return;
+      }
+
+      let res = await fetch(hfUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: textToSpeak })
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${hfKey}`
+        },
+        body: JSON.stringify({ inputs: textToSpeak })
       });
       
       // Handle Hugging Face model loading (503)
@@ -169,10 +183,13 @@ export default function App() {
         console.log("Model loading, waiting 5 seconds...");
         await new Promise(resolve => setTimeout(resolve, 5000));
         if (!isSpeakingRef.current) return;
-        res = await fetch('/api/tts', {
+        res = await fetch(hfUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: textToSpeak })
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${hfKey}`
+          },
+          body: JSON.stringify({ inputs: textToSpeak })
         });
         retries--;
       }
