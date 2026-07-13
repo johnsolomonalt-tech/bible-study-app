@@ -9,7 +9,7 @@ export async function POST(req: Request) {
     }
 
     step = "checking env";
-    const hfKey = process.env.HF_API_KEY;
+    const hfKey = process.env.HF_API_KEY?.trim();
     if (!hfKey) {
       return NextResponse.json({ error: 'VERCEL_ENV_MISSING' }, { status: 500 });
     }
