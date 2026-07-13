@@ -177,12 +177,22 @@ export default function App() {
         retries--;
       }
       
-      if (res.status === 500) {
-        alert("Server Error! If you just added your API key, you MUST trigger a new deployment on Vercel for it to take effect.");
-        throw new Error('API Key missing or Server 500');
+      if (res.status === 500 || !res.ok) {
+        let errText = `Status: ${res.status}`;
+        try {
+          const errJson = await res.json();
+          errText = errJson.error || errText;
+        } catch(e) {
+          errText = await res.text().catch(() => errText);
+        }
+        
+        if (errText === 'VERCEL_ENV_MISSING') {
+          alert("Vercel definitely does NOT have your HF_API_KEY. Please double check that you saved it and hit Redeploy.");
+        } else {
+          alert(`TTS Error: ${errText}`);
+        }
+        throw new Error(`TTS failed: ${errText}`);
       }
-
-      if (!res.ok) throw new Error(`TTS failed with status: ${res.status}`);
       
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);

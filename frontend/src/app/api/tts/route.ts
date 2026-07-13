@@ -9,7 +9,7 @@ export async function POST(req: Request) {
 
     const hfKey = process.env.HF_API_KEY;
     if (!hfKey) {
-      return NextResponse.json({ error: 'HF_API_KEY is not set' }, { status: 500 });
+      return NextResponse.json({ error: 'VERCEL_ENV_MISSING' }, { status: 500 });
     }
 
     const response = await fetch(
@@ -24,10 +24,9 @@ export async function POST(req: Request) {
     if (!response.ok) {
       const errorText = await response.text();
       console.error("HF API Error:", errorText);
-      return NextResponse.json({ error: 'Failed to fetch TTS from Hugging Face' }, { status: response.status });
+      return NextResponse.json({ error: `HF_API_ERROR: ${errorText}` }, { status: response.status });
     }
 
-    // Stream the audio blob directly back to the client
     const audioBuffer = await response.arrayBuffer();
     return new NextResponse(audioBuffer, {
       headers: {
@@ -35,8 +34,8 @@ export async function POST(req: Request) {
         'Cache-Control': 'public, max-age=31536000, immutable',
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("TTS Proxy Error:", error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ error: `SERVER_CRASH: ${error.message}` }, { status: 500 });
   }
 }
