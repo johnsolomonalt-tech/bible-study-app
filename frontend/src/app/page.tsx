@@ -611,7 +611,7 @@ export default function App() {
                   activeChat.messages.map((m, i) => (
                     <div key={i} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
                       {m.role === 'model' && <span className="text-[11px] text-[#87867f] mb-1.5 ml-1 font-semibold tracking-wide uppercase">Study AI</span>}
-                      <div className={`px-4 py-3 max-w-[90%] text-[14px] leading-relaxed ${
+                      <div className={`px-4 py-3 max-w-[95%] sm:max-w-[90%] text-[14px] leading-relaxed overflow-x-auto break-words ${
                         m.role === 'user' 
                         ? 'bg-[#c96442] text-white rounded-2xl rounded-br-sm shadow-sm' 
                         : 'bg-[#30302e] text-[#faf9f5] rounded-2xl rounded-bl-sm ring-1 ring-[#4d4c48] shadow-sm markdown-body'
