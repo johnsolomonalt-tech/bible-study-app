@@ -440,7 +440,7 @@ export default function App() {
           <div className="font-display text-[22px] tracking-tight text-[#c96442] flex items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/icon.png" alt="Theologica Logo" className="w-8 h-8 object-contain drop-shadow-md rounded-md" />
-            <span className="hidden sm:inline">Theologica</span>
+            <span className="inline">Theologica</span>
           </div>
         </div>
 
