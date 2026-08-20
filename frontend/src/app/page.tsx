@@ -3,8 +3,9 @@ const API_URL = '';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth, UserButton, SignIn } from '@clerk/nextjs';
-import { Send, Plus, Layout, Edit, Sparkles, Target, Check, ChevronRight, ChevronLeft, Trash2, Volume2, VolumeX } from 'lucide-react';
+import { Send, Plus, Layout, Edit, Sparkles, Target, Check, ChevronRight, ChevronLeft, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { getDevotionalForDay, DevotionalEntry } from '../lib/devotionals';
 import PWAInstallPrompt from './PWAInstallPrompt';
 
 // --- All 66 Books ---
@@ -27,8 +28,15 @@ export default function App() {
       }
     });
   }, [getToken]);
-  const [activeTab, setActiveTab] = useState('study'); // study, notes, chats, tracker
+  const [activeTab, setActiveTab] = useState('study'); // study, notes, chats, tracker, devotional
   
+  // Devotional State
+  const [dayOfYear, setDayOfYear] = useState(1);
+  const [devotionalTime, setDevotionalTime] = useState<'morning' | 'evening'>('morning');
+  const [devotionalEntry, setDevotionalEntry] = useState<DevotionalEntry | null>(null);
+  const [isDevoSpeaking, setIsDevoSpeaking] = useState(false);
+  const isDevoSpeakingRef = useRef(false);
+
   // Bible State
   const [activeBook, setActiveBook] = useState(OT_BOOKS[0]);
   const [activeChapter, setActiveChapter] = useState(1);
@@ -106,6 +114,78 @@ export default function App() {
       window.speechSynthesis.onvoiceschanged = loadVoices;
     }
   }, []);
+
+  // Timezone-Aware Day Calculation (America/Chicago)
+  useEffect(() => {
+    const calculateChicagoDayOfYear = () => {
+      const now = new Date();
+      const options: Intl.DateTimeFormatOptions = { timeZone: 'America/Chicago', year: 'numeric', month: 'numeric', day: 'numeric' };
+      const parts = new Intl.DateTimeFormat('en-US', options).formatToParts(now);
+      const tzYear = parseInt(parts.find(p => p.type === 'year')!.value);
+      const tzMonth = parseInt(parts.find(p => p.type === 'month')!.value);
+      const tzDay = parseInt(parts.find(p => p.type === 'day')!.value);
+      
+      const current = new Date(Date.UTC(tzYear, tzMonth - 1, tzDay));
+      const start = new Date(Date.UTC(tzYear, 0, 0));
+      const diff = current.getTime() - start.getTime();
+      const oneDay = 1000 * 60 * 60 * 24;
+      return Math.floor(diff / oneDay);
+    };
+
+    const doy = calculateChicagoDayOfYear();
+    setDayOfYear(doy);
+    setDevotionalEntry(getDevotionalForDay(doy));
+  }, []);
+
+  // Devotional TTS
+  useEffect(() => {
+    // Cancel devo speech if changing time of day or changing main tabs
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    setIsDevoSpeaking(false);
+    isDevoSpeakingRef.current = false;
+  }, [devotionalTime, activeTab]);
+
+  const toggleDevoSpeech = () => {
+    if (isDevoSpeaking) {
+      setIsDevoSpeaking(false);
+      isDevoSpeakingRef.current = false;
+      window.speechSynthesis.cancel();
+    } else {
+      if (!devotionalEntry) return;
+      window.speechSynthesis.cancel();
+      setIsDevoSpeaking(true);
+      isDevoSpeakingRef.current = true;
+      
+      const textToSpeak = devotionalTime === 'morning' 
+        ? `${devotionalEntry.morningVerse}. ${devotionalEntry.morningText}`
+        : `${devotionalEntry.eveningVerse}. ${devotionalEntry.eveningText}`;
+        
+      const utterance = new SpeechSynthesisUtterance(textToSpeak);
+      utterance.rate = 0.9;
+      
+      const preferredVoices = ['Samantha', 'Siri Female', 'Siri', 'Google UK English Female', 'Google US English', 'Microsoft Zira', 'Microsoft Mark'];
+      let selectedVoice = null;
+      for (const voiceName of preferredVoices) {
+        selectedVoice = voices.find(v => v.name.includes(voiceName) && v.lang.startsWith('en'));
+        if (selectedVoice) break;
+      }
+      if (!selectedVoice) selectedVoice = voices.find(v => v.lang.startsWith('en')) || null;
+      if (selectedVoice) utterance.voice = selectedVoice;
+
+      utterance.onend = () => {
+        setIsDevoSpeaking(false);
+        isDevoSpeakingRef.current = false;
+      };
+      utterance.onerror = () => {
+        setIsDevoSpeaking(false);
+        isDevoSpeakingRef.current = false;
+      };
+      
+      window.speechSynthesis.speak(utterance);
+    }
+  };
 
   // Fetch Verses on Chapter Change
   useEffect(() => {
@@ -446,13 +526,14 @@ export default function App() {
 
         {/* Center: Tabs (Desktop) */}
         <div className="hidden lg:flex absolute left-1/2 -translate-x-1/2 gap-1.5 p-1.5 bg-[#30302e] rounded-xl ring-shadow">
-          {['study', 'notes', 'chats', 'tracker'].map(tab => (
+          {['study', 'devotional', 'notes', 'chats', 'tracker'].map(tab => (
             <button 
               key={tab} 
               onClick={() => setActiveTab(tab)}
               className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${activeTab === tab ? 'bg-[#4d4c48] text-white shadow-sm' : 'text-[#87867f] hover:text-[#faf9f5]'}`}
             >
               {tab === 'study' && <Layout size={16} />}
+              {tab === 'devotional' && <BookOpen size={16} />}
               {tab === 'notes' && <Edit size={16} />}
               {tab === 'chats' && <Sparkles size={16} />}
               {tab === 'tracker' && <Target size={16} />}
@@ -653,6 +734,63 @@ export default function App() {
                 </div>
               </form>
             </aside>
+          </div>
+        )}
+
+        {/* DEVOTIONAL TAB */}
+        {activeTab === 'devotional' && (
+          <div className="flex-1 flex flex-col items-center overflow-y-auto custom-scroll p-4 lg:p-8 bg-[#141413]">
+            <div className="w-full max-w-2xl bg-[#141413]">
+              {/* Toggle switch */}
+              <div className="flex justify-center mb-8 shrink-0">
+                <div className="flex p-1 bg-[#30302e] rounded-full ring-shadow">
+                  <button 
+                    onClick={() => setDevotionalTime('morning')}
+                    className={`flex items-center gap-2 px-6 py-2 rounded-full text-sm font-medium transition-colors ${devotionalTime === 'morning' ? 'bg-[#c96442] text-white shadow-sm' : 'text-[#87867f] hover:text-[#faf9f5]'}`}
+                  >
+                    <Sun size={16} /> Morning
+                  </button>
+                  <button 
+                    onClick={() => setDevotionalTime('evening')}
+                    className={`flex items-center gap-2 px-6 py-2 rounded-full text-sm font-medium transition-colors ${devotionalTime === 'evening' ? 'bg-[#4d4c48] text-white shadow-sm' : 'text-[#87867f] hover:text-[#faf9f5]'}`}
+                  >
+                    <Moon size={16} /> Evening
+                  </button>
+                </div>
+              </div>
+
+              {/* Devotional Card */}
+              {devotionalEntry && (
+                <article className="border border-[#30302e] rounded-2xl p-6 lg:p-10 shadow-sm bg-[#141413] ring-shadow">
+                  <header className="flex justify-between items-start mb-6">
+                    <div>
+                      <h2 className="text-[#c96442] font-display text-2xl lg:text-3xl mb-2">
+                        {devotionalTime === 'morning' ? devotionalEntry.morningVerse : devotionalEntry.eveningVerse}
+                      </h2>
+                      <p className="text-[#87867f] text-sm uppercase tracking-widest font-bold">
+                        Day {devotionalEntry.dayOfYear} of 366
+                      </p>
+                    </div>
+                    <button 
+                      onClick={toggleDevoSpeech}
+                      className="p-3 bg-[#30302e] text-[#faf9f5] rounded-full hover:bg-[#4d4c48] transition-colors shrink-0 ring-shadow"
+                    >
+                      {isDevoSpeaking ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                    </button>
+                  </header>
+                  
+                  <div className="w-full h-px bg-[#30302e] mb-8" />
+                  
+                  <div className="text-[17px] leading-[1.8] text-[#faf9f5] font-serif mb-10 whitespace-pre-wrap">
+                    {devotionalTime === 'morning' ? devotionalEntry.morningText : devotionalEntry.eveningText}
+                  </div>
+                  
+                  <footer className="text-[#87867f] text-sm italic border-t border-[#30302e] pt-4">
+                    {devotionalEntry.citation}
+                  </footer>
+                </article>
+              )}
+            </div>
           </div>
         )}
 
@@ -950,13 +1088,14 @@ export default function App() {
           className="lg:hidden shrink-0 h-[calc(64px+env(safe-area-inset-bottom))] bg-[#141413] border-t border-[#30302e] flex items-center justify-around px-2 z-50 w-full"
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
-          {['study', 'notes', 'chats', 'tracker'].map(tab => (
+          {['study', 'devotional', 'notes', 'chats', 'tracker'].map(tab => (
             <button 
               key={tab} 
               onClick={() => setActiveTab(tab)}
               className={`flex flex-col items-center justify-center w-full h-full min-h-[44px] transition-colors ${activeTab === tab ? 'text-[#c96442]' : 'text-[#87867f] hover:text-[#faf9f5]'}`}
             >
               {tab === 'study' && <Layout size={20} className="mb-1" />}
+              {tab === 'devotional' && <BookOpen size={20} className="mb-1" />}
               {tab === 'notes' && <Edit size={20} className="mb-1" />}
               {tab === 'chats' && <Sparkles size={20} className="mb-1" />}
               {tab === 'tracker' && <Target size={20} className="mb-1" />}
