@@ -31,7 +31,8 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('study'); // study, notes, chats, tracker, devotional
   
   // Devotional State
-  const [dayOfYear, setDayOfYear] = useState(1);
+  const [displayDay, setDisplayDay] = useState(1);
+  const [totalDays, setTotalDays] = useState(365);
   const [devotionalTime, setDevotionalTime] = useState<'morning' | 'evening'>('morning');
   const [devotionalEntry, setDevotionalEntry] = useState<DevotionalEntry | null>(null);
   const [isDevoSpeaking, setIsDevoSpeaking] = useState(false);
@@ -117,24 +118,33 @@ export default function App() {
 
   // Timezone-Aware Day Calculation (America/Chicago)
   useEffect(() => {
-    const calculateChicagoDayOfYear = () => {
-      const now = new Date();
-      const options: Intl.DateTimeFormatOptions = { timeZone: 'America/Chicago', year: 'numeric', month: 'numeric', day: 'numeric' };
-      const parts = new Intl.DateTimeFormat('en-US', options).formatToParts(now);
-      const tzYear = parseInt(parts.find(p => p.type === 'year')!.value);
-      const tzMonth = parseInt(parts.find(p => p.type === 'month')!.value);
-      const tzDay = parseInt(parts.find(p => p.type === 'day')!.value);
-      
-      const current = new Date(Date.UTC(tzYear, tzMonth - 1, tzDay));
-      const start = new Date(Date.UTC(tzYear, 0, 0));
-      const diff = current.getTime() - start.getTime();
-      const oneDay = 1000 * 60 * 60 * 24;
-      return Math.floor(diff / oneDay);
-    };
+    const now = new Date();
+    const options: Intl.DateTimeFormatOptions = { timeZone: 'America/Chicago', year: 'numeric', month: 'numeric', day: 'numeric' };
+    const parts = new Intl.DateTimeFormat('en-US', options).formatToParts(now);
+    const tzYear = parseInt(parts.find(p => p.type === 'year')!.value);
+    const tzMonth = parseInt(parts.find(p => p.type === 'month')!.value);
+    const tzDay = parseInt(parts.find(p => p.type === 'day')!.value);
+    
+    // 1. Calculate actual day of the year for UI display
+    const current = new Date(Date.UTC(tzYear, tzMonth - 1, tzDay));
+    const start = new Date(Date.UTC(tzYear, 0, 0));
+    const actualDiff = current.getTime() - start.getTime();
+    const actualDoy = Math.floor(actualDiff / (1000 * 60 * 60 * 24));
+    
+    // 2. Calculate leap-year-aligned day to perfectly map to our 366-day dataset
+    const leapDaysInMonth = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    let alignedDoy = 0;
+    for (let i = 0; i < tzMonth - 1; i++) {
+      alignedDoy += leapDaysInMonth[i];
+    }
+    alignedDoy += tzDay;
 
-    const doy = calculateChicagoDayOfYear();
-    setDayOfYear(doy);
-    setDevotionalEntry(getDevotionalForDay(doy));
+    // Check if current year is a leap year for UI total
+    const isLeapYear = (tzYear % 4 === 0 && tzYear % 100 !== 0) || (tzYear % 400 === 0);
+    
+    setDisplayDay(actualDoy);
+    setTotalDays(isLeapYear ? 366 : 365);
+    setDevotionalEntry(getDevotionalForDay(alignedDoy));
   }, []);
 
   // Devotional TTS
@@ -768,7 +778,7 @@ export default function App() {
                         {devotionalTime === 'morning' ? devotionalEntry.morningVerse : devotionalEntry.eveningVerse}
                       </h2>
                       <p className="text-[#87867f] text-sm uppercase tracking-widest font-bold">
-                        Day {dayOfYear} of 366
+                        Day {displayDay} of {totalDays}
                       </p>
                     </div>
                     <button 
