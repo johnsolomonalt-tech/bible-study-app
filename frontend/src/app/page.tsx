@@ -3,10 +3,12 @@ const API_URL = '';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth, UserButton, SignIn } from '@clerk/nextjs';
-import { Send, Plus, Layout, Edit, Sparkles, Target, Check, ChevronRight, ChevronLeft, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen } from 'lucide-react';
+import { Send, Plus, Layout, Edit, Sparkles, Target, Check, ChevronRight, ChevronLeft, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { getDevotionalForDay, DevotionalEntry } from '../lib/devotionals';
 import PWAInstallPrompt from './PWAInstallPrompt';
+import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from 'react-resizable-panels';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // --- All 66 Books ---
 const otStr = "Genesis:50,Exodus:40,Leviticus:27,Numbers:36,Deuteronomy:34,Joshua:24,Judges:21,Ruth:4,1 Samuel:31,2 Samuel:24,1 Kings:22,2 Kings:25,1 Chronicles:29,2 Chronicles:36,Ezra:10,Nehemiah:13,Esther:10,Job:42,Psalms:150,Proverbs:31,Ecclesiastes:12,Song of Solomon:8,Isaiah:66,Jeremiah:52,Lamentations:5,Ezekiel:48,Daniel:12,Hosea:14,Joel:3,Amos:9,Obadiah:1,Jonah:4,Micah:7,Nahum:3,Habakkuk:3,Zephaniah:3,Haggai:2,Zechariah:14,Malachi:4";
@@ -564,9 +566,9 @@ export default function App() {
         
         {/* STUDY TAB */}
         {activeTab === 'study' && (
-          <div className="flex w-full h-full">
+          <PanelGroup orientation="horizontal" className="flex w-full h-full">
             {/* Left Sidebar: Navigation */}
-            <aside className={`w-full lg:w-[260px] border-r border-[#30302e] bg-[#141413] flex-col ${mobileStudyView === 'chapters' ? 'flex' : 'hidden lg:flex'}`}>
+            <Panel defaultSize={20} minSize={15} maxSize={40} className={`w-full lg:w-auto border-r border-[#30302e] bg-[#141413] flex-col ${mobileStudyView === 'chapters' ? 'flex' : 'hidden lg:flex'}`}>
               <header className="lg:hidden h-[60px] border-b border-[#30302e] flex items-center px-4 shrink-0">
                 <button onClick={() => setMobileStudyView('reader')} className="p-2 mr-2 text-[#b0aea5] hover:text-[#faf9f5]">
                   <ChevronLeft size={20} />
@@ -621,11 +623,15 @@ export default function App() {
                   </details>
                 ))}
               </div>
-            </aside>
+            </Panel>
+
+            <PanelResizeHandle className="hidden lg:flex w-1 bg-transparent hover:bg-[#c96442] active:bg-[#c96442] transition-colors cursor-col-resize shrink-0 z-10 relative" />
 
             {/* Center: Bible Reader */}
-            <section className={`flex-1 flex-col h-full bg-[#141413] ${mobileStudyView === 'reader' ? 'flex' : 'hidden lg:flex'}`}>
-              <header className="h-[60px] border-b border-[#30302e] flex items-center justify-between px-4 lg:px-6 bg-[#141413] shrink-0">
+            <Panel defaultSize={55} minSize={30} className={`flex-1 flex-col h-full bg-[#141413] ${mobileStudyView === 'reader' ? 'flex' : 'hidden lg:flex'}`}>
+              <PanelGroup orientation="vertical">
+                <Panel defaultSize={75} minSize={40} className="flex flex-col relative">
+                  <header className="h-[60px] border-b border-[#30302e] flex items-center justify-between px-4 lg:px-6 bg-[#141413] shrink-0">
                 <div className="flex items-center gap-1 lg:gap-2">
                   <button onClick={() => setMobileStudyView('chapters')} className="lg:hidden p-2 text-[#b0aea5] hover:text-[#faf9f5]">
                     <Layout size={20} />
@@ -670,8 +676,12 @@ export default function App() {
                   </p>
                 </article>
               </div>
+                </Panel>
+                
+                <PanelResizeHandle className="h-1 bg-[#30302e] hover:bg-[#c96442] active:bg-[#c96442] transition-colors cursor-row-resize shrink-0 z-10 w-full" />
+
               {/* Quick Note Split */}
-              <div className="h-[220px] border-t border-[#30302e] bg-[#141413] flex flex-col shrink-0">
+                <Panel defaultSize={25} minSize={10} maxSize={60} className="border-t border-[#30302e] bg-[#141413] flex flex-col shrink-0">
                 <div className="h-10 border-b border-[#30302e] flex items-center px-6 text-[11px] font-bold text-[#87867f] uppercase tracking-widest">
                   Quick Note — {chapterTitle}
                 </div>
@@ -681,11 +691,14 @@ export default function App() {
                   value={chapterNote ? chapterNote.content : ''}
                   onChange={handleQuickNoteChange}
                 />
-              </div>
-            </section>
+                </Panel>
+              </PanelGroup>
+            </Panel>
+
+            <PanelResizeHandle className="hidden lg:flex w-1 bg-transparent hover:bg-[#c96442] active:bg-[#c96442] transition-colors cursor-col-resize shrink-0 z-10 relative" />
 
             {/* Right Sidebar: Study AI */}
-            <aside className={`w-full lg:w-[360px] border-l border-[#30302e] bg-[#141413] flex-col ${mobileStudyView === 'ai' ? 'flex' : 'hidden lg:flex'}`}>
+            <Panel defaultSize={25} minSize={20} maxSize={50} className={`w-full lg:w-auto border-l border-[#30302e] bg-[#141413] flex-col ${mobileStudyView === 'ai' ? 'flex' : 'hidden lg:flex'}`}>
               <header className="h-[60px] border-b border-[#30302e] flex items-center px-4 lg:px-6 gap-2 text-[15px] font-medium text-[#faf9f5] shrink-0">
                 <button onClick={() => setMobileStudyView('reader')} className="lg:hidden p-2 mr-1 text-[#b0aea5] hover:text-[#faf9f5]">
                   <ChevronLeft size={20} />
@@ -743,8 +756,8 @@ export default function App() {
                   </button>
                 </div>
               </form>
-            </aside>
-          </div>
+            </Panel>
+          </PanelGroup>
         )}
 
         {/* DEVOTIONAL TAB */}
@@ -762,7 +775,7 @@ export default function App() {
                   </button>
                   <button 
                     onClick={() => setDevotionalTime('evening')}
-                    className={`flex items-center gap-2 px-6 py-2 rounded-full text-sm font-medium transition-colors ${devotionalTime === 'evening' ? 'bg-[#4d4c48] text-white shadow-sm' : 'text-[#87867f] hover:text-[#faf9f5]'}`}
+                    className={`flex items-center gap-2 px-6 py-2 rounded-full text-sm font-medium transition-colors ${devotionalTime === 'evening' ? 'bg-[#c96442] text-white shadow-sm' : 'text-[#87867f] hover:text-[#faf9f5]'}`}
                   >
                     <Moon size={16} /> Evening
                   </button>
@@ -771,33 +784,43 @@ export default function App() {
 
               {/* Devotional Card */}
               {devotionalEntry && (
-                <article className="border border-[#30302e] rounded-2xl p-6 lg:p-10 shadow-sm bg-[#141413] ring-shadow">
-                  <header className="flex justify-between items-start mb-6">
-                    <div>
-                      <h2 className="text-[#c96442] font-display text-2xl lg:text-3xl mb-2">
-                        {devotionalTime === 'morning' ? devotionalEntry.morningVerse : devotionalEntry.eveningVerse}
-                      </h2>
-                      <p className="text-[#87867f] text-sm uppercase tracking-widest font-bold">
-                        Day {displayDay} of {totalDays}
-                      </p>
-                    </div>
-                    <button 
-                      onClick={toggleDevoSpeech}
-                      className="p-3 bg-[#30302e] text-[#faf9f5] rounded-full hover:bg-[#4d4c48] transition-colors shrink-0 ring-shadow"
+                <article className="border border-[#30302e] rounded-2xl p-6 lg:p-10 shadow-sm bg-[#141413] ring-shadow overflow-hidden">
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={devotionalTime}
+                      initial={{ x: devotionalTime === 'morning' ? -20 : 20, opacity: 0 }}
+                      animate={{ x: 0, opacity: 1 }}
+                      exit={{ x: devotionalTime === 'morning' ? 20 : -20, opacity: 0 }}
+                      transition={{ duration: 0.3, ease: "easeInOut" }}
                     >
-                      {isDevoSpeaking ? <VolumeX size={20} /> : <Volume2 size={20} />}
-                    </button>
-                  </header>
-                  
-                  <div className="w-full h-px bg-[#30302e] mb-8" />
-                  
-                  <div className="text-[17px] leading-[1.8] text-[#faf9f5] font-serif mb-10 whitespace-pre-wrap">
-                    {devotionalTime === 'morning' ? devotionalEntry.morningText : devotionalEntry.eveningText}
-                  </div>
-                  
-                  <footer className="text-[#87867f] text-sm italic border-t border-[#30302e] pt-4">
-                    {devotionalEntry.citation}
-                  </footer>
+                      <header className="flex justify-between items-start mb-6">
+                        <div>
+                          <h2 className="text-[#c96442] font-display text-2xl lg:text-3xl mb-2">
+                            {devotionalTime === 'morning' ? devotionalEntry.morningVerse : devotionalEntry.eveningVerse}
+                          </h2>
+                          <p className="text-[#87867f] text-sm uppercase tracking-widest font-bold">
+                            Day {displayDay} of {totalDays}
+                          </p>
+                        </div>
+                        <button 
+                          onClick={toggleDevoSpeech}
+                          className="p-3 bg-[#30302e] text-[#faf9f5] rounded-full hover:bg-[#4d4c48] transition-colors shrink-0 ring-shadow"
+                        >
+                          {isDevoSpeaking ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                        </button>
+                      </header>
+                      
+                      <div className="w-full h-px bg-[#30302e] mb-8" />
+                      
+                      <div className="text-[17px] leading-[1.8] text-[#faf9f5] font-serif mb-10 whitespace-pre-wrap">
+                        {devotionalTime === 'morning' ? devotionalEntry.morningText : devotionalEntry.eveningText}
+                      </div>
+                      
+                      <footer className="text-[#87867f] text-sm italic border-t border-[#30302e] pt-4">
+                        {devotionalEntry.citation}
+                      </footer>
+                    </motion.div>
+                  </AnimatePresence>
                 </article>
               )}
             </div>
