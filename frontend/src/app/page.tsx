@@ -768,7 +768,7 @@ export default function App() {
                         {devotionalTime === 'morning' ? devotionalEntry.morningVerse : devotionalEntry.eveningVerse}
                       </h2>
                       <p className="text-[#87867f] text-sm uppercase tracking-widest font-bold">
-                        Day {devotionalEntry.dayOfYear} of 366
+                        Day {dayOfYear} of 366
                       </p>
                     </div>
                     <button 
