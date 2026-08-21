@@ -566,9 +566,9 @@ export default function App() {
         
         {/* STUDY TAB */}
         {activeTab === 'study' && (
-          <PanelGroup orientation="horizontal" className="flex w-full h-full">
+          <PanelGroup orientation="horizontal" id="theologica-layout" className="flex w-full h-full">
             {/* Left Sidebar: Navigation */}
-            <Panel defaultSize={20} minSize={15} maxSize={40} className={`w-full lg:w-auto border-r border-[#30302e] bg-[#141413] flex-col ${mobileStudyView === 'chapters' ? 'flex' : 'hidden lg:flex'}`}>
+            <Panel defaultSize={18} minSize={10} maxSize={40} className={`w-full lg:w-auto border-r border-[#30302e] bg-[#141413] flex-col ${mobileStudyView === 'chapters' ? 'flex' : 'hidden lg:flex'}`}>
               <header className="lg:hidden h-[60px] border-b border-[#30302e] flex items-center px-4 shrink-0">
                 <button onClick={() => setMobileStudyView('reader')} className="p-2 mr-2 text-[#b0aea5] hover:text-[#faf9f5]">
                   <ChevronLeft size={20} />
@@ -628,7 +628,7 @@ export default function App() {
             <PanelResizeHandle className="hidden lg:flex w-1 bg-transparent hover:bg-[#c96442] active:bg-[#c96442] transition-colors cursor-col-resize shrink-0 z-10 relative" />
 
             {/* Center: Bible Reader */}
-            <Panel defaultSize={55} minSize={30} className={`flex-1 flex-col h-full bg-[#141413] ${mobileStudyView === 'reader' ? 'flex' : 'hidden lg:flex'}`}>
+            <Panel defaultSize={57} minSize={30} className={`flex-1 flex-col h-full bg-[#141413] ${mobileStudyView === 'reader' ? 'flex' : 'hidden lg:flex'}`}>
               <PanelGroup orientation="vertical">
                 <Panel defaultSize={75} minSize={40} className="flex flex-col relative">
                   <header className="h-[60px] border-b border-[#30302e] flex items-center justify-between px-4 lg:px-6 bg-[#141413] shrink-0">
@@ -785,13 +785,13 @@ export default function App() {
               {/* Devotional Card */}
               {devotionalEntry && (
                 <article className="border border-[#30302e] rounded-2xl p-6 lg:p-10 shadow-sm bg-[#141413] ring-shadow overflow-hidden">
-                  <AnimatePresence mode="wait">
+                  <AnimatePresence mode="popLayout" initial={false}>
                     <motion.div
                       key={devotionalTime}
-                      initial={{ x: devotionalTime === 'morning' ? -20 : 20, opacity: 0 }}
+                      initial={{ x: devotionalTime === 'morning' ? -100 : 100, opacity: 0 }}
                       animate={{ x: 0, opacity: 1 }}
-                      exit={{ x: devotionalTime === 'morning' ? 20 : -20, opacity: 0 }}
-                      transition={{ duration: 0.3, ease: "easeInOut" }}
+                      exit={{ x: devotionalTime === 'morning' ? -100 : 100, opacity: 0 }}
+                      transition={{ duration: 0.4, ease: "easeInOut" }}
                     >
                       <header className="flex justify-between items-start mb-6">
                         <div>
