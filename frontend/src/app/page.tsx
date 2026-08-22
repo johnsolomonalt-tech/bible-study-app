@@ -628,7 +628,7 @@ export default function App() {
             <PanelResizeHandle className="hidden lg:flex w-1 bg-transparent hover:bg-[#c96442] active:bg-[#c96442] transition-colors cursor-col-resize shrink-0 z-10 relative" />
 
             {/* Center: Bible Reader */}
-            <Panel defaultSize={57} minSize={30} className={`flex-1 flex-col h-full bg-[#141413] ${mobileStudyView === 'reader' ? 'flex' : 'hidden lg:flex'}`}>
+            <Panel defaultSize={57} minSize={30} className={`w-full lg:w-auto flex-col h-full bg-[#141413] ${mobileStudyView === 'reader' ? 'flex' : 'hidden lg:flex'}`}>
               <PanelGroup orientation="vertical">
                 <Panel defaultSize={75} minSize={40} className="flex flex-col relative">
                   <header className="h-[60px] border-b border-[#30302e] flex items-center justify-between px-4 lg:px-6 bg-[#141413] shrink-0">
