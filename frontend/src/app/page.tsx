@@ -19,6 +19,19 @@ const OT_BOOKS = otStr.split(',').map(s => { const [n, c] = s.split(':'); return
 const NT_BOOKS = ntStr.split(',').map(s => { const [n, c] = s.split(':'); return { name: n, chapters: parseInt(c) }; });
 
 export default function App() {
+  useEffect(() => {
+    const handleGlobalClick = (e: MouseEvent) => {
+      // Small timeout to allow the toolbar buttons to fire their click handlers first
+      setTimeout(() => {
+        const selection = window.getSelection();
+        if (!selection || selection.isCollapsed) {
+          setToolbarPosition(null);
+        }
+      }, 50);
+    };
+    document.addEventListener('mousedown', handleGlobalClick);
+    return () => document.removeEventListener('mousedown', handleGlobalClick);
+  }, []);
   const { getToken } = useAuth();
   
   const fetchWithAuth = useCallback(async (url: string, options: RequestInit = {}) => {
@@ -42,6 +55,11 @@ export default function App() {
   const isDevoSpeakingRef = useRef(false);
 
   // Bible State
+  const [highlights, setHighlights] = useState<{id: number, book: string, chapter: number, verse: number, text: string, color: string}[]>([]);
+  const [selectionRange, setSelectionRange] = useState<Range | null>(null);
+  const [selectionVerse, setSelectionVerse] = useState<number | null>(null);
+  const [toolbarPosition, setToolbarPosition] = useState<{x: number, y: number} | null>(null);
+  
   const [activeBook, setActiveBook] = useState(OT_BOOKS[0]);
   const [activeChapter, setActiveChapter] = useState(1);
   const [translation, setTranslation] = useState("kjv");
@@ -94,6 +112,145 @@ export default function App() {
 
   const activeNote = notes.find(n => n.id === activeNoteId) || { id: 0, title: 'No Note Selected', content: '' };
   const activeChat = chats.find(c => c.id === activeChatId) || { id: 0, title: 'No Conversation Selected', messages: [] };
+
+
+  // Highlighting Logic
+  const handleSelection = useCallback(() => {
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed) {
+      setToolbarPosition(null);
+      return;
+    }
+    const range = selection.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+    
+    // Find the verse this selection belongs to by looking at parent elements
+    let verseNumber = null;
+    let node = range.startContainer.parentNode;
+    while (node && node !== document.body) {
+      if (node instanceof HTMLElement && node.getAttribute('data-verse')) {
+        verseNumber = parseInt(node.getAttribute('data-verse')!, 10);
+        break;
+      }
+      node = node.parentNode;
+    }
+    
+    if (verseNumber) {
+      setSelectionRange(range);
+      setSelectionVerse(verseNumber);
+      setToolbarPosition({
+        x: rect.left + rect.width / 2,
+        y: rect.top - 40 // 40px above
+      });
+    } else {
+      setToolbarPosition(null);
+    }
+  }, []);
+
+  const saveHighlight = async (color: string) => {
+    if (!selectionRange || !selectionVerse) return;
+    
+    const text = selectionRange.toString();
+    const verse = selectionVerse;
+    const book = activeBook.name;
+    const chapter = activeChapter;
+
+    // Optimistic UI update
+    const tempId = Date.now();
+    const newHighlight = { id: tempId, book, chapter, verse, text, color };
+    setHighlights(prev => [...prev, newHighlight]);
+    setToolbarPosition(null);
+    window.getSelection()?.removeAllRanges();
+
+    try {
+      const res = await fetchWithAuth(`${API_URL}/api/highlights`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ book, chapter, verse, text, color })
+      });
+      const data = await res.json();
+      setHighlights(prev => prev.map(h => h.id === tempId ? data : h));
+    } catch (e) {
+      setHighlights(prev => prev.filter(h => h.id !== tempId));
+      console.error("Failed to save highlight", e);
+    }
+  };
+
+  const deleteHighlight = async (id: number) => {
+    setHighlights(prev => prev.filter(h => h.id !== id));
+    try {
+      await fetchWithAuth(`${API_URL}/api/highlights/${id}`, { method: 'DELETE' });
+    } catch (e) {
+      console.error("Failed to delete highlight", e);
+    }
+  };
+
+  const askAiAboutHighlight = () => {
+    if (!selectionRange || !selectionVerse) return;
+    const text = selectionRange.toString();
+    const query = `What does "${text}" mean in verse ${selectionVerse} of ${activeBook.name} ${activeChapter}?`;
+    
+    // Switch to AI tab
+    setMobileStudyView('ai');
+    if (!showRightSidebar) setShowRightSidebar(true);
+    
+    setToolbarPosition(null);
+    window.getSelection()?.removeAllRanges();
+    
+    handleSendMessage(undefined, query);
+  };
+
+
+  const renderVerseContent = (verse: number, text: string) => {
+    const verseHighlights = highlights.filter(h => h.verse === verse);
+    if (verseHighlights.length === 0) return <>{text}</>;
+
+    // Simple implementation: sort highlights by length descending to replace biggest first
+    // In a robust implementation, we would split the string using offsets.
+    // For now, let's use a regex replacement to wrap text in marked spans.
+    // Since React needs elements, we can do this by splitting the string safely.
+    
+    // For perfect non-overlapping rendering:
+    let segments: { text: string, highlight?: typeof highlights[0] }[] = [{ text }];
+    
+    verseHighlights.forEach(h => {
+      let newSegments: typeof segments = [];
+      segments.forEach(seg => {
+        if (seg.highlight) {
+          newSegments.push(seg);
+        } else {
+          const index = seg.text.toLowerCase().indexOf(h.text.toLowerCase());
+          if (index !== -1) {
+            newSegments.push({ text: seg.text.substring(0, index) });
+            newSegments.push({ text: seg.text.substring(index, index + h.text.length), highlight: h });
+            newSegments.push({ text: seg.text.substring(index + h.text.length) });
+          } else {
+            newSegments.push(seg);
+          }
+        }
+      });
+      segments = newSegments.filter(s => s.text.length > 0);
+    });
+
+    return (
+      <>
+        {segments.map((seg, i) => 
+          seg.highlight ? (
+            <mark 
+              key={i} 
+              onClick={() => deleteHighlight(seg.highlight!.id)}
+              className={`cursor-pointer rounded-sm px-0.5 ${seg.highlight.color === 'yellow' ? 'bg-yellow-500/40 text-inherit' : seg.highlight.color === 'green' ? 'bg-green-500/40 text-inherit' : seg.highlight.color === 'blue' ? 'bg-blue-500/40 text-inherit' : seg.highlight.color === 'pink' ? 'bg-pink-500/40 text-inherit' : 'bg-purple-500/40 text-inherit'}`}
+              title="Click to remove highlight"
+            >
+              {seg.text}
+            </mark>
+          ) : (
+            <span key={i}>{seg.text}</span>
+          )
+        )}
+      </>
+    );
+  };
 
   const scrollToBottom = () => {
     if (messagesEndRef.current) {
@@ -228,6 +385,14 @@ export default function App() {
       .catch(() => {
         if (isMounted) setBibleVerses([{verse: 1, text: "Error loading text from bible-api.com."}]);
       });
+
+    // Fetch highlights for current chapter
+    fetchWithAuth(`${API_URL}/api/highlights?book=${encodeURIComponent(activeBook.name)}&chapter=${activeChapter}`)
+      .then(r => r.json())
+      .then(data => {
+        if (isMounted && Array.isArray(data)) setHighlights(data);
+      })
+      .catch(e => console.error("Failed to load highlights", e));
       
     // Cancel any ongoing speech when chapter changes
     // eslint-disable-next-line
@@ -382,9 +547,10 @@ export default function App() {
   };
 
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatInput.trim() || cooldown > 0) return;
+  const handleSendMessage = async (e?: React.FormEvent, overrideText?: string) => {
+    if (e) e.preventDefault();
+    const textToSend = overrideText || chatInput;
+    if (!textToSend.trim() || cooldown > 0) return;
 
     let targetChatId = activeChatId;
 
@@ -414,7 +580,7 @@ export default function App() {
     }
     
     const currentInput = chatInput;
-    setChatInput('');
+    if (!overrideText) setChatInput(''); else setChatInput('');
     setCooldown(30); // 30s cooldown
     setIsAiTyping(true);
 
@@ -666,14 +832,14 @@ export default function App() {
                 </div>
               </header>
 
-              <div className="flex-1 overflow-y-auto custom-scroll p-6">
+              <div className="flex-1 overflow-y-auto custom-scroll p-6" onMouseUp={handleSelection} onTouchEnd={handleSelection}>
                 <article className="max-w-3xl mx-auto">
                   <p className="font-serif text-[18px] leading-[1.8] text-[#faf9f5] whitespace-pre-wrap">
                     {bibleVerses.length > 0 ? (
                       bibleVerses.map((v, index) => (
-                        <span key={index}>
+                        <span key={index} data-verse={v.verse}>
                           <sup className="text-[#87867f] text-[10px] mr-1">{v.verse}</sup>
-                          {v.text}{' '}
+                          {renderVerseContent(v.verse, v.text)}{' '}
                         </span>
                       ))
                     ) : (
@@ -861,14 +1027,14 @@ export default function App() {
                   </div>
                 </div>
               </header>
-              <div className="flex-1 overflow-y-auto custom-scroll p-10 lg:p-16">
+              <div className="flex-1 overflow-y-auto custom-scroll p-10 lg:p-16" onMouseUp={handleSelection} onTouchEnd={handleSelection}>
                 <article className="max-w-3xl mx-auto">
                   <p className="font-serif text-[18px] leading-[1.8] text-[#faf9f5] whitespace-pre-wrap">
                     {bibleVerses.length > 0 ? (
                       bibleVerses.map((v, index) => (
-                        <span key={v.verse} className={`transition-colors duration-300 ${currentSpeakingVerseIndex === index ? 'text-[#c96442]' : ''}`}>
+                        <span key={v.verse} data-verse={v.verse} className={`transition-colors duration-300 ${currentSpeakingVerseIndex === index ? 'text-[#c96442]' : ''}`}>
                           <sup className={`text-[10px] font-sans font-semibold mr-1.5 opacity-80 ${currentSpeakingVerseIndex === index ? 'text-[#c96442]' : 'text-[#87867f]'}`}>{v.verse}</sup>
-                          {v.text}
+                          {renderVerseContent(v.verse, v.text)}
                         </span>
                       ))
                     ) : (
@@ -967,6 +1133,25 @@ export default function App() {
               </Panel>
             )}
           </PanelGroup>
+          </div>
+        )}
+
+
+        {/* Floating Toolbar for Highlighting */}
+        {toolbarPosition && (
+          <div 
+            className="fixed z-50 flex items-center gap-1.5 bg-[#30302e] border border-[#4d4c48] p-1.5 rounded-xl shadow-2xl backdrop-blur-md transform -translate-x-1/2 -translate-y-full"
+            style={{ left: toolbarPosition.x, top: toolbarPosition.y - 10 }}
+          >
+            <button onClick={() => saveHighlight('yellow')} className="w-7 h-7 rounded-full bg-yellow-500 hover:scale-110 transition-transform shadow-sm" title="Highlight Yellow" />
+            <button onClick={() => saveHighlight('green')} className="w-7 h-7 rounded-full bg-green-500 hover:scale-110 transition-transform shadow-sm" title="Highlight Green" />
+            <button onClick={() => saveHighlight('blue')} className="w-7 h-7 rounded-full bg-blue-500 hover:scale-110 transition-transform shadow-sm" title="Highlight Blue" />
+            <button onClick={() => saveHighlight('pink')} className="w-7 h-7 rounded-full bg-pink-500 hover:scale-110 transition-transform shadow-sm" title="Highlight Pink" />
+            <button onClick={() => saveHighlight('purple')} className="w-7 h-7 rounded-full bg-purple-500 hover:scale-110 transition-transform shadow-sm" title="Highlight Purple" />
+            <div className="w-[1px] h-5 bg-[#4d4c48] mx-1" />
+            <button onClick={askAiAboutHighlight} className="flex items-center justify-center h-7 px-2.5 rounded-lg bg-[#c96442] text-white hover:bg-[#d87654] hover:scale-105 transition-all text-xs font-semibold shadow-sm gap-1">
+              <Sparkles size={12} /> Ask AI
+            </button>
           </div>
         )}
 

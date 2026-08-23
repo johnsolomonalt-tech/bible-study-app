@@ -44,3 +44,14 @@ model Tracker {
   
   @@unique([userId, chapterId])
 }
+
+model Highlight {
+  id        Int      @id @default(autoincrement())
+  userId    String   @default("legacy")
+  book      String
+  chapter   Int
+  verse     Int
+  text      String
+  color     String
+  createdAt DateTime @default(now())
+}
