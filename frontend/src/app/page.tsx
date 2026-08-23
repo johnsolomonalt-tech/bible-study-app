@@ -582,7 +582,7 @@ export default function App() {
           <PanelGroup orientation="horizontal" id="theologica-layout-v2" className="flex w-full h-full">
             {/* Left Sidebar: Navigation */}
             {showLeftSidebar && (
-              <Panel panelRef={leftPanelRef} defaultSize="20" minSize="20" className={`w-full lg:w-auto border-r border-[#30302e] bg-[#141413] flex-col ${mobileStudyView === 'chapters' ? 'flex' : 'hidden lg:flex'}`}>
+              <Panel panelRef={leftPanelRef} defaultSize="15" minSize="15" className={`w-full lg:w-auto border-r border-[#30302e] bg-[#141413] flex-col ${mobileStudyView === 'chapters' ? 'flex' : 'hidden lg:flex'}`}>
               <header className="lg:hidden h-[60px] border-b border-[#30302e] flex items-center px-4 shrink-0">
                 <button onClick={() => setMobileStudyView('reader')} className="p-2 mr-2 text-[#b0aea5] hover:text-[#faf9f5]">
                   <ChevronLeft size={20} />
@@ -645,7 +645,7 @@ export default function App() {
             )}
 
             {/* Center: Bible Reader */}
-            <Panel defaultSize="50" minSize="30" className={`w-full lg:w-auto flex-col h-full bg-[#141413] ${mobileStudyView === 'reader' ? 'flex' : 'hidden lg:flex'}`}>
+            <Panel defaultSize="60" minSize="30" className={`w-full lg:w-auto flex-col h-full bg-[#141413] ${mobileStudyView === 'reader' ? 'flex' : 'hidden lg:flex'}`}>
               <PanelGroup orientation="vertical" id="theologica-layout-vertical-v2">
                 <Panel defaultSize="75" minSize="30" className="flex flex-col relative">
                   <header className="h-[60px] border-b border-[#30302e] flex items-center justify-between px-4 lg:px-6 bg-[#141413] shrink-0">
@@ -733,7 +733,7 @@ export default function App() {
 
             {/* Right Sidebar: Study AI */}
             {showRightSidebar && (
-              <Panel panelRef={rightPanelRef} defaultSize="30" minSize="25" className={`w-full lg:w-auto border-l border-[#30302e] bg-[#141413] flex-col ${mobileStudyView === 'ai' ? 'flex' : 'hidden lg:flex'}`}>
+              <Panel panelRef={rightPanelRef} defaultSize="25" minSize="20" className={`w-full lg:w-auto border-l border-[#30302e] bg-[#141413] flex-col ${mobileStudyView === 'ai' ? 'flex' : 'hidden lg:flex'}`}>
               <header className="h-[60px] border-b border-[#30302e] flex items-center px-4 lg:px-6 gap-2 text-[15px] font-medium text-[#faf9f5] shrink-0">
                 <button onClick={() => setMobileStudyView('reader')} className="lg:hidden p-2 mr-1 text-[#b0aea5] hover:text-[#faf9f5]">
                   <ChevronLeft size={20} />
