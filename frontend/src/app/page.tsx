@@ -884,8 +884,12 @@ export default function App() {
                   </button>
                   <select value={translation} onChange={(e) => setTranslation(e.target.value)} className="bg-transparent text-sm font-medium text-[#b0aea5] hover:text-[#faf9f5] focus:outline-none cursor-pointer transition-colors max-w-[60px] mr-2">
                     <option value="kjv" className="bg-[#30302e]">KJV</option>
+                    <option value="asv" className="bg-[#30302e]">ASV</option>
                     <option value="web" className="bg-[#30302e]">WEB</option>
                     <option value="bbe" className="bg-[#30302e]">BBE</option>
+                    <option value="darby" className="bg-[#30302e]">DARBY</option>
+                    <option value="dra" className="bg-[#30302e]">DRA</option>
+                    <option value="ylt" className="bg-[#30302e]">YLT</option>
                   </select>
                 </div>
               </header>
@@ -1073,8 +1077,12 @@ export default function App() {
                   <div className="hidden lg:block h-6 w-px bg-[#30302e]"></div>
                   <select value={translation} onChange={(e) => setTranslation(e.target.value)} className="bg-transparent text-sm font-medium text-[#b0aea5] hover:text-[#faf9f5] focus:outline-none cursor-pointer transition-colors max-w-[60px] lg:max-w-none mr-2">
                     <option value="kjv" className="bg-[#30302e]">KJV</option>
+                    <option value="asv" className="bg-[#30302e]">ASV</option>
                     <option value="web" className="bg-[#30302e]">WEB</option>
                     <option value="bbe" className="bg-[#30302e]">BBE</option>
+                    <option value="darby" className="bg-[#30302e]">DARBY</option>
+                    <option value="dra" className="bg-[#30302e]">DRA</option>
+                    <option value="ylt" className="bg-[#30302e]">YLT</option>
                   </select>
                   <div className="hidden lg:flex items-center bg-[#30302e] rounded-lg p-0.5">
                     <button onClick={() => setShowLeftSidebar(!showLeftSidebar)} className={`p-1.5 rounded-md transition-colors ${showLeftSidebar ? 'text-[#faf9f5] hover:bg-[#4d4c48]' : 'text-[#87867f] hover:text-[#faf9f5]'}`} title="Toggle Navigation">
