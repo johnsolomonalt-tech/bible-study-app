@@ -564,13 +564,13 @@ export default function App() {
       const newChat = await res.json();
       targetChatId = newChat.id;
       
-      const newMsg = { role: 'user', content: chatInput.trim() };
+      const newMsg = { role: 'user', content: textToSend.trim() };
       const chatWithOptimisticMsg = { ...newChat, messages: [newMsg] };
       
       setChats(prev => [chatWithOptimisticMsg, ...prev]);
       setActiveChatId(newChat.id);
     } else {
-      const newMsg = { role: 'user', content: chatInput.trim() };
+      const newMsg = { role: 'user', content: textToSend.trim() };
       setChats(prev => prev.map(c => {
         if (c.id === targetChatId) {
           return { ...c, messages: [...c.messages, newMsg] };
@@ -579,7 +579,7 @@ export default function App() {
       }));
     }
     
-    const currentInput = chatInput;
+    const currentInput = textToSend;
     if (!overrideText) setChatInput(''); else setChatInput('');
     setCooldown(30); // 30s cooldown
     setIsAiTyping(true);
