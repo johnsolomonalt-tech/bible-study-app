@@ -889,7 +889,6 @@ export default function App() {
                     <option value="bbe" className="bg-[#30302e]">BBE</option>
                     <option value="darby" className="bg-[#30302e]">DARBY</option>
                     <option value="dra" className="bg-[#30302e]">DRA</option>
-                    <option value="ylt" className="bg-[#30302e]">YLT</option>
                   </select>
                 </div>
               </header>
@@ -1082,7 +1081,6 @@ export default function App() {
                     <option value="bbe" className="bg-[#30302e]">BBE</option>
                     <option value="darby" className="bg-[#30302e]">DARBY</option>
                     <option value="dra" className="bg-[#30302e]">DRA</option>
-                    <option value="ylt" className="bg-[#30302e]">YLT</option>
                   </select>
                   <div className="hidden lg:flex items-center bg-[#30302e] rounded-lg p-0.5">
                     <button onClick={() => setShowLeftSidebar(!showLeftSidebar)} className={`p-1.5 rounded-md transition-colors ${showLeftSidebar ? 'text-[#faf9f5] hover:bg-[#4d4c48]' : 'text-[#87867f] hover:text-[#faf9f5]'}`} title="Toggle Navigation">
