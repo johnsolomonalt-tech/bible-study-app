@@ -181,7 +181,11 @@ export default function App() {
   const saveHighlight = async (color: string) => {
     if (!selectionRange || !selectionVerse) return;
     
-    const text = selectionRange.toString();
+    let text = selectionRange.toString().trim();
+    const versePrefix = `${selectionVerse}`;
+    if (text.startsWith(versePrefix)) {
+      text = text.substring(versePrefix.length).trim();
+    }
     const verse = selectionVerse;
     const book = activeBook.name;
     const chapter = activeChapter;
@@ -250,11 +254,25 @@ export default function App() {
         if (seg.highlight) {
           newSegments.push(seg);
         } else {
-          const index = seg.text.toLowerCase().indexOf(h.text.toLowerCase());
+          let matchText = h.text;
+          let index = seg.text.toLowerCase().indexOf(matchText.toLowerCase());
+          
+          if (index === -1) {
+            // Strip leading verse number if accidentally highlighted
+            const cleanedMatch = matchText.replace(new RegExp('^\\s*' + verse + '\\s*'), '');
+            index = seg.text.toLowerCase().indexOf(cleanedMatch.toLowerCase());
+            if (index !== -1) {
+              matchText = cleanedMatch;
+            }
+          }
+
           if (index !== -1) {
             newSegments.push({ text: seg.text.substring(0, index) });
-            newSegments.push({ text: seg.text.substring(index, index + h.text.length), highlight: h });
-            newSegments.push({ text: seg.text.substring(index + h.text.length) });
+            newSegments.push({ text: seg.text.substring(index, index + matchText.length), highlight: h });
+            newSegments.push({ text: seg.text.substring(index + matchText.length) });
+          } else if (h.text.toLowerCase().includes(seg.text.toLowerCase().trim()) && seg.text.trim().length > 0) {
+            // Highlight covers this entire segment
+            newSegments.push({ text: seg.text, highlight: h });
           } else {
             newSegments.push(seg);
           }
