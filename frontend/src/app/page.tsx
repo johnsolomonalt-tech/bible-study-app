@@ -575,7 +575,7 @@ export default function App() {
           <PanelGroup orientation="horizontal" id="theologica-layout" className="flex w-full h-full">
             {/* Left Sidebar: Navigation */}
             {showLeftSidebar && (
-              <Panel defaultSize={18} minSize={10} className={`w-full lg:w-auto border-r border-[#30302e] bg-[#141413] flex-col ${mobileStudyView === 'chapters' ? 'flex' : 'hidden lg:flex'}`}>
+              <Panel defaultSize={18} minSize={16} className={`w-full lg:w-auto border-r border-[#30302e] bg-[#141413] flex-col ${mobileStudyView === 'chapters' ? 'flex' : 'hidden lg:flex'}`}>
               <header className="lg:hidden h-[60px] border-b border-[#30302e] flex items-center px-4 shrink-0">
                 <button onClick={() => setMobileStudyView('reader')} className="p-2 mr-2 text-[#b0aea5] hover:text-[#faf9f5]">
                   <ChevronLeft size={20} />
@@ -643,9 +643,6 @@ export default function App() {
                 <Panel defaultSize={75} minSize={20} className="flex flex-col relative">
                   <header className="h-[60px] border-b border-[#30302e] flex items-center justify-between px-4 lg:px-6 bg-[#141413] shrink-0">
                 <div className="flex items-center gap-1 lg:gap-2">
-                  <button onClick={() => setShowLeftSidebar(!showLeftSidebar)} className="hidden lg:flex p-2 text-[#b0aea5] hover:text-[#faf9f5] hover:bg-[#30302e] rounded-lg transition-colors" title="Toggle Navigation">
-                    {showLeftSidebar ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
-                  </button>
                   <button onClick={() => setMobileStudyView('chapters')} className="lg:hidden p-2 text-[#b0aea5] hover:text-[#faf9f5]">
                     <Layout size={20} />
                   </button>
@@ -671,12 +668,17 @@ export default function App() {
                     <option value="web" className="bg-[#30302e]">WEB</option>
                     <option value="bbe" className="bg-[#30302e]">BBE</option>
                   </select>
-                  <button onClick={() => setShowBottomNotes(!showBottomNotes)} className="hidden lg:flex p-2 text-[#b0aea5] hover:text-[#faf9f5] hover:bg-[#30302e] rounded-lg transition-colors" title="Toggle Notes">
-                    {showBottomNotes ? <PanelBottomClose size={20} /> : <PanelBottomOpen size={20} />}
-                  </button>
-                  <button onClick={() => setShowRightSidebar(!showRightSidebar)} className="hidden lg:flex p-2 text-[#b0aea5] hover:text-[#faf9f5] hover:bg-[#30302e] rounded-lg transition-colors" title="Toggle Study AI">
-                    {showRightSidebar ? <PanelRightClose size={20} /> : <PanelRightOpen size={20} />}
-                  </button>
+                  <div className="hidden lg:flex items-center bg-[#30302e] rounded-lg p-0.5">
+                    <button onClick={() => setShowLeftSidebar(!showLeftSidebar)} className={`p-1.5 rounded-md transition-colors ${showLeftSidebar ? 'text-[#faf9f5] hover:bg-[#4d4c48]' : 'text-[#87867f] hover:text-[#faf9f5]'}`} title="Toggle Navigation">
+                      {showLeftSidebar ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
+                    </button>
+                    <button onClick={() => setShowBottomNotes(!showBottomNotes)} className={`p-1.5 rounded-md transition-colors ${showBottomNotes ? 'text-[#faf9f5] hover:bg-[#4d4c48]' : 'text-[#87867f] hover:text-[#faf9f5]'}`} title="Toggle Notes">
+                      {showBottomNotes ? <PanelBottomClose size={18} /> : <PanelBottomOpen size={18} />}
+                    </button>
+                    <button onClick={() => setShowRightSidebar(!showRightSidebar)} className={`p-1.5 rounded-md transition-colors ${showRightSidebar ? 'text-[#faf9f5] hover:bg-[#4d4c48]' : 'text-[#87867f] hover:text-[#faf9f5]'}`} title="Toggle Study AI">
+                      {showRightSidebar ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
+                    </button>
+                  </div>
                 </div>
               </header>
               <div className="flex-1 overflow-y-auto custom-scroll p-10 lg:p-16">
@@ -703,7 +705,7 @@ export default function App() {
 
               {/* Quick Note Split */}
                 {showBottomNotes && (
-                  <Panel defaultSize={25} minSize={10} className="border-t border-[#30302e] bg-[#141413] flex flex-col shrink-0">
+                  <Panel defaultSize={25} minSize={14} className="border-t border-[#30302e] bg-[#141413] flex flex-col shrink-0">
                 <div className="h-10 border-b border-[#30302e] flex items-center px-6 text-[11px] font-bold text-[#87867f] uppercase tracking-widest">
                   Quick Note — {chapterTitle}
                 </div>
@@ -724,7 +726,7 @@ export default function App() {
 
             {/* Right Sidebar: Study AI */}
             {showRightSidebar && (
-              <Panel defaultSize={25} minSize={15} className={`w-full lg:w-auto border-l border-[#30302e] bg-[#141413] flex-col ${mobileStudyView === 'ai' ? 'flex' : 'hidden lg:flex'}`}>
+              <Panel defaultSize={25} minSize={18} className={`w-full lg:w-auto border-l border-[#30302e] bg-[#141413] flex-col ${mobileStudyView === 'ai' ? 'flex' : 'hidden lg:flex'}`}>
               <header className="h-[60px] border-b border-[#30302e] flex items-center px-4 lg:px-6 gap-2 text-[15px] font-medium text-[#faf9f5] shrink-0">
                 <button onClick={() => setMobileStudyView('reader')} className="lg:hidden p-2 mr-1 text-[#b0aea5] hover:text-[#faf9f5]">
                   <ChevronLeft size={20} />
