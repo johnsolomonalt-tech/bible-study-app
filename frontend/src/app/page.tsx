@@ -33,7 +33,7 @@ const TypewriterMessage = ({ content }: { content: string }) => {
     
     let index = 0;
     const interval = setInterval(() => {
-      index += 2; // Type 2 chars every 30ms (~1000 wpm) for a fast but readable pace
+      index += 25; // Type 25 chars every 15ms for an extremely fast but noticeable typing effect
       if (index > content.length) index = content.length;
       setDisplayed(content.slice(0, index));
       
@@ -41,7 +41,7 @@ const TypewriterMessage = ({ content }: { content: string }) => {
         clearInterval(interval);
         seenMessages.add(content);
       }
-    }, 30);
+    }, 15);
     
     return () => clearInterval(interval);
   }, [content]);
