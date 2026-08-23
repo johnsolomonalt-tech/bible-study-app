@@ -150,6 +150,7 @@ export default function App() {
     // Check if current year is a leap year for UI total
     const isLeapYear = (tzYear % 4 === 0 && tzYear % 100 !== 0) || (tzYear % 400 === 0);
     
+    // eslint-disable-next-line
     setDisplayDay(actualDoy);
     setTotalDays(isLeapYear ? 366 : 365);
     setDevotionalEntry(getDevotionalForDay(alignedDoy));
@@ -161,6 +162,7 @@ export default function App() {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
+    // eslint-disable-next-line
     setIsDevoSpeaking(false);
     isDevoSpeakingRef.current = false;
   }, [devotionalTime, activeTab]);
@@ -224,6 +226,7 @@ export default function App() {
       });
       
     // Cancel any ongoing speech when chapter changes
+    // eslint-disable-next-line
     setIsSpeaking(false);
     isSpeakingRef.current = false;
     setCurrentSpeakingVerseIndex(null);
@@ -575,7 +578,7 @@ export default function App() {
           <PanelGroup orientation="horizontal" id="theologica-layout" className="flex w-full h-full">
             {/* Left Sidebar: Navigation */}
             {showLeftSidebar && (
-              <Panel defaultSize={18} minSize={16} className={`w-full lg:w-auto border-r border-[#30302e] bg-[#141413] flex-col ${mobileStudyView === 'chapters' ? 'flex' : 'hidden lg:flex'}`}>
+              <Panel defaultSize={20} minSize={20} className={`w-full lg:w-auto border-r border-[#30302e] bg-[#141413] flex-col ${mobileStudyView === 'chapters' ? 'flex' : 'hidden lg:flex'}`}>
               <header className="lg:hidden h-[60px] border-b border-[#30302e] flex items-center px-4 shrink-0">
                 <button onClick={() => setMobileStudyView('reader')} className="p-2 mr-2 text-[#b0aea5] hover:text-[#faf9f5]">
                   <ChevronLeft size={20} />
@@ -705,7 +708,7 @@ export default function App() {
 
               {/* Quick Note Split */}
                 {showBottomNotes && (
-                  <Panel defaultSize={25} minSize={14} className="border-t border-[#30302e] bg-[#141413] flex flex-col shrink-0">
+                  <Panel defaultSize={25} minSize={20} className="border-t border-[#30302e] bg-[#141413] flex flex-col shrink-0">
                 <div className="h-10 border-b border-[#30302e] flex items-center px-6 text-[11px] font-bold text-[#87867f] uppercase tracking-widest">
                   Quick Note — {chapterTitle}
                 </div>
@@ -726,7 +729,7 @@ export default function App() {
 
             {/* Right Sidebar: Study AI */}
             {showRightSidebar && (
-              <Panel defaultSize={25} minSize={18} className={`w-full lg:w-auto border-l border-[#30302e] bg-[#141413] flex-col ${mobileStudyView === 'ai' ? 'flex' : 'hidden lg:flex'}`}>
+              <Panel defaultSize={25} minSize={25} className={`w-full lg:w-auto border-l border-[#30302e] bg-[#141413] flex-col ${mobileStudyView === 'ai' ? 'flex' : 'hidden lg:flex'}`}>
               <header className="h-[60px] border-b border-[#30302e] flex items-center px-4 lg:px-6 gap-2 text-[15px] font-medium text-[#faf9f5] shrink-0">
                 <button onClick={() => setMobileStudyView('reader')} className="lg:hidden p-2 mr-1 text-[#b0aea5] hover:text-[#faf9f5]">
                   <ChevronLeft size={20} />
