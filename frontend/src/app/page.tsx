@@ -581,7 +581,8 @@ export default function App() {
         {activeTab === 'study' && (
           <PanelGroup orientation="horizontal" id="theologica-layout-v2" className="flex w-full h-full">
             {/* Left Sidebar: Navigation */}
-            <Panel panelRef={leftPanelRef} collapsible={true} defaultSize={25} minSize={20} className={`w-full lg:w-auto border-r border-[#30302e] bg-[#141413] flex-col ${mobileStudyView === 'chapters' ? 'flex' : 'hidden lg:flex'}`}>
+            {showLeftSidebar && (
+              <Panel panelRef={leftPanelRef} defaultSize={25} minSize={20} className={`w-full lg:w-auto border-r border-[#30302e] bg-[#141413] flex-col ${mobileStudyView === 'chapters' ? 'flex' : 'hidden lg:flex'}`}>
               <header className="lg:hidden h-[60px] border-b border-[#30302e] flex items-center px-4 shrink-0">
                 <button onClick={() => setMobileStudyView('reader')} className="p-2 mr-2 text-[#b0aea5] hover:text-[#faf9f5]">
                   <ChevronLeft size={20} />
@@ -637,8 +638,11 @@ export default function App() {
                 ))}
               </div>
               </Panel>
+            )}
 
-            <PanelResizeHandle className="hidden lg:flex w-1 bg-transparent hover:bg-[#c96442] active:bg-[#c96442] transition-colors cursor-col-resize shrink-0 z-10 relative" />
+            {showLeftSidebar && (
+              <PanelResizeHandle className="hidden lg:flex w-1 bg-transparent hover:bg-[#c96442] active:bg-[#c96442] transition-colors cursor-col-resize shrink-0 z-10 relative" />
+            )}
 
             {/* Center: Bible Reader */}
             <Panel defaultSize={45} minSize={15} className={`w-full lg:w-auto flex-col h-full bg-[#141413] ${mobileStudyView === 'reader' ? 'flex' : 'hidden lg:flex'}`}>
@@ -672,13 +676,13 @@ export default function App() {
                     <option value="bbe" className="bg-[#30302e]">BBE</option>
                   </select>
                   <div className="hidden lg:flex items-center bg-[#30302e] rounded-lg p-0.5">
-                    <button onClick={() => { const p = leftPanelRef.current; if (p) { p.isCollapsed() ? p.expand() : p.collapse(); setShowLeftSidebar(!p.isCollapsed()); } }} className={`p-1.5 rounded-md transition-colors ${showLeftSidebar ? 'text-[#faf9f5] hover:bg-[#4d4c48]' : 'text-[#87867f] hover:text-[#faf9f5]'}`} title="Toggle Navigation">
+                    <button onClick={() => setShowLeftSidebar(!showLeftSidebar)} className={`p-1.5 rounded-md transition-colors ${showLeftSidebar ? 'text-[#faf9f5] hover:bg-[#4d4c48]' : 'text-[#87867f] hover:text-[#faf9f5]'}`} title="Toggle Navigation">
                       {showLeftSidebar ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
                     </button>
-                    <button onClick={() => { const p = bottomPanelRef.current; if (p) { p.isCollapsed() ? p.expand() : p.collapse(); setShowBottomNotes(!p.isCollapsed()); } }} className={`p-1.5 rounded-md transition-colors ${showBottomNotes ? 'text-[#faf9f5] hover:bg-[#4d4c48]' : 'text-[#87867f] hover:text-[#faf9f5]'}`} title="Toggle Notes">
+                    <button onClick={() => setShowBottomNotes(!showBottomNotes)} className={`p-1.5 rounded-md transition-colors ${showBottomNotes ? 'text-[#faf9f5] hover:bg-[#4d4c48]' : 'text-[#87867f] hover:text-[#faf9f5]'}`} title="Toggle Notes">
                       {showBottomNotes ? <PanelBottomClose size={18} /> : <PanelBottomOpen size={18} />}
                     </button>
-                    <button onClick={() => { const p = rightPanelRef.current; if (p) { p.isCollapsed() ? p.expand() : p.collapse(); setShowRightSidebar(!p.isCollapsed()); } }} className={`p-1.5 rounded-md transition-colors ${showRightSidebar ? 'text-[#faf9f5] hover:bg-[#4d4c48]' : 'text-[#87867f] hover:text-[#faf9f5]'}`} title="Toggle Study AI">
+                    <button onClick={() => setShowRightSidebar(!showRightSidebar)} className={`p-1.5 rounded-md transition-colors ${showRightSidebar ? 'text-[#faf9f5] hover:bg-[#4d4c48]' : 'text-[#87867f] hover:text-[#faf9f5]'}`} title="Toggle Study AI">
                       {showRightSidebar ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
                     </button>
                   </div>
@@ -707,7 +711,8 @@ export default function App() {
                 )}
 
               {/* Quick Note Split */}
-                <Panel panelRef={bottomPanelRef} collapsible={true} defaultSize={25} minSize={20} className="border-t border-[#30302e] bg-[#141413] flex flex-col shrink-0">
+                {showBottomNotes && (
+                <Panel panelRef={bottomPanelRef} defaultSize={25} minSize={20} className="border-t border-[#30302e] bg-[#141413] flex flex-col shrink-0">
                 <div className="h-10 border-b border-[#30302e] flex items-center px-6 text-[11px] font-bold text-[#87867f] uppercase tracking-widest">
                   Quick Note — {chapterTitle}
                 </div>
@@ -718,13 +723,17 @@ export default function App() {
                   onChange={handleQuickNoteChange}
                 />
                 </Panel>
+                )}
               </PanelGroup>
             </Panel>
 
-            <PanelResizeHandle className="hidden lg:flex w-1 bg-transparent hover:bg-[#c96442] active:bg-[#c96442] transition-colors cursor-col-resize shrink-0 z-10 relative" />
+            {showRightSidebar && (
+              <PanelResizeHandle className="hidden lg:flex w-1 bg-transparent hover:bg-[#c96442] active:bg-[#c96442] transition-colors cursor-col-resize shrink-0 z-10 relative" />
+            )}
 
             {/* Right Sidebar: Study AI */}
-            <Panel panelRef={rightPanelRef} collapsible={true} defaultSize={30} minSize={25} className={`w-full lg:w-auto border-l border-[#30302e] bg-[#141413] flex-col ${mobileStudyView === 'ai' ? 'flex' : 'hidden lg:flex'}`}>
+            {showRightSidebar && (
+              <Panel panelRef={rightPanelRef} defaultSize={30} minSize={25} className={`w-full lg:w-auto border-l border-[#30302e] bg-[#141413] flex-col ${mobileStudyView === 'ai' ? 'flex' : 'hidden lg:flex'}`}>
               <header className="h-[60px] border-b border-[#30302e] flex items-center px-4 lg:px-6 gap-2 text-[15px] font-medium text-[#faf9f5] shrink-0">
                 <button onClick={() => setMobileStudyView('reader')} className="lg:hidden p-2 mr-1 text-[#b0aea5] hover:text-[#faf9f5]">
                   <ChevronLeft size={20} />
@@ -783,6 +792,7 @@ export default function App() {
                 </div>
               </form>
             </Panel>
+            )}
           </PanelGroup>
         )}
 
