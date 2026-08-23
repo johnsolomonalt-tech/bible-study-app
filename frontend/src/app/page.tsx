@@ -751,7 +751,8 @@ export default function App() {
 
         {/* DESKTOP STUDY TAB (With Resizable Panels) */}
         {activeTab === 'study' && (
-          <PanelGroup orientation="horizontal" id="theologica-layout-v2" className="hidden lg:flex w-full h-full">
+          <div className="hidden lg:flex w-full h-full">
+            <PanelGroup orientation="horizontal" id="theologica-layout-v2" className="flex w-full h-full">
             {/* Left Sidebar: Navigation */}
             {showLeftSidebar && (
               <Panel panelRef={leftPanelRef} defaultSize="15" minSize="15" className={`w-full lg:w-auto border-r border-[#30302e] bg-[#141413] flex-col ${mobileStudyView === 'chapters' ? 'flex' : 'hidden lg:flex'}`}>
@@ -963,9 +964,10 @@ export default function App() {
                   </button>
                 </div>
               </form>
-            </Panel>
+              </Panel>
             )}
           </PanelGroup>
+          </div>
         )}
 
         {/* DEVOTIONAL TAB */}
