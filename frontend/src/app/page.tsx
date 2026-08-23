@@ -18,6 +18,37 @@ const ntStr = "Matthew:28,Mark:16,Luke:24,John:21,Acts:28,Romans:16,1 Corinthian
 const OT_BOOKS = otStr.split(',').map(s => { const [n, c] = s.split(':'); return { name: n, chapters: parseInt(c) }; });
 const NT_BOOKS = ntStr.split(',').map(s => { const [n, c] = s.split(':'); return { name: n, chapters: parseInt(c) }; });
 
+
+// Typewriter configuration
+const seenMessages = new Set<string>();
+
+const TypewriterMessage = ({ content }: { content: string }) => {
+  const [displayed, setDisplayed] = useState(() => seenMessages.has(content) ? content : '');
+  
+  useEffect(() => {
+    if (seenMessages.has(content)) {
+      setDisplayed(content);
+      return;
+    }
+    
+    let index = 0;
+    const interval = setInterval(() => {
+      index += 2; // Type 2 chars every 30ms (~1000 wpm) for a fast but readable pace
+      if (index > content.length) index = content.length;
+      setDisplayed(content.slice(0, index));
+      
+      if (index >= content.length) {
+        clearInterval(interval);
+        seenMessages.add(content);
+      }
+    }, 30);
+    
+    return () => clearInterval(interval);
+  }, [content]);
+
+  return <ReactMarkdown>{displayed}</ReactMarkdown>;
+};
+
 export default function App() {
   useEffect(() => {
     const handleGlobalClick = (e: MouseEvent) => {
@@ -261,7 +292,7 @@ export default function App() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [activeChat?.messages, activeTab]);
+  }, [activeChat?.id, activeTab]);
 
   useEffect(() => {
     if (cooldown > 0) {
@@ -583,6 +614,7 @@ export default function App() {
     if (!overrideText) setChatInput(''); else setChatInput('');
     setCooldown(30); // 30s cooldown
     setIsAiTyping(true);
+    setTimeout(scrollToBottom, 50);
 
     const res = await fetchWithAuth(`${API_URL}/api/chats/${targetChatId}/messages`, {
       method: 'POST',
@@ -870,7 +902,11 @@ export default function App() {
                       <div key={i} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
                         {m.role === 'model' && <span className="text-[11px] text-[#87867f] mb-1.5 ml-1 font-semibold tracking-wide uppercase">Study AI</span>}
                         <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-[14px] leading-relaxed ${m.role === 'user' ? 'bg-[#c96442] text-white' : 'bg-[#30302e] text-[#e4e1cf]'}`}>
-                          <ReactMarkdown>{m.content}</ReactMarkdown>
+                          {m.role === 'model' && i === activeChat.messages.length - 1 ? (
+                            <TypewriterMessage content={m.content} />
+                          ) : (
+                            <ReactMarkdown>{m.content}</ReactMarkdown>
+                          )}
                         </div>
                       </div>
                     ))
@@ -1094,7 +1130,11 @@ export default function App() {
                         ? 'bg-[#c96442] text-white rounded-2xl rounded-br-sm shadow-sm' 
                         : 'bg-[#30302e] text-[#faf9f5] rounded-2xl rounded-bl-sm ring-1 ring-[#4d4c48] shadow-sm markdown-body'
                       }`}>
-                        <ReactMarkdown>{m.content}</ReactMarkdown>
+                        {m.role === 'model' && i === activeChat.messages.length - 1 ? (
+                            <TypewriterMessage content={m.content} />
+                          ) : (
+                            <ReactMarkdown>{m.content}</ReactMarkdown>
+                          )}
                       </div>
                     </div>
                   ))
@@ -1289,7 +1329,11 @@ export default function App() {
                             ? 'bg-[#c96442] text-white rounded-[20px] rounded-br-sm shadow-sm' 
                             : 'bg-[#30302e] text-[#faf9f5] rounded-[20px] rounded-bl-sm ring-1 ring-[#4d4c48] shadow-sm markdown-body'
                           }`}>
+                            {m.role === 'model' && i === activeChat.messages.length - 1 ? (
+                            <TypewriterMessage content={m.content} />
+                          ) : (
                             <ReactMarkdown>{m.content}</ReactMarkdown>
+                          )}
                           </div>
                         </div>
                       ))
