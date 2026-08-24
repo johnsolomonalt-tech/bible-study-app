@@ -38,18 +38,7 @@ const withPWA = withPWAInit({
             statuses: [0, 200],
           },
         },
-      },
-      {
-        urlPattern: /\/$/,
-        handler: "NetworkFirst",
-        options: {
-          cacheName: "start-url",
-          expiration: {
-            maxEntries: 1,
-            maxAgeSeconds: 60 * 60 * 24 * 30,
-          },
-        },
-      },
+      }
     ],
   },
 });
