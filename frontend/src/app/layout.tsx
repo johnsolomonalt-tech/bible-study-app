@@ -35,20 +35,16 @@ export const viewport: Viewport = {
   themeColor: '#141413',
 };
 
-import { ClerkProvider } from '@clerk/nextjs'
-
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
-      <html lang="en" className="dark">
-        <body className={`${inter.variable} ${merriweather.variable} antialiased`}>
-          {children}
-        </body>
-      </html>
-    </ClerkProvider>
+    <html lang="en" className="dark">
+      <body className={`${inter.variable} ${merriweather.variable} antialiased`}>
+        {children}
+      </body>
+    </html>
   );
 }
