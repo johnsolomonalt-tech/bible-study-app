@@ -65,6 +65,21 @@ export default function App() {
   }, []);
   const { getToken } = useAuth();
   
+  const [isOnline, setIsOnline] = useState(true);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsOnline(navigator.onLine);
+      const handleOnline = () => setIsOnline(true);
+      const handleOffline = () => setIsOnline(false);
+      window.addEventListener('online', handleOnline);
+      window.addEventListener('offline', handleOffline);
+      return () => {
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+      };
+    }
+  }, []);
+  
   const fetchWithAuth = useCallback(async (url: string, options: RequestInit = {}) => {
     const token = await getToken();
     return fetch(url, {
@@ -189,6 +204,10 @@ export default function App() {
   }, []);
 
   const saveHighlight = async (color: string) => {
+    if (!isOnline) {
+      alert("You must be connected to the internet to save highlights.");
+      return;
+    }
     if (!selectionRange || !selectionVerse) return;
     
     let text = selectionRange.toString().trim();
@@ -223,6 +242,11 @@ export default function App() {
 
   const deleteHighlight = async (id: number) => {
     setActiveHighlightMenu(null);
+    if (!isOnline) {
+      alert("You must be connected to the internet to delete highlights.");
+      return;
+    }
+
     setHighlights(prev => prev.filter(h => h.id !== id));
     try {
       await fetchWithAuth(`${API_URL}/api/highlights/${id}`, { method: 'DELETE' });
@@ -1200,13 +1224,13 @@ export default function App() {
                     type="text" 
                     value={chatInput} 
                     onChange={e => setChatInput(e.target.value)}
-                    disabled={cooldown > 0}
-                    placeholder={cooldown > 0 ? `Study AI is resting... (${cooldown}s)` : "Message Study AI..."}
+                    disabled={cooldown > 0 || !isOnline}
+                    placeholder={!isOnline ? "Study AI is unavailable offline" : cooldown > 0 ? `Study AI is resting... (${cooldown}s)` : "Message Study AI..."}
                     className="w-full bg-[#30302e] text-[#faf9f5] rounded-full pl-5 pr-12 py-3 text-[14px] focus:outline-none focus:ring-[3px] focus:ring-[rgba(56,152,236,0.3)] disabled:opacity-50 transition-all placeholder:text-[#5e5d59]"
                   />
                   <button 
                     type="submit" 
-                    disabled={!chatInput.trim() || cooldown > 0} 
+                    disabled={!chatInput.trim() || cooldown > 0 || !isOnline} 
                     className="absolute right-1.5 top-1.5 p-2 bg-[#c96442] hover:bg-[#b5583b] text-white rounded-full disabled:opacity-50 disabled:hover:bg-[#c96442] transition-colors"
                   >
                     <Send size={16} />
