@@ -11,17 +11,6 @@ const withPWA = withPWAInit({
   workboxOptions: {
     runtimeCaching: [
       {
-        urlPattern: ({ request }) => request.destination === 'document',
-        handler: "NetworkFirst",
-        options: {
-          cacheName: "html-pages",
-          expiration: {
-            maxEntries: 10,
-            maxAgeSeconds: 60 * 60 * 24 * 30,
-          },
-        },
-      },
-      {
         urlPattern: /^https:\/\/bible-api\.com\/.*/i,
         handler: "CacheFirst",
         options: {
