@@ -90,6 +90,7 @@ export default function App() {
   const [selectionRange, setSelectionRange] = useState<Range | null>(null);
   const [selectionVerse, setSelectionVerse] = useState<number | null>(null);
   const [toolbarPosition, setToolbarPosition] = useState<{x: number, y: number} | null>(null);
+  const [activeHighlightMenu, setActiveHighlightMenu] = useState<{id: number, x: number, y: number} | null>(null);
   
   const [activeBook, setActiveBook] = useState(OT_BOOKS[0]);
   const [activeChapter, setActiveChapter] = useState(1);
@@ -155,6 +156,7 @@ export default function App() {
 
   // Highlighting Logic
   const handleSelection = useCallback(() => {
+    setActiveHighlightMenu(null);
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed) {
       setToolbarPosition(null);
@@ -220,6 +222,7 @@ export default function App() {
   };
 
   const deleteHighlight = async (id: number) => {
+    setActiveHighlightMenu(null);
     setHighlights(prev => prev.filter(h => h.id !== id));
     try {
       await fetchWithAuth(`${API_URL}/api/highlights/${id}`, { method: 'DELETE' });
@@ -295,7 +298,15 @@ export default function App() {
           seg.highlight ? (
             <mark 
               key={i} 
-              onClick={() => deleteHighlight(seg.highlight!.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                const rect = (e.target as HTMLElement).getBoundingClientRect();
+                setActiveHighlightMenu({
+                  id: seg.highlight!.id,
+                  x: rect.left + rect.width / 2,
+                  y: rect.top - 10
+                });
+              }}
               className={`cursor-pointer rounded-sm px-0.5 ${seg.highlight.color === 'yellow' ? 'bg-yellow-500/40 text-inherit' : seg.highlight.color === 'green' ? 'bg-green-500/40 text-inherit' : seg.highlight.color === 'blue' ? 'bg-blue-500/40 text-inherit' : seg.highlight.color === 'pink' ? 'bg-pink-500/40 text-inherit' : 'bg-purple-500/40 text-inherit'}`}
               title="Click to remove highlight"
             >
@@ -1223,6 +1234,21 @@ export default function App() {
             <div className="w-[1px] h-5 bg-[#4d4c48] mx-1" />
             <button onClick={askAiAboutHighlight} className="flex items-center justify-center h-7 px-2.5 rounded-lg bg-[#c96442] text-white hover:bg-[#d87654] hover:scale-105 transition-all text-xs font-semibold shadow-sm gap-1">
               <Sparkles size={12} /> Ask AI
+            </button>
+          </div>
+        )}
+
+        {/* Floating Menu for Existing Highlight */}
+        {activeHighlightMenu && (
+          <div 
+            className="fixed z-50 flex items-center bg-[#30302e] border border-[#4d4c48] p-1.5 rounded-xl shadow-2xl backdrop-blur-md transform -translate-x-1/2 -translate-y-full"
+            style={{ left: activeHighlightMenu.x, top: activeHighlightMenu.y }}
+          >
+            <button 
+              onClick={() => deleteHighlight(activeHighlightMenu.id)} 
+              className="flex items-center justify-center h-7 px-3 rounded-lg bg-[#141413] text-[#ef4444] hover:bg-[#ef4444] hover:text-white transition-all text-[13px] font-medium shadow-sm"
+            >
+              Delete highlight
             </button>
           </div>
         )}
