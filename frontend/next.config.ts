@@ -5,6 +5,8 @@ const withPWA = withPWAInit({
   dest: "public",
   disable: process.env.NODE_ENV === "development",
   register: true,
+  cacheStartUrl: true,
+  dynamicStartUrl: false,
   extendDefaultRuntimeCaching: true,
   workboxOptions: {
     runtimeCaching: [
@@ -34,6 +36,17 @@ const withPWA = withPWAInit({
           networkTimeoutSeconds: 3,
           cacheableResponse: {
             statuses: [0, 200],
+          },
+        },
+      },
+      {
+        urlPattern: /\/$/,
+        handler: "NetworkFirst",
+        options: {
+          cacheName: "start-url",
+          expiration: {
+            maxEntries: 1,
+            maxAgeSeconds: 60 * 60 * 24 * 30,
           },
         },
       },
