@@ -3,7 +3,7 @@ const API_URL = '';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth, UserButton, SignIn } from '@clerk/nextjs';
-import { Send, Plus, Layout, Edit, Sparkles, Target, Check, ChevronRight, ChevronLeft, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquarePlus } from 'lucide-react';
+import { Send, Plus, Layout, Edit, Sparkles, Target, Check, ChevronRight, ChevronLeft, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquarePlus, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import TextareaAutosize from 'react-textarea-autosize';
 import { getDevotionalForDay, DevotionalEntry } from '../../lib/devotionals';
@@ -181,6 +181,7 @@ export default function App() {
   const [chats, setChats] = useState<{id: number, title: string, messages: {role: string, content: string}[]}[]>([]);
   const [activeChatId, setActiveChatId] = useState<number | null>(null);
   const [chatInput, setChatInput] = useState('');
+  const [chatQuote, setChatQuote] = useState<{text: string, reference: string} | null>(null);
   const [cooldown, setCooldown] = useState(0);
   const [isAiTyping, setIsAiTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -340,14 +341,14 @@ export default function App() {
       ? `v. ${selectionVerse}` 
       : `v. ${selectionVerse}-${endVerseNumber}`;
 
-    const text = selectionRange.toString();
-    const formattedQuote = `> "${text}" — *${activeBook.name} ${activeChapter}:${verseText}*\n\n`;
+    setChatQuote({
+      text: selectionRange.toString(),
+      reference: `${activeBook.name} ${activeChapter}:${verseText}`
+    });
     
     // Switch to AI tab
     setMobileStudyView('ai');
     if (!showRightSidebar) setShowRightSidebar(true);
-    
-    setChatInput(prev => prev ? `${prev}\n${formattedQuote}` : formattedQuote);
     
     setToolbarPosition(null);
     window.getSelection()?.removeAllRanges();
@@ -731,8 +732,15 @@ export default function App() {
 
   const handleSendMessage = async (e?: React.FormEvent | React.KeyboardEvent, overrideText?: string) => {
     if (e) e.preventDefault();
-    const textToSend = overrideText || chatInput;
+    
+    let textToSend = overrideText || chatInput;
+    if (chatQuote && !overrideText) {
+      textToSend = `> "${chatQuote.text}" — *${chatQuote.reference}*\n\n${textToSend}`;
+    }
+    
     if (!textToSend.trim() || cooldown > 0) return;
+    
+    setChatQuote(null);
 
     let targetChatId = activeChatId;
 
@@ -1310,6 +1318,21 @@ export default function App() {
               </div>
               <form onSubmit={handleSendMessage} className="p-4 border-t border-[#30302e] bg-[#141413] shrink-0">
                 <div className="relative">
+                  {chatQuote && (
+                    <div className="mb-3 relative group">
+                      <div className="border-l-[3px] border-[#c96442] bg-[#c96442]/10 py-2.5 px-4 rounded-r-xl rounded-bl-sm shadow-sm">
+                        <button 
+                          type="button" 
+                          onClick={() => setChatQuote(null)} 
+                          className="absolute -top-2 -right-2 bg-[#30302e] border border-[#4d4c48] text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                        >
+                          <X size={12} />
+                        </button>
+                        <p className="text-[13px] text-[#e4e1cf] italic line-clamp-3">"{chatQuote.text}"</p>
+                        <p className="text-[11px] text-[#87867f] font-semibold mt-1">— {chatQuote.reference}</p>
+                      </div>
+                    </div>
+                  )}
                   <TextareaAutosize 
                     minRows={1}
                     maxRows={6}
@@ -1529,6 +1552,21 @@ export default function App() {
                   </div>
                   <form onSubmit={handleSendMessage} className="p-6 border-t border-[#30302e] w-full shrink-0">
                     <div className="relative max-w-4xl mx-auto">
+                      {chatQuote && (
+                        <div className="mb-3 relative group max-w-3xl">
+                          <div className="border-l-[3px] border-[#c96442] bg-[#c96442]/10 py-3 px-5 rounded-r-xl rounded-bl-sm shadow-sm">
+                            <button 
+                              type="button" 
+                              onClick={() => setChatQuote(null)} 
+                              className="absolute -top-2 -right-2 bg-[#30302e] border border-[#4d4c48] text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                            >
+                              <X size={12} />
+                            </button>
+                            <p className="text-[14px] text-[#e4e1cf] italic line-clamp-4">"{chatQuote.text}"</p>
+                            <p className="text-[12px] text-[#87867f] font-semibold mt-1">— {chatQuote.reference}</p>
+                          </div>
+                        </div>
+                      )}
                       <TextareaAutosize 
                         minRows={1}
                         maxRows={6}
