@@ -37,6 +37,24 @@ const markdownComponents = {
   a: ({ children, href }: any) => <a href={href} className="text-[#c96442] hover:underline" target="_blank" rel="noreferrer">{children}</a>,
 };
 
+const userMarkdownComponents = {
+  p: ({ children }: any) => <p className="mb-4 last:mb-0 leading-[1.7] text-[15px]">{children}</p>,
+  blockquote: ({ children }: any) => (
+    <blockquote className="border-l-[3px] border-white/40 bg-white/10 py-3 px-5 my-3 italic rounded-r-xl shadow-sm text-white/90 text-[15px]">
+      {children}
+    </blockquote>
+  ),
+  strong: ({ children }: any) => <strong className="font-semibold text-white">{children}</strong>,
+  em: ({ children }: any) => <em className="italic text-white/90">{children}</em>,
+  ul: ({ children }: any) => <ul className="list-disc pl-6 mb-4 space-y-2">{children}</ul>,
+  ol: ({ children }: any) => <ol className="list-decimal pl-6 mb-4 space-y-2">{children}</ol>,
+  li: ({ children }: any) => <li className="leading-[1.7] text-[15px]">{children}</li>,
+  h1: ({ children }: any) => <h1 className="text-xl font-bold mb-4 mt-6 text-white">{children}</h1>,
+  h2: ({ children }: any) => <h2 className="text-[18px] font-bold mb-3 mt-5 text-white">{children}</h2>,
+  h3: ({ children }: any) => <h3 className="text-[16px] font-bold mb-2 mt-4 text-white/90">{children}</h3>,
+  a: ({ children, href }: any) => <a href={href} className="text-white hover:underline" target="_blank" rel="noreferrer">{children}</a>,
+};
+
 // Typewriter configuration
 const seenMessages = new Set<string>();
 
@@ -1041,7 +1059,7 @@ export default function App() {
                           {m.role === 'model' && i === activeChat.messages.length - 1 ? (
                             <TypewriterMessage content={m.content} />
                           ) : (
-                            <ReactMarkdown components={markdownComponents}>{m.content}</ReactMarkdown>
+                            <ReactMarkdown components={m.role === 'user' ? userMarkdownComponents : markdownComponents}>{m.content}</ReactMarkdown>
                           )}
                         </div>
                       </div>
@@ -1272,7 +1290,7 @@ export default function App() {
                         {m.role === 'model' && i === activeChat.messages.length - 1 ? (
                             <TypewriterMessage content={m.content} />
                           ) : (
-                            <ReactMarkdown components={markdownComponents}>{m.content}</ReactMarkdown>
+                            <ReactMarkdown components={m.role === 'user' ? userMarkdownComponents : markdownComponents}>{m.content}</ReactMarkdown>
                           )}
                       </div>
                     </div>
@@ -1491,7 +1509,7 @@ export default function App() {
                             {m.role === 'model' && i === activeChat.messages.length - 1 ? (
                             <TypewriterMessage content={m.content} />
                           ) : (
-                            <ReactMarkdown components={markdownComponents}>{m.content}</ReactMarkdown>
+                            <ReactMarkdown components={m.role === 'user' ? userMarkdownComponents : markdownComponents}>{m.content}</ReactMarkdown>
                           )}
                           </div>
                         </div>
