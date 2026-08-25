@@ -196,7 +196,7 @@ export default function App() {
       setSelectionVerse(verseNumber);
       setToolbarPosition({
         x: rect.left + rect.width / 2,
-        y: rect.top - 40 // 40px above
+        y: rect.top - 4
       });
     } else {
       setToolbarPosition(null);
@@ -328,7 +328,7 @@ export default function App() {
                 setActiveHighlightMenu({
                   id: seg.highlight!.id,
                   x: rect.left + rect.width / 2,
-                  y: rect.top - 10
+                  y: rect.top - 4
                 });
               }}
               className={`cursor-pointer rounded-sm px-0.5 ${seg.highlight.color === 'yellow' ? 'bg-yellow-500/40 text-inherit' : seg.highlight.color === 'green' ? 'bg-green-500/40 text-inherit' : seg.highlight.color === 'blue' ? 'bg-blue-500/40 text-inherit' : seg.highlight.color === 'pink' ? 'bg-pink-500/40 text-inherit' : 'bg-purple-500/40 text-inherit'}`}
@@ -1248,7 +1248,7 @@ export default function App() {
         {toolbarPosition && (
           <div 
             className="fixed z-50 flex items-center gap-1.5 bg-[#30302e] border border-[#4d4c48] p-1.5 rounded-xl shadow-2xl backdrop-blur-md transform -translate-x-1/2 -translate-y-full"
-            style={{ left: toolbarPosition.x, top: toolbarPosition.y - 10 }}
+            style={{ left: toolbarPosition.x, top: toolbarPosition.y }}
           >
             <button onClick={() => saveHighlight('yellow')} className="w-7 h-7 rounded-full bg-yellow-500 hover:scale-110 transition-transform shadow-sm" title="Highlight Yellow" />
             <button onClick={() => saveHighlight('green')} className="w-7 h-7 rounded-full bg-green-500 hover:scale-110 transition-transform shadow-sm" title="Highlight Green" />
