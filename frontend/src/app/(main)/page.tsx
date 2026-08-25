@@ -1317,7 +1317,7 @@ export default function App() {
                 <div ref={messagesEndRef} />
               </div>
               <form onSubmit={handleSendMessage} className="p-4 border-t border-[#30302e] bg-[#141413] shrink-0">
-                <div className="relative">
+                <div className="flex flex-col">
                   {chatQuote && (
                     <div className="mb-3 relative group">
                       <div className="border-l-[3px] border-[#c96442] bg-[#c96442]/10 py-2.5 px-4 rounded-r-xl rounded-bl-sm shadow-sm">
@@ -1333,6 +1333,7 @@ export default function App() {
                       </div>
                     </div>
                   )}
+                  <div className="relative">
                   <TextareaAutosize 
                     minRows={1}
                     maxRows={6}
@@ -1350,6 +1351,7 @@ export default function App() {
                   >
                     <Send size={16} />
                   </button>
+                  </div>
                 </div>
               </form>
               </Panel>
@@ -1551,7 +1553,7 @@ export default function App() {
                     <div ref={messagesEndRef} />
                   </div>
                   <form onSubmit={handleSendMessage} className="p-6 border-t border-[#30302e] w-full shrink-0">
-                    <div className="relative max-w-4xl mx-auto">
+                    <div className="flex flex-col max-w-4xl mx-auto w-full">
                       {chatQuote && (
                         <div className="mb-3 relative group max-w-3xl">
                           <div className="border-l-[3px] border-[#c96442] bg-[#c96442]/10 py-3 px-5 rounded-r-xl rounded-bl-sm shadow-sm">
@@ -1567,6 +1569,7 @@ export default function App() {
                           </div>
                         </div>
                       )}
+                      <div className="relative">
                       <TextareaAutosize 
                         minRows={1}
                         maxRows={6}
@@ -1584,6 +1587,7 @@ export default function App() {
                       >
                         <Send size={16} />
                       </button>
+                      </div>
                     </div>
                   </form>
                 </>
