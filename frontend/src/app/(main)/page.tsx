@@ -3,8 +3,9 @@ const API_URL = '';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth, UserButton, SignIn } from '@clerk/nextjs';
-import { Send, Plus, Layout, Edit, Sparkles, Target, Check, ChevronRight, ChevronLeft, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen } from 'lucide-react';
+import { Send, Plus, Layout, Edit, Sparkles, Target, Check, ChevronRight, ChevronLeft, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquarePlus } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import TextareaAutosize from 'react-textarea-autosize';
 import { getDevotionalForDay, DevotionalEntry } from '../../lib/devotionals';
 import PWAInstallPrompt from '../PWAInstallPrompt';
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from 'react-resizable-panels';
@@ -18,6 +19,23 @@ const ntStr = "Matthew:28,Mark:16,Luke:24,John:21,Acts:28,Romans:16,1 Corinthian
 const OT_BOOKS = otStr.split(',').map(s => { const [n, c] = s.split(':'); return { name: n, chapters: parseInt(c) }; });
 const NT_BOOKS = ntStr.split(',').map(s => { const [n, c] = s.split(':'); return { name: n, chapters: parseInt(c) }; });
 
+const markdownComponents = {
+  p: ({ children }: any) => <p className="mb-4 last:mb-0 leading-[1.7] text-[15px]">{children}</p>,
+  blockquote: ({ children }: any) => (
+    <blockquote className="border-l-[3px] border-[#c96442] bg-[#c96442]/10 py-3 px-5 my-5 italic rounded-r-xl shadow-sm text-[#e4e1cf] text-[15px]">
+      {children}
+    </blockquote>
+  ),
+  strong: ({ children }: any) => <strong className="font-semibold text-[#faf9f5]">{children}</strong>,
+  em: ({ children }: any) => <em className="italic text-[#e4e1cf]">{children}</em>,
+  ul: ({ children }: any) => <ul className="list-disc pl-6 mb-4 space-y-2">{children}</ul>,
+  ol: ({ children }: any) => <ol className="list-decimal pl-6 mb-4 space-y-2">{children}</ol>,
+  li: ({ children }: any) => <li className="leading-[1.7] text-[15px]">{children}</li>,
+  h1: ({ children }: any) => <h1 className="text-xl font-bold mb-4 mt-6 text-[#faf9f5]">{children}</h1>,
+  h2: ({ children }: any) => <h2 className="text-[18px] font-bold mb-3 mt-5 text-[#faf9f5]">{children}</h2>,
+  h3: ({ children }: any) => <h3 className="text-[16px] font-bold mb-2 mt-4 text-[#e4e1cf]">{children}</h3>,
+  a: ({ children, href }: any) => <a href={href} className="text-[#c96442] hover:underline" target="_blank" rel="noreferrer">{children}</a>,
+};
 
 // Typewriter configuration
 const seenMessages = new Set<string>();
@@ -46,7 +64,7 @@ const TypewriterMessage = ({ content }: { content: string }) => {
     return () => clearInterval(interval);
   }, [content]);
 
-  return <ReactMarkdown>{displayed}</ReactMarkdown>;
+  return <ReactMarkdown components={markdownComponents}>{displayed}</ReactMarkdown>;
 };
 
 export default function App() {
@@ -284,6 +302,37 @@ export default function App() {
     window.getSelection()?.removeAllRanges();
     
     handleSendMessage(undefined, query);
+  };
+
+  const addHighlightToChat = () => {
+    if (!selectionRange || !selectionVerse) return;
+    
+    // Check if the selection spans multiple verses
+    let endVerseNumber = selectionVerse;
+    let endNode = selectionRange.endContainer.parentNode;
+    while (endNode && endNode !== document.body) {
+      if (endNode instanceof HTMLElement && endNode.getAttribute('data-verse')) {
+        endVerseNumber = parseInt(endNode.getAttribute('data-verse')!, 10);
+        break;
+      }
+      endNode = endNode.parentNode;
+    }
+    
+    const verseText = selectionVerse === endVerseNumber 
+      ? `v. ${selectionVerse}` 
+      : `v. ${selectionVerse}-${endVerseNumber}`;
+
+    const text = selectionRange.toString();
+    const formattedQuote = `> "${text}" — *${activeBook.name} ${activeChapter}:${verseText}*\n\n`;
+    
+    // Switch to AI tab
+    setMobileStudyView('ai');
+    if (!showRightSidebar) setShowRightSidebar(true);
+    
+    setChatInput(prev => prev ? `${prev}\n${formattedQuote}` : formattedQuote);
+    
+    setToolbarPosition(null);
+    window.getSelection()?.removeAllRanges();
   };
 
 
@@ -655,7 +704,14 @@ export default function App() {
   };
 
 
-  const handleSendMessage = async (e?: React.FormEvent, overrideText?: string) => {
+  const handleChatKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage(e as any);
+    }
+  };
+
+  const handleSendMessage = async (e?: React.FormEvent | React.KeyboardEvent, overrideText?: string) => {
     if (e) e.preventDefault();
     const textToSend = overrideText || chatInput;
     if (!textToSend.trim() || cooldown > 0) return;
@@ -985,7 +1041,7 @@ export default function App() {
                           {m.role === 'model' && i === activeChat.messages.length - 1 ? (
                             <TypewriterMessage content={m.content} />
                           ) : (
-                            <ReactMarkdown>{m.content}</ReactMarkdown>
+                            <ReactMarkdown components={markdownComponents}>{m.content}</ReactMarkdown>
                           )}
                         </div>
                       </div>
@@ -1216,7 +1272,7 @@ export default function App() {
                         {m.role === 'model' && i === activeChat.messages.length - 1 ? (
                             <TypewriterMessage content={m.content} />
                           ) : (
-                            <ReactMarkdown>{m.content}</ReactMarkdown>
+                            <ReactMarkdown components={markdownComponents}>{m.content}</ReactMarkdown>
                           )}
                       </div>
                     </div>
@@ -1236,18 +1292,20 @@ export default function App() {
               </div>
               <form onSubmit={handleSendMessage} className="p-4 border-t border-[#30302e] bg-[#141413] shrink-0">
                 <div className="relative">
-                  <input 
-                    type="text" 
+                  <TextareaAutosize 
+                    minRows={1}
+                    maxRows={6}
                     value={chatInput} 
                     onChange={e => setChatInput(e.target.value)}
+                    onKeyDown={handleChatKeyDown}
                     disabled={cooldown > 0 || !isOnline}
                     placeholder={!isOnline ? "Study AI is unavailable offline" : cooldown > 0 ? `Study AI is resting... (${cooldown}s)` : "Message Study AI..."}
-                    className="w-full bg-[#30302e] text-[#faf9f5] rounded-full pl-5 pr-12 py-3 text-[14px] focus:outline-none focus:ring-[3px] focus:ring-[rgba(56,152,236,0.3)] disabled:opacity-50 transition-all placeholder:text-[#5e5d59]"
+                    className="w-full bg-[#30302e] text-[#faf9f5] rounded-[24px] pl-5 pr-12 py-3 text-[14px] focus:outline-none focus:ring-[3px] focus:ring-[rgba(56,152,236,0.3)] disabled:opacity-50 transition-all placeholder:text-[#5e5d59] resize-none overflow-hidden"
                   />
                   <button 
                     type="submit" 
                     disabled={!chatInput.trim() || cooldown > 0 || !isOnline} 
-                    className="absolute right-1.5 top-1.5 p-2 bg-[#c96442] hover:bg-[#b5583b] text-white rounded-full disabled:opacity-50 disabled:hover:bg-[#c96442] transition-colors"
+                    className="absolute right-1.5 bottom-1.5 p-2 bg-[#c96442] hover:bg-[#b5583b] text-white rounded-full disabled:opacity-50 disabled:hover:bg-[#c96442] transition-colors"
                   >
                     <Send size={16} />
                   </button>
@@ -1274,6 +1332,9 @@ export default function App() {
             <div className="w-[1px] h-5 bg-[#4d4c48] mx-1" />
             <button onClick={askAiAboutHighlight} className="flex items-center justify-center h-7 px-2.5 rounded-lg bg-[#c96442] text-white hover:bg-[#d87654] hover:scale-105 transition-all text-xs font-semibold shadow-sm gap-1">
               <Sparkles size={12} /> Ask AI
+            </button>
+            <button onClick={addHighlightToChat} className="flex items-center justify-center h-7 px-2.5 rounded-lg bg-[#30302e] border border-[#4d4c48] text-[#e4e1cf] hover:bg-[#4d4c48] hover:scale-105 transition-all text-xs font-semibold shadow-sm gap-1" title="Add to Chat">
+              <MessageSquarePlus size={12} />
             </button>
           </div>
         )}
@@ -1430,7 +1491,7 @@ export default function App() {
                             {m.role === 'model' && i === activeChat.messages.length - 1 ? (
                             <TypewriterMessage content={m.content} />
                           ) : (
-                            <ReactMarkdown>{m.content}</ReactMarkdown>
+                            <ReactMarkdown components={markdownComponents}>{m.content}</ReactMarkdown>
                           )}
                           </div>
                         </div>
@@ -1450,18 +1511,20 @@ export default function App() {
                   </div>
                   <form onSubmit={handleSendMessage} className="p-6 border-t border-[#30302e] w-full shrink-0">
                     <div className="relative max-w-4xl mx-auto">
-                      <input 
-                        type="text" 
+                      <TextareaAutosize 
+                        minRows={1}
+                        maxRows={6}
                         value={chatInput} 
                         onChange={e => setChatInput(e.target.value)}
+                        onKeyDown={handleChatKeyDown}
                         disabled={cooldown > 0}
                         placeholder={cooldown > 0 ? `Study AI is resting... (${cooldown}s remaining)` : "Message Study AI..."}
-                        className="w-full bg-[#30302e] text-[#faf9f5] rounded-full pl-6 pr-14 py-4 text-[15px] focus:outline-none focus:ring-[3px] focus:ring-[rgba(56,152,236,0.3)] disabled:opacity-50 transition-all placeholder:text-[#5e5d59]"
+                        className="w-full bg-[#30302e] text-[#faf9f5] rounded-[26px] pl-6 pr-14 py-4 text-[15px] focus:outline-none focus:ring-[3px] focus:ring-[rgba(56,152,236,0.3)] disabled:opacity-50 transition-all placeholder:text-[#5e5d59] resize-none overflow-hidden"
                       />
                       <button 
                         type="submit" 
                         disabled={!chatInput.trim() || cooldown > 0} 
-                        className="absolute right-2 top-2 p-2.5 bg-[#c96442] hover:bg-[#b5583b] text-white rounded-full disabled:opacity-50 disabled:hover:bg-[#c96442] transition-colors"
+                        className="absolute right-2 bottom-2 p-2.5 bg-[#c96442] hover:bg-[#b5583b] text-white rounded-full disabled:opacity-50 disabled:hover:bg-[#c96442] transition-colors"
                       >
                         <Send size={16} />
                       </button>
