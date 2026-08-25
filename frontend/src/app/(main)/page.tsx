@@ -257,8 +257,24 @@ export default function App() {
 
   const askAiAboutHighlight = () => {
     if (!selectionRange || !selectionVerse) return;
+    
+    // Check if the selection spans multiple verses
+    let endVerseNumber = selectionVerse;
+    let endNode = selectionRange.endContainer.parentNode;
+    while (endNode && endNode !== document.body) {
+      if (endNode instanceof HTMLElement && endNode.getAttribute('data-verse')) {
+        endVerseNumber = parseInt(endNode.getAttribute('data-verse')!, 10);
+        break;
+      }
+      endNode = endNode.parentNode;
+    }
+    
+    const verseText = selectionVerse === endVerseNumber 
+      ? `verse ${selectionVerse}` 
+      : `verses ${selectionVerse}-${endVerseNumber}`;
+
     const text = selectionRange.toString();
-    const query = `What does "${text}" mean in verse ${selectionVerse} of ${activeBook.name} ${activeChapter}?`;
+    const query = `What does "${text}" mean in ${verseText} of ${activeBook.name} ${activeChapter}?`;
     
     // Switch to AI tab
     setMobileStudyView('ai');
