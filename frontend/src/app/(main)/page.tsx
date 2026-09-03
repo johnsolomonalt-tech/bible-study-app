@@ -266,11 +266,41 @@ export default function App() {
     }
     if (!selectionRange || !selectionVerse) return;
     
+    if (toolbarPosition?.highlightId) {
+      const existingId = toolbarPosition.highlightId;
+      setHighlights(prev => prev.map(h => h.id === existingId ? { ...h, color } : h));
+      setToolbarPosition(null);
+      window.getSelection()?.removeAllRanges();
+
+      try {
+        await fetchWithAuth(`${API_URL}/api/highlights/${existingId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ color })
+        });
+      } catch (e) {
+        console.error("Failed to update highlight", e);
+      }
+      return;
+    }
+    
     let text = selectionRange.toString().trim();
     const versePrefix = `${selectionVerse}`;
     if (text.startsWith(versePrefix)) {
       text = text.substring(versePrefix.length).trim();
     }
+    
+    // Fallback protection: if they try to highlight over text that is already highlighted but toolbarPosition doesn't have the id for some reason
+    const verseHighlights = highlights.filter(h => h.book === activeBook.name && h.chapter === activeChapter && h.verse === selectionVerse);
+    const hasOverlap = verseHighlights.some(h => h.text.toLowerCase().includes(text.toLowerCase()) || text.toLowerCase().includes(h.text.toLowerCase()));
+    
+    if (hasOverlap) {
+      alert("This text is already highlighted. Click the highlight to change its color or delete it.");
+      setToolbarPosition(null);
+      window.getSelection()?.removeAllRanges();
+      return;
+    }
+    
     const verse = selectionVerse;
     const book = activeBook.name;
     const chapter = activeChapter;
