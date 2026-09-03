@@ -3,7 +3,7 @@ const API_URL = '';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth, UserButton, SignIn } from '@clerk/nextjs';
-import { Send, Plus, Layout, Edit, Sparkles, Target, Check, ChevronRight, ChevronLeft, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquarePlus, X } from 'lucide-react';
+import { Send, Plus, Layout, Edit, Sparkles, Target, Check, ChevronRight, ChevronLeft, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquarePlus, X, Paperclip, Image as ImageIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import TextareaAutosize from 'react-textarea-autosize';
 import { getDevotionalForDay, DevotionalEntry } from '../../lib/devotionals';
@@ -182,6 +182,8 @@ export default function App() {
   const [activeChatId, setActiveChatId] = useState<number | null>(null);
   const [chatInput, setChatInput] = useState('');
   const [chatQuote, setChatQuote] = useState<{text: string, reference: string} | null>(null);
+  const [chatImage, setChatImage] = useState<{base64: string, mimeType: string, preview: string} | null>(null);
+  const imageFileRef = useRef<HTMLInputElement>(null);
   const [cooldown, setCooldown] = useState(0);
   const [isAiTyping, setIsAiTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -803,9 +805,13 @@ export default function App() {
       textToSend = `> "${chatQuote.text}" — *${chatQuote.reference}*\n\n${textToSend}`;
     }
     
-    if (!textToSend.trim() || cooldown > 0) return;
+    const isFirstMessage = !activeChatId;
+    if (!textToSend.trim() && !chatImage) return;
+    if (cooldown > 0) return;
     
     setChatQuote(null);
+    const currentImage = chatImage;
+    setChatImage(null);
 
     let targetChatId = activeChatId;
 
@@ -819,13 +825,13 @@ export default function App() {
       const newChat = await res.json();
       targetChatId = newChat.id;
       
-      const newMsg = { role: 'user', content: textToSend.trim() };
+      const newMsg = { role: 'user', content: textToSend.trim(), imagePreview: currentImage?.preview };
       const chatWithOptimisticMsg = { ...newChat, messages: [newMsg] };
       
       setChats(prev => [chatWithOptimisticMsg, ...prev]);
       setActiveChatId(newChat.id);
     } else {
-      const newMsg = { role: 'user', content: textToSend.trim() };
+      const newMsg = { role: 'user', content: textToSend.trim(), imagePreview: currentImage?.preview };
       setChats(prev => prev.map(c => {
         if (c.id === targetChatId) {
           return { ...c, messages: [...c.messages, newMsg] };
@@ -843,17 +849,40 @@ export default function App() {
     const res = await fetchWithAuth(`${API_URL}/api/chats/${targetChatId}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: currentInput })
+      body: JSON.stringify({ 
+        content: currentInput,
+        image: currentImage ? { base64: currentImage.base64, mimeType: currentImage.mimeType } : undefined
+      })
     });
     
     if (res.ok) {
       const data = await res.json();
       setChats(prev => prev.map(c => {
         if (c.id === targetChatId) {
-          return { ...c, messages: [...c.messages.slice(0, -1), data.userMessage, data.aiMessage] };
+          const msgs = c.messages;
+          const lastUserIdx = [...msgs].reverse().findIndex(m => m.role === 'user');
+          const sliceEnd = lastUserIdx >= 0 ? msgs.length - lastUserIdx : msgs.length;
+          return { ...c, messages: [...msgs.slice(0, sliceEnd - 1), { ...msgs[sliceEnd - 1], ...data.userMessage }, data.aiMessage] };
         }
         return c;
       }));
+
+      // Auto-name the conversation after the first exchange
+      if (isFirstMessage && targetChatId) {
+        try {
+          const nameRes = await fetchWithAuth(`${API_URL}/api/chats/${targetChatId}/name`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userMessage: currentInput })
+          });
+          if (nameRes.ok) {
+            const { title } = await nameRes.json();
+            setChats(prev => prev.map(c => c.id === targetChatId ? { ...c, title } : c));
+          }
+        } catch {
+          // Silent fail — auto-naming is non-critical
+        }
+      }
     } else {
       const errorData = await res.json().catch(() => null);
       const errorMsg = { 
@@ -1360,10 +1389,13 @@ export default function App() {
                         ? 'bg-[#c96442] text-white rounded-2xl rounded-br-sm shadow-sm' 
                         : 'bg-[#30302e] text-[#faf9f5] rounded-2xl rounded-bl-sm ring-1 ring-[#4d4c48] shadow-sm markdown-body'
                       }`}>
+                        {(m as any).imagePreview && (
+                          <img src={(m as any).imagePreview} alt="attached" className="max-h-40 rounded-xl mb-2 object-contain" />
+                        )}
                         {m.role === 'model' && i === activeChat.messages.length - 1 ? (
                             <TypewriterMessage content={m.content} />
                           ) : (
-                            <ReactMarkdown components={m.role === 'user' ? userMarkdownComponents : markdownComponents}>{m.content}</ReactMarkdown>
+                            m.content ? <ReactMarkdown components={m.role === 'user' ? userMarkdownComponents : markdownComponents}>{m.content}</ReactMarkdown> : null
                           )}
                       </div>
                     </div>
@@ -1381,44 +1413,67 @@ export default function App() {
                 )}
                 <div ref={messagesEndRef} />
               </div>
-              <form onSubmit={handleSendMessage} className="p-4 border-t border-[#30302e] bg-[#141413] shrink-0">
-                <div className="flex flex-col">
-                  {chatQuote && (
-                    <div className="mb-3 relative group">
-                      <div className="border-l-[3px] border-[#c96442] bg-[#c96442]/10 py-2.5 px-4 rounded-r-xl rounded-bl-sm shadow-sm">
-                        <button 
-                          type="button" 
-                          onClick={() => setChatQuote(null)} 
-                          className="absolute -top-2 -right-2 bg-[#30302e] border border-[#4d4c48] text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                        >
-                          <X size={12} />
-                        </button>
-                        <p className="text-[13px] text-[#e4e1cf] italic line-clamp-3">"{chatQuote.text}"</p>
-                        <p className="text-[11px] text-[#87867f] font-semibold mt-1">— {chatQuote.reference}</p>
+                <form onSubmit={handleSendMessage} className="p-4 border-t border-[#30302e] bg-[#141413] shrink-0">
+                  <input ref={imageFileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                      const dataUrl = ev.target?.result as string;
+                      const base64 = dataUrl.split(',')[1];
+                      setChatImage({ base64, mimeType: file.type, preview: dataUrl });
+                    };
+                    reader.readAsDataURL(file);
+                    e.target.value = '';
+                  }} />
+                  <div className="flex flex-col">
+                    {chatQuote && (
+                      <div className="mb-3 relative group">
+                        <div className="border-l-[3px] border-[#c96442] bg-[#c96442]/10 py-2.5 px-4 rounded-r-xl rounded-bl-sm shadow-sm">
+                          <button 
+                            type="button" 
+                            onClick={() => setChatQuote(null)} 
+                            className="absolute -top-2 -right-2 bg-[#30302e] border border-[#4d4c48] text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                          >
+                            <X size={12} />
+                          </button>
+                          <p className="text-[13px] text-[#e4e1cf] italic line-clamp-3">"{chatQuote.text}"</p>
+                          <p className="text-[11px] text-[#87867f] font-semibold mt-1">— {chatQuote.reference}</p>
+                        </div>
                       </div>
+                    )}
+                    {chatImage && (
+                      <div className="mb-2 relative self-start">
+                        <img src={chatImage.preview} alt="preview" className="h-16 rounded-xl object-cover border border-[#4d4c48]" />
+                        <button type="button" onClick={() => setChatImage(null)} className="absolute -top-1.5 -right-1.5 bg-[#30302e] border border-[#4d4c48] rounded-full p-0.5">
+                          <X size={10} className="text-white" />
+                        </button>
+                      </div>
+                    )}
+                    <div className="relative flex items-end">
+                      <button type="button" onClick={() => imageFileRef.current?.click()} disabled={cooldown > 0 || !isOnline} className="flex-shrink-0 p-2 text-[#87867f] hover:text-[#e4e1cf] disabled:opacity-40 transition-colors mr-1">
+                        <Paperclip size={16} />
+                      </button>
+                    <TextareaAutosize 
+                      minRows={1}
+                      maxRows={6}
+                      value={chatInput} 
+                      onChange={e => setChatInput(e.target.value)}
+                      onKeyDown={handleChatKeyDown}
+                      disabled={cooldown > 0 || !isOnline}
+                      placeholder={!isOnline ? "Study AI is unavailable offline" : cooldown > 0 ? `Study AI is resting... (${cooldown}s)` : "Message Study AI..."}
+                      className="flex-1 bg-[#30302e] text-[#faf9f5] rounded-[24px] pl-5 pr-12 py-3 text-[14px] focus:outline-none focus:ring-[3px] focus:ring-[rgba(56,152,236,0.3)] disabled:opacity-50 transition-all placeholder:text-[#5e5d59] resize-none overflow-hidden"
+                    />
+                    <button 
+                      type="submit" 
+                      disabled={(!chatInput.trim() && !chatImage) || cooldown > 0 || !isOnline} 
+                      className="absolute right-1.5 bottom-1.5 p-2 bg-[#c96442] hover:bg-[#b5583b] text-white rounded-full disabled:opacity-50 disabled:hover:bg-[#c96442] transition-colors"
+                    >
+                      <Send size={16} />
+                    </button>
                     </div>
-                  )}
-                  <div className="relative">
-                  <TextareaAutosize 
-                    minRows={1}
-                    maxRows={6}
-                    value={chatInput} 
-                    onChange={e => setChatInput(e.target.value)}
-                    onKeyDown={handleChatKeyDown}
-                    disabled={cooldown > 0 || !isOnline}
-                    placeholder={!isOnline ? "Study AI is unavailable offline" : cooldown > 0 ? `Study AI is resting... (${cooldown}s)` : "Message Study AI..."}
-                    className="w-full bg-[#30302e] text-[#faf9f5] rounded-[24px] pl-5 pr-12 py-3 text-[14px] focus:outline-none focus:ring-[3px] focus:ring-[rgba(56,152,236,0.3)] disabled:opacity-50 transition-all placeholder:text-[#5e5d59] resize-none overflow-hidden"
-                  />
-                  <button 
-                    type="submit" 
-                    disabled={!chatInput.trim() || cooldown > 0 || !isOnline} 
-                    className="absolute right-1.5 bottom-1.5 p-2 bg-[#c96442] hover:bg-[#b5583b] text-white rounded-full disabled:opacity-50 disabled:hover:bg-[#c96442] transition-colors"
-                  >
-                    <Send size={16} />
-                  </button>
                   </div>
-                </div>
-              </form>
+                </form>
               </Panel>
             )}
           </PanelGroup>
@@ -1593,10 +1648,13 @@ export default function App() {
                             ? 'bg-[#c96442] text-white rounded-[20px] rounded-br-sm shadow-sm' 
                             : 'bg-[#30302e] text-[#faf9f5] rounded-[20px] rounded-bl-sm ring-1 ring-[#4d4c48] shadow-sm markdown-body'
                           }`}>
+                            {(m as any).imagePreview && (
+                              <img src={(m as any).imagePreview} alt="attached" className="max-h-52 rounded-xl mb-3 object-contain" />
+                            )}
                             {m.role === 'model' && i === activeChat.messages.length - 1 ? (
                             <TypewriterMessage content={m.content} />
                           ) : (
-                            <ReactMarkdown components={m.role === 'user' ? userMarkdownComponents : markdownComponents}>{m.content}</ReactMarkdown>
+                            m.content ? <ReactMarkdown components={m.role === 'user' ? userMarkdownComponents : markdownComponents}>{m.content}</ReactMarkdown> : null
                           )}
                           </div>
                         </div>
@@ -1631,7 +1689,18 @@ export default function App() {
                           </div>
                         </div>
                       )}
-                      <div className="relative">
+                      {chatImage && (
+                        <div className="mb-2 relative self-start">
+                          <img src={chatImage.preview} alt="preview" className="h-20 rounded-xl object-cover border border-[#4d4c48]" />
+                          <button type="button" onClick={() => setChatImage(null)} className="absolute -top-1.5 -right-1.5 bg-[#30302e] border border-[#4d4c48] rounded-full p-0.5">
+                            <X size={10} className="text-white" />
+                          </button>
+                        </div>
+                      )}
+                      <div className="relative flex items-end">
+                        <button type="button" onClick={() => imageFileRef.current?.click()} disabled={cooldown > 0} className="flex-shrink-0 p-2.5 text-[#87867f] hover:text-[#e4e1cf] disabled:opacity-40 transition-colors mr-1">
+                          <Paperclip size={18} />
+                        </button>
                       <TextareaAutosize 
                         minRows={1}
                         maxRows={6}
@@ -1640,11 +1709,11 @@ export default function App() {
                         onKeyDown={handleChatKeyDown}
                         disabled={cooldown > 0}
                         placeholder={cooldown > 0 ? `Study AI is resting... (${cooldown}s remaining)` : "Message Study AI..."}
-                        className="w-full bg-[#30302e] text-[#faf9f5] rounded-[26px] pl-6 pr-14 py-4 text-[15px] focus:outline-none focus:ring-[3px] focus:ring-[rgba(56,152,236,0.3)] disabled:opacity-50 transition-all placeholder:text-[#5e5d59] resize-none overflow-hidden"
+                        className="flex-1 bg-[#30302e] text-[#faf9f5] rounded-[26px] pl-6 pr-14 py-4 text-[15px] focus:outline-none focus:ring-[3px] focus:ring-[rgba(56,152,236,0.3)] disabled:opacity-50 transition-all placeholder:text-[#5e5d59] resize-none overflow-hidden"
                       />
                       <button 
                         type="submit" 
-                        disabled={!chatInput.trim() || cooldown > 0} 
+                        disabled={(!chatInput.trim() && !chatImage) || cooldown > 0} 
                         className="absolute right-2 bottom-2 p-2.5 bg-[#c96442] hover:bg-[#b5583b] text-white rounded-full disabled:opacity-50 disabled:hover:bg-[#c96442] transition-colors"
                       >
                         <Send size={16} />

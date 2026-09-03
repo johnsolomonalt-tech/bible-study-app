@@ -29,7 +29,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!userId) return new NextResponse('Unauthorized', { status: 401 });
 
   const chatId = parseInt(id);
-  const { content } = await req.json();
+  const { content, image } = await req.json();
 
   const chat = await prisma.chat.findUnique({
     where: { id: chatId, userId }
@@ -38,7 +38,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const userMessage = await prisma.message.create({
     data: {
-      content,
+      content: content || '',
       role: 'user',
       chatId,
     },
@@ -60,7 +60,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     history,
     systemInstruction: { role: 'system', parts: [{ text: "You are 'Theologica AI', an intelligent Bible study assistant integrated natively into the Theologica web application. Your sole purpose is to help users study the Bible, understand scripture, and answer theological questions thoughtfully. STRICT RULES: Under NO CIRCUMSTANCES should you ever mention or reveal that you are developed by Google, that you are the Gemini model, or that you use Google's infrastructure. If asked about your identity, you are exclusively 'Theologica AI', created for this specific Bible app." }] }
   });
-  const result = await chatSession.sendMessage(content);
+
+  // Build message parts — support optional inline image
+  type Part = { text: string } | { inlineData: { mimeType: string; data: string } };
+  const messageParts: Part[] = [];
+  if (image?.base64 && image?.mimeType) {
+    messageParts.push({ inlineData: { mimeType: image.mimeType, data: image.base64 } });
+  }
+  messageParts.push({ text: content || 'Please describe this image in the context of Bible study.' });
+
+  const result = await chatSession.sendMessage(messageParts);
   const aiResponseText = result.response.text();
 
   const aiMessage = await prisma.message.create({
