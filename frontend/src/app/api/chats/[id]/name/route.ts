@@ -1,10 +1,9 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash-lite' });
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -18,15 +17,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!chat) return new NextResponse('Forbidden', { status: 403 });
 
   try {
-    const result = await model.generateContent(
-      `Generate a very short, concise title (3-6 words max) for a Bible study conversation that started with this message: "${userMessage}". 
-      Only return the title itself, no quotes, no punctuation at the end, no extra text.`
-    );
-    const title = result.response.text().trim().replace(/^["']|["']$/g, '');
+    const result = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: `Generate a very short, concise title (3-6 words max) for a Bible study conversation that started with this message: "${userMessage}". 
+      Only return the title itself, no quotes, no punctuation at the end, no extra text.`,
+    });
+
+    const title = (result.text ?? '').trim().replace(/^["']|["']$/g, '');
 
     const updated = await prisma.chat.update({
       where: { id: chatId, userId },
-      data: { title }
+      data: { title: title || 'New Conversation' }
     });
 
     return NextResponse.json({ title: updated.title });

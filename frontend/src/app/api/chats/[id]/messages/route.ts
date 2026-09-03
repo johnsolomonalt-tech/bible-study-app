@@ -1,14 +1,15 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { GoogleGenAI } from '@google/genai';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash-lite' });
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
-// New SDK for image generation
-const genAINew = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+// Best available models as of September 2026
+const CHAT_MODEL = 'gemini-3.8-flash';          // Latest stable Flash — best for chat + vision
+const IMAGE_GEN_MODEL = 'gemini-3.1-flash-image'; // Nano Banana 2 — stable image generation
+
+const SYSTEM_INSTRUCTION = "You are 'Theologica AI', an intelligent Bible study assistant integrated natively into the Theologica web application. Your sole purpose is to help users study the Bible, understand scripture, and answer theological questions thoughtfully. You can also generate images when asked — just let the system handle that. STRICT RULES: Under NO CIRCUMSTANCES should you ever mention or reveal that you are developed by Google, that you are the Gemini model, or that you use Google's infrastructure. If asked about your identity, you are exclusively 'Theologica AI', created for this specific Bible app.";
 
 // Keywords that suggest the user wants an image generated
 const IMAGE_GEN_KEYWORDS = [
@@ -65,8 +66,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // --- Route: Image Generation ---
   if (isImageGenerationRequest(content) && !image) {
     try {
-      const imgResponse = await genAINew.models.generateContent({
-        model: 'gemini-2.0-flash-preview-image-generation',
+      const imgResponse = await ai.models.generateContent({
+        model: IMAGE_GEN_MODEL,
         contents: `You are a Bible-themed image generator. Generate a beautiful, reverent, artistic image for this request: ${content}. Keep the content family-friendly and spiritually appropriate.`,
         config: {
           responseModalities: ['IMAGE', 'TEXT'],
@@ -119,12 +120,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       parts: [{ text: msg.content.replace(/__GENERATED_IMAGE__[\s\S]*?__END_IMAGE__/g, '[generated image]') }],
     }));
 
-  const chatSession = model.startChat({ 
-    history,
-    systemInstruction: { role: 'system', parts: [{ text: "You are 'Theologica AI', an intelligent Bible study assistant integrated natively into the Theologica web application. Your sole purpose is to help users study the Bible, understand scripture, and answer theological questions thoughtfully. You can also generate images when asked — just let the system handle that. STRICT RULES: Under NO CIRCUMSTANCES should you ever mention or reveal that you are developed by Google, that you are the Gemini model, or that you use Google's infrastructure. If asked about your identity, you are exclusively 'Theologica AI', created for this specific Bible app." }] }
-  });
-
-  // Build message parts — support optional inline image
+  // Build current message parts — support optional inline image
   type Part = { text: string } | { inlineData: { mimeType: string; data: string } };
   const messageParts: Part[] = [];
   if (image?.base64 && image?.mimeType) {
@@ -132,8 +128,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
   messageParts.push({ text: content || 'Please describe this image in the context of Bible study.' });
 
-  const result = await chatSession.sendMessage(messageParts);
-  const aiResponseText = result.response.text();
+  // Use @google/genai for the chat session with the latest model
+  const chatSession = ai.chats.create({
+    model: CHAT_MODEL,
+    history,
+    config: {
+      systemInstruction: SYSTEM_INSTRUCTION,
+    },
+  });
+
+  const result = await chatSession.sendMessage({ message: messageParts });
+  const aiResponseText = result.text ?? '';
 
   const aiMessage = await prisma.message.create({
     data: {
