@@ -140,7 +140,7 @@ export default function App() {
   const [highlights, setHighlights] = useState<{id: number, book: string, chapter: number, verse: number, text: string, color: string}[]>([]);
   const [selectionRange, setSelectionRange] = useState<Range | null>(null);
   const [selectionVerse, setSelectionVerse] = useState<number | null>(null);
-  const [toolbarPosition, setToolbarPosition] = useState<{x: number, y: number} | null>(null);
+  const [toolbarPosition, setToolbarPosition] = useState<{x: number, y: number, highlightId?: number} | null>(null);
   const [activeHighlightMenu, setActiveHighlightMenu] = useState<{id: number, x: number, y: number} | null>(null);
   
   const [activeBook, setActiveBook] = useState(OT_BOOKS[0]);
@@ -208,7 +208,6 @@ export default function App() {
 
   // Highlighting Logic
   const handleSelection = useCallback(() => {
-    setActiveHighlightMenu(null);
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed) {
       setToolbarPosition(null);
@@ -231,9 +230,29 @@ export default function App() {
     if (verseNumber) {
       setSelectionRange(range);
       setSelectionVerse(verseNumber);
+      
+      let activeHighlightId: number | undefined = undefined;
+      const commonAncestor = range.commonAncestorContainer;
+      const parentElement = commonAncestor.nodeType === 3 ? commonAncestor.parentElement : commonAncestor as HTMLElement;
+      
+      if (parentElement) {
+        if (parentElement.tagName === 'MARK' && parentElement.dataset.highlightId) {
+          activeHighlightId = parseInt(parentElement.dataset.highlightId, 10);
+        } else {
+          const marks = parentElement.querySelectorAll('mark');
+          for (let i = 0; i < marks.length; i++) {
+            if (window.getSelection()?.containsNode(marks[i], true)) {
+              activeHighlightId = parseInt(marks[i].dataset.highlightId!, 10);
+              break;
+            }
+          }
+        }
+      }
+
       setToolbarPosition({
         x: rect.left + rect.width / 2,
-        y: rect.top - 4
+        y: rect.top - 4,
+        highlightId: activeHighlightId
       });
     } else {
       setToolbarPosition(null);
@@ -278,7 +297,7 @@ export default function App() {
   };
 
   const deleteHighlight = async (id: number) => {
-    setActiveHighlightMenu(null);
+    setToolbarPosition(null);
     if (!isOnline) {
       alert("You must be connected to the internet to delete highlights.");
       return;
@@ -406,13 +425,29 @@ export default function App() {
           seg.highlight ? (
             <mark 
               key={i} 
+              data-highlight-id={seg.highlight.id}
               onClick={(e) => {
                 e.stopPropagation();
+                const range = document.createRange();
+                range.selectNodeContents(e.target as Node);
+                const selection = window.getSelection();
+                selection?.removeAllRanges();
+                selection?.addRange(range);
+                
                 const rect = (e.target as HTMLElement).getBoundingClientRect();
-                setActiveHighlightMenu({
-                  id: seg.highlight!.id,
+                setSelectionRange(range);
+                
+                let verseNumber = null;
+                const verseNode = (e.target as HTMLElement).closest('[data-verse]');
+                if (verseNode) {
+                  verseNumber = parseInt(verseNode.getAttribute('data-verse')!, 10);
+                }
+                setSelectionVerse(verseNumber);
+                
+                setToolbarPosition({
                   x: rect.left + rect.width / 2,
-                  y: rect.top - 4
+                  y: rect.top - 4,
+                  highlightId: seg.highlight!.id
                 });
               }}
               className={`cursor-pointer rounded-sm px-0.5 ${seg.highlight.color === 'yellow' ? 'bg-yellow-500/40 text-inherit' : seg.highlight.color === 'green' ? 'bg-green-500/40 text-inherit' : seg.highlight.color === 'blue' ? 'bg-blue-500/40 text-inherit' : seg.highlight.color === 'pink' ? 'bg-pink-500/40 text-inherit' : 'bg-purple-500/40 text-inherit'}`}
@@ -1379,21 +1414,18 @@ export default function App() {
             <button onClick={addHighlightToChat} className="flex items-center justify-center h-7 px-2.5 rounded-lg bg-[#30302e] border border-[#4d4c48] text-[#e4e1cf] hover:bg-[#4d4c48] hover:scale-105 transition-all text-xs font-semibold shadow-sm gap-1" title="Add to Chat">
               <MessageSquarePlus size={12} />
             </button>
-          </div>
-        )}
-
-        {/* Floating Menu for Existing Highlight */}
-        {activeHighlightMenu && (
-          <div 
-            className="fixed z-50 flex items-center bg-[#30302e] border border-[#4d4c48] p-1.5 rounded-xl shadow-2xl backdrop-blur-md transform -translate-x-1/2 -translate-y-full"
-            style={{ left: activeHighlightMenu.x, top: activeHighlightMenu.y }}
-          >
-            <button 
-              onClick={() => deleteHighlight(activeHighlightMenu.id)} 
-              className="flex items-center justify-center h-7 px-3 rounded-lg bg-[#141413] text-[#ef4444] hover:bg-[#ef4444] hover:text-white transition-all text-[13px] font-medium shadow-sm"
-            >
-              Delete highlight
-            </button>
+            {toolbarPosition.highlightId && (
+              <>
+                <div className="w-[1px] h-5 bg-[#4d4c48] mx-1" />
+                <button 
+                  onClick={() => deleteHighlight(toolbarPosition.highlightId!)} 
+                  className="flex items-center justify-center h-7 px-2 rounded-lg bg-[#30302e] border border-[#4d4c48] text-[#ef4444] hover:bg-[#ef4444] hover:text-white transition-all shadow-sm"
+                  title="Delete Highlight"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </>
+            )}
           </div>
         )}
 
