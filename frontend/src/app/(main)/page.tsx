@@ -58,32 +58,71 @@ const userMarkdownComponents = {
 // Typewriter configuration
 const seenMessages = new Set<string>();
 
+// Parse AI message content — handles __GENERATED_IMAGE__ markers
+function parseAiMessage(content: string): { imageBase64: string | null; textContent: string } {
+  const imageMatch = content.match(/__GENERATED_IMAGE__([\s\S]*?)__END_IMAGE__/);
+  if (imageMatch) {
+    const imageBase64 = imageMatch[1];
+    const textContent = content.replace(/__GENERATED_IMAGE__[\s\S]*?__END_IMAGE__/, '').trim();
+    return { imageBase64, textContent };
+  }
+  return { imageBase64: null, textContent: content };
+}
+
 const TypewriterMessage = ({ content }: { content: string }) => {
-  const [displayed, setDisplayed] = useState(() => seenMessages.has(content) ? content : '');
+  const { imageBase64, textContent } = parseAiMessage(content);
+  const [displayed, setDisplayed] = useState(() => seenMessages.has(content) ? textContent : '');
   
   useEffect(() => {
     if (seenMessages.has(content)) {
-      setDisplayed(content);
+      setDisplayed(textContent);
+      return;
+    }
+    if (imageBase64) {
+      // Images don't need typewriter — just mark as seen
+      seenMessages.add(content);
+      setDisplayed(textContent);
       return;
     }
     
     let index = 0;
     const interval = setInterval(() => {
       index += 25; // Type 25 chars every 15ms for an extremely fast but noticeable typing effect
-      if (index > content.length) index = content.length;
-      setDisplayed(content.slice(0, index));
+      if (index > textContent.length) index = textContent.length;
+      setDisplayed(textContent.slice(0, index));
       
-      if (index >= content.length) {
+      if (index >= textContent.length) {
         clearInterval(interval);
         seenMessages.add(content);
       }
     }, 15);
     
     return () => clearInterval(interval);
-  }, [content]);
+  }, [content, textContent, imageBase64]);
 
-  return <ReactMarkdown components={markdownComponents}>{displayed}</ReactMarkdown>;
+  return (
+    <>
+      {imageBase64 && (
+        <div className="mb-3">
+          <img 
+            src={`data:image/png;base64,${imageBase64}`} 
+            alt="AI generated image" 
+            className="rounded-xl max-w-full object-contain max-h-96 shadow-lg" 
+          />
+          <a 
+            href={`data:image/png;base64,${imageBase64}`} 
+            download="theologica-image.png" 
+            className="inline-flex items-center gap-1.5 mt-2 text-[11px] text-[#87867f] hover:text-[#e4e1cf] transition-colors"
+          >
+            ↓ Download image
+          </a>
+        </div>
+      )}
+      {displayed && <ReactMarkdown components={markdownComponents}>{displayed}</ReactMarkdown>}
+    </>
+  );
 };
+
 
 export default function App() {
   useEffect(() => {
@@ -1394,9 +1433,20 @@ export default function App() {
                         )}
                         {m.role === 'model' && i === activeChat.messages.length - 1 ? (
                             <TypewriterMessage content={m.content} />
-                          ) : (
-                            m.content ? <ReactMarkdown components={m.role === 'user' ? userMarkdownComponents : markdownComponents}>{m.content}</ReactMarkdown> : null
-                          )}
+                          ) : (() => {
+                            const { imageBase64, textContent } = parseAiMessage(m.content);
+                            return (
+                              <>
+                                {imageBase64 && (
+                                  <div className="mb-2">
+                                    <img src={`data:image/png;base64,${imageBase64}`} alt="AI generated" className="rounded-xl max-w-full object-contain max-h-64 shadow-lg" />
+                                    <a href={`data:image/png;base64,${imageBase64}`} download="theologica-image.png" className="inline-flex items-center gap-1 mt-1 text-[10px] text-[#87867f] hover:text-[#e4e1cf] transition-colors">↓ Download</a>
+                                  </div>
+                                )}
+                                {textContent ? <ReactMarkdown components={m.role === 'user' ? userMarkdownComponents : markdownComponents}>{textContent}</ReactMarkdown> : null}
+                              </>
+                            );
+                          })()}
                       </div>
                     </div>
                   ))
@@ -1653,9 +1703,20 @@ export default function App() {
                             )}
                             {m.role === 'model' && i === activeChat.messages.length - 1 ? (
                             <TypewriterMessage content={m.content} />
-                          ) : (
-                            m.content ? <ReactMarkdown components={m.role === 'user' ? userMarkdownComponents : markdownComponents}>{m.content}</ReactMarkdown> : null
-                          )}
+                          ) : (() => {
+                            const { imageBase64, textContent } = parseAiMessage(m.content);
+                            return (
+                              <>
+                                {imageBase64 && (
+                                  <div className="mb-3">
+                                    <img src={`data:image/png;base64,${imageBase64}`} alt="AI generated" className="rounded-xl max-w-full object-contain max-h-96 shadow-lg" />
+                                    <a href={`data:image/png;base64,${imageBase64}`} download="theologica-image.png" className="inline-flex items-center gap-1.5 mt-2 text-[11px] text-[#87867f] hover:text-[#e4e1cf] transition-colors">↓ Download image</a>
+                                  </div>
+                                )}
+                                {textContent ? <ReactMarkdown components={m.role === 'user' ? userMarkdownComponents : markdownComponents}>{textContent}</ReactMarkdown> : null}
+                              </>
+                            );
+                          })()}
                           </div>
                         </div>
                       ))

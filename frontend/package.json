@@ -12,6 +12,7 @@
   "dependencies": {
     "@clerk/nextjs": "latest",
     "@ducanh2912/next-pwa": "^10.2.9",
+    "@google/genai": "^2.21.0",
     "@google/generative-ai": "^0.24.1",
     "@prisma/client": "^5.22.0",
     "framer-motion": "^13.1.1",
