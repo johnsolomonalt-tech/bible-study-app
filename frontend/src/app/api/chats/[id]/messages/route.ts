@@ -6,7 +6,7 @@ import { GoogleGenAI } from '@google/genai';
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
 // Ordered fallback chain — newest first. On 503/overload we try the next one.
-const CHAT_MODELS = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.5-flash'];
+const CHAT_MODELS = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash'];
 
 // Image gen model — Nano Banana 2, fall back to 2.5-flash-image
 const IMAGE_GEN_MODELS = ['gemini-3.1-flash-image', 'gemini-2.5-flash-image'];
@@ -138,7 +138,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         // Image generation needs a paid API key — return a helpful message
         const aiMessage = await prisma.message.create({
           data: {
-            content: "Image generation isn't available on the current plan. To enable AI image creation, a paid Gemini API key is required.\n\nIn the meantime, I can describe the scene in detail or help you with any Bible study questions!",
+            content: "Image generation requires a paid API plan and isn't enabled on this account yet.\n\nI can still help with Bible study — just ask me any question about scripture!",
             role: 'model',
             chatId,
           },
