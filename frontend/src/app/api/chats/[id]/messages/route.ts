@@ -97,6 +97,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   // --- Route: Image Generation ---
   if (isImageGenerationRequest(content) && !image) {
+    let imageGenSucceeded = false;
     try {
       const imgResponse = await withModelFallback(IMAGE_GEN_MODELS, (model) =>
         ai.models.generateContent({
@@ -126,10 +127,27 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         data: { content: aiContent, role: 'model', chatId },
       });
 
+      imageGenSucceeded = true;
       return NextResponse.json({ userMessage, aiMessage }, { status: 201 });
-    } catch (err) {
+    } catch (err: unknown) {
+      // Check if this is a quota/billing error
+      let isQuotaError = false;
+      try { isQuotaError = JSON.parse((err as Error).message)?.error?.code === 429; } catch {}
+
+      if (isQuotaError && !imageGenSucceeded) {
+        // Image generation needs a paid API key — return a helpful message
+        const aiMessage = await prisma.message.create({
+          data: {
+            content: "Image generation isn't available on the current plan. To enable AI image creation, a paid Gemini API key is required.\n\nIn the meantime, I can describe the scene in detail or help you with any Bible study questions!",
+            role: 'model',
+            chatId,
+          },
+        });
+        return NextResponse.json({ userMessage, aiMessage }, { status: 201 });
+      }
+
       console.error('Image generation failed, falling back to text:', err);
-      // Fall through to normal text response
+      // Fall through to normal text response for non-quota errors
     }
   }
 
