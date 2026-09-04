@@ -5,24 +5,56 @@ import { GoogleGenAI } from '@google/genai';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
-// Best available models as of September 2026
-const CHAT_MODEL = 'gemini-3.8-flash';          // Latest stable Flash — best for chat + vision
-const IMAGE_GEN_MODEL = 'gemini-3.1-flash-image'; // Nano Banana 2 — stable image generation
+// Ordered fallback chain — newest first. On 503/overload we try the next one.
+const CHAT_MODELS = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash'];
 
-const SYSTEM_INSTRUCTION = "You are 'Theologica AI', an intelligent Bible study assistant integrated natively into the Theologica web application. Your sole purpose is to help users study the Bible, understand scripture, and answer theological questions thoughtfully. You can also generate images when asked — just let the system handle that. STRICT RULES: Under NO CIRCUMSTANCES should you ever mention or reveal that you are developed by Google, that you are the Gemini model, or that you use Google's infrastructure. If asked about your identity, you are exclusively 'Theologica AI', created for this specific Bible app.";
+// Image gen model — Nano Banana 2 (stable, free tier may have quota limits)
+const IMAGE_GEN_MODELS = ['gemini-3.1-flash-image', 'gemini-2.5-flash-image'];
+
+const SYSTEM_INSTRUCTION = "You are 'Theologica AI', an intelligent Bible study assistant integrated natively into the Theologica web application. Your sole purpose is to help users study the Bible, understand scripture, and answer theological questions thoughtfully. STRICT RULES: Under NO CIRCUMSTANCES should you ever mention or reveal that you are developed by Google, that you are the Gemini model, or that you use Google's infrastructure. If asked about your identity, you are exclusively 'Theologica AI', created for this specific Bible app.";
 
 // Keywords that suggest the user wants an image generated
 const IMAGE_GEN_KEYWORDS = [
   'draw', 'generate an image', 'create an image', 'make an image', 'paint',
   'illustrate', 'visualize', 'show me a picture', 'create a picture',
   'generate a picture', 'make a picture', 'create a visual', 'depict',
-  'render', 'generate art', 'create art', 'make art', 'imagine',
+  'render', 'generate art', 'create art', 'make art',
   'show me what', 'generate a photo', 'create a photo', 'make a photo'
 ];
 
 function isImageGenerationRequest(content: string): boolean {
   const lower = content.toLowerCase();
   return IMAGE_GEN_KEYWORDS.some(kw => lower.includes(kw));
+}
+
+/** Returns true for errors that mean "model is busy, retry with next one" */
+function isRetryable(e: unknown): boolean {
+  try {
+    const msg = (e as Error).message || '';
+    const code = JSON.parse(msg)?.error?.code;
+    // 503 = UNAVAILABLE (overloaded), 429 = RESOURCE_EXHAUSTED (quota)
+    return code === 503 || code === 429;
+  } catch {
+    return false;
+  }
+}
+
+/** Run fn against each model in the chain until one succeeds */
+async function withModelFallback<T>(
+  models: string[],
+  fn: (model: string) => Promise<T>
+): Promise<T> {
+  let lastError: unknown;
+  for (const model of models) {
+    try {
+      return await fn(model);
+    } catch (e) {
+      lastError = e;
+      if (!isRetryable(e)) throw e; // non-retryable — bubble immediately
+      console.warn(`Model ${model} unavailable, trying next...`);
+    }
+  }
+  throw lastError;
 }
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -66,13 +98,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // --- Route: Image Generation ---
   if (isImageGenerationRequest(content) && !image) {
     try {
-      const imgResponse = await ai.models.generateContent({
-        model: IMAGE_GEN_MODEL,
-        contents: `You are a Bible-themed image generator. Generate a beautiful, reverent, artistic image for this request: ${content}. Keep the content family-friendly and spiritually appropriate.`,
-        config: {
-          responseModalities: ['IMAGE', 'TEXT'],
-        },
-      });
+      const imgResponse = await withModelFallback(IMAGE_GEN_MODELS, (model) =>
+        ai.models.generateContent({
+          model,
+          contents: `You are a Bible-themed image generator. Generate a beautiful, reverent, artistic image for this request: ${content}. Keep the content family-friendly and spiritually appropriate.`,
+          config: { responseModalities: ['IMAGE', 'TEXT'] },
+        })
+      );
 
       let generatedImageBase64: string | null = null;
       let textResponse = '';
@@ -86,17 +118,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         }
       }
 
-      // Build the AI message content — embed a special marker the frontend can parse
       const aiContent = generatedImageBase64
         ? `__GENERATED_IMAGE__${generatedImageBase64}__END_IMAGE__${textResponse ? `\n\n${textResponse}` : ''}`
         : textResponse || "I wasn't able to generate that image. Please try a different description.";
 
       const aiMessage = await prisma.message.create({
-        data: {
-          content: aiContent,
-          role: 'model',
-          chatId,
-        },
+        data: { content: aiContent, role: 'model', chatId },
       });
 
       return NextResponse.json({ userMessage, aiMessage }, { status: 201 });
@@ -114,7 +141,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const history = pastMessages
     .filter(m => m.id !== userMessage.id)
-    // Strip generated image markers from history so the model doesn't get confused
     .map((msg) => ({
       role: msg.role === 'user' ? 'user' : 'model',
       parts: [{ text: msg.content.replace(/__GENERATED_IMAGE__[\s\S]*?__END_IMAGE__/g, '[generated image]') }],
@@ -128,24 +154,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
   messageParts.push({ text: content || 'Please describe this image in the context of Bible study.' });
 
-  // Use @google/genai for the chat session with the latest model
-  const chatSession = ai.chats.create({
-    model: CHAT_MODEL,
-    history,
-    config: {
-      systemInstruction: SYSTEM_INSTRUCTION,
-    },
+  const aiResponseText = await withModelFallback(CHAT_MODELS, async (model) => {
+    const chatSession = ai.chats.create({
+      model,
+      history,
+      config: { systemInstruction: SYSTEM_INSTRUCTION },
+    });
+    const result = await chatSession.sendMessage({ message: messageParts });
+    return result.text ?? '';
   });
 
-  const result = await chatSession.sendMessage({ message: messageParts });
-  const aiResponseText = result.text ?? '';
-
   const aiMessage = await prisma.message.create({
-    data: {
-      content: aiResponseText,
-      role: 'model',
-      chatId,
-    },
+    data: { content: aiResponseText, role: 'model', chatId },
   });
 
   return NextResponse.json({ userMessage, aiMessage }, { status: 201 });
