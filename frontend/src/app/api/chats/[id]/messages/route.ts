@@ -99,29 +99,60 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (isImageGenerationRequest(content) && !image) {
     let imageGenSucceeded = false;
     try {
-      const imgResponse = await withModelFallback(IMAGE_GEN_MODELS, (model) =>
-        ai.models.generateContent({
-          model,
-          contents: `You are a Bible-themed image generator. Generate a beautiful, reverent, artistic image for this request: ${content}. Keep the content family-friendly and spiritually appropriate.`,
-          config: { responseModalities: ['IMAGE', 'TEXT'] },
-        })
-      );
-
-      let generatedImageBase64: string | null = null;
-      let textResponse = '';
-
-      const parts = imgResponse.candidates?.[0]?.content?.parts || [];
-      for (const part of parts) {
-        if (part.inlineData?.data) {
-          generatedImageBase64 = part.inlineData.data;
-        } else if (part.text) {
-          textResponse += part.text;
-        }
+      const pixazoKey = process.env.PIXAZO_API_KEY;
+      
+      if (!pixazoKey) {
+        // Fallback message if no API key is provided
+        const aiMessage = await prisma.message.create({
+          data: {
+            content: "Image generation requires a Pixazo API key. Please add PIXAZO_API_KEY to your environment variables to enable Flux image generation.\n\nI can still help with Bible study — just ask me any question about scripture!",
+            role: 'model',
+            chatId,
+          },
+        });
+        return NextResponse.json({ userMessage, aiMessage }, { status: 201 });
       }
 
-      const aiContent = generatedImageBase64
-        ? `__GENERATED_IMAGE__${generatedImageBase64}__END_IMAGE__${textResponse ? `\n\n${textResponse}` : ''}`
-        : textResponse || "I wasn't able to generate that image. Please try a different description.";
+      // 1. Call Pixazo API for image generation
+      const prompt = `A beautiful, reverent, artistic Bible-themed image: ${content}`;
+      const pixazoRes = await fetch('https://gateway.pixazo.ai/flux-1-schnell/v1/getData', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+          'Ocp-Apim-Subscription-Key': pixazoKey,
+        },
+        body: JSON.stringify({
+          prompt: prompt,
+          num_steps: 4,
+          height: 512,
+          width: 512,
+          seed: Math.floor(Math.random() * 100000)
+        })
+      });
+
+      if (!pixazoRes.ok) {
+        throw new Error(`Pixazo API Error: ${pixazoRes.status} ${pixazoRes.statusText}`);
+      }
+
+      const data = await pixazoRes.json();
+      const imageUrl = data.output;
+      
+      if (!imageUrl) {
+        throw new Error("No output URL returned from Pixazo API");
+      }
+
+      // 2. Fetch the actual image from the returned URL to convert to base64
+      const imageFetchRes = await fetch(imageUrl);
+      if (!imageFetchRes.ok) {
+         throw new Error(`Failed to fetch image from URL: ${imageUrl}`);
+      }
+      
+      const imageBuffer = await imageFetchRes.arrayBuffer();
+      const generatedImageBase64 = Buffer.from(imageBuffer).toString('base64');
+      const textResponse = "Here is the image you requested.";
+
+      const aiContent = `__GENERATED_IMAGE__${generatedImageBase64}__END_IMAGE__\n\n${textResponse}`;
 
       const aiMessage = await prisma.message.create({
         data: { content: aiContent, role: 'model', chatId },
@@ -130,24 +161,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       imageGenSucceeded = true;
       return NextResponse.json({ userMessage, aiMessage }, { status: 201 });
     } catch (err: unknown) {
-      // Check if this is a quota/billing error
-      let isQuotaError = false;
-      try { isQuotaError = JSON.parse((err as Error).message)?.error?.code === 429; } catch {}
-
-      if (isQuotaError && !imageGenSucceeded) {
-        // Image generation needs a paid API key — return a helpful message
-        const aiMessage = await prisma.message.create({
-          data: {
-            content: "Image generation requires a paid API plan and isn't enabled on this account yet.\n\nI can still help with Bible study — just ask me any question about scripture!",
-            role: 'model',
-            chatId,
-          },
-        });
-        return NextResponse.json({ userMessage, aiMessage }, { status: 201 });
-      }
-
       console.error('Image generation failed, falling back to text:', err);
-      // Fall through to normal text response for non-quota errors
+      // Fall through to normal text response if anything fails
     }
   }
 
