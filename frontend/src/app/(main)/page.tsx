@@ -844,7 +844,8 @@ export default function App() {
       textToSend = `> "${chatQuote.text}" — *${chatQuote.reference}*\n\n${textToSend}`;
     }
     
-    const isFirstMessage = !activeChatId;
+    const currentChat = activeChatId ? chats.find(c => c.id === activeChatId) : null;
+    const isFirstMessage = !activeChatId || (currentChat && currentChat.messages.length === 0);
     if (!textToSend.trim() && !chatImage) return;
     if (cooldown > 0) return;
     
