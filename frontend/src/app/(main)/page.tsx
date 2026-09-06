@@ -69,6 +69,35 @@ function parseAiMessage(content: string): { imageBase64: string | null; textCont
   return { imageBase64: null, textContent: content };
 }
 
+const seenTitles = new Set<string>();
+
+const TypewriterTitle = ({ title }: { title: string }) => {
+  const [displayed, setDisplayed] = useState(() => seenTitles.has(title) || title === 'New Conversation' ? title : '');
+  
+  useEffect(() => {
+    if (seenTitles.has(title) || title === 'New Conversation') {
+      setDisplayed(title);
+      return;
+    }
+    
+    let index = 0;
+    const interval = setInterval(() => {
+      index += 1;
+      if (index > title.length) index = title.length;
+      setDisplayed(title.slice(0, index));
+      
+      if (index >= title.length) {
+        clearInterval(interval);
+        seenTitles.add(title);
+      }
+    }, 30);
+    
+    return () => clearInterval(interval);
+  }, [title]);
+
+  return <>{displayed}</>;
+};
+
 const TypewriterMessage = ({ content }: { content: string }) => {
   const { imageBase64, textContent } = parseAiMessage(content);
   const [displayed, setDisplayed] = useState(() => seenMessages.has(content) ? textContent : '');
@@ -235,6 +264,7 @@ export default function App() {
     });
     fetchWithAuth(`${API_URL}/api/chats`).then(r => r.json()).then(data => {
       setChats(data);
+      data.forEach((c: { title: string }) => seenTitles.add(c.title));
       setActiveChatId(null); // Fresh session on reload
     });
     fetchWithAuth(`${API_URL}/api/tracker`).then(r => r.json()).then(data => {
@@ -1647,7 +1677,7 @@ export default function App() {
                     onClick={() => setActiveChatId(c.id)} 
                     className={`group flex items-center justify-between w-full px-4 py-3 rounded-lg text-[14px] transition-colors cursor-pointer ${activeChatId === c.id ? 'bg-[#30302e] text-[#faf9f5] ring-shadow' : 'text-[#87867f] hover:bg-[#30302e] hover:text-[#faf9f5]'}`}
                   >
-                    <span className="truncate pr-2">{c.title}</span>
+                    <span className="truncate pr-2"><TypewriterTitle title={c.title} /></span>
                     <div className="flex items-center gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity shrink-0">
                       <button 
                         onClick={(e) => {
