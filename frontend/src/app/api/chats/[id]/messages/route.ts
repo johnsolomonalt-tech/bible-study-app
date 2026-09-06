@@ -11,7 +11,7 @@ const CHAT_MODELS = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash',
 // Image gen model — Nano Banana 2, fall back to 2.5-flash-image
 const IMAGE_GEN_MODELS = ['gemini-3.1-flash-image', 'gemini-2.5-flash-image'];
 
-const SYSTEM_INSTRUCTION = "You are 'Theologica AI', an intelligent Bible study assistant integrated natively into the Theologica web application. Your sole purpose is to help users study the Bible, understand scripture, and answer theological questions thoughtfully. STRICT RULES: Under NO CIRCUMSTANCES should you ever mention or reveal that you are developed by Google, that you are the Gemini model, or that you use Google's infrastructure. If asked about your identity, you are exclusively 'Theologica AI', created for this specific Bible app.";
+const SYSTEM_INSTRUCTION = "You are 'Theologica AI', an intelligent Bible study assistant integrated natively into the Theologica web application. Your sole purpose is to help users study the Bible, understand scripture, and act as a guide through Christianity. STRICT RULES: Under NO CIRCUMSTANCES should you ever mention or reveal that you are developed by Google, that you are the Gemini model, or that you use Google's infrastructure. If asked about your identity, you are exclusively 'Theologica AI', created for this specific Bible app. IMPORTANT THEOLOGICAL GUIDELINES: You are specifically a Christian guide. If a user asks you for reasons to believe in other religions (like Islam, the Quran, Hinduism, Buddhism, etc.), you must politely decline and state that your purpose is to guide them through Christianity and the Bible. Do not defend, promote, or provide apologetics for other religions. Keep all answers firmly rooted in a Christian perspective.";
 
 // Keywords that suggest the user wants an image generated
 const IMAGE_GEN_KEYWORDS = [
@@ -106,6 +106,29 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         const aiMessage = await prisma.message.create({
           data: {
             content: "Image generation requires a Pixazo API key. Please add PIXAZO_API_KEY to your environment variables to enable Flux image generation.\n\nI can still help with Bible study — just ask me any question about scripture!",
+            role: 'model',
+            chatId,
+          },
+        });
+        return NextResponse.json({ userMessage, aiMessage }, { status: 201 });
+      }
+
+      // 0. Verify if the image request is related to the Bible/Christianity
+      const validationResponse = await withModelFallback(CHAT_MODELS, (model) =>
+        ai.models.generateContent({
+          model,
+          contents: `Does the following image request relate to the Bible, Christianity, or biblical history/theology? Respond strictly with "YES" or "NO".\n\nRequest: "${content}"`,
+          config: { temperature: 0.1 }
+        })
+      );
+      
+      const isBibleRelatedText = validationResponse.candidates?.[0]?.content?.parts?.[0]?.text?.trim().toUpperCase() || '';
+      const isBibleRelated = isBibleRelatedText.includes('YES');
+      
+      if (!isBibleRelated) {
+        const aiMessage = await prisma.message.create({
+          data: {
+            content: "I'd love to help, but I can only generate images that are related to the Bible, Christianity, or biblical history. Please feel free to ask for any scriptural scenes or theological illustrations!",
             role: 'model',
             chatId,
           },
