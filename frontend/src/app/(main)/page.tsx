@@ -916,7 +916,7 @@ export default function App() {
     setIsAiTyping(true);
     setTimeout(scrollToBottom, 50);
 
-    const res = await fetchWithAuth(`${API_URL}/api/chats/${targetChatId}/messages`, {
+    const messagePromise = fetchWithAuth(`${API_URL}/api/chats/${targetChatId}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
@@ -924,6 +924,19 @@ export default function App() {
         image: currentImage ? { base64: currentImage.base64, mimeType: currentImage.mimeType } : undefined
       })
     });
+
+    // Fire auto-naming concurrently so it doesn't block the UI and types simultaneously
+    let namePromise: Promise<Response> | null = null;
+    if (isFirstMessage && targetChatId) {
+      namePromise = fetchWithAuth(`${API_URL}/api/chats/${targetChatId}/name`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userMessage: currentInput })
+      });
+    }
+
+    const res = await messagePromise;
+    setIsAiTyping(false); // Hide 3 dots immediately once the message is back
     
     if (res.ok) {
       const data = await res.json();
@@ -937,21 +950,15 @@ export default function App() {
         return c;
       }));
 
-      // Auto-name the conversation after the first exchange
-      if (isFirstMessage && targetChatId) {
-        try {
-          const nameRes = await fetchWithAuth(`${API_URL}/api/chats/${targetChatId}/name`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userMessage: currentInput })
-          });
+      if (namePromise) {
+        namePromise.then(async (nameRes) => {
           if (nameRes.ok) {
             const { title } = await nameRes.json();
             setChats(prev => prev.map(c => c.id === targetChatId ? { ...c, title } : c));
           }
-        } catch {
-          // Silent fail — auto-naming is non-critical
-        }
+        }).catch(() => {
+          // Silent fail
+        });
       }
     } else {
       const errorData = await res.json().catch(() => null);
@@ -968,8 +975,6 @@ export default function App() {
         return c;
       }));
     }
-    
-    setIsAiTyping(false);
   };
 
   const currentChapterId = `${activeBook.name}-${activeChapter}`;
