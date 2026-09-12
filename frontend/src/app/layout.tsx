@@ -41,7 +41,26 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                let theme = localStorage.getItem('theme');
+                if (!theme) {
+                  theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                }
+                if (theme === 'light') {
+                  document.documentElement.setAttribute('data-theme', 'light');
+                } else {
+                  document.documentElement.removeAttribute('data-theme');
+                }
+              } catch (e) {}
+            `,
+          }}
+        />
+      </head>
       <body className={`${inter.variable} ${merriweather.variable} antialiased`}>
         {children}
       </body>

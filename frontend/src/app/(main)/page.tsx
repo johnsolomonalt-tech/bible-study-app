@@ -3,7 +3,7 @@ const API_URL = '';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth, UserButton, SignIn } from '@clerk/nextjs';
-import { Send, Plus, Layout, Edit, Sparkles, Target, Check, ChevronRight, ChevronLeft, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquarePlus, X, Paperclip, Image as ImageIcon } from 'lucide-react';
+import { Send, Plus, Layout, Edit, Sparkles, Target, Check, ChevronRight, ChevronLeft, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import TextareaAutosize from 'react-textarea-autosize';
 import { getDevotionalForDay, DevotionalEntry } from '../../lib/devotionals';
@@ -22,19 +22,19 @@ const NT_BOOKS = ntStr.split(',').map(s => { const [n, c] = s.split(':'); return
 const markdownComponents = {
   p: ({ children }: any) => <p className="mb-4 last:mb-0 leading-[1.7] text-[15px]">{children}</p>,
   blockquote: ({ children }: any) => (
-    <blockquote className="border-l-[3px] border-[#c96442] bg-[#c96442]/10 py-3 px-5 my-5 italic rounded-r-xl shadow-sm text-[#e4e1cf] text-[15px]">
+    <blockquote className="border-l-[3px] border-[#c96442] bg-accent/10 py-3 px-5 my-5 italic rounded-r-xl shadow-sm text-fg-hover text-[15px]">
       {children}
     </blockquote>
   ),
-  strong: ({ children }: any) => <strong className="font-semibold text-[#faf9f5]">{children}</strong>,
-  em: ({ children }: any) => <em className="italic text-[#e4e1cf]">{children}</em>,
+  strong: ({ children }: any) => <strong className="font-semibold text-fg">{children}</strong>,
+  em: ({ children }: any) => <em className="italic text-fg-hover">{children}</em>,
   ul: ({ children }: any) => <ul className="list-disc pl-6 mb-4 space-y-2">{children}</ul>,
   ol: ({ children }: any) => <ol className="list-decimal pl-6 mb-4 space-y-2">{children}</ol>,
   li: ({ children }: any) => <li className="leading-[1.7] text-[15px]">{children}</li>,
-  h1: ({ children }: any) => <h1 className="text-xl font-bold mb-4 mt-6 text-[#faf9f5]">{children}</h1>,
-  h2: ({ children }: any) => <h2 className="text-[18px] font-bold mb-3 mt-5 text-[#faf9f5]">{children}</h2>,
-  h3: ({ children }: any) => <h3 className="text-[16px] font-bold mb-2 mt-4 text-[#e4e1cf]">{children}</h3>,
-  a: ({ children, href }: any) => <a href={href} className="text-[#c96442] hover:underline" target="_blank" rel="noreferrer">{children}</a>,
+  h1: ({ children }: any) => <h1 className="text-xl font-bold mb-4 mt-6 text-fg">{children}</h1>,
+  h2: ({ children }: any) => <h2 className="text-[18px] font-bold mb-3 mt-5 text-fg">{children}</h2>,
+  h3: ({ children }: any) => <h3 className="text-[16px] font-bold mb-2 mt-4 text-fg-hover">{children}</h3>,
+  a: ({ children, href }: any) => <a href={href} className="text-accent hover:underline" target="_blank" rel="noreferrer">{children}</a>,
 };
 
 const userMarkdownComponents = {
@@ -141,7 +141,7 @@ const TypewriterMessage = ({ content }: { content: string }) => {
           <a 
             href={`data:image/png;base64,${imageBase64}`} 
             download="theologica-image.png" 
-            className="inline-flex items-center gap-1.5 mt-2 text-[11px] text-[#87867f] hover:text-[#e4e1cf] transition-colors"
+            className="inline-flex items-center gap-1.5 mt-2 text-[11px] text-muted hover:text-fg-hover transition-colors"
           >
             ↓ Download image
           </a>
@@ -248,6 +248,31 @@ export default function App() {
   // Chats State
   const [chats, setChats] = useState<{id: number, title: string, messages: {role: string, content: string}[]}[]>([]);
   const [activeChatId, setActiveChatId] = useState<number | null>(null);
+
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [theme, setTheme] = useState('dark');
+  const [trackerFormat, setTrackerFormat] = useState<'percent' | 'fraction'>('percent');
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    setTheme(savedTheme);
+    const savedTracker = (localStorage.getItem('trackerFormat') as 'percent' | 'fraction') || 'percent';
+    setTrackerFormat(savedTracker);
+  }, []);
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
+    if (newTheme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  };
+
+  const toggleTrackerFormat = () => {
+    const newFormat = trackerFormat === 'percent' ? 'fraction' : 'percent';
+    setTrackerFormat(newFormat);
+    localStorage.setItem('trackerFormat', newFormat);
+  };
   const [chatInput, setChatInput] = useState('');
   const [chatQuote, setChatQuote] = useState<{text: string, reference: string} | null>(null);
   const [chatImage, setChatImage] = useState<{base64: string, mimeType: string, preview: string} | null>(null);
@@ -1050,11 +1075,11 @@ export default function App() {
 
   const { isLoaded, userId } = useAuth();
   
-  if (!isLoaded) return <div className="h-screen w-full flex items-center justify-center bg-[#141413] text-white">Loading...</div>;
+  if (!isLoaded) return <div className="h-screen w-full flex items-center justify-center bg-bg text-white">Loading...</div>;
   
   if (!userId) {
     return (
-      <div className="h-screen w-full flex items-center justify-center bg-[#141413]">
+      <div className="h-screen w-full flex items-center justify-center bg-bg">
         <SignIn routing="hash" />
       </div>
     );
@@ -1062,13 +1087,13 @@ export default function App() {
 
   return (
     <>
-        <div className="h-full flex flex-col bg-[#141413] text-[#faf9f5]">
+        <div className="h-full flex flex-col bg-bg text-fg">
       {/* Top Navbar */}
-      <header className="relative h-14 border-b border-[#30302e] flex items-center justify-between px-6 bg-[#141413] z-10 shrink-0">
+      <header className="relative h-14 border-b border-border flex items-center justify-between px-6 bg-bg z-10 shrink-0">
         
         {/* Left: Logo */}
         <div className="flex-1 flex items-center">
-          <div className="font-display text-[22px] tracking-tight text-[#c96442] flex items-center gap-3">
+          <div className="font-display text-[22px] tracking-tight text-accent flex items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/icon.png" alt="Theologica Logo" className="w-8 h-8 object-contain drop-shadow-md rounded-md" />
             <span className="inline">Theologica</span>
@@ -1076,12 +1101,12 @@ export default function App() {
         </div>
 
         {/* Center: Tabs (Desktop) */}
-        <div className="hidden lg:flex absolute left-1/2 -translate-x-1/2 gap-1.5 p-1.5 bg-[#30302e] rounded-xl ring-shadow">
+        <div className="hidden lg:flex absolute left-1/2 -translate-x-1/2 gap-1.5 p-1.5 bg-surface rounded-xl ring-shadow">
           {['study', 'devotional', 'notes', 'chats', 'tracker'].map(tab => (
             <button 
               key={tab} 
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${activeTab === tab ? 'bg-[#4d4c48] text-white shadow-sm' : 'text-[#87867f] hover:text-[#faf9f5]'}`}
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${activeTab === tab ? 'bg-border-soft text-white shadow-sm' : 'text-muted hover:text-fg'}`}
             >
               {tab === 'study' && <Layout size={16} />}
               {tab === 'devotional' && <BookOpen size={16} />}
@@ -1093,10 +1118,47 @@ export default function App() {
           ))}
         </div>
         
-        {/* Right: Clerk UserButton */}
+        {/* Right: Settings & Clerk UserButton */}
         <div className="flex-1 flex justify-end items-center gap-4">
+          <button onClick={() => setIsSettingsOpen(true)} className="text-muted hover:text-fg transition-colors" title="Settings">
+            <Settings size={20} />
+          </button>
           <UserButton />
         </div>
+
+        {/* SETTINGS MODAL */}
+        {isSettingsOpen && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <div className="bg-bg w-full max-w-sm rounded-[24px] p-6 shadow-2xl ring-1 ring-border">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-display text-fg">Settings</h2>
+                <button onClick={() => setIsSettingsOpen(false)} className="text-muted hover:text-fg transition-colors">✕</button>
+              </div>
+              
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between p-4 bg-surface rounded-[16px] ring-1 ring-border">
+                  <div>
+                    <div className="text-[15px] font-medium text-fg">Appearance</div>
+                    <div className="text-[13px] text-muted">{theme === 'dark' ? 'Dark Mode' : 'Light Mode'}</div>
+                  </div>
+                  <button onClick={toggleTheme} className="w-12 h-6 rounded-full bg-border-soft relative transition-colors" style={{ backgroundColor: theme === 'light' ? 'var(--accent)' : 'var(--border-soft)' }}>
+                    <div className="w-5 h-5 rounded-full bg-bg absolute top-0.5 transition-transform" style={{ transform: theme === 'light' ? 'translateX(26px)' : 'translateX(2px)' }} />
+                  </button>
+                </div>
+                
+                <div className="flex items-center justify-between p-4 bg-surface rounded-[16px] ring-1 ring-border">
+                  <div>
+                    <div className="text-[15px] font-medium text-fg">Tracker Format</div>
+                    <div className="text-[13px] text-muted">{trackerFormat === 'percent' ? 'Percentage (%)' : 'Fractions (1/10)'}</div>
+                  </div>
+                  <button onClick={toggleTrackerFormat} className="text-[13px] font-semibold bg-bg px-3 py-1.5 rounded-lg text-fg ring-1 ring-border hover:bg-surface-warm transition-colors">
+                    Toggle
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         
       </header>
       
@@ -1108,18 +1170,18 @@ export default function App() {
         {activeTab === 'study' && (
           <div className="lg:hidden flex w-full h-full">
             {/* Mobile Left Sidebar: Navigation */}
-            <aside className={`w-full border-r border-[#30302e] bg-[#141413] flex-col ${mobileStudyView === 'chapters' ? 'flex' : 'hidden'}`}>
-              <header className="h-[60px] border-b border-[#30302e] flex items-center px-4 shrink-0">
-                <button onClick={() => setMobileStudyView('reader')} className="p-2 mr-2 text-[#b0aea5] hover:text-[#faf9f5]">
+            <aside className={`w-full border-r border-border bg-bg flex-col ${mobileStudyView === 'chapters' ? 'flex' : 'hidden'}`}>
+              <header className="h-[60px] border-b border-border flex items-center px-4 shrink-0">
+                <button onClick={() => setMobileStudyView('reader')} className="p-2 mr-2 text-fg-2 hover:text-fg">
                   <ChevronLeft size={20} />
                 </button>
-                <span className="font-medium text-[#faf9f5]">Books</span>
+                <span className="font-medium text-fg">Books</span>
               </header>
               <div className="flex-1 overflow-y-auto custom-scroll p-3">
-                <div className="text-[11px] font-bold tracking-widest text-[#87867f] uppercase mb-3 ml-2 mt-2">Old Testament</div>
+                <div className="text-[11px] font-bold tracking-widest text-muted uppercase mb-3 ml-2 mt-2">Old Testament</div>
                 {OT_BOOKS.map(b => (
                   <details key={b.name} className="group mb-1">
-                    <summary className="w-full text-left px-3 py-2.5 rounded-lg text-[14px] font-medium text-[#b0aea5] hover:bg-[#30302e] hover:text-[#faf9f5] cursor-pointer list-none flex justify-between items-center transition-colors">
+                    <summary className="w-full text-left px-3 py-2.5 rounded-lg text-[14px] font-medium text-fg-2 hover:bg-surface hover:text-fg cursor-pointer list-none flex justify-between items-center transition-colors">
                       {b.name} 
                       <ChevronRight size={16} className="group-open:rotate-90 transition-transform opacity-50" />
                     </summary>
@@ -1130,7 +1192,7 @@ export default function App() {
                           <button 
                             key={i} 
                             onClick={() => { setActiveBook(b); setActiveChapter(i + 1); setMobileStudyView('reader'); }}
-                            className={`text-xs min-h-[44px] py-2 rounded-md transition-colors ${isActive ? 'bg-[#c96442] text-white shadow-sm' : 'text-[#87867f] hover:bg-[#4d4c48] hover:text-[#faf9f5]'}`}
+                            className={`text-xs min-h-[44px] py-2 rounded-md transition-colors ${isActive ? 'bg-accent text-white shadow-sm' : 'text-muted hover:bg-border-soft hover:text-fg'}`}
                           >
                             {i + 1}
                           </button>
@@ -1139,10 +1201,10 @@ export default function App() {
                     </div>
                   </details>
                 ))}
-                <div className="text-[11px] font-bold tracking-widest text-[#87867f] uppercase mb-3 ml-2 mt-6">New Testament</div>
+                <div className="text-[11px] font-bold tracking-widest text-muted uppercase mb-3 ml-2 mt-6">New Testament</div>
                 {NT_BOOKS.map(b => (
                   <details key={b.name} className="group mb-1">
-                    <summary className="w-full text-left px-3 py-2.5 rounded-lg text-[14px] font-medium text-[#b0aea5] hover:bg-[#30302e] hover:text-[#faf9f5] cursor-pointer list-none flex justify-between items-center transition-colors">
+                    <summary className="w-full text-left px-3 py-2.5 rounded-lg text-[14px] font-medium text-fg-2 hover:bg-surface hover:text-fg cursor-pointer list-none flex justify-between items-center transition-colors">
                       {b.name} 
                       <ChevronRight size={16} className="group-open:rotate-90 transition-transform opacity-50" />
                     </summary>
@@ -1153,7 +1215,7 @@ export default function App() {
                           <button 
                             key={i} 
                             onClick={() => { setActiveBook(b); setActiveChapter(i + 1); setMobileStudyView('reader'); }}
-                            className={`text-xs min-h-[44px] py-2 rounded-md transition-colors ${isActive ? 'bg-[#c96442] text-white shadow-sm' : 'text-[#87867f] hover:bg-[#4d4c48] hover:text-[#faf9f5]'}`}
+                            className={`text-xs min-h-[44px] py-2 rounded-md transition-colors ${isActive ? 'bg-accent text-white shadow-sm' : 'text-muted hover:bg-border-soft hover:text-fg'}`}
                           >
                             {i + 1}
                           </button>
@@ -1166,47 +1228,47 @@ export default function App() {
             </aside>
 
             {/* Mobile Center: Bible Reader */}
-            <section className={`flex-1 flex-col h-full bg-[#141413] ${mobileStudyView === 'reader' ? 'flex' : 'hidden'}`}>
-              <header className="h-[60px] border-b border-[#30302e] flex items-center justify-between px-4 bg-[#141413] shrink-0">
+            <section className={`flex-1 flex-col h-full bg-bg ${mobileStudyView === 'reader' ? 'flex' : 'hidden'}`}>
+              <header className="h-[60px] border-b border-border flex items-center justify-between px-4 bg-bg shrink-0">
                 <div className="flex items-center gap-1">
-                  <button onClick={() => setMobileStudyView('chapters')} className="p-2 text-[#b0aea5] hover:text-[#faf9f5]">
+                  <button onClick={() => setMobileStudyView('chapters')} className="p-2 text-fg-2 hover:text-fg">
                     <Layout size={20} />
                   </button>
                   <div className="font-display text-[18px] ml-1">{activeBook.name} {activeChapter}</div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => setMobileStudyView('ai')} className="p-2 text-[#b0aea5] hover:text-[#faf9f5]">
+                  <button onClick={() => setMobileStudyView('ai')} className="p-2 text-fg-2 hover:text-fg">
                     <Sparkles size={20} />
                   </button>
-                  <button onClick={toggleCompleted} className="flex items-center justify-center p-2 rounded-lg bg-[#30302e] text-[#faf9f5]">
-                    <Check size={20} className={isCompleted ? "text-[#c96442]" : "text-[#5e5d59]"} /> 
+                  <button onClick={toggleCompleted} className="flex items-center justify-center p-2 rounded-lg bg-surface text-fg">
+                    <Check size={20} className={isCompleted ? "text-accent" : "text-meta"} /> 
                   </button>
-                  <button onClick={toggleSpeech} className="flex items-center justify-center p-2 rounded-lg text-[#b0aea5] hover:text-[#faf9f5] hover:bg-[#30302e] transition-colors" title="Read chapter aloud">
+                  <button onClick={toggleSpeech} className="flex items-center justify-center p-2 rounded-lg text-fg-2 hover:text-fg hover:bg-surface transition-colors" title="Read chapter aloud">
                     {isSpeaking ? <VolumeX size={20} /> : <Volume2 size={20} />}
                   </button>
-                  <select value={translation} onChange={(e) => setTranslation(e.target.value)} className="bg-transparent text-sm font-medium text-[#b0aea5] hover:text-[#faf9f5] focus:outline-none cursor-pointer transition-colors max-w-[60px] mr-2">
-                    <option value="kjv" className="bg-[#30302e]">KJV</option>
-                    <option value="asv" className="bg-[#30302e]">ASV</option>
-                    <option value="web" className="bg-[#30302e]">WEB</option>
-                    <option value="bbe" className="bg-[#30302e]">BBE</option>
-                    <option value="darby" className="bg-[#30302e]">DARBY</option>
-                    <option value="dra" className="bg-[#30302e]">DRA</option>
+                  <select value={translation} onChange={(e) => setTranslation(e.target.value)} className="bg-transparent text-sm font-medium text-fg-2 hover:text-fg focus:outline-none cursor-pointer transition-colors max-w-[60px] mr-2">
+                    <option value="kjv" className="bg-surface">KJV</option>
+                    <option value="asv" className="bg-surface">ASV</option>
+                    <option value="web" className="bg-surface">WEB</option>
+                    <option value="bbe" className="bg-surface">BBE</option>
+                    <option value="darby" className="bg-surface">DARBY</option>
+                    <option value="dra" className="bg-surface">DRA</option>
                   </select>
                 </div>
               </header>
 
               <div className="flex-1 overflow-y-auto custom-scroll p-6" onMouseUp={handleSelection} onTouchEnd={handleSelection}>
                 <article className="max-w-3xl mx-auto">
-                  <p className="font-serif text-[18px] leading-[1.8] text-[#faf9f5] whitespace-pre-wrap">
+                  <p className="font-serif text-[18px] leading-[1.8] text-fg whitespace-pre-wrap">
                     {bibleVerses.length > 0 ? (
                       bibleVerses.map((v, index) => (
                         <span key={index} data-verse={v.verse}>
-                          <sup className="text-[#87867f] text-[10px] mr-1">{v.verse}</sup>
+                          <sup className="text-muted text-[10px] mr-1">{v.verse}</sup>
                           {renderVerseContent(v.verse, v.text)}{' '}
                         </span>
                       ))
                     ) : (
-                      <span className="text-[#87867f]">Loading chapter...</span>
+                      <span className="text-muted">Loading chapter...</span>
                     )}
                   </p>
                 </article>
@@ -1214,25 +1276,25 @@ export default function App() {
             </section>
 
             {/* Mobile Right Sidebar: Study AI */}
-            <aside className={`w-full border-l border-[#30302e] bg-[#141413] flex-col ${mobileStudyView === 'ai' ? 'flex' : 'hidden'}`}>
-              <header className="h-[60px] border-b border-[#30302e] flex items-center px-4 gap-2 text-[15px] font-medium text-[#faf9f5] shrink-0">
-                <button onClick={() => setMobileStudyView('reader')} className="p-2 mr-1 text-[#b0aea5] hover:text-[#faf9f5]">
+            <aside className={`w-full border-l border-border bg-bg flex-col ${mobileStudyView === 'ai' ? 'flex' : 'hidden'}`}>
+              <header className="h-[60px] border-b border-border flex items-center px-4 gap-2 text-[15px] font-medium text-fg shrink-0">
+                <button onClick={() => setMobileStudyView('reader')} className="p-2 mr-1 text-fg-2 hover:text-fg">
                   <ChevronLeft size={20} />
                 </button>
-                <Sparkles size={16} className="text-[#c96442]" /> Study AI
+                <Sparkles size={16} className="text-accent" /> Study AI
               </header>
               <div className="flex-1 flex flex-col h-[calc(100%-60px)]">
                 <div className="flex-1 overflow-y-auto custom-scroll p-4 space-y-4">
                   {activeChat.messages.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-center text-[#87867f] p-4">
+                    <div className="h-full flex flex-col items-center justify-center text-center text-muted p-4">
                       <Sparkles size={32} className="mb-3 opacity-20" />
                       <p className="text-sm">Ask a question about {activeBook.name} {activeChapter}</p>
                     </div>
                   ) : (
                     activeChat.messages.map((m, i) => (
                       <div key={i} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
-                        {m.role === 'model' && <span className="text-[11px] text-[#87867f] mb-1.5 ml-1 font-semibold tracking-wide uppercase">Study AI</span>}
-                        <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-[14px] leading-relaxed ${m.role === 'user' ? 'bg-[#c96442] text-white' : 'bg-[#30302e] text-[#e4e1cf]'}`}>
+                        {m.role === 'model' && <span className="text-[11px] text-muted mb-1.5 ml-1 font-semibold tracking-wide uppercase">Study AI</span>}
+                        <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-[14px] leading-relaxed ${m.role === 'user' ? 'bg-accent text-white' : 'bg-surface text-fg-hover'}`}>
                           {m.role === 'model' && i === activeChat.messages.length - 1 ? (
                             <TypewriterMessage content={m.content} />
                           ) : (
@@ -1244,8 +1306,8 @@ export default function App() {
                   )}
                   {isAiTyping && (
                     <div className="flex flex-col items-start">
-                      <span className="text-[11px] text-[#87867f] mb-1.5 ml-1 font-semibold tracking-wide uppercase">Study AI</span>
-                      <div className="px-4 py-3 max-w-[90%] text-[14px] leading-relaxed bg-[#30302e] text-[#faf9f5] rounded-2xl rounded-bl-sm ring-1 ring-[#4d4c48] shadow-sm flex gap-1.5 items-center h-[46px]">
+                      <span className="text-[11px] text-muted mb-1.5 ml-1 font-semibold tracking-wide uppercase">Study AI</span>
+                      <div className="px-4 py-3 max-w-[90%] text-[14px] leading-relaxed bg-surface text-fg rounded-2xl rounded-bl-sm ring-1 ring-border-soft shadow-sm flex gap-1.5 items-center h-[46px]">
                         <div className="w-1.5 h-1.5 rounded-full bg-[#87867f] animate-bounce" style={{ animationDelay: '0ms' }} />
                         <div className="w-1.5 h-1.5 rounded-full bg-[#87867f] animate-bounce" style={{ animationDelay: '150ms' }} />
                         <div className="w-1.5 h-1.5 rounded-full bg-[#87867f] animate-bounce" style={{ animationDelay: '300ms' }} />
@@ -1253,10 +1315,10 @@ export default function App() {
                     </div>
                   )}
                 </div>
-                <form onSubmit={handleSendMessage} className="p-3 border-t border-[#30302e] bg-[#141413]">
-                  <div className="relative flex items-end bg-[#1c1c1b] rounded-xl border border-[#30302e] focus-within:border-[#4d4c48] transition-colors p-1">
+                <form onSubmit={handleSendMessage} className="p-3 border-t border-border bg-bg">
+                  <div className="relative flex items-end bg-[#1c1c1b] rounded-xl border border-border focus-within:border-border-soft transition-colors p-1">
                     <textarea 
-                      className="w-full bg-transparent p-2.5 pl-3 min-h-[44px] max-h-[120px] text-[14px] text-[#faf9f5] placeholder-[#5e5d59] focus:outline-none resize-none custom-scroll" 
+                      className="w-full bg-transparent p-2.5 pl-3 min-h-[44px] max-h-[120px] text-[14px] text-fg placeholder-[#5e5d59] focus:outline-none resize-none custom-scroll" 
                       placeholder="Ask anything..." 
                       rows={1}
                       value={chatInput}
@@ -1271,7 +1333,7 @@ export default function App() {
                     <button 
                       type="submit"
                       disabled={isAiTyping || !chatInput.trim()}
-                      className="p-2.5 text-[#c96442] hover:text-[#e4e1cf] disabled:opacity-50 disabled:hover:text-[#c96442] transition-colors shrink-0"
+                      className="p-2.5 text-accent hover:text-fg-hover disabled:opacity-50 disabled:hover:text-accent transition-colors shrink-0"
                     >
                       <Send size={18} />
                     </button>
@@ -1288,18 +1350,18 @@ export default function App() {
             <PanelGroup orientation="horizontal" id="theologica-layout-v2" className="flex w-full h-full">
             {/* Left Sidebar: Navigation */}
             {showLeftSidebar && (
-              <Panel panelRef={leftPanelRef} defaultSize="15" minSize="15" className={`w-full lg:w-auto border-r border-[#30302e] bg-[#141413] flex-col ${mobileStudyView === 'chapters' ? 'flex' : 'hidden lg:flex'}`}>
-              <header className="lg:hidden h-[60px] border-b border-[#30302e] flex items-center px-4 shrink-0">
-                <button onClick={() => setMobileStudyView('reader')} className="p-2 mr-2 text-[#b0aea5] hover:text-[#faf9f5]">
+              <Panel panelRef={leftPanelRef} defaultSize="15" minSize="15" className={`w-full lg:w-auto border-r border-border bg-bg flex-col ${mobileStudyView === 'chapters' ? 'flex' : 'hidden lg:flex'}`}>
+              <header className="lg:hidden h-[60px] border-b border-border flex items-center px-4 shrink-0">
+                <button onClick={() => setMobileStudyView('reader')} className="p-2 mr-2 text-fg-2 hover:text-fg">
                   <ChevronLeft size={20} />
                 </button>
-                <span className="font-medium text-[#faf9f5]">Books</span>
+                <span className="font-medium text-fg">Books</span>
               </header>
               <div className="flex-1 overflow-y-auto custom-scroll p-3">
-                <div className="text-[11px] font-bold tracking-widest text-[#87867f] uppercase mb-3 ml-2 mt-2">Old Testament</div>
+                <div className="text-[11px] font-bold tracking-widest text-muted uppercase mb-3 ml-2 mt-2">Old Testament</div>
                 {OT_BOOKS.map(b => (
                   <details key={b.name} className="group mb-1">
-                    <summary className="w-full text-left px-3 py-2.5 rounded-lg text-[14px] font-medium text-[#b0aea5] hover:bg-[#30302e] hover:text-[#faf9f5] cursor-pointer list-none flex justify-between items-center transition-colors">
+                    <summary className="w-full text-left px-3 py-2.5 rounded-lg text-[14px] font-medium text-fg-2 hover:bg-surface hover:text-fg cursor-pointer list-none flex justify-between items-center transition-colors">
                       {b.name} 
                       <ChevronRight size={16} className="group-open:rotate-90 transition-transform opacity-50" />
                     </summary>
@@ -1310,7 +1372,7 @@ export default function App() {
                           <button 
                             key={i} 
                             onClick={() => { setActiveBook(b); setActiveChapter(i + 1); setMobileStudyView('reader'); }}
-                            className={`text-xs min-h-[44px] lg:min-h-0 py-2 lg:py-1.5 rounded-md transition-colors ${isActive ? 'bg-[#c96442] text-white shadow-sm' : 'text-[#87867f] hover:bg-[#4d4c48] hover:text-[#faf9f5]'}`}
+                            className={`text-xs min-h-[44px] lg:min-h-0 py-2 lg:py-1.5 rounded-md transition-colors ${isActive ? 'bg-accent text-white shadow-sm' : 'text-muted hover:bg-border-soft hover:text-fg'}`}
                           >
                             {i + 1}
                           </button>
@@ -1319,10 +1381,10 @@ export default function App() {
                     </div>
                   </details>
                 ))}
-                <div className="text-[11px] font-bold tracking-widest text-[#87867f] uppercase mb-3 ml-2 mt-6">New Testament</div>
+                <div className="text-[11px] font-bold tracking-widest text-muted uppercase mb-3 ml-2 mt-6">New Testament</div>
                 {NT_BOOKS.map(b => (
                   <details key={b.name} className="group mb-1">
-                    <summary className="w-full text-left px-3 py-2.5 rounded-lg text-[14px] font-medium text-[#b0aea5] hover:bg-[#30302e] hover:text-[#faf9f5] cursor-pointer list-none flex justify-between items-center transition-colors">
+                    <summary className="w-full text-left px-3 py-2.5 rounded-lg text-[14px] font-medium text-fg-2 hover:bg-surface hover:text-fg cursor-pointer list-none flex justify-between items-center transition-colors">
                       {b.name} 
                       <ChevronRight size={16} className="group-open:rotate-90 transition-transform opacity-50" />
                     </summary>
@@ -1333,7 +1395,7 @@ export default function App() {
                           <button 
                             key={i} 
                             onClick={() => { setActiveBook(b); setActiveChapter(i + 1); setMobileStudyView('reader'); }}
-                            className={`text-xs min-h-[44px] lg:min-h-0 py-2 lg:py-1.5 rounded-md transition-colors ${isActive ? 'bg-[#c96442] text-white shadow-sm' : 'text-[#87867f] hover:bg-[#4d4c48] hover:text-[#faf9f5]'}`}
+                            className={`text-xs min-h-[44px] lg:min-h-0 py-2 lg:py-1.5 rounded-md transition-colors ${isActive ? 'bg-accent text-white shadow-sm' : 'text-muted hover:bg-border-soft hover:text-fg'}`}
                           >
                             {i + 1}
                           </button>
@@ -1347,51 +1409,51 @@ export default function App() {
             )}
 
             {showLeftSidebar && (
-              <PanelResizeHandle className="hidden lg:flex w-1 bg-transparent hover:bg-[#c96442] active:bg-[#c96442] transition-colors cursor-col-resize shrink-0 z-10 relative" />
+              <PanelResizeHandle className="hidden lg:flex w-1 bg-transparent hover:bg-accent active:bg-accent transition-colors cursor-col-resize shrink-0 z-10 relative" />
             )}
 
             {/* Center: Bible Reader */}
-            <Panel defaultSize="60" minSize="30" className={`w-full lg:w-auto flex-col h-full bg-[#141413] ${mobileStudyView === 'reader' ? 'flex' : 'hidden lg:flex'}`}>
+            <Panel defaultSize="60" minSize="30" className={`w-full lg:w-auto flex-col h-full bg-bg ${mobileStudyView === 'reader' ? 'flex' : 'hidden lg:flex'}`}>
               <PanelGroup orientation="vertical" id="theologica-layout-vertical-v2">
                 <Panel defaultSize="75" minSize="30" className="flex flex-col relative">
-                  <header className="h-[60px] border-b border-[#30302e] flex items-center justify-between px-4 lg:px-6 bg-[#141413] shrink-0">
+                  <header className="h-[60px] border-b border-border flex items-center justify-between px-4 lg:px-6 bg-bg shrink-0">
                 <div className="flex items-center gap-1 lg:gap-2">
-                  <button onClick={() => setMobileStudyView('chapters')} className="lg:hidden p-2 text-[#b0aea5] hover:text-[#faf9f5]">
+                  <button onClick={() => setMobileStudyView('chapters')} className="lg:hidden p-2 text-fg-2 hover:text-fg">
                     <Layout size={20} />
                   </button>
                   <div className="font-display text-[18px] lg:text-[22px] ml-1">{activeBook.name} {activeChapter}</div>
                 </div>
                 <div className="flex items-center gap-2 lg:gap-4">
-                  <button onClick={() => setMobileStudyView('ai')} className="lg:hidden p-2 text-[#b0aea5] hover:text-[#faf9f5]">
+                  <button onClick={() => setMobileStudyView('ai')} className="lg:hidden p-2 text-fg-2 hover:text-fg">
                     <Sparkles size={20} />
                   </button>
-                  <button onClick={toggleCompleted} className="hidden lg:flex items-center gap-2 text-[13px] font-medium px-3.5 py-2 rounded-lg bg-[#30302e] text-[#faf9f5] hover:bg-[#4d4c48] ring-shadow ring-shadow-hover transition-all">
-                    <Check size={16} className={isCompleted ? "text-[#c96442]" : "text-[#5e5d59]"} /> 
+                  <button onClick={toggleCompleted} className="hidden lg:flex items-center gap-2 text-[13px] font-medium px-3.5 py-2 rounded-lg bg-surface text-fg hover:bg-border-soft ring-shadow ring-shadow-hover transition-all">
+                    <Check size={16} className={isCompleted ? "text-accent" : "text-meta"} /> 
                     {isCompleted ? "Completed" : "Mark Complete"}
                   </button>
-                  <button onClick={toggleCompleted} className="lg:hidden flex items-center justify-center p-2 rounded-lg bg-[#30302e] text-[#faf9f5]">
-                    <Check size={20} className={isCompleted ? "text-[#c96442]" : "text-[#5e5d59]"} /> 
+                  <button onClick={toggleCompleted} className="lg:hidden flex items-center justify-center p-2 rounded-lg bg-surface text-fg">
+                    <Check size={20} className={isCompleted ? "text-accent" : "text-meta"} /> 
                   </button>
-                  <button onClick={toggleSpeech} className="flex items-center justify-center p-2 lg:p-2 rounded-lg text-[#b0aea5] hover:text-[#faf9f5] hover:bg-[#30302e] transition-colors" title="Read chapter aloud">
+                  <button onClick={toggleSpeech} className="flex items-center justify-center p-2 lg:p-2 rounded-lg text-fg-2 hover:text-fg hover:bg-surface transition-colors" title="Read chapter aloud">
                     {isSpeaking ? <VolumeX size={20} /> : <Volume2 size={20} />}
                   </button>
-                  <div className="hidden lg:block h-6 w-px bg-[#30302e]"></div>
-                  <select value={translation} onChange={(e) => setTranslation(e.target.value)} className="bg-transparent text-sm font-medium text-[#b0aea5] hover:text-[#faf9f5] focus:outline-none cursor-pointer transition-colors max-w-[60px] lg:max-w-none mr-2">
-                    <option value="kjv" className="bg-[#30302e]">KJV</option>
-                    <option value="asv" className="bg-[#30302e]">ASV</option>
-                    <option value="web" className="bg-[#30302e]">WEB</option>
-                    <option value="bbe" className="bg-[#30302e]">BBE</option>
-                    <option value="darby" className="bg-[#30302e]">DARBY</option>
-                    <option value="dra" className="bg-[#30302e]">DRA</option>
+                  <div className="hidden lg:block h-6 w-px bg-surface"></div>
+                  <select value={translation} onChange={(e) => setTranslation(e.target.value)} className="bg-transparent text-sm font-medium text-fg-2 hover:text-fg focus:outline-none cursor-pointer transition-colors max-w-[60px] lg:max-w-none mr-2">
+                    <option value="kjv" className="bg-surface">KJV</option>
+                    <option value="asv" className="bg-surface">ASV</option>
+                    <option value="web" className="bg-surface">WEB</option>
+                    <option value="bbe" className="bg-surface">BBE</option>
+                    <option value="darby" className="bg-surface">DARBY</option>
+                    <option value="dra" className="bg-surface">DRA</option>
                   </select>
-                  <div className="hidden lg:flex items-center bg-[#30302e] rounded-lg p-0.5">
-                    <button onClick={() => setShowLeftSidebar(!showLeftSidebar)} className={`p-1.5 rounded-md transition-colors ${showLeftSidebar ? 'text-[#faf9f5] hover:bg-[#4d4c48]' : 'text-[#87867f] hover:text-[#faf9f5]'}`} title="Toggle Navigation">
+                  <div className="hidden lg:flex items-center bg-surface rounded-lg p-0.5">
+                    <button onClick={() => setShowLeftSidebar(!showLeftSidebar)} className={`p-1.5 rounded-md transition-colors ${showLeftSidebar ? 'text-fg hover:bg-border-soft' : 'text-muted hover:text-fg'}`} title="Toggle Navigation">
                       {showLeftSidebar ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
                     </button>
-                    <button onClick={() => setShowBottomNotes(!showBottomNotes)} className={`p-1.5 rounded-md transition-colors ${showBottomNotes ? 'text-[#faf9f5] hover:bg-[#4d4c48]' : 'text-[#87867f] hover:text-[#faf9f5]'}`} title="Toggle Notes">
+                    <button onClick={() => setShowBottomNotes(!showBottomNotes)} className={`p-1.5 rounded-md transition-colors ${showBottomNotes ? 'text-fg hover:bg-border-soft' : 'text-muted hover:text-fg'}`} title="Toggle Notes">
                       {showBottomNotes ? <PanelBottomClose size={18} /> : <PanelBottomOpen size={18} />}
                     </button>
-                    <button onClick={() => setShowRightSidebar(!showRightSidebar)} className={`p-1.5 rounded-md transition-colors ${showRightSidebar ? 'text-[#faf9f5] hover:bg-[#4d4c48]' : 'text-[#87867f] hover:text-[#faf9f5]'}`} title="Toggle Study AI">
+                    <button onClick={() => setShowRightSidebar(!showRightSidebar)} className={`p-1.5 rounded-md transition-colors ${showRightSidebar ? 'text-fg hover:bg-border-soft' : 'text-muted hover:text-fg'}`} title="Toggle Study AI">
                       {showRightSidebar ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
                     </button>
                   </div>
@@ -1399,16 +1461,16 @@ export default function App() {
               </header>
               <div className="flex-1 overflow-y-auto custom-scroll p-10 lg:p-16" onMouseUp={handleSelection} onTouchEnd={handleSelection}>
                 <article className="max-w-3xl mx-auto">
-                  <p className="font-serif text-[18px] leading-[1.8] text-[#faf9f5] whitespace-pre-wrap">
+                  <p className="font-serif text-[18px] leading-[1.8] text-fg whitespace-pre-wrap">
                     {bibleVerses.length > 0 ? (
                       bibleVerses.map((v, index) => (
-                        <span key={v.verse} data-verse={v.verse} className={`transition-colors duration-300 ${currentSpeakingVerseIndex === index ? 'text-[#c96442]' : ''}`}>
-                          <sup className={`text-[10px] font-sans font-semibold mr-1.5 opacity-80 ${currentSpeakingVerseIndex === index ? 'text-[#c96442]' : 'text-[#87867f]'}`}>{v.verse}</sup>
+                        <span key={v.verse} data-verse={v.verse} className={`transition-colors duration-300 ${currentSpeakingVerseIndex === index ? 'text-accent' : ''}`}>
+                          <sup className={`text-[10px] font-sans font-semibold mr-1.5 opacity-80 ${currentSpeakingVerseIndex === index ? 'text-accent' : 'text-muted'}`}>{v.verse}</sup>
                           {renderVerseContent(v.verse, v.text)}
                         </span>
                       ))
                     ) : (
-                      <span className="text-[#5e5d59]">Loading...</span>
+                      <span className="text-meta">Loading...</span>
                     )}
                   </p>
                 </article>
@@ -1416,17 +1478,17 @@ export default function App() {
                 </Panel>
                 
                 {showBottomNotes && (
-                  <PanelResizeHandle className="h-1 bg-[#30302e] hover:bg-[#c96442] active:bg-[#c96442] transition-colors cursor-row-resize shrink-0 z-10 w-full" />
+                  <PanelResizeHandle className="h-1 bg-surface hover:bg-accent active:bg-accent transition-colors cursor-row-resize shrink-0 z-10 w-full" />
                 )}
 
               {/* Quick Note Split */}
                 {showBottomNotes && (
-                <Panel panelRef={bottomPanelRef} defaultSize="25" minSize="20" className="hidden lg:flex border-t border-[#30302e] bg-[#141413] flex-col shrink-0">
-                <div className="h-10 border-b border-[#30302e] flex items-center px-6 text-[11px] font-bold text-[#87867f] uppercase tracking-widest">
+                <Panel panelRef={bottomPanelRef} defaultSize="25" minSize="20" className="hidden lg:flex border-t border-border bg-bg flex-col shrink-0">
+                <div className="h-10 border-b border-border flex items-center px-6 text-[11px] font-bold text-muted uppercase tracking-widest">
                   Quick Note — {chapterTitle}
                 </div>
                 <textarea 
-                  className="flex-1 bg-transparent p-6 focus:outline-none resize-none text-[15px] leading-relaxed text-[#faf9f5] custom-scroll" 
+                  className="flex-1 bg-transparent p-6 focus:outline-none resize-none text-[15px] leading-relaxed text-fg custom-scroll" 
                   placeholder={`Take notes for ${chapterTitle}...`}
                   value={chapterNote ? chapterNote.content : ''}
                   onChange={handleQuickNoteChange}
@@ -1437,32 +1499,32 @@ export default function App() {
             </Panel>
 
             {showRightSidebar && (
-              <PanelResizeHandle className="hidden lg:flex w-1 bg-transparent hover:bg-[#c96442] active:bg-[#c96442] transition-colors cursor-col-resize shrink-0 z-10 relative" />
+              <PanelResizeHandle className="hidden lg:flex w-1 bg-transparent hover:bg-accent active:bg-accent transition-colors cursor-col-resize shrink-0 z-10 relative" />
             )}
 
             {/* Right Sidebar: Study AI */}
             {showRightSidebar && (
-              <Panel panelRef={rightPanelRef} defaultSize="25" minSize="20" className={`w-full lg:w-auto border-l border-[#30302e] bg-[#141413] flex-col ${mobileStudyView === 'ai' ? 'flex' : 'hidden lg:flex'}`}>
-              <header className="h-[60px] border-b border-[#30302e] flex items-center px-4 lg:px-6 gap-2 text-[15px] font-medium text-[#faf9f5] shrink-0">
-                <button onClick={() => setMobileStudyView('reader')} className="lg:hidden p-2 mr-1 text-[#b0aea5] hover:text-[#faf9f5]">
+              <Panel panelRef={rightPanelRef} defaultSize="25" minSize="20" className={`w-full lg:w-auto border-l border-border bg-bg flex-col ${mobileStudyView === 'ai' ? 'flex' : 'hidden lg:flex'}`}>
+              <header className="h-[60px] border-b border-border flex items-center px-4 lg:px-6 gap-2 text-[15px] font-medium text-fg shrink-0">
+                <button onClick={() => setMobileStudyView('reader')} className="lg:hidden p-2 mr-1 text-fg-2 hover:text-fg">
                   <ChevronLeft size={20} />
                 </button>
                 <Sparkles size={16} className="hidden lg:block" /> Study AI
               </header>
               <div className="flex-1 overflow-y-auto custom-scroll p-5 space-y-6">
                 {activeChat.messages.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center text-[#5e5d59] text-sm">
+                  <div className="h-full flex flex-col items-center justify-center text-meta text-sm">
                     <Sparkles size={16} />
                     <span className="mt-3">Ask Study AI a question</span>
                   </div>
                 ) : (
                   activeChat.messages.map((m, i) => (
                     <div key={i} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
-                      {m.role === 'model' && <span className="text-[11px] text-[#87867f] mb-1.5 ml-1 font-semibold tracking-wide uppercase">Study AI</span>}
+                      {m.role === 'model' && <span className="text-[11px] text-muted mb-1.5 ml-1 font-semibold tracking-wide uppercase">Study AI</span>}
                       <div className={`px-4 py-3 max-w-[95%] sm:max-w-[90%] text-[14px] leading-relaxed overflow-x-auto break-words ${
                         m.role === 'user' 
-                        ? 'bg-[#c96442] text-white rounded-2xl rounded-br-sm shadow-sm' 
-                        : 'bg-[#30302e] text-[#faf9f5] rounded-2xl rounded-bl-sm ring-1 ring-[#4d4c48] shadow-sm markdown-body'
+                        ? 'bg-accent text-white rounded-2xl rounded-br-sm shadow-sm' 
+                        : 'bg-surface text-fg rounded-2xl rounded-bl-sm ring-1 ring-border-soft shadow-sm markdown-body'
                       }`}>
                         {(m as any).imagePreview && (
                           <img src={(m as any).imagePreview} alt="attached" className="max-h-40 rounded-xl mb-2 object-contain" />
@@ -1476,7 +1538,7 @@ export default function App() {
                                 {imageBase64 && (
                                   <div className="mb-2">
                                     <img src={`data:image/png;base64,${imageBase64}`} alt="AI generated" className="rounded-xl max-w-full object-contain max-h-64 shadow-lg" />
-                                    <a href={`data:image/png;base64,${imageBase64}`} download="theologica-image.png" className="inline-flex items-center gap-1 mt-1 text-[10px] text-[#87867f] hover:text-[#e4e1cf] transition-colors">↓ Download</a>
+                                    <a href={`data:image/png;base64,${imageBase64}`} download="theologica-image.png" className="inline-flex items-center gap-1 mt-1 text-[10px] text-muted hover:text-fg-hover transition-colors">↓ Download</a>
                                   </div>
                                 )}
                                 {textContent ? <ReactMarkdown components={m.role === 'user' ? userMarkdownComponents : markdownComponents}>{textContent}</ReactMarkdown> : null}
@@ -1489,8 +1551,8 @@ export default function App() {
                 )}
                 {isAiTyping && (
                   <div className="flex flex-col items-start">
-                    <span className="text-[11px] text-[#87867f] mb-1.5 ml-1 font-semibold tracking-wide uppercase">Study AI</span>
-                    <div className="px-4 py-3 max-w-[90%] text-[14px] leading-relaxed bg-[#30302e] text-[#faf9f5] rounded-2xl rounded-bl-sm ring-1 ring-[#4d4c48] shadow-sm flex gap-1.5 items-center h-[46px]">
+                    <span className="text-[11px] text-muted mb-1.5 ml-1 font-semibold tracking-wide uppercase">Study AI</span>
+                    <div className="px-4 py-3 max-w-[90%] text-[14px] leading-relaxed bg-surface text-fg rounded-2xl rounded-bl-sm ring-1 ring-border-soft shadow-sm flex gap-1.5 items-center h-[46px]">
                       <div className="w-1.5 h-1.5 rounded-full bg-[#87867f] animate-bounce" style={{ animationDelay: '0ms' }} />
                       <div className="w-1.5 h-1.5 rounded-full bg-[#87867f] animate-bounce" style={{ animationDelay: '150ms' }} />
                       <div className="w-1.5 h-1.5 rounded-full bg-[#87867f] animate-bounce" style={{ animationDelay: '300ms' }} />
@@ -1499,7 +1561,7 @@ export default function App() {
                 )}
                 <div ref={messagesEndRef} />
               </div>
-                <form onSubmit={handleSendMessage} className="p-4 border-t border-[#30302e] bg-[#141413] shrink-0">
+                <form onSubmit={handleSendMessage} className="p-4 border-t border-border bg-bg shrink-0">
                   <input ref={imageFileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
@@ -1515,29 +1577,29 @@ export default function App() {
                   <div className="flex flex-col">
                     {chatQuote && (
                       <div className="mb-3 relative group">
-                        <div className="border-l-[3px] border-[#c96442] bg-[#c96442]/10 py-2.5 px-4 rounded-r-xl rounded-bl-sm shadow-sm">
+                        <div className="border-l-[3px] border-[#c96442] bg-accent/10 py-2.5 px-4 rounded-r-xl rounded-bl-sm shadow-sm">
                           <button 
                             type="button" 
                             onClick={() => setChatQuote(null)} 
-                            className="absolute -top-2 -right-2 bg-[#30302e] border border-[#4d4c48] text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                            className="absolute -top-2 -right-2 bg-surface border border-border-soft text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10"
                           >
                             <X size={12} />
                           </button>
-                          <p className="text-[13px] text-[#e4e1cf] italic line-clamp-3">"{chatQuote.text}"</p>
-                          <p className="text-[11px] text-[#87867f] font-semibold mt-1">— {chatQuote.reference}</p>
+                          <p className="text-[13px] text-fg-hover italic line-clamp-3">"{chatQuote.text}"</p>
+                          <p className="text-[11px] text-muted font-semibold mt-1">— {chatQuote.reference}</p>
                         </div>
                       </div>
                     )}
                     {chatImage && (
                       <div className="mb-2 relative self-start">
-                        <img src={chatImage.preview} alt="preview" className="h-16 rounded-xl object-cover border border-[#4d4c48]" />
-                        <button type="button" onClick={() => setChatImage(null)} className="absolute -top-1.5 -right-1.5 bg-[#30302e] border border-[#4d4c48] rounded-full p-0.5">
+                        <img src={chatImage.preview} alt="preview" className="h-16 rounded-xl object-cover border border-border-soft" />
+                        <button type="button" onClick={() => setChatImage(null)} className="absolute -top-1.5 -right-1.5 bg-surface border border-border-soft rounded-full p-0.5">
                           <X size={10} className="text-white" />
                         </button>
                       </div>
                     )}
                     <div className="relative flex items-end">
-                      <button type="button" onClick={() => imageFileRef.current?.click()} disabled={cooldown > 0 || !isOnline} className="flex-shrink-0 p-2 text-[#87867f] hover:text-[#e4e1cf] disabled:opacity-40 transition-colors mr-1">
+                      <button type="button" onClick={() => imageFileRef.current?.click()} disabled={cooldown > 0 || !isOnline} className="flex-shrink-0 p-2 text-muted hover:text-fg-hover disabled:opacity-40 transition-colors mr-1">
                         <Paperclip size={16} />
                       </button>
                     <TextareaAutosize 
@@ -1548,12 +1610,12 @@ export default function App() {
                       onKeyDown={handleChatKeyDown}
                       disabled={cooldown > 0 || !isOnline}
                       placeholder={!isOnline ? "Study AI is unavailable offline" : cooldown > 0 ? `Study AI is resting... (${cooldown}s)` : "Message Study AI..."}
-                      className="flex-1 bg-[#30302e] text-[#faf9f5] rounded-[24px] pl-5 pr-12 py-3 text-[14px] focus:outline-none focus:ring-[3px] focus:ring-[rgba(56,152,236,0.3)] disabled:opacity-50 transition-all placeholder:text-[#5e5d59] resize-none overflow-hidden"
+                      className="flex-1 bg-surface text-fg rounded-[24px] pl-5 pr-12 py-3 text-[14px] focus:outline-none focus:ring-[3px] focus:ring-[rgba(56,152,236,0.3)] disabled:opacity-50 transition-all placeholder:text-meta resize-none overflow-hidden"
                     />
                     <button 
                       type="submit" 
                       disabled={(!chatInput.trim() && !chatImage) || cooldown > 0 || !isOnline} 
-                      className="absolute right-1.5 bottom-1.5 p-2 bg-[#c96442] hover:bg-[#b5583b] text-white rounded-full disabled:opacity-50 disabled:hover:bg-[#c96442] transition-colors"
+                      className="absolute right-1.5 bottom-1.5 p-2 bg-accent hover:bg-[#b5583b] text-white rounded-full disabled:opacity-50 disabled:hover:bg-accent transition-colors"
                     >
                       <Send size={16} />
                     </button>
@@ -1570,7 +1632,7 @@ export default function App() {
         {/* Floating Toolbar for Highlighting */}
         {toolbarPosition && (
           <div 
-            className="fixed z-50 flex items-center gap-1.5 bg-[#30302e] border border-[#4d4c48] p-1.5 rounded-xl shadow-2xl backdrop-blur-md transform -translate-x-1/2 -translate-y-full"
+            className="fixed z-50 flex items-center gap-1.5 bg-surface border border-border-soft p-1.5 rounded-xl shadow-2xl backdrop-blur-md transform -translate-x-1/2 -translate-y-full"
             style={{ left: toolbarPosition.x, top: toolbarPosition.y }}
           >
             <button onClick={() => saveHighlight('yellow')} className="w-7 h-7 rounded-full bg-yellow-500 hover:scale-110 transition-transform shadow-sm" title="Highlight Yellow" />
@@ -1578,19 +1640,19 @@ export default function App() {
             <button onClick={() => saveHighlight('blue')} className="w-7 h-7 rounded-full bg-blue-500 hover:scale-110 transition-transform shadow-sm" title="Highlight Blue" />
             <button onClick={() => saveHighlight('pink')} className="w-7 h-7 rounded-full bg-pink-500 hover:scale-110 transition-transform shadow-sm" title="Highlight Pink" />
             <button onClick={() => saveHighlight('purple')} className="w-7 h-7 rounded-full bg-purple-500 hover:scale-110 transition-transform shadow-sm" title="Highlight Purple" />
-            <div className="w-[1px] h-5 bg-[#4d4c48] mx-1" />
-            <button onClick={askAiAboutHighlight} className="flex items-center justify-center h-7 px-2.5 rounded-lg bg-[#c96442] text-white hover:bg-[#d87654] hover:scale-105 transition-all text-xs font-semibold shadow-sm gap-1">
+            <div className="w-[1px] h-5 bg-border-soft mx-1" />
+            <button onClick={askAiAboutHighlight} className="flex items-center justify-center h-7 px-2.5 rounded-lg bg-accent text-white hover:bg-[#d87654] hover:scale-105 transition-all text-xs font-semibold shadow-sm gap-1">
               <Sparkles size={12} /> Ask AI
             </button>
-            <button onClick={addHighlightToChat} className="flex items-center justify-center h-7 px-2.5 rounded-lg bg-[#30302e] border border-[#4d4c48] text-[#e4e1cf] hover:bg-[#4d4c48] hover:scale-105 transition-all text-xs font-semibold shadow-sm gap-1" title="Add to Chat">
+            <button onClick={addHighlightToChat} className="flex items-center justify-center h-7 px-2.5 rounded-lg bg-surface border border-border-soft text-fg-hover hover:bg-border-soft hover:scale-105 transition-all text-xs font-semibold shadow-sm gap-1" title="Add to Chat">
               <MessageSquarePlus size={12} />
             </button>
             {toolbarPosition.highlightId && (
               <>
-                <div className="w-[1px] h-5 bg-[#4d4c48] mx-1" />
+                <div className="w-[1px] h-5 bg-border-soft mx-1" />
                 <button 
                   onClick={() => deleteHighlight(toolbarPosition.highlightId!)} 
-                  className="flex items-center justify-center h-7 px-2 rounded-lg bg-[#30302e] border border-[#4d4c48] text-[#ef4444] hover:bg-[#ef4444] hover:text-white transition-all shadow-sm"
+                  className="flex items-center justify-center h-7 px-2 rounded-lg bg-surface border border-border-soft text-error hover:bg-[#ef4444] hover:text-white transition-all shadow-sm"
                   title="Delete Highlight"
                 >
                   <Trash2 size={12} />
@@ -1602,20 +1664,20 @@ export default function App() {
 
         {/* DEVOTIONAL TAB */}
         {activeTab === 'devotional' && (
-          <div className="flex-1 flex flex-col items-center overflow-y-auto custom-scroll p-4 lg:p-8 bg-[#141413]">
-            <div className="w-full max-w-2xl bg-[#141413]">
+          <div className="flex-1 flex flex-col items-center overflow-y-auto custom-scroll p-4 lg:p-8 bg-bg">
+            <div className="w-full max-w-2xl bg-bg">
               {/* Toggle switch */}
               <div className="flex justify-center mb-8 shrink-0">
-                <div className="flex p-1 bg-[#30302e] rounded-full ring-shadow">
+                <div className="flex p-1 bg-surface rounded-full ring-shadow">
                   <button 
                     onClick={() => setDevotionalTime('morning')}
-                    className={`flex items-center gap-2 px-6 py-2 rounded-full text-sm font-medium transition-colors ${devotionalTime === 'morning' ? 'bg-[#c96442] text-white shadow-sm' : 'text-[#87867f] hover:text-[#faf9f5]'}`}
+                    className={`flex items-center gap-2 px-6 py-2 rounded-full text-sm font-medium transition-colors ${devotionalTime === 'morning' ? 'bg-accent text-white shadow-sm' : 'text-muted hover:text-fg'}`}
                   >
                     <Sun size={16} /> Morning
                   </button>
                   <button 
                     onClick={() => setDevotionalTime('evening')}
-                    className={`flex items-center gap-2 px-6 py-2 rounded-full text-sm font-medium transition-colors ${devotionalTime === 'evening' ? 'bg-[#c96442] text-white shadow-sm' : 'text-[#87867f] hover:text-[#faf9f5]'}`}
+                    className={`flex items-center gap-2 px-6 py-2 rounded-full text-sm font-medium transition-colors ${devotionalTime === 'evening' ? 'bg-accent text-white shadow-sm' : 'text-muted hover:text-fg'}`}
                   >
                     <Moon size={16} /> Evening
                   </button>
@@ -1624,7 +1686,7 @@ export default function App() {
 
               {/* Devotional Card */}
               {devotionalEntry && (
-                <article className="border border-[#30302e] rounded-2xl p-6 lg:p-10 shadow-sm bg-[#141413] ring-shadow overflow-hidden">
+                <article className="border border-border rounded-2xl p-6 lg:p-10 shadow-sm bg-bg ring-shadow overflow-hidden">
                   <AnimatePresence mode="popLayout" initial={false}>
                     <motion.div
                       key={devotionalTime}
@@ -1635,28 +1697,28 @@ export default function App() {
                     >
                       <header className="flex justify-between items-start mb-6">
                         <div>
-                          <h2 className="text-[#c96442] font-display text-2xl lg:text-3xl mb-2">
+                          <h2 className="text-accent font-display text-2xl lg:text-3xl mb-2">
                             {devotionalTime === 'morning' ? devotionalEntry.morningVerse : devotionalEntry.eveningVerse}
                           </h2>
-                          <p className="text-[#87867f] text-sm uppercase tracking-widest font-bold">
+                          <p className="text-muted text-sm uppercase tracking-widest font-bold">
                             Day {displayDay} of {totalDays}
                           </p>
                         </div>
                         <button 
                           onClick={toggleDevoSpeech}
-                          className="p-3 bg-[#30302e] text-[#faf9f5] rounded-full hover:bg-[#4d4c48] transition-colors shrink-0 ring-shadow"
+                          className="p-3 bg-surface text-fg rounded-full hover:bg-border-soft transition-colors shrink-0 ring-shadow"
                         >
                           {isDevoSpeaking ? <VolumeX size={20} /> : <Volume2 size={20} />}
                         </button>
                       </header>
                       
-                      <div className="w-full h-px bg-[#30302e] mb-8" />
+                      <div className="w-full h-px bg-surface mb-8" />
                       
-                      <div className="text-[17px] leading-[1.8] text-[#faf9f5] font-serif mb-10 whitespace-pre-wrap">
+                      <div className="text-[17px] leading-[1.8] text-fg font-serif mb-10 whitespace-pre-wrap">
                         {devotionalTime === 'morning' ? devotionalEntry.morningText : devotionalEntry.eveningText}
                       </div>
                       
-                      <footer className="text-[#87867f] text-sm italic border-t border-[#30302e] pt-4">
+                      <footer className="text-muted text-sm italic border-t border-border pt-4">
                         {devotionalEntry.citation}
                       </footer>
                     </motion.div>
@@ -1670,17 +1732,17 @@ export default function App() {
         {/* AI CHATS TAB */}
         {activeTab === 'chats' && (
           <div className="flex w-full h-full">
-            <aside className={`w-full lg:w-[280px] border-r border-[#30302e] bg-[#141413] flex-col shrink-0 ${activeChatId ? 'hidden lg:flex' : 'flex'}`}>
-              <header className="h-[60px] border-b border-[#30302e] flex items-center justify-between px-5 shrink-0">
-                <span className="text-[15px] font-medium text-[#faf9f5]">Conversations</span>
-                <button onClick={handleNewChat} className="p-2 text-[#b0aea5] hover:text-[#faf9f5] hover:bg-[#30302e] rounded-lg transition-colors"><Plus size={16} /></button>
+            <aside className={`w-full lg:w-[280px] border-r border-border bg-bg flex-col shrink-0 ${activeChatId ? 'hidden lg:flex' : 'flex'}`}>
+              <header className="h-[60px] border-b border-border flex items-center justify-between px-5 shrink-0">
+                <span className="text-[15px] font-medium text-fg">Conversations</span>
+                <button onClick={handleNewChat} className="p-2 text-fg-2 hover:text-fg hover:bg-surface rounded-lg transition-colors"><Plus size={16} /></button>
               </header>
               <div className="flex-1 overflow-y-auto custom-scroll p-3 space-y-1">
                 {chats.map(c => (
                   <div 
                     key={c.id} 
                     onClick={() => setActiveChatId(c.id)} 
-                    className={`group flex items-center justify-between w-full px-4 py-3 rounded-lg text-[14px] transition-colors cursor-pointer ${activeChatId === c.id ? 'bg-[#30302e] text-[#faf9f5] ring-shadow' : 'text-[#87867f] hover:bg-[#30302e] hover:text-[#faf9f5]'}`}
+                    className={`group flex items-center justify-between w-full px-4 py-3 rounded-lg text-[14px] transition-colors cursor-pointer ${activeChatId === c.id ? 'bg-surface text-fg ring-shadow' : 'text-muted hover:bg-surface hover:text-fg'}`}
                   >
                     <span className="truncate pr-2"><TypewriterTitle title={c.title} /></span>
                     <div className="flex items-center gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity shrink-0">
@@ -1689,7 +1751,7 @@ export default function App() {
                           e.stopPropagation();
                           handleRenameChat(c.id, c.title);
                         }}
-                        className="p-2 lg:p-1 min-w-[44px] min-h-[44px] lg:min-w-0 lg:min-h-0 text-[#5e5d59] hover:text-[#e4e1cf] transition-colors"
+                        className="p-2 lg:p-1 min-w-[44px] min-h-[44px] lg:min-w-0 lg:min-h-0 text-meta hover:text-fg-hover transition-colors"
                         title="Rename Conversation"
                       >
                         <Edit size={14} />
@@ -1699,7 +1761,7 @@ export default function App() {
                           e.stopPropagation();
                           handleDeleteChat(c.id);
                         }}
-                        className="p-2 lg:p-1 min-w-[44px] min-h-[44px] lg:min-w-0 lg:min-h-0 text-[#5e5d59] hover:text-[#c96442] transition-colors"
+                        className="p-2 lg:p-1 min-w-[44px] min-h-[44px] lg:min-w-0 lg:min-h-0 text-meta hover:text-accent transition-colors"
                         title="Delete Conversation"
                       >
                         <Trash2 size={14} />
@@ -1710,29 +1772,29 @@ export default function App() {
               </div>
             </aside>
             
-            <section className={`flex-1 flex-col bg-[#141413] ${activeChatId ? 'flex' : 'hidden lg:flex'}`}>
+            <section className={`flex-1 flex-col bg-bg ${activeChatId ? 'flex' : 'hidden lg:flex'}`}>
               {activeChatId ? (
                 <>
-                  <header className="h-[60px] border-b border-[#30302e] flex items-center px-4 lg:px-8 shrink-0">
-                    <button onClick={() => setActiveChatId(null)} className="lg:hidden p-2 mr-2 text-[#b0aea5] hover:text-[#faf9f5]">
+                  <header className="h-[60px] border-b border-border flex items-center px-4 lg:px-8 shrink-0">
+                    <button onClick={() => setActiveChatId(null)} className="lg:hidden p-2 mr-2 text-fg-2 hover:text-fg">
                       <ChevronLeft size={20} />
                     </button>
                     <h2 className="text-[18px] font-medium">{activeChat.title}</h2>
                   </header>
                   <div className="flex-1 overflow-y-auto custom-scroll p-8 lg:p-12 space-y-8 flex flex-col">
                     {activeChat.messages.length === 0 ? (
-                      <div className="flex-1 flex flex-col items-center justify-center text-[#5e5d59]">
+                      <div className="flex-1 flex flex-col items-center justify-center text-meta">
                         <Sparkles size={24} />
                         <p className="mt-4 text-[15px]">Start a new conversation with Study AI</p>
                       </div>
                     ) : (
                       activeChat.messages.map((m, i) => (
                         <div key={i} className={`flex flex-col max-w-3xl w-full mx-auto ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
-                          {m.role === 'model' && <span className="text-[11px] text-[#87867f] mb-2 ml-1 font-semibold tracking-wide uppercase">Study AI</span>}
+                          {m.role === 'model' && <span className="text-[11px] text-muted mb-2 ml-1 font-semibold tracking-wide uppercase">Study AI</span>}
                           <div className={`px-5 py-4 text-[15px] leading-[1.7] ${
                             m.role === 'user' 
-                            ? 'bg-[#c96442] text-white rounded-[20px] rounded-br-sm shadow-sm' 
-                            : 'bg-[#30302e] text-[#faf9f5] rounded-[20px] rounded-bl-sm ring-1 ring-[#4d4c48] shadow-sm markdown-body'
+                            ? 'bg-accent text-white rounded-[20px] rounded-br-sm shadow-sm' 
+                            : 'bg-surface text-fg rounded-[20px] rounded-bl-sm ring-1 ring-border-soft shadow-sm markdown-body'
                           }`}>
                             {(m as any).imagePreview && (
                               <img src={(m as any).imagePreview} alt="attached" className="max-h-52 rounded-xl mb-3 object-contain" />
@@ -1746,7 +1808,7 @@ export default function App() {
                                 {imageBase64 && (
                                   <div className="mb-3">
                                     <img src={`data:image/png;base64,${imageBase64}`} alt="AI generated" className="rounded-xl max-w-full object-contain max-h-96 shadow-lg" />
-                                    <a href={`data:image/png;base64,${imageBase64}`} download="theologica-image.png" className="inline-flex items-center gap-1.5 mt-2 text-[11px] text-[#87867f] hover:text-[#e4e1cf] transition-colors">↓ Download image</a>
+                                    <a href={`data:image/png;base64,${imageBase64}`} download="theologica-image.png" className="inline-flex items-center gap-1.5 mt-2 text-[11px] text-muted hover:text-fg-hover transition-colors">↓ Download image</a>
                                   </div>
                                 )}
                                 {textContent ? <ReactMarkdown components={m.role === 'user' ? userMarkdownComponents : markdownComponents}>{textContent}</ReactMarkdown> : null}
@@ -1759,8 +1821,8 @@ export default function App() {
                     )}
                     {isAiTyping && (
                       <div className="flex flex-col max-w-3xl w-full mx-auto items-start">
-                        <span className="text-[11px] text-[#87867f] mb-2 ml-1 font-semibold tracking-wide uppercase">Study AI</span>
-                        <div className="px-5 py-4 text-[15px] leading-[1.7] bg-[#30302e] text-[#faf9f5] rounded-[20px] rounded-bl-sm ring-1 ring-[#4d4c48] shadow-sm flex gap-1.5 items-center h-[58px]">
+                        <span className="text-[11px] text-muted mb-2 ml-1 font-semibold tracking-wide uppercase">Study AI</span>
+                        <div className="px-5 py-4 text-[15px] leading-[1.7] bg-surface text-fg rounded-[20px] rounded-bl-sm ring-1 ring-border-soft shadow-sm flex gap-1.5 items-center h-[58px]">
                           <div className="w-1.5 h-1.5 rounded-full bg-[#87867f] animate-bounce" style={{ animationDelay: '0ms' }} />
                           <div className="w-1.5 h-1.5 rounded-full bg-[#87867f] animate-bounce" style={{ animationDelay: '150ms' }} />
                           <div className="w-1.5 h-1.5 rounded-full bg-[#87867f] animate-bounce" style={{ animationDelay: '300ms' }} />
@@ -1769,33 +1831,33 @@ export default function App() {
                     )}
                     <div ref={messagesEndRef} />
                   </div>
-                  <form onSubmit={handleSendMessage} className="p-6 border-t border-[#30302e] w-full shrink-0">
+                  <form onSubmit={handleSendMessage} className="p-6 border-t border-border w-full shrink-0">
                     <div className="flex flex-col max-w-4xl mx-auto w-full">
                       {chatQuote && (
                         <div className="mb-3 relative group max-w-3xl">
-                          <div className="border-l-[3px] border-[#c96442] bg-[#c96442]/10 py-3 px-5 rounded-r-xl rounded-bl-sm shadow-sm">
+                          <div className="border-l-[3px] border-[#c96442] bg-accent/10 py-3 px-5 rounded-r-xl rounded-bl-sm shadow-sm">
                             <button 
                               type="button" 
                               onClick={() => setChatQuote(null)} 
-                              className="absolute -top-2 -right-2 bg-[#30302e] border border-[#4d4c48] text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                              className="absolute -top-2 -right-2 bg-surface border border-border-soft text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10"
                             >
                               <X size={12} />
                             </button>
-                            <p className="text-[14px] text-[#e4e1cf] italic line-clamp-4">"{chatQuote.text}"</p>
-                            <p className="text-[12px] text-[#87867f] font-semibold mt-1">— {chatQuote.reference}</p>
+                            <p className="text-[14px] text-fg-hover italic line-clamp-4">"{chatQuote.text}"</p>
+                            <p className="text-[12px] text-muted font-semibold mt-1">— {chatQuote.reference}</p>
                           </div>
                         </div>
                       )}
                       {chatImage && (
                         <div className="mb-2 relative self-start">
-                          <img src={chatImage.preview} alt="preview" className="h-20 rounded-xl object-cover border border-[#4d4c48]" />
-                          <button type="button" onClick={() => setChatImage(null)} className="absolute -top-1.5 -right-1.5 bg-[#30302e] border border-[#4d4c48] rounded-full p-0.5">
+                          <img src={chatImage.preview} alt="preview" className="h-20 rounded-xl object-cover border border-border-soft" />
+                          <button type="button" onClick={() => setChatImage(null)} className="absolute -top-1.5 -right-1.5 bg-surface border border-border-soft rounded-full p-0.5">
                             <X size={10} className="text-white" />
                           </button>
                         </div>
                       )}
                       <div className="relative flex items-end">
-                        <button type="button" onClick={() => imageFileRef.current?.click()} disabled={cooldown > 0} className="flex-shrink-0 p-2.5 text-[#87867f] hover:text-[#e4e1cf] disabled:opacity-40 transition-colors mr-1">
+                        <button type="button" onClick={() => imageFileRef.current?.click()} disabled={cooldown > 0} className="flex-shrink-0 p-2.5 text-muted hover:text-fg-hover disabled:opacity-40 transition-colors mr-1">
                           <Paperclip size={18} />
                         </button>
                       <TextareaAutosize 
@@ -1806,12 +1868,12 @@ export default function App() {
                         onKeyDown={handleChatKeyDown}
                         disabled={cooldown > 0}
                         placeholder={cooldown > 0 ? `Study AI is resting... (${cooldown}s remaining)` : "Message Study AI..."}
-                        className="flex-1 bg-[#30302e] text-[#faf9f5] rounded-[26px] pl-6 pr-14 py-4 text-[15px] focus:outline-none focus:ring-[3px] focus:ring-[rgba(56,152,236,0.3)] disabled:opacity-50 transition-all placeholder:text-[#5e5d59] resize-none overflow-hidden"
+                        className="flex-1 bg-surface text-fg rounded-[26px] pl-6 pr-14 py-4 text-[15px] focus:outline-none focus:ring-[3px] focus:ring-[rgba(56,152,236,0.3)] disabled:opacity-50 transition-all placeholder:text-meta resize-none overflow-hidden"
                       />
                       <button 
                         type="submit" 
                         disabled={(!chatInput.trim() && !chatImage) || cooldown > 0} 
-                        className="absolute right-2 bottom-2 p-2.5 bg-[#c96442] hover:bg-[#b5583b] text-white rounded-full disabled:opacity-50 disabled:hover:bg-[#c96442] transition-colors"
+                        className="absolute right-2 bottom-2 p-2.5 bg-accent hover:bg-[#b5583b] text-white rounded-full disabled:opacity-50 disabled:hover:bg-accent transition-colors"
                       >
                         <Send size={16} />
                       </button>
@@ -1820,7 +1882,7 @@ export default function App() {
                   </form>
                 </>
               ) : (
-                <div className="flex-1 flex flex-col items-center justify-center text-[#5e5d59]">
+                <div className="flex-1 flex flex-col items-center justify-center text-meta">
                   <Sparkles size={24} className="mb-4" />
                   <p className="text-[15px]">Select a conversation or create a new one.</p>
                 </div>
@@ -1834,25 +1896,33 @@ export default function App() {
           const totalChapters = 1189;
           const completedCount = completedChapters.length;
           const progressPercent = Math.round((completedCount / totalChapters) * 100) || 0;
+          
+          const otTotal = OT_BOOKS.reduce((acc, b) => acc + b.chapters, 0);
+          const ntTotal = NT_BOOKS.reduce((acc, b) => acc + b.chapters, 0);
+          const otCompleted = OT_BOOKS.reduce((acc, b) => acc + completedChapters.filter(c => c.startsWith(b.name + '-')).length, 0);
+          const ntCompleted = NT_BOOKS.reduce((acc, b) => acc + completedChapters.filter(c => c.startsWith(b.name + '-')).length, 0);
+          const otPercent = Math.round((otCompleted / otTotal) * 100) || 0;
+          const ntPercent = Math.round((ntCompleted / ntTotal) * 100) || 0;
+
 
           return (
-            <div className="flex-1 overflow-y-auto custom-scroll p-10 lg:p-16 bg-[#141413]">
+            <div className="flex-1 overflow-y-auto custom-scroll p-10 lg:p-16 bg-bg">
               <div className="max-w-5xl mx-auto">
                 <header className="mb-12">
-                  <h1 className="text-[40px] font-display text-[#faf9f5] mb-3">Reading Tracker</h1>
-                  <p className="text-[16px] text-[#87867f]">Track your progress through all 66 books.</p>
+                  <h1 className="text-[40px] font-display text-fg mb-3">Reading Tracker</h1>
+                  <p className="text-[16px] text-muted">Track your progress through all 66 books.</p>
                 </header>
 
-                <div className="bg-[#30302e] p-8 rounded-[20px] ring-shadow mb-16">
+                <div className="bg-surface p-8 rounded-[20px] ring-shadow mb-16">
                   <div className="flex justify-between items-end mb-4">
                     <div>
-                      <div className="text-[12px] font-bold tracking-widest text-[#87867f] uppercase mb-2">Overall Progress</div>
-                      <div className="text-[32px] font-semibold text-[#faf9f5] leading-none">{progressPercent}%</div>
+                      <div className="text-[12px] font-bold tracking-widest text-muted uppercase mb-2">Overall Progress</div>
+                      <div className="text-[32px] font-semibold text-fg leading-none">{progressPercent}%</div>
                     </div>
-                    <div className="text-[15px] font-medium text-[#b0aea5]">{completedCount} / {totalChapters} Chapters</div>
+                    <div className="text-[15px] font-medium text-fg-2">{completedCount} / {totalChapters} Chapters</div>
                   </div>
-                  <div className="h-3.5 w-full bg-[#141413] rounded-full overflow-hidden inset-shadow">
-                    <div className="h-full bg-[#c96442] transition-all duration-700 ease-out" style={{ width: `${progressPercent}%` }} />
+                  <div className="h-3.5 w-full bg-bg rounded-full overflow-hidden inset-shadow">
+                    <div className="h-full bg-accent transition-all duration-700 ease-out" style={{ width: `${progressPercent}%` }} />
                   </div>
                 </div>
 
@@ -1860,28 +1930,41 @@ export default function App() {
                 <div className="mb-6">
                   <button 
                     onClick={() => toggleTestament('OT')}
-                    className="w-full flex items-center justify-between text-left bg-[#30302e] p-5 rounded-[20px] ring-shadow hover:bg-[#393936] transition-colors"
+                    className="w-full flex items-center justify-between text-left bg-surface p-5 rounded-[20px] ring-shadow hover:bg-surface-warm transition-colors"
                   >
-                    <div className="text-[16px] font-bold tracking-widest text-[#faf9f5] uppercase">Old Testament</div>
-                    <div className="text-[#87867f]">{expandedTestaments.includes('OT') ? '▲' : '▼'}</div>
+                    <div className="text-[16px] font-bold tracking-widest text-fg uppercase">Old Testament</div>
+                    
+                      <div className="flex-1 mx-6 hidden sm:block">
+                        <div className="h-1.5 w-full bg-bg rounded-full overflow-hidden">
+                          <div className="h-full bg-accent transition-all duration-500" style={{ width: `${otPercent}%` }} />
+                        </div>
+                      </div>
+                      <div className="text-[13px] font-mono text-muted mr-4">{trackerFormat === 'percent' ? `${otPercent}%` : `${otCompleted}/${otTotal}`}</div>
+                      <div className="text-muted">{expandedTestaments.includes('OT') ? '▲' : '▼'}</div>
                   </button>
                   
                   {expandedTestaments.includes('OT') && (
-                    <div className="mt-4 flex flex-col gap-3 pl-4 border-l-2 border-[#30302e]">
+                    <div className="mt-4 flex flex-col gap-3 pl-4 border-l-2 border-border">
                       {OT_BOOKS.map(book => {
                         const isBookExpanded = expandedBooks.includes(book.name);
                         return (
-                          <div key={book.name} className="bg-[#1c1c1b] rounded-[16px] overflow-hidden ring-1 ring-[#30302e]">
+                          <div key={book.name} className="bg-[#1c1c1b] rounded-[16px] overflow-hidden ring-1 ring-border">
                             <button 
                               onClick={() => toggleBook(book.name)}
-                              className="w-full flex items-center justify-between p-4 hover:bg-[#252523] transition-colors"
+                              className="w-full flex items-center justify-between p-4 hover:bg-surface transition-colors"
                             >
-                              <h3 className="font-medium text-[15px] text-[#faf9f5]">{book.name}</h3>
-                              <span className="text-xs text-[#87867f] font-mono">{book.chapters} CH</span>
+                              <h3 className="font-medium text-[15px] text-fg">{book.name}</h3>
+                              
+                              <span className="text-[13px] text-muted font-mono bg-bg px-2 py-1 rounded-md">
+                                {(() => {
+                                  const comp = completedChapters.filter(c => c.startsWith(book.name + '-')).length;
+                                  return trackerFormat === 'percent' ? `${Math.round((comp / book.chapters) * 100) || 0}%` : `${comp}/${book.chapters}`;
+                                })()}
+                              </span>
                             </button>
                             
                             {isBookExpanded && (
-                              <div className="p-4 pt-0 border-t border-[#30302e] bg-[#141413]">
+                              <div className="p-4 pt-0 border-t border-border bg-bg">
                                 <div className="flex flex-wrap gap-2 mt-4">
                                   {Array.from({ length: book.chapters }).map((_, i) => {
                                     const id = `${book.name}-${i + 1}`;
@@ -1892,8 +1975,8 @@ export default function App() {
                                         onClick={() => toggleAnyChapter(id)}
                                         className={`w-11 h-11 lg:w-9 lg:h-9 rounded-xl text-xs font-semibold flex items-center justify-center transition-all ${
                                           isChecked 
-                                            ? 'bg-[#c96442] text-white shadow-sm' 
-                                            : 'bg-[#252523] text-[#87867f] hover:text-[#faf9f5] hover:bg-[#4d4c48]'
+                                            ? 'bg-accent text-white shadow-sm' 
+                                            : 'bg-surface text-muted hover:text-fg hover:bg-border-soft'
                                         }`}
                                       >
                                         {i + 1}
@@ -1914,28 +1997,41 @@ export default function App() {
                 <div className="mb-16">
                   <button 
                     onClick={() => toggleTestament('NT')}
-                    className="w-full flex items-center justify-between text-left bg-[#30302e] p-5 rounded-[20px] ring-shadow hover:bg-[#393936] transition-colors"
+                    className="w-full flex items-center justify-between text-left bg-surface p-5 rounded-[20px] ring-shadow hover:bg-surface-warm transition-colors"
                   >
-                    <div className="text-[16px] font-bold tracking-widest text-[#faf9f5] uppercase">New Testament</div>
-                    <div className="text-[#87867f]">{expandedTestaments.includes('NT') ? '▲' : '▼'}</div>
+                    <div className="text-[16px] font-bold tracking-widest text-fg uppercase">New Testament</div>
+                    
+                      <div className="flex-1 mx-6 hidden sm:block">
+                        <div className="h-1.5 w-full bg-bg rounded-full overflow-hidden">
+                          <div className="h-full bg-accent transition-all duration-500" style={{ width: `${ntPercent}%` }} />
+                        </div>
+                      </div>
+                      <div className="text-[13px] font-mono text-muted mr-4">{trackerFormat === 'percent' ? `${ntPercent}%` : `${ntCompleted}/${ntTotal}`}</div>
+                      <div className="text-muted">{expandedTestaments.includes('NT') ? '▲' : '▼'}</div>
                   </button>
                   
                   {expandedTestaments.includes('NT') && (
-                    <div className="mt-4 flex flex-col gap-3 pl-4 border-l-2 border-[#30302e]">
+                    <div className="mt-4 flex flex-col gap-3 pl-4 border-l-2 border-border">
                       {NT_BOOKS.map(book => {
                         const isBookExpanded = expandedBooks.includes(book.name);
                         return (
-                          <div key={book.name} className="bg-[#1c1c1b] rounded-[16px] overflow-hidden ring-1 ring-[#30302e]">
+                          <div key={book.name} className="bg-[#1c1c1b] rounded-[16px] overflow-hidden ring-1 ring-border">
                             <button 
                               onClick={() => toggleBook(book.name)}
-                              className="w-full flex items-center justify-between p-4 hover:bg-[#252523] transition-colors"
+                              className="w-full flex items-center justify-between p-4 hover:bg-surface transition-colors"
                             >
-                              <h3 className="font-medium text-[15px] text-[#faf9f5]">{book.name}</h3>
-                              <span className="text-xs text-[#87867f] font-mono">{book.chapters} CH</span>
+                              <h3 className="font-medium text-[15px] text-fg">{book.name}</h3>
+                              
+                              <span className="text-[13px] text-muted font-mono bg-bg px-2 py-1 rounded-md">
+                                {(() => {
+                                  const comp = completedChapters.filter(c => c.startsWith(book.name + '-')).length;
+                                  return trackerFormat === 'percent' ? `${Math.round((comp / book.chapters) * 100) || 0}%` : `${comp}/${book.chapters}`;
+                                })()}
+                              </span>
                             </button>
                             
                             {isBookExpanded && (
-                              <div className="p-4 pt-0 border-t border-[#30302e] bg-[#141413]">
+                              <div className="p-4 pt-0 border-t border-border bg-bg">
                                 <div className="flex flex-wrap gap-2 mt-4">
                                   {Array.from({ length: book.chapters }).map((_, i) => {
                                     const id = `${book.name}-${i + 1}`;
@@ -1946,8 +2042,8 @@ export default function App() {
                                         onClick={() => toggleAnyChapter(id)}
                                         className={`w-11 h-11 lg:w-9 lg:h-9 rounded-xl text-xs font-semibold flex items-center justify-center transition-all ${
                                           isChecked 
-                                            ? 'bg-[#c96442] text-white shadow-sm' 
-                                            : 'bg-[#252523] text-[#87867f] hover:text-[#faf9f5] hover:bg-[#4d4c48]'
+                                            ? 'bg-accent text-white shadow-sm' 
+                                            : 'bg-surface text-muted hover:text-fg hover:bg-border-soft'
                                         }`}
                                       >
                                         {i + 1}
@@ -1971,9 +2067,9 @@ export default function App() {
         {/* NOTES TAB */}
         {activeTab === 'notes' && (
           <div className="flex w-full h-full">
-            <aside className={`w-full lg:w-[280px] border-r border-[#30302e] bg-[#141413] flex-col shrink-0 ${activeNoteId ? 'hidden lg:flex' : 'flex'}`}>
-              <header className="h-[60px] border-b border-[#30302e] flex items-center justify-between px-5 shrink-0">
-                <span className="text-[15px] font-medium text-[#faf9f5]">Notebooks</span>
+            <aside className={`w-full lg:w-[280px] border-r border-border bg-bg flex-col shrink-0 ${activeNoteId ? 'hidden lg:flex' : 'flex'}`}>
+              <header className="h-[60px] border-b border-border flex items-center justify-between px-5 shrink-0">
+                <span className="text-[15px] font-medium text-fg">Notebooks</span>
                 <button 
                   onClick={async () => {
                     const res = await fetchWithAuth(`${API_URL}/api/notes`, {
@@ -1985,7 +2081,7 @@ export default function App() {
                     setNotes([newNote, ...notes]);
                     setActiveNoteId(newNote.id);
                   }}
-                  className="p-2 text-[#b0aea5] hover:text-[#faf9f5] hover:bg-[#30302e] rounded-lg transition-colors"
+                  className="p-2 text-fg-2 hover:text-fg hover:bg-surface rounded-lg transition-colors"
                 >
                   <Plus size={16} />
                 </button>
@@ -1995,7 +2091,7 @@ export default function App() {
                   <div 
                     key={n.id} 
                     onClick={() => setActiveNoteId(n.id)} 
-                    className={`group flex items-center justify-between w-full px-4 py-3 rounded-lg text-[14px] transition-colors mb-1 cursor-pointer ${activeNoteId === n.id ? 'bg-[#30302e] text-[#faf9f5] ring-shadow' : 'text-[#87867f] hover:bg-[#30302e] hover:text-[#faf9f5]'}`}
+                    className={`group flex items-center justify-between w-full px-4 py-3 rounded-lg text-[14px] transition-colors mb-1 cursor-pointer ${activeNoteId === n.id ? 'bg-surface text-fg ring-shadow' : 'text-muted hover:bg-surface hover:text-fg'}`}
                   >
                     <span className="truncate pr-2">{n.title || 'Untitled Note'}</span>
                     <div className="flex items-center gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity shrink-0">
@@ -2004,7 +2100,7 @@ export default function App() {
                           e.stopPropagation();
                           handleRenameNoteSidebar(n.id, n.title, n.content);
                         }}
-                        className="p-2 lg:p-1 min-w-[44px] min-h-[44px] lg:min-w-0 lg:min-h-0 text-[#5e5d59] hover:text-[#e4e1cf] transition-colors"
+                        className="p-2 lg:p-1 min-w-[44px] min-h-[44px] lg:min-w-0 lg:min-h-0 text-meta hover:text-fg-hover transition-colors"
                         title="Rename Note"
                       >
                         <Edit size={14} />
@@ -2014,7 +2110,7 @@ export default function App() {
                           e.stopPropagation();
                           handleDeleteNote(n.id);
                         }}
-                        className="p-2 lg:p-1 min-w-[44px] min-h-[44px] lg:min-w-0 lg:min-h-0 text-[#5e5d59] hover:text-[#c96442] transition-colors"
+                        className="p-2 lg:p-1 min-w-[44px] min-h-[44px] lg:min-w-0 lg:min-h-0 text-meta hover:text-accent transition-colors"
                         title="Delete Note"
                       >
                         <Trash2 size={14} />
@@ -2024,30 +2120,30 @@ export default function App() {
                 ))}
               </div>
             </aside>
-            <section className={`flex-1 flex-col bg-[#141413] ${activeNoteId ? 'flex' : 'hidden lg:flex'}`}>
+            <section className={`flex-1 flex-col bg-bg ${activeNoteId ? 'flex' : 'hidden lg:flex'}`}>
               {activeNoteId ? (
                 <>
-                  <header className="h-[60px] border-b border-[#30302e] flex items-center px-4 lg:px-8 shrink-0">
-                    <button onClick={() => setActiveNoteId(null)} className="lg:hidden p-2 mr-2 text-[#b0aea5] hover:text-[#faf9f5]">
+                  <header className="h-[60px] border-b border-border flex items-center px-4 lg:px-8 shrink-0">
+                    <button onClick={() => setActiveNoteId(null)} className="lg:hidden p-2 mr-2 text-fg-2 hover:text-fg">
                       <ChevronLeft size={20} />
                     </button>
                     <input 
                       type="text" 
                       value={activeNote.title} 
                       onChange={(e) => updateNote(activeNote.id, e.target.value, activeNote.content)}
-                      className="bg-transparent text-[20px] font-medium text-[#faf9f5] focus:outline-none w-full" 
+                      className="bg-transparent text-[20px] font-medium text-fg focus:outline-none w-full" 
                       placeholder="Note Title..."
                     />
                   </header>
                   <textarea 
-                    className="flex-1 bg-transparent p-8 lg:p-16 focus:outline-none resize-none text-[16px] leading-[1.8] text-[#faf9f5] custom-scroll" 
+                    className="flex-1 bg-transparent p-8 lg:p-16 focus:outline-none resize-none text-[16px] leading-[1.8] text-fg custom-scroll" 
                     value={activeNote.content} 
                     onChange={(e) => updateNote(activeNote.id, activeNote.title, e.target.value)}
                     placeholder="Start typing your note here..."
                   />
                 </>
               ) : (
-                <div className="flex-1 flex flex-col items-center justify-center text-[#5e5d59]">
+                <div className="flex-1 flex flex-col items-center justify-center text-meta">
                   <Edit size={24} className="mb-4" />
                   <p className="text-[15px]">Select a note or create a new one.</p>
                 </div>
@@ -2058,14 +2154,14 @@ export default function App() {
       </main>
         {/* Mobile Bottom Navigation */}
         <div 
-          className="lg:hidden shrink-0 h-[calc(64px+env(safe-area-inset-bottom))] bg-[#141413] border-t border-[#30302e] flex items-center justify-around px-2 z-50 w-full"
+          className="lg:hidden shrink-0 h-[calc(64px+env(safe-area-inset-bottom))] bg-bg border-t border-border flex items-center justify-around px-2 z-50 w-full"
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
           {['study', 'devotional', 'notes', 'chats', 'tracker'].map(tab => (
             <button 
               key={tab} 
               onClick={() => setActiveTab(tab)}
-              className={`flex flex-col items-center justify-center w-full h-full min-h-[44px] transition-colors ${activeTab === tab ? 'text-[#c96442]' : 'text-[#87867f] hover:text-[#faf9f5]'}`}
+              className={`flex flex-col items-center justify-center w-full h-full min-h-[44px] transition-colors ${activeTab === tab ? 'text-accent' : 'text-muted hover:text-fg'}`}
             >
               {tab === 'study' && <Layout size={20} className="mb-1" />}
               {tab === 'devotional' && <BookOpen size={20} className="mb-1" />}
