@@ -47,6 +47,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <link id="dynamic-favicon" rel="icon" href="/logo-dark.png" type="image/png" />
+        <link id="dynamic-apple-icon" rel="apple-touch-icon" href="/logo-dark.png" type="image/png" />
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -60,13 +62,11 @@ export default function RootLayout({
                 } else {
                   document.documentElement.removeAttribute('data-theme');
                 }
-                var link = document.querySelector("link[rel~='icon']");
-                if (!link) {
-                  link = document.createElement('link');
-                  link.rel = 'icon';
-                  document.head.appendChild(link);
-                }
-                link.href = theme === 'light' ? '/logo-light.png' : '/logo-dark.png';
+                var iconPath = theme === 'light' ? '/logo-light.png' : '/logo-dark.png';
+                var fav = document.getElementById('dynamic-favicon') || document.querySelector("link[rel~='icon']");
+                if (fav) fav.href = iconPath;
+                var appleFav = document.getElementById('dynamic-apple-icon') || document.querySelector("link[rel~='apple-touch-icon']");
+                if (appleFav) appleFav.href = iconPath;
               } catch (e) {}
             `,
           }}

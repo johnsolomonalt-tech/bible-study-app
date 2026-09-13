@@ -262,6 +262,38 @@ export default function App() {
     setTrackerFormat(savedTracker);
   }, []);
 
+  // Dynamic favicon and theme sync effect across browser tab and mobile
+  useEffect(() => {
+    const iconUrl = theme === 'light' ? '/logo-light.png' : '/logo-dark.png';
+
+    // 1. Update dynamic favicon
+    const favLink = document.getElementById('dynamic-favicon') as HTMLLinkElement | null;
+    if (favLink) {
+      favLink.href = `${iconUrl}?v=${theme}`;
+    }
+
+    // 2. Update dynamic apple-touch-icon
+    const appleLink = document.getElementById('dynamic-apple-icon') as HTMLLinkElement | null;
+    if (appleLink) {
+      appleLink.href = `${iconUrl}?v=${theme}`;
+    }
+
+    // 3. Update any other icon links
+    document.querySelectorAll<HTMLLinkElement>("link[rel*='icon']").forEach(link => {
+      link.href = `${iconUrl}?v=${theme}`;
+    });
+
+    // 4. Update theme-color meta for mobile address bar
+    const themeColor = theme === 'light' ? '#faf9f5' : '#141413';
+    let metaTheme = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (!metaTheme) {
+      metaTheme = document.createElement('meta');
+      metaTheme.name = 'theme-color';
+      document.head.appendChild(metaTheme);
+    }
+    metaTheme.content = themeColor;
+  }, [theme]);
+
   const toggleTheme = () => {
     const newTheme = theme === 'dark' ? 'light' : 'dark';
     setTheme(newTheme);
@@ -300,41 +332,24 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Dismiss toolbar when clicking outside
-  useEffect(() => {
-    const handleDocumentClick = (e: MouseEvent | TouchEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (!target) return;
-      if (target.closest('.floating-verse-toolbar') || target.closest('.verse-number-btn')) return;
-      setToolbarPosition(null);
-    };
-    document.addEventListener('mousedown', handleDocumentClick);
-    document.addEventListener('touchend', handleDocumentClick);
-    return () => {
-      document.removeEventListener('mousedown', handleDocumentClick);
-      document.removeEventListener('touchend', handleDocumentClick);
-    };
-  }, []);
-
-  const activeNote = notes.find(n => n.id === activeNoteId) || { id: 0, title: 'No Note Selected', content: '' };
-  const activeChat = chats.find(c => c.id === activeChatId) || { id: 0, title: 'No Conversation Selected', messages: [] };
-
-
   // Helper to clean verse text and strip verse numbers cleanly
   const cleanVerseText = (rawText: string, startVerse?: number | null, endVerse?: number | null): string => {
     if (!rawText) return '';
     let cleaned = rawText.trim();
     
+    const sVerse = startVerse && endVerse ? Math.min(startVerse, endVerse) : startVerse;
+    const eVerse = startVerse && endVerse ? Math.max(startVerse, endVerse) : endVerse;
+
     // 1. Remove leading verse number if present (e.g. "1 In the beginning" or "16 For God")
-    if (startVerse) {
-      cleaned = cleaned.replace(new RegExp(`^${startVerse}\\s*`), '');
+    if (sVerse) {
+      cleaned = cleaned.replace(new RegExp(`^${sVerse}\\s*`), '');
     }
     // Fallback: strip any generic leading digits
     cleaned = cleaned.replace(/^\d+\s+/, '');
 
     // 2. If multiple verses are spanned, remove verse numbers that appear between verses
-    if (startVerse && endVerse && endVerse > startVerse) {
-      for (let v = startVerse; v <= endVerse; v++) {
+    if (sVerse && eVerse && eVerse > sVerse) {
+      for (let v = sVerse; v <= eVerse; v++) {
         cleaned = cleaned.replace(new RegExp(`\\s+${v}\\s+`, 'g'), ' ');
         cleaned = cleaned.replace(new RegExp(`([.!?,"';:])\\s*${v}\\s+`, 'g'), '$1 ');
       }
@@ -342,6 +357,9 @@ export default function App() {
 
     // 3. Remove any remaining standalone numbers followed by capitalized words
     cleaned = cleaned.replace(/([.!?,"';:])\s*\d+\s+([A-Z])/g, '$1 $2');
+
+    // 4. Normalize multiple spaces / newlines
+    cleaned = cleaned.replace(/\s+/g, ' ');
 
     return cleaned.trim();
   };
@@ -351,6 +369,9 @@ export default function App() {
     e.stopPropagation();
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     
+    // Clear any native browser selection
+    window.getSelection()?.removeAllRanges();
+
     setSelectedText(verseText);
     setSelectionVerse(verseNum);
     setEndVerseNumber(verseNum);
@@ -358,8 +379,9 @@ export default function App() {
     
     const existingHighlight = highlights.find(h => h.book === activeBook.name && h.chapter === activeChapter && h.verse === verseNum);
 
-    const x = Math.max(160, Math.min(window.innerWidth - 160, rect.left + rect.width / 2));
-    const isNearTop = rect.top < 90;
+    const toolbarHalfWidth = 165;
+    const x = Math.max(toolbarHalfWidth + 12, Math.min(window.innerWidth - toolbarHalfWidth - 12, rect.left + rect.width / 2));
+    const isNearTop = rect.top < 110;
     const y = isNearTop ? rect.bottom + 8 : rect.top - 6;
 
     setToolbarPosition({
@@ -381,32 +403,29 @@ export default function App() {
 
     const range = selection.getRangeAt(0);
     const rect = range.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) return;
     
     // Find the verse this selection belongs to by looking at parent elements
-    let startVerse: number | null = null;
-    let node = range.startContainer.parentNode;
-    while (node && node !== document.body) {
-      if (node instanceof HTMLElement && node.getAttribute('data-verse')) {
-        startVerse = parseInt(node.getAttribute('data-verse')!, 10);
-        break;
-      }
-      node = node.parentNode;
-    }
+    const getVerseFromNode = (n: Node | null): number | null => {
+      if (!n) return null;
+      const el = n.nodeType === Node.ELEMENT_NODE ? (n as HTMLElement) : n.parentElement;
+      const verseEl = el?.closest('[data-verse]');
+      if (!verseEl) return null;
+      const v = verseEl.getAttribute('data-verse');
+      return v ? parseInt(v, 10) : null;
+    };
 
-    let endVerse = startVerse;
-    let endNode = range.endContainer.parentNode;
-    while (endNode && endNode !== document.body) {
-      if (endNode instanceof HTMLElement && endNode.getAttribute('data-verse')) {
-        endVerse = parseInt(endNode.getAttribute('data-verse')!, 10);
-        break;
-      }
-      endNode = endNode.parentNode;
-    }
+    let startVerse = getVerseFromNode(range.startContainer);
+    let endVerse = getVerseFromNode(range.endContainer) || startVerse;
+    if (!startVerse && endVerse) startVerse = endVerse;
     
     if (startVerse) {
+      const actualStart = Math.min(startVerse, endVerse || startVerse);
+      const actualEnd = Math.max(startVerse, endVerse || startVerse);
+
       setSelectionRange(range);
-      setSelectionVerse(startVerse);
-      setEndVerseNumber(endVerse);
+      setSelectionVerse(actualStart);
+      setEndVerseNumber(actualEnd);
       setSelectedText(rawText);
       
       let activeHighlightId: number | undefined = undefined;
@@ -427,8 +446,9 @@ export default function App() {
         }
       }
 
-      const x = Math.max(160, Math.min(window.innerWidth - 160, rect.left + rect.width / 2));
-      const isNearTop = rect.top < 90;
+      const toolbarHalfWidth = 165;
+      const x = Math.max(toolbarHalfWidth + 12, Math.min(window.innerWidth - toolbarHalfWidth - 12, rect.left + rect.width / 2));
+      const isNearTop = rect.top < 110;
       const y = isNearTop ? rect.bottom + 8 : rect.top - 6;
 
       setToolbarPosition({
@@ -439,6 +459,57 @@ export default function App() {
       });
     }
   }, []);
+
+  // Dismiss toolbar when clicking outside (safely ignoring selection & toolbar clicks)
+  useEffect(() => {
+    const handleDocumentClick = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      if (target.closest('.floating-verse-toolbar') || target.closest('.verse-number-btn')) return;
+      
+      // Do not dismiss if user is actively selecting text
+      const selection = window.getSelection();
+      if (selection && !selection.isCollapsed && selection.toString().trim().length > 0) {
+        return;
+      }
+
+      setToolbarPosition(null);
+    };
+
+    document.addEventListener('mousedown', handleDocumentClick);
+    document.addEventListener('touchend', handleDocumentClick);
+    return () => {
+      document.removeEventListener('mousedown', handleDocumentClick);
+      document.removeEventListener('touchend', handleDocumentClick);
+    };
+  }, []);
+
+  // Listen to mobile selectionchange for seamless mobile text selection
+  useEffect(() => {
+    let timeout: NodeJS.Timeout;
+    const onSelectionChange = () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        const sel = window.getSelection();
+        if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) {
+          const range = sel.getRangeAt(0);
+          const el = range.startContainer.nodeType === Node.ELEMENT_NODE ? (range.startContainer as HTMLElement) : range.startContainer.parentElement;
+          if (el?.closest('.bible-reader-content')) {
+            handleSelection();
+          }
+        }
+      }, 150);
+    };
+
+    document.addEventListener('selectionchange', onSelectionChange);
+    return () => {
+      clearTimeout(timeout);
+      document.removeEventListener('selectionchange', onSelectionChange);
+    };
+  }, [handleSelection]);
+
+  const activeNote = notes.find(n => n.id === activeNoteId) || { id: 0, title: 'No Note Selected', content: '' };
+  const activeChat = chats.find(c => c.id === activeChatId) || { id: 0, title: 'No Conversation Selected', messages: [] };
 
   const saveHighlight = async (color: string) => {
     if (!isOnline) {
@@ -523,8 +594,13 @@ export default function App() {
     const rawText = selectedText || selectionRange?.toString().trim() || '';
     if (!rawText || !selectionVerse) return;
     
-    const startVerse = selectionVerse;
-    const endVerse = endVerseNumber || selectionVerse;
+    if (cooldown > 0) {
+      alert(`Study AI is resting (${cooldown}s remaining). Please wait a moment.`);
+      return;
+    }
+
+    const startVerse = Math.min(selectionVerse, endVerseNumber || selectionVerse);
+    const endVerse = Math.max(selectionVerse, endVerseNumber || selectionVerse);
     const verseText = startVerse === endVerse 
       ? `verse ${startVerse}` 
       : `verses ${startVerse}-${endVerse}`;
@@ -546,8 +622,8 @@ export default function App() {
     const rawText = selectedText || selectionRange?.toString().trim() || '';
     if (!rawText || !selectionVerse) return;
     
-    const startVerse = selectionVerse;
-    const endVerse = endVerseNumber || selectionVerse;
+    const startVerse = Math.min(selectionVerse, endVerseNumber || selectionVerse);
+    const endVerse = Math.max(selectionVerse, endVerseNumber || selectionVerse);
     const refVerses = startVerse === endVerse 
       ? `${startVerse}` 
       : `${startVerse}-${endVerse}`;
@@ -1314,8 +1390,13 @@ export default function App() {
                   <div className="font-display text-[18px] ml-1">{activeBook.name} {activeChapter}</div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => setMobileStudyView('ai')} className="p-2 text-fg-2 hover:text-fg">
+                  <button onClick={() => setMobileStudyView('ai')} className="p-2 text-fg-2 hover:text-fg relative" title="Study AI">
                     <Sparkles size={20} />
+                    {chatQuotes.length > 0 && (
+                      <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 bg-accent text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm">
+                        {chatQuotes.length}
+                      </span>
+                    )}
                   </button>
                   <button onClick={toggleCompleted} className="flex items-center justify-center p-2 rounded-lg bg-surface text-fg">
                     <Check size={20} className={isCompleted ? "text-accent" : "text-meta"} /> 
@@ -1334,7 +1415,7 @@ export default function App() {
                 </div>
               </header>
 
-              <div className="flex-1 overflow-y-auto custom-scroll p-6" onMouseUp={handleSelection} onTouchEnd={handleSelection}>
+              <div className="bible-reader-content flex-1 overflow-y-auto custom-scroll p-6" onMouseUp={handleSelection} onTouchEnd={handleSelection}>
                 <article className="max-w-3xl mx-auto">
                   <p className="font-serif text-[18px] leading-[1.8] text-fg whitespace-pre-wrap">
                     {bibleVerses.length > 0 ? (
@@ -1342,7 +1423,11 @@ export default function App() {
                         <span key={index} data-verse={v.verse} className={`transition-colors duration-200 ${currentSpeakingVerseIndex === index ? 'text-accent' : ''}`}>
                           <sup 
                             onClick={(e) => handleVerseNumberClick(v.verse, v.text, e)}
-                            onTouchEnd={(e) => handleVerseNumberClick(v.verse, v.text, e)}
+                            onTouchEnd={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleVerseNumberClick(v.verse, v.text, e);
+                            }}
                             className="verse-number-btn select-none text-muted hover:text-accent font-semibold text-[11px] mr-1.5 cursor-pointer transition-colors px-1 py-0.5 rounded hover:bg-surface"
                             title={`Reference ${activeBook.name} ${activeChapter}:${v.verse}`}
                           >
@@ -1604,7 +1689,7 @@ export default function App() {
                   </div>
                 </div>
               </header>
-              <div className="flex-1 overflow-y-auto custom-scroll p-10 lg:p-16" onMouseUp={handleSelection} onTouchEnd={handleSelection}>
+              <div className="bible-reader-content flex-1 overflow-y-auto custom-scroll p-10 lg:p-16" onMouseUp={handleSelection} onTouchEnd={handleSelection}>
                 <article className="max-w-3xl mx-auto">
                   <p className="font-serif text-[18px] leading-[1.8] text-fg whitespace-pre-wrap">
                     {bibleVerses.length > 0 ? (
@@ -1612,7 +1697,11 @@ export default function App() {
                         <span key={v.verse} data-verse={v.verse} className={`transition-colors duration-300 ${currentSpeakingVerseIndex === index ? 'text-accent' : ''}`}>
                           <sup 
                             onClick={(e) => handleVerseNumberClick(v.verse, v.text, e)}
-                            onTouchEnd={(e) => handleVerseNumberClick(v.verse, v.text, e)}
+                            onTouchEnd={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleVerseNumberClick(v.verse, v.text, e);
+                            }}
                             className={`verse-number-btn select-none text-[10px] font-sans font-semibold mr-1.5 cursor-pointer px-1 py-0.5 rounded hover:bg-surface hover:text-accent transition-colors ${currentSpeakingVerseIndex === index ? 'text-accent' : 'text-muted'}`}
                             title={`Reference ${activeBook.name} ${activeChapter}:${v.verse}`}
                           >
@@ -1811,19 +1900,49 @@ export default function App() {
         {toolbarPosition && (
           <div 
             onMouseDown={(e) => e.preventDefault()}
-            onTouchStart={(e) => e.stopPropagation()}
             className={`floating-verse-toolbar fixed z-50 flex items-center gap-1.5 bg-surface border border-border-soft p-1.5 rounded-xl shadow-2xl backdrop-blur-md transform -translate-x-1/2 max-w-[95vw] ${
               toolbarPosition.isBelow ? 'translate-y-2' : '-translate-y-full'
             }`}
             style={{ left: toolbarPosition.x, top: toolbarPosition.y }}
           >
-            <button onMouseDown={(e) => e.preventDefault()} onClick={() => saveHighlight('yellow')} className="w-7 h-7 min-w-[28px] rounded-full bg-yellow-500 hover:scale-110 active:scale-95 transition-transform shadow-sm cursor-pointer" title="Highlight Yellow" />
-            <button onMouseDown={(e) => e.preventDefault()} onClick={() => saveHighlight('green')} className="w-7 h-7 min-w-[28px] rounded-full bg-green-500 hover:scale-110 active:scale-95 transition-transform shadow-sm cursor-pointer" title="Highlight Green" />
-            <button onMouseDown={(e) => e.preventDefault()} onClick={() => saveHighlight('blue')} className="w-7 h-7 min-w-[28px] rounded-full bg-blue-500 hover:scale-110 active:scale-95 transition-transform shadow-sm cursor-pointer" title="Highlight Blue" />
-            <button onMouseDown={(e) => e.preventDefault()} onClick={() => saveHighlight('pink')} className="w-7 h-7 min-w-[28px] rounded-full bg-pink-500 hover:scale-110 active:scale-95 transition-transform shadow-sm cursor-pointer" title="Highlight Pink" />
-            <button onMouseDown={(e) => e.preventDefault()} onClick={() => saveHighlight('purple')} className="w-7 h-7 min-w-[28px] rounded-full bg-purple-500 hover:scale-110 active:scale-95 transition-transform shadow-sm cursor-pointer" title="Highlight Purple" />
+            <button 
+              type="button" 
+              onMouseDown={(e) => e.preventDefault()} 
+              onClick={() => saveHighlight('yellow')} 
+              className="w-7 h-7 min-w-[28px] rounded-full bg-yellow-500 hover:scale-110 active:scale-95 transition-transform shadow-sm cursor-pointer" 
+              title="Highlight Yellow" 
+            />
+            <button 
+              type="button" 
+              onMouseDown={(e) => e.preventDefault()} 
+              onClick={() => saveHighlight('green')} 
+              className="w-7 h-7 min-w-[28px] rounded-full bg-green-500 hover:scale-110 active:scale-95 transition-transform shadow-sm cursor-pointer" 
+              title="Highlight Green" 
+            />
+            <button 
+              type="button" 
+              onMouseDown={(e) => e.preventDefault()} 
+              onClick={() => saveHighlight('blue')} 
+              className="w-7 h-7 min-w-[28px] rounded-full bg-blue-500 hover:scale-110 active:scale-95 transition-transform shadow-sm cursor-pointer" 
+              title="Highlight Blue" 
+            />
+            <button 
+              type="button" 
+              onMouseDown={(e) => e.preventDefault()} 
+              onClick={() => saveHighlight('pink')} 
+              className="w-7 h-7 min-w-[28px] rounded-full bg-pink-500 hover:scale-110 active:scale-95 transition-transform shadow-sm cursor-pointer" 
+              title="Highlight Pink" 
+            />
+            <button 
+              type="button" 
+              onMouseDown={(e) => e.preventDefault()} 
+              onClick={() => saveHighlight('purple')} 
+              className="w-7 h-7 min-w-[28px] rounded-full bg-purple-500 hover:scale-110 active:scale-95 transition-transform shadow-sm cursor-pointer" 
+              title="Highlight Purple" 
+            />
             <div className="w-[1px] h-5 bg-border-soft mx-0.5" />
             <button 
+              type="button"
               onMouseDown={(e) => e.preventDefault()} 
               onClick={askAiAboutHighlight} 
               className="flex items-center justify-center h-8 px-2.5 rounded-lg bg-accent text-white hover:bg-[#d87654] active:scale-95 transition-all text-xs font-semibold shadow-sm gap-1 cursor-pointer shrink-0"
@@ -1832,6 +1951,7 @@ export default function App() {
               <Sparkles size={13} /> Ask AI
             </button>
             <button 
+              type="button"
               onMouseDown={(e) => e.preventDefault()} 
               onClick={addHighlightToChat} 
               className="flex items-center justify-center h-8 px-2.5 rounded-lg bg-surface border border-border-soft text-fg hover:bg-border-soft active:scale-95 transition-all text-xs font-semibold shadow-sm gap-1 cursor-pointer shrink-0" 
@@ -1844,6 +1964,7 @@ export default function App() {
               <>
                 <div className="w-[1px] h-5 bg-border-soft mx-0.5" />
                 <button 
+                  type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => deleteHighlight(toolbarPosition.highlightId!)} 
                   className="flex items-center justify-center h-8 px-2 rounded-lg bg-surface border border-border-soft text-error hover:bg-error hover:text-white transition-all shadow-sm cursor-pointer shrink-0"
