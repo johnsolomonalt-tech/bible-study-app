@@ -18,6 +18,10 @@ export const metadata: Metadata = {
   title: "Theologica Study Workspace",
   description: "Bible app with AI chat and notes",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/logo-dark.png",
+    apple: "/logo-dark.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -56,6 +60,13 @@ export default function RootLayout({
                 } else {
                   document.documentElement.removeAttribute('data-theme');
                 }
+                var link = document.querySelector("link[rel~='icon']");
+                if (!link) {
+                  link = document.createElement('link');
+                  link.rel = 'icon';
+                  document.head.appendChild(link);
+                }
+                link.href = theme === 'light' ? '/logo-light.png' : '/logo-dark.png';
               } catch (e) {}
             `,
           }}

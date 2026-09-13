@@ -208,7 +208,9 @@ export default function App() {
   const [highlights, setHighlights] = useState<{id: number, book: string, chapter: number, verse: number, text: string, color: string}[]>([]);
   const [selectionRange, setSelectionRange] = useState<Range | null>(null);
   const [selectionVerse, setSelectionVerse] = useState<number | null>(null);
-  const [toolbarPosition, setToolbarPosition] = useState<{x: number, y: number, highlightId?: number} | null>(null);
+  const [endVerseNumber, setEndVerseNumber] = useState<number | null>(null);
+  const [selectedText, setSelectedText] = useState<string>('');
+  const [toolbarPosition, setToolbarPosition] = useState<{x: number, y: number, highlightId?: number, isBelow?: boolean} | null>(null);
   const [activeHighlightMenu, setActiveHighlightMenu] = useState<{id: number, x: number, y: number} | null>(null);
   
   const [activeBook, setActiveBook] = useState(OT_BOOKS[0]);
@@ -298,34 +300,114 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Dismiss toolbar when clicking outside
+  useEffect(() => {
+    const handleDocumentClick = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      if (target.closest('.floating-verse-toolbar') || target.closest('.verse-number-btn')) return;
+      setToolbarPosition(null);
+    };
+    document.addEventListener('mousedown', handleDocumentClick);
+    document.addEventListener('touchend', handleDocumentClick);
+    return () => {
+      document.removeEventListener('mousedown', handleDocumentClick);
+      document.removeEventListener('touchend', handleDocumentClick);
+    };
+  }, []);
+
   const activeNote = notes.find(n => n.id === activeNoteId) || { id: 0, title: 'No Note Selected', content: '' };
   const activeChat = chats.find(c => c.id === activeChatId) || { id: 0, title: 'No Conversation Selected', messages: [] };
 
 
-  // Highlighting Logic
+  // Helper to clean verse text and strip verse numbers cleanly
+  const cleanVerseText = (rawText: string, startVerse?: number | null, endVerse?: number | null): string => {
+    if (!rawText) return '';
+    let cleaned = rawText.trim();
+    
+    // 1. Remove leading verse number if present (e.g. "1 In the beginning" or "16 For God")
+    if (startVerse) {
+      cleaned = cleaned.replace(new RegExp(`^${startVerse}\\s*`), '');
+    }
+    // Fallback: strip any generic leading digits
+    cleaned = cleaned.replace(/^\d+\s+/, '');
+
+    // 2. If multiple verses are spanned, remove verse numbers that appear between verses
+    if (startVerse && endVerse && endVerse > startVerse) {
+      for (let v = startVerse; v <= endVerse; v++) {
+        cleaned = cleaned.replace(new RegExp(`\\s+${v}\\s+`, 'g'), ' ');
+        cleaned = cleaned.replace(new RegExp(`([.!?,"';:])\\s*${v}\\s+`, 'g'), '$1 ');
+      }
+    }
+
+    // 3. Remove any remaining standalone numbers followed by capitalized words
+    cleaned = cleaned.replace(/([.!?,"';:])\s*\d+\s+([A-Z])/g, '$1 $2');
+
+    return cleaned.trim();
+  };
+
+  // Click on a verse number to reference that verse directly
+  const handleVerseNumberClick = (verseNum: number, verseText: string, e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    
+    setSelectedText(verseText);
+    setSelectionVerse(verseNum);
+    setEndVerseNumber(verseNum);
+    setSelectionRange(null);
+    
+    const existingHighlight = highlights.find(h => h.book === activeBook.name && h.chapter === activeChapter && h.verse === verseNum);
+
+    const x = Math.max(160, Math.min(window.innerWidth - 160, rect.left + rect.width / 2));
+    const isNearTop = rect.top < 90;
+    const y = isNearTop ? rect.bottom + 8 : rect.top - 6;
+
+    setToolbarPosition({
+      x,
+      y,
+      highlightId: existingHighlight?.id,
+      isBelow: isNearTop
+    });
+  };
+
+  // Highlighting & Drag Selection Logic
   const handleSelection = useCallback(() => {
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed) {
-      setToolbarPosition(null);
       return;
     }
+    const rawText = selection.toString().trim();
+    if (!rawText) return;
+
     const range = selection.getRangeAt(0);
     const rect = range.getBoundingClientRect();
     
     // Find the verse this selection belongs to by looking at parent elements
-    let verseNumber = null;
+    let startVerse: number | null = null;
     let node = range.startContainer.parentNode;
     while (node && node !== document.body) {
       if (node instanceof HTMLElement && node.getAttribute('data-verse')) {
-        verseNumber = parseInt(node.getAttribute('data-verse')!, 10);
+        startVerse = parseInt(node.getAttribute('data-verse')!, 10);
         break;
       }
       node = node.parentNode;
     }
+
+    let endVerse = startVerse;
+    let endNode = range.endContainer.parentNode;
+    while (endNode && endNode !== document.body) {
+      if (endNode instanceof HTMLElement && endNode.getAttribute('data-verse')) {
+        endVerse = parseInt(endNode.getAttribute('data-verse')!, 10);
+        break;
+      }
+      endNode = endNode.parentNode;
+    }
     
-    if (verseNumber) {
+    if (startVerse) {
       setSelectionRange(range);
-      setSelectionVerse(verseNumber);
+      setSelectionVerse(startVerse);
+      setEndVerseNumber(endVerse);
+      setSelectedText(rawText);
       
       let activeHighlightId: number | undefined = undefined;
       const commonAncestor = range.commonAncestorContainer;
@@ -345,13 +427,16 @@ export default function App() {
         }
       }
 
+      const x = Math.max(160, Math.min(window.innerWidth - 160, rect.left + rect.width / 2));
+      const isNearTop = rect.top < 90;
+      const y = isNearTop ? rect.bottom + 8 : rect.top - 6;
+
       setToolbarPosition({
-        x: rect.left + rect.width / 2,
-        y: rect.top - 4,
-        highlightId: activeHighlightId
+        x,
+        y,
+        highlightId: activeHighlightId,
+        isBelow: isNearTop
       });
-    } else {
-      setToolbarPosition(null);
     }
   }, []);
 
@@ -360,7 +445,8 @@ export default function App() {
       alert("You must be connected to the internet to save highlights.");
       return;
     }
-    if (!selectionRange || !selectionVerse) return;
+    const rawText = selectedText || selectionRange?.toString().trim() || '';
+    if (!rawText || !selectionVerse) return;
     
     if (toolbarPosition?.highlightId) {
       const existingId = toolbarPosition.highlightId;
@@ -380,13 +466,9 @@ export default function App() {
       return;
     }
     
-    let text = selectionRange.toString().trim();
-    const versePrefix = `${selectionVerse}`;
-    if (text.startsWith(versePrefix)) {
-      text = text.substring(versePrefix.length).trim();
-    }
+    let text = cleanVerseText(rawText, selectionVerse, endVerseNumber || selectionVerse);
     
-    // Fallback protection: if they try to highlight over text that is already highlighted but toolbarPosition doesn't have the id for some reason
+    // Fallback protection: if they try to highlight over text that is already highlighted
     const verseHighlights = highlights.filter(h => h.book === activeBook.name && h.chapter === activeChapter && h.verse === selectionVerse);
     const hasOverlap = verseHighlights.some(h => h.text.toLowerCase().includes(text.toLowerCase()) || text.toLowerCase().includes(h.text.toLowerCase()));
     
@@ -438,25 +520,17 @@ export default function App() {
   };
 
   const askAiAboutHighlight = () => {
-    if (!selectionRange || !selectionVerse) return;
+    const rawText = selectedText || selectionRange?.toString().trim() || '';
+    if (!rawText || !selectionVerse) return;
     
-    // Check if the selection spans multiple verses
-    let endVerseNumber = selectionVerse;
-    let endNode = selectionRange.endContainer.parentNode;
-    while (endNode && endNode !== document.body) {
-      if (endNode instanceof HTMLElement && endNode.getAttribute('data-verse')) {
-        endVerseNumber = parseInt(endNode.getAttribute('data-verse')!, 10);
-        break;
-      }
-      endNode = endNode.parentNode;
-    }
-    
-    const verseText = selectionVerse === endVerseNumber 
-      ? `verse ${selectionVerse}` 
-      : `verses ${selectionVerse}-${endVerseNumber}`;
+    const startVerse = selectionVerse;
+    const endVerse = endVerseNumber || selectionVerse;
+    const verseText = startVerse === endVerse 
+      ? `verse ${startVerse}` 
+      : `verses ${startVerse}-${endVerse}`;
 
-    const text = selectionRange.toString();
-    const query = `What does "${text}" mean in ${verseText} of ${activeBook.name} ${activeChapter}?`;
+    const cleanText = cleanVerseText(rawText, startVerse, endVerse);
+    const query = `What does "${cleanText}" mean in ${verseText} of ${activeBook.name} ${activeChapter}?`;
     
     // Switch to AI tab
     setMobileStudyView('ai');
@@ -469,26 +543,20 @@ export default function App() {
   };
 
   const addHighlightToChat = () => {
-    if (!selectionRange || !selectionVerse) return;
+    const rawText = selectedText || selectionRange?.toString().trim() || '';
+    if (!rawText || !selectionVerse) return;
     
-    // Check if the selection spans multiple verses
-    let endVerseNumber = selectionVerse;
-    let endNode = selectionRange.endContainer.parentNode;
-    while (endNode && endNode !== document.body) {
-      if (endNode instanceof HTMLElement && endNode.getAttribute('data-verse')) {
-        endVerseNumber = parseInt(endNode.getAttribute('data-verse')!, 10);
-        break;
-      }
-      endNode = endNode.parentNode;
-    }
-    
-    const verseText = selectionVerse === endVerseNumber 
-      ? `v. ${selectionVerse}` 
-      : `v. ${selectionVerse}-${endVerseNumber}`;
+    const startVerse = selectionVerse;
+    const endVerse = endVerseNumber || selectionVerse;
+    const refVerses = startVerse === endVerse 
+      ? `${startVerse}` 
+      : `${startVerse}-${endVerse}`;
+
+    const cleanText = cleanVerseText(rawText, startVerse, endVerse);
 
     setChatQuote({
-      text: selectionRange.toString(),
-      reference: `${activeBook.name} ${activeChapter}:${verseText}`
+      text: cleanText,
+      reference: `${activeBook.name} ${activeChapter}:${refVerses}`
     });
     
     // Switch to AI tab
@@ -1095,7 +1163,7 @@ export default function App() {
         <div className="flex-1 flex items-center">
           <div className="font-display text-[22px] tracking-tight text-accent flex items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icon.png" alt="Theologica Logo" className="w-8 h-8 object-contain drop-shadow-md rounded-md" />
+            <img src={theme === 'light' ? '/logo-light.png' : '/logo-dark.png'} alt="Theologica Logo" className="w-8 h-8 object-contain drop-shadow-md rounded-md" />
             <span className="inline">Theologica</span>
           </div>
         </div>
@@ -1262,8 +1330,15 @@ export default function App() {
                   <p className="font-serif text-[18px] leading-[1.8] text-fg whitespace-pre-wrap">
                     {bibleVerses.length > 0 ? (
                       bibleVerses.map((v, index) => (
-                        <span key={index} data-verse={v.verse}>
-                          <sup className="text-muted text-[10px] mr-1">{v.verse}</sup>
+                        <span key={index} data-verse={v.verse} className={`transition-colors duration-200 ${currentSpeakingVerseIndex === index ? 'text-accent' : ''}`}>
+                          <sup 
+                            onClick={(e) => handleVerseNumberClick(v.verse, v.text, e)}
+                            onTouchEnd={(e) => handleVerseNumberClick(v.verse, v.text, e)}
+                            className="verse-number-btn select-none text-muted hover:text-accent font-semibold text-[11px] mr-1.5 cursor-pointer transition-colors px-1 py-0.5 rounded hover:bg-surface"
+                            title={`Reference ${activeBook.name} ${activeChapter}:${v.verse}`}
+                          >
+                            {v.verse}
+                          </sup>
                           {renderVerseContent(v.verse, v.text)}{' '}
                         </span>
                       ))
@@ -1314,29 +1389,64 @@ export default function App() {
                       </div>
                     </div>
                   )}
+                  <div ref={messagesEndRef} />
                 </div>
-                <form onSubmit={handleSendMessage} className="p-3 border-t border-border bg-bg">
-                  <div className="relative flex items-end bg-[#1c1c1b] rounded-xl border border-border focus-within:border-border-soft transition-colors p-1">
-                    <textarea 
-                      className="w-full bg-transparent p-2.5 pl-3 min-h-[44px] max-h-[120px] text-[14px] text-fg placeholder-[#5e5d59] focus:outline-none resize-none custom-scroll" 
-                      placeholder="Ask anything..." 
-                      rows={1}
-                      value={chatInput}
-                      onChange={(e) => setChatInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          handleSendMessage(e as any);
-                        }
-                      }}
-                    />
-                    <button 
-                      type="submit"
-                      disabled={isAiTyping || !chatInput.trim()}
-                      className="p-2.5 text-accent hover:text-fg-hover disabled:opacity-50 disabled:hover:text-accent transition-colors shrink-0"
-                    >
-                      <Send size={18} />
-                    </button>
+                <form onSubmit={handleSendMessage} className="p-3 border-t border-border bg-bg shrink-0">
+                  <div className="flex flex-col">
+                    {chatQuote && (
+                      <div className="mb-2.5 relative group">
+                        <div className="border-l-[3px] border-accent bg-accent/10 py-2.5 px-3.5 rounded-r-xl rounded-bl-sm shadow-sm relative">
+                          <button 
+                            type="button" 
+                            onClick={() => setChatQuote(null)} 
+                            className="absolute -top-2 -right-2 bg-surface border border-border-soft text-fg hover:text-error rounded-full p-1 transition-colors z-10 shadow"
+                          >
+                            <X size={12} />
+                          </button>
+                          <p className="text-[13px] text-fg italic line-clamp-3">"{chatQuote.text}"</p>
+                          <p className="text-[11px] text-muted font-semibold mt-1">— {chatQuote.reference}</p>
+                        </div>
+                      </div>
+                    )}
+                    {chatImage && (
+                      <div className="mb-2 relative self-start">
+                        <img src={chatImage.preview} alt="preview" className="h-16 rounded-xl object-cover border border-border-soft" />
+                        <button type="button" onClick={() => setChatImage(null)} className="absolute -top-1.5 -right-1.5 bg-surface border border-border-soft rounded-full p-0.5">
+                          <X size={10} className="text-white" />
+                        </button>
+                      </div>
+                    )}
+                    <div className="relative flex items-end bg-surface rounded-xl border border-border focus-within:border-border-soft transition-colors p-1">
+                      <button 
+                        type="button" 
+                        onClick={() => imageFileRef.current?.click()} 
+                        disabled={cooldown > 0 || !isOnline} 
+                        className="flex-shrink-0 p-2 text-muted hover:text-fg-hover disabled:opacity-40 transition-colors"
+                        title="Attach image"
+                      >
+                        <Paperclip size={16} />
+                      </button>
+                      <textarea 
+                        className="w-full bg-transparent p-2 min-h-[44px] max-h-[120px] text-[14px] text-fg placeholder-meta focus:outline-none resize-none custom-scroll" 
+                        placeholder={!isOnline ? "Study AI is unavailable offline" : cooldown > 0 ? `Study AI is resting... (${cooldown}s)` : "Ask anything..."} 
+                        rows={1}
+                        value={chatInput}
+                        onChange={(e) => setChatInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSendMessage(e as any);
+                          }
+                        }}
+                      />
+                      <button 
+                        type="submit" 
+                        disabled={isAiTyping || (!chatInput.trim() && !chatImage && !chatQuote) || cooldown > 0 || !isOnline}
+                        className="p-2 text-accent hover:text-fg-hover disabled:opacity-30 disabled:hover:text-accent transition-colors shrink-0"
+                      >
+                        <Send size={18} />
+                      </button>
+                    </div>
                   </div>
                 </form>
               </div>
@@ -1465,7 +1575,14 @@ export default function App() {
                     {bibleVerses.length > 0 ? (
                       bibleVerses.map((v, index) => (
                         <span key={v.verse} data-verse={v.verse} className={`transition-colors duration-300 ${currentSpeakingVerseIndex === index ? 'text-accent' : ''}`}>
-                          <sup className={`text-[10px] font-sans font-semibold mr-1.5 opacity-80 ${currentSpeakingVerseIndex === index ? 'text-accent' : 'text-muted'}`}>{v.verse}</sup>
+                          <sup 
+                            onClick={(e) => handleVerseNumberClick(v.verse, v.text, e)}
+                            onTouchEnd={(e) => handleVerseNumberClick(v.verse, v.text, e)}
+                            className={`verse-number-btn select-none text-[10px] font-sans font-semibold mr-1.5 cursor-pointer px-1 py-0.5 rounded hover:bg-surface hover:text-accent transition-colors ${currentSpeakingVerseIndex === index ? 'text-accent' : 'text-muted'}`}
+                            title={`Reference ${activeBook.name} ${activeChapter}:${v.verse}`}
+                          >
+                            {v.verse}
+                          </sup>
                           {renderVerseContent(v.verse, v.text)}
                         </span>
                       ))
@@ -1614,7 +1731,7 @@ export default function App() {
                     />
                     <button 
                       type="submit" 
-                      disabled={(!chatInput.trim() && !chatImage) || cooldown > 0 || !isOnline} 
+                      disabled={isAiTyping || (!chatInput.trim() && !chatImage && !chatQuote) || cooldown > 0 || !isOnline} 
                       className="absolute right-1.5 bottom-1.5 p-2 bg-accent hover:bg-[#b5583b] text-white rounded-full disabled:opacity-50 disabled:hover:bg-accent transition-colors"
                     >
                       <Send size={16} />
@@ -1629,33 +1746,49 @@ export default function App() {
         )}
 
 
-        {/* Floating Toolbar for Highlighting */}
+        {/* Floating Toolbar for Highlighting & Referencing */}
         {toolbarPosition && (
           <div 
-            className="fixed z-50 flex items-center gap-1.5 bg-surface border border-border-soft p-1.5 rounded-xl shadow-2xl backdrop-blur-md transform -translate-x-1/2 -translate-y-full"
+            onMouseDown={(e) => e.preventDefault()}
+            onTouchStart={(e) => e.stopPropagation()}
+            className={`floating-verse-toolbar fixed z-50 flex items-center gap-1.5 bg-surface border border-border-soft p-1.5 rounded-xl shadow-2xl backdrop-blur-md transform -translate-x-1/2 max-w-[95vw] ${
+              toolbarPosition.isBelow ? 'translate-y-2' : '-translate-y-full'
+            }`}
             style={{ left: toolbarPosition.x, top: toolbarPosition.y }}
           >
-            <button onClick={() => saveHighlight('yellow')} className="w-7 h-7 rounded-full bg-yellow-500 hover:scale-110 transition-transform shadow-sm" title="Highlight Yellow" />
-            <button onClick={() => saveHighlight('green')} className="w-7 h-7 rounded-full bg-green-500 hover:scale-110 transition-transform shadow-sm" title="Highlight Green" />
-            <button onClick={() => saveHighlight('blue')} className="w-7 h-7 rounded-full bg-blue-500 hover:scale-110 transition-transform shadow-sm" title="Highlight Blue" />
-            <button onClick={() => saveHighlight('pink')} className="w-7 h-7 rounded-full bg-pink-500 hover:scale-110 transition-transform shadow-sm" title="Highlight Pink" />
-            <button onClick={() => saveHighlight('purple')} className="w-7 h-7 rounded-full bg-purple-500 hover:scale-110 transition-transform shadow-sm" title="Highlight Purple" />
-            <div className="w-[1px] h-5 bg-border-soft mx-1" />
-            <button onClick={askAiAboutHighlight} className="flex items-center justify-center h-7 px-2.5 rounded-lg bg-accent text-white hover:bg-[#d87654] hover:scale-105 transition-all text-xs font-semibold shadow-sm gap-1">
-              <Sparkles size={12} /> Ask AI
+            <button onMouseDown={(e) => e.preventDefault()} onClick={() => saveHighlight('yellow')} className="w-7 h-7 min-w-[28px] rounded-full bg-yellow-500 hover:scale-110 active:scale-95 transition-transform shadow-sm cursor-pointer" title="Highlight Yellow" />
+            <button onMouseDown={(e) => e.preventDefault()} onClick={() => saveHighlight('green')} className="w-7 h-7 min-w-[28px] rounded-full bg-green-500 hover:scale-110 active:scale-95 transition-transform shadow-sm cursor-pointer" title="Highlight Green" />
+            <button onMouseDown={(e) => e.preventDefault()} onClick={() => saveHighlight('blue')} className="w-7 h-7 min-w-[28px] rounded-full bg-blue-500 hover:scale-110 active:scale-95 transition-transform shadow-sm cursor-pointer" title="Highlight Blue" />
+            <button onMouseDown={(e) => e.preventDefault()} onClick={() => saveHighlight('pink')} className="w-7 h-7 min-w-[28px] rounded-full bg-pink-500 hover:scale-110 active:scale-95 transition-transform shadow-sm cursor-pointer" title="Highlight Pink" />
+            <button onMouseDown={(e) => e.preventDefault()} onClick={() => saveHighlight('purple')} className="w-7 h-7 min-w-[28px] rounded-full bg-purple-500 hover:scale-110 active:scale-95 transition-transform shadow-sm cursor-pointer" title="Highlight Purple" />
+            <div className="w-[1px] h-5 bg-border-soft mx-0.5" />
+            <button 
+              onMouseDown={(e) => e.preventDefault()} 
+              onClick={askAiAboutHighlight} 
+              className="flex items-center justify-center h-8 px-2.5 rounded-lg bg-accent text-white hover:bg-[#d87654] active:scale-95 transition-all text-xs font-semibold shadow-sm gap-1 cursor-pointer shrink-0"
+              title="Ask AI about this verse"
+            >
+              <Sparkles size={13} /> Ask AI
             </button>
-            <button onClick={addHighlightToChat} className="flex items-center justify-center h-7 px-2.5 rounded-lg bg-surface border border-border-soft text-fg-hover hover:bg-border-soft hover:scale-105 transition-all text-xs font-semibold shadow-sm gap-1" title="Add to Chat">
-              <MessageSquarePlus size={12} />
+            <button 
+              onMouseDown={(e) => e.preventDefault()} 
+              onClick={addHighlightToChat} 
+              className="flex items-center justify-center h-8 px-2.5 rounded-lg bg-surface border border-border-soft text-fg hover:bg-border-soft active:scale-95 transition-all text-xs font-semibold shadow-sm gap-1 cursor-pointer shrink-0" 
+              title="Add to Chat"
+            >
+              <MessageSquarePlus size={13} />
+              <span className="text-[11px] font-semibold">Quote</span>
             </button>
             {toolbarPosition.highlightId && (
               <>
-                <div className="w-[1px] h-5 bg-border-soft mx-1" />
+                <div className="w-[1px] h-5 bg-border-soft mx-0.5" />
                 <button 
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => deleteHighlight(toolbarPosition.highlightId!)} 
-                  className="flex items-center justify-center h-7 px-2 rounded-lg bg-surface border border-border-soft text-error hover:bg-[#ef4444] hover:text-white transition-all shadow-sm"
+                  className="flex items-center justify-center h-8 px-2 rounded-lg bg-surface border border-border-soft text-error hover:bg-error hover:text-white transition-all shadow-sm cursor-pointer shrink-0"
                   title="Delete Highlight"
                 >
-                  <Trash2 size={12} />
+                  <Trash2 size={13} />
                 </button>
               </>
             )}
@@ -1872,7 +2005,7 @@ export default function App() {
                       />
                       <button 
                         type="submit" 
-                        disabled={(!chatInput.trim() && !chatImage) || cooldown > 0} 
+                        disabled={isAiTyping || (!chatInput.trim() && !chatImage && !chatQuote) || cooldown > 0} 
                         className="absolute right-2 bottom-2 p-2.5 bg-accent hover:bg-[#b5583b] text-white rounded-full disabled:opacity-50 disabled:hover:bg-accent transition-colors"
                       >
                         <Send size={16} />
@@ -1934,12 +2067,12 @@ export default function App() {
                   >
                     <div className="text-[16px] font-bold tracking-widest text-fg uppercase">Old Testament</div>
                     
-                      <div className="flex-1 mx-6 hidden sm:block">
+                      <div className="flex-1 mx-3 sm:mx-6 min-w-[50px]">
                         <div className="h-1.5 w-full bg-bg rounded-full overflow-hidden">
                           <div className="h-full bg-accent transition-all duration-500" style={{ width: `${otPercent}%` }} />
                         </div>
                       </div>
-                      <div className="text-[13px] font-mono text-muted mr-4">{trackerFormat === 'percent' ? `${otPercent}%` : `${otCompleted}/${otTotal}`}</div>
+                      <div className="text-[13px] font-mono text-muted mr-3 sm:mr-4 shrink-0">{trackerFormat === 'percent' ? `${otPercent}%` : `${otCompleted}/${otTotal}`}</div>
                       <div className="text-muted">{expandedTestaments.includes('OT') ? '▲' : '▼'}</div>
                   </button>
                   
@@ -2001,12 +2134,12 @@ export default function App() {
                   >
                     <div className="text-[16px] font-bold tracking-widest text-fg uppercase">New Testament</div>
                     
-                      <div className="flex-1 mx-6 hidden sm:block">
+                      <div className="flex-1 mx-3 sm:mx-6 min-w-[50px]">
                         <div className="h-1.5 w-full bg-bg rounded-full overflow-hidden">
                           <div className="h-full bg-accent transition-all duration-500" style={{ width: `${ntPercent}%` }} />
                         </div>
                       </div>
-                      <div className="text-[13px] font-mono text-muted mr-4">{trackerFormat === 'percent' ? `${ntPercent}%` : `${ntCompleted}/${ntTotal}`}</div>
+                      <div className="text-[13px] font-mono text-muted mr-3 sm:mr-4 shrink-0">{trackerFormat === 'percent' ? `${ntPercent}%` : `${ntCompleted}/${ntTotal}`}</div>
                       <div className="text-muted">{expandedTestaments.includes('NT') ? '▲' : '▼'}</div>
                   </button>
                   
