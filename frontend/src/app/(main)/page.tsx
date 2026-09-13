@@ -276,7 +276,7 @@ export default function App() {
     localStorage.setItem('trackerFormat', newFormat);
   };
   const [chatInput, setChatInput] = useState('');
-  const [chatQuote, setChatQuote] = useState<{text: string, reference: string} | null>(null);
+  const [chatQuotes, setChatQuotes] = useState<{id: string, text: string, reference: string}[]>([]);
   const [chatImage, setChatImage] = useState<{base64: string, mimeType: string, preview: string} | null>(null);
   const imageFileRef = useRef<HTMLInputElement>(null);
   const [cooldown, setCooldown] = useState(0);
@@ -553,10 +553,18 @@ export default function App() {
       : `${startVerse}-${endVerse}`;
 
     const cleanText = cleanVerseText(rawText, startVerse, endVerse);
-
-    setChatQuote({
+    const reference = `${activeBook.name} ${activeChapter}:${refVerses}`;
+    const newQuote = {
+      id: `${reference}-${Date.now()}`,
       text: cleanText,
-      reference: `${activeBook.name} ${activeChapter}:${refVerses}`
+      reference
+    };
+
+    setChatQuotes(prev => {
+      if (prev.some(q => q.reference === newQuote.reference && q.text === newQuote.text)) {
+        return prev;
+      }
+      return [...prev, newQuote];
     });
     
     // Switch to AI tab
@@ -963,8 +971,9 @@ export default function App() {
     if (e) e.preventDefault();
     
     let textToSend = overrideText || chatInput;
-    if (chatQuote && !overrideText) {
-      textToSend = `> "${chatQuote.text}" — *${chatQuote.reference}*\n\n${textToSend}`;
+    if (chatQuotes.length > 0 && !overrideText) {
+      const quotesBlock = chatQuotes.map(q => `> "${q.text}" — *${q.reference}*`).join('\n\n');
+      textToSend = `${quotesBlock}\n\n${textToSend}`.trim();
     }
     
     const currentChat = activeChatId ? chats.find(c => c.id === activeChatId) : null;
@@ -972,7 +981,7 @@ export default function App() {
     if (!textToSend.trim() && !chatImage) return;
     if (cooldown > 0) return;
     
-    setChatQuote(null);
+    setChatQuotes([]);
     const currentImage = chatImage;
     setChatImage(null);
 
@@ -1393,18 +1402,44 @@ export default function App() {
                 </div>
                 <form onSubmit={handleSendMessage} className="p-3 border-t border-border bg-bg shrink-0">
                   <div className="flex flex-col">
-                    {chatQuote && (
-                      <div className="mb-2.5 relative group">
-                        <div className="border-l-[3px] border-accent bg-accent/10 py-2.5 px-3.5 rounded-r-xl rounded-bl-sm shadow-sm relative">
-                          <button 
-                            type="button" 
-                            onClick={() => setChatQuote(null)} 
-                            className="absolute -top-2 -right-2 bg-surface border border-border-soft text-fg hover:text-error rounded-full p-1 transition-colors z-10 shadow"
-                          >
-                            <X size={12} />
-                          </button>
-                          <p className="text-[13px] text-fg italic line-clamp-3">"{chatQuote.text}"</p>
-                          <p className="text-[11px] text-muted font-semibold mt-1">— {chatQuote.reference}</p>
+                    {chatQuotes.length > 0 && (
+                      <div className="mb-2">
+                        <div className="flex items-center justify-between mb-1 px-1">
+                          <span className="text-[10px] font-semibold text-muted tracking-wider uppercase">
+                            Referenced Scripture ({chatQuotes.length})
+                          </span>
+                          {chatQuotes.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => setChatQuotes([])}
+                              className="text-[10px] text-muted hover:text-error transition-colors cursor-pointer"
+                            >
+                              Clear all
+                            </button>
+                          )}
+                        </div>
+                        <div className="max-h-28 overflow-y-auto custom-scroll space-y-1.5 pr-0.5">
+                          {chatQuotes.map((q) => (
+                            <div 
+                              key={q.id} 
+                              className="relative border-l-[3px] border-accent bg-accent/10 py-1.5 px-3 rounded-r-xl rounded-bl-sm shadow-sm"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-[12px] text-fg italic line-clamp-2 leading-snug">"{q.text}"</p>
+                                  <p className="text-[10px] text-muted font-semibold mt-0.5">— {q.reference}</p>
+                                </div>
+                                <button 
+                                  type="button" 
+                                  onClick={() => setChatQuotes(prev => prev.filter(item => item.id !== q.id))} 
+                                  className="shrink-0 p-1 text-muted hover:text-error hover:bg-surface rounded-full transition-colors"
+                                  title="Remove reference"
+                                >
+                                  <X size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     )}
@@ -1441,7 +1476,7 @@ export default function App() {
                       />
                       <button 
                         type="submit" 
-                        disabled={isAiTyping || (!chatInput.trim() && !chatImage && !chatQuote) || cooldown > 0 || !isOnline}
+                        disabled={isAiTyping || (!chatInput.trim() && !chatImage && chatQuotes.length === 0) || cooldown > 0 || !isOnline}
                         className="p-2 text-accent hover:text-fg-hover disabled:opacity-30 disabled:hover:text-accent transition-colors shrink-0"
                       >
                         <Send size={18} />
@@ -1692,18 +1727,44 @@ export default function App() {
                     e.target.value = '';
                   }} />
                   <div className="flex flex-col">
-                    {chatQuote && (
-                      <div className="mb-3 relative group">
-                        <div className="border-l-[3px] border-[#c96442] bg-accent/10 py-2.5 px-4 rounded-r-xl rounded-bl-sm shadow-sm">
-                          <button 
-                            type="button" 
-                            onClick={() => setChatQuote(null)} 
-                            className="absolute -top-2 -right-2 bg-surface border border-border-soft text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                          >
-                            <X size={12} />
-                          </button>
-                          <p className="text-[13px] text-fg-hover italic line-clamp-3">"{chatQuote.text}"</p>
-                          <p className="text-[11px] text-muted font-semibold mt-1">— {chatQuote.reference}</p>
+                    {chatQuotes.length > 0 && (
+                      <div className="mb-2.5">
+                        <div className="flex items-center justify-between mb-1 px-1">
+                          <span className="text-[11px] font-semibold text-muted tracking-wider uppercase">
+                            Referenced Scripture ({chatQuotes.length})
+                          </span>
+                          {chatQuotes.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => setChatQuotes([])}
+                              className="text-[11px] text-muted hover:text-error transition-colors cursor-pointer"
+                            >
+                              Clear all
+                            </button>
+                          )}
+                        </div>
+                        <div className="max-h-36 overflow-y-auto custom-scroll space-y-1.5 pr-0.5">
+                          {chatQuotes.map((q) => (
+                            <div 
+                              key={q.id} 
+                              className="group relative border-l-[3px] border-accent bg-accent/10 py-2 px-3.5 rounded-r-xl rounded-bl-sm shadow-sm"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-[13px] text-fg-hover italic line-clamp-2 leading-snug">"{q.text}"</p>
+                                  <p className="text-[11px] text-muted font-semibold mt-1">— {q.reference}</p>
+                                </div>
+                                <button 
+                                  type="button" 
+                                  onClick={() => setChatQuotes(prev => prev.filter(item => item.id !== q.id))} 
+                                  className="shrink-0 p-1 text-muted hover:text-error hover:bg-surface rounded-full transition-colors cursor-pointer"
+                                  title="Remove reference"
+                                >
+                                  <X size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     )}
@@ -1731,7 +1792,7 @@ export default function App() {
                     />
                     <button 
                       type="submit" 
-                      disabled={isAiTyping || (!chatInput.trim() && !chatImage && !chatQuote) || cooldown > 0 || !isOnline} 
+                      disabled={isAiTyping || (!chatInput.trim() && !chatImage && chatQuotes.length === 0) || cooldown > 0 || !isOnline} 
                       className="absolute right-1.5 bottom-1.5 p-2 bg-accent hover:bg-[#b5583b] text-white rounded-full disabled:opacity-50 disabled:hover:bg-accent transition-colors"
                     >
                       <Send size={16} />
@@ -1966,18 +2027,44 @@ export default function App() {
                   </div>
                   <form onSubmit={handleSendMessage} className="p-6 border-t border-border w-full shrink-0">
                     <div className="flex flex-col max-w-4xl mx-auto w-full">
-                      {chatQuote && (
-                        <div className="mb-3 relative group max-w-3xl">
-                          <div className="border-l-[3px] border-[#c96442] bg-accent/10 py-3 px-5 rounded-r-xl rounded-bl-sm shadow-sm">
-                            <button 
-                              type="button" 
-                              onClick={() => setChatQuote(null)} 
-                              className="absolute -top-2 -right-2 bg-surface border border-border-soft text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                            >
-                              <X size={12} />
-                            </button>
-                            <p className="text-[14px] text-fg-hover italic line-clamp-4">"{chatQuote.text}"</p>
-                            <p className="text-[12px] text-muted font-semibold mt-1">— {chatQuote.reference}</p>
+                      {chatQuotes.length > 0 && (
+                        <div className="mb-3 max-w-3xl">
+                          <div className="flex items-center justify-between mb-1.5 px-1">
+                            <span className="text-[11px] font-semibold text-muted tracking-wider uppercase">
+                              Referenced Scripture ({chatQuotes.length})
+                            </span>
+                            {chatQuotes.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => setChatQuotes([])}
+                                className="text-[11px] text-muted hover:text-error transition-colors cursor-pointer"
+                              >
+                                Clear all
+                              </button>
+                            )}
+                          </div>
+                          <div className="max-h-36 overflow-y-auto custom-scroll space-y-2 pr-1">
+                            {chatQuotes.map((q) => (
+                              <div 
+                                key={q.id} 
+                                className="group relative border-l-[3px] border-accent bg-accent/10 py-2.5 px-4 rounded-r-xl rounded-bl-sm shadow-sm"
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-[14px] text-fg-hover italic line-clamp-3 leading-snug">"{q.text}"</p>
+                                    <p className="text-[12px] text-muted font-semibold mt-1">— {q.reference}</p>
+                                  </div>
+                                  <button 
+                                    type="button" 
+                                    onClick={() => setChatQuotes(prev => prev.filter(item => item.id !== q.id))} 
+                                    className="shrink-0 p-1 text-muted hover:text-error hover:bg-surface rounded-full transition-colors cursor-pointer"
+                                    title="Remove reference"
+                                  >
+                                    <X size={13} />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       )}
@@ -2005,7 +2092,7 @@ export default function App() {
                       />
                       <button 
                         type="submit" 
-                        disabled={isAiTyping || (!chatInput.trim() && !chatImage && !chatQuote) || cooldown > 0} 
+                        disabled={isAiTyping || (!chatInput.trim() && !chatImage && chatQuotes.length === 0) || cooldown > 0} 
                         className="absolute right-2 bottom-2 p-2.5 bg-accent hover:bg-[#b5583b] text-white rounded-full disabled:opacity-50 disabled:hover:bg-accent transition-colors"
                       >
                         <Send size={16} />
