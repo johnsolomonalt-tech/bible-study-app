@@ -1248,7 +1248,7 @@ export default function App() {
         <div className="flex-1 flex items-center">
           <div className="font-display text-[22px] tracking-tight text-accent flex items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={theme === 'light' ? '/logo-light.png' : '/logo-dark.png'} alt="Theologica Logo" className="w-8 h-8 object-contain drop-shadow-md rounded-md" />
+            <img src={theme === 'light' ? '/logo-light.png' : '/logo-dark.png'} alt="Theologica Logo" className="w-10 h-10 object-contain drop-shadow-md rounded-lg" />
             <span className="inline">Theologica</span>
           </div>
         </div>

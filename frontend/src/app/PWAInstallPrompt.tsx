@@ -69,7 +69,7 @@ export default function PWAInstallPrompt() {
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 bg-[#141413] rounded-xl flex items-center justify-center shrink-0 shadow-inner">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={theme === 'light' ? '/logo-light.png' : '/logo-dark.png'} className="w-8 h-8 object-contain" alt="Theologica" />
+            <img src={theme === 'light' ? '/logo-light.png' : '/logo-dark.png'} className="w-10 h-10 object-contain" alt="Theologica" />
           </div>
           <div>
             <h3 className="text-[15px] font-semibold text-[#faf9f5] mb-1">Install Theologica</h3>
@@ -87,7 +87,7 @@ export default function PWAInstallPrompt() {
     <div className="fixed bottom-[84px] left-4 right-4 bg-[#30302e] border border-[#4d4c48] rounded-[20px] p-4 shadow-2xl z-[100] animate-in slide-in-from-bottom-5 fade-in duration-500 flex items-center justify-between" style={{ marginBottom: 'env(safe-area-inset-bottom)' }}>
       <div className="flex items-center gap-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={theme === 'light' ? '/logo-light.png' : '/logo-dark.png'} className="w-10 h-10 object-contain drop-shadow" alt="Theologica" />
+        <img src={theme === 'light' ? '/logo-light.png' : '/logo-dark.png'} className="w-12 h-12 object-contain drop-shadow" alt="Theologica" />
         <div>
           <h3 className="text-[14px] font-semibold text-[#faf9f5]">Install App</h3>
           <p className="text-[12px] text-[#87867f]">Add to your home screen</p>
