@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Sparkles, 
   X, 
@@ -73,6 +73,17 @@ export function TheologicaAiCanvasModal({
   const [error, setError] = useState<string | null>(null);
   const [synthesisResult, setSynthesisResult] = useState<string | null>(null);
   const [copiedSynthesis, setCopiedSynthesis] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const handleCancelOrClose = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsLoading(false);
+    setError(null);
+    onClose();
+  };
 
   const isDark = theme === 'dark';
 
@@ -150,6 +161,9 @@ export function TheologicaAiCanvasModal({
       return;
     }
 
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setIsLoading(true);
     setError(null);
     setSynthesisResult(null);
@@ -158,6 +172,7 @@ export function TheologicaAiCanvasModal({
       const res = await fetch('/api/canvas/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           prompt: finalPrompt,
           currentGraph,
@@ -186,6 +201,10 @@ export function TheologicaAiCanvasModal({
         onClose();
       }
     } catch (err: any) {
+      if (err.name === 'AbortError' || controller.signal.aborted) {
+        // Generation was cancelled by user - exit silently without altering board
+        return;
+      }
       console.error('Theologica AI Canvas Error:', err);
       const rawMsg = err.message || '';
       const isTechnicalError = /json|syntax|parse|token|fetch|failed to fetch|internal server|unexpected/i.test(rawMsg);
@@ -195,6 +214,7 @@ export function TheologicaAiCanvasModal({
       setError(friendlyMsg);
     } finally {
       setIsLoading(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -253,9 +273,10 @@ export function TheologicaAiCanvasModal({
           </div>
           <button 
             type="button" 
-            onClick={onClose}
-            disabled={isLoading}
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+            onClick={handleCancelOrClose}
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors cursor-pointer"
+            title={isLoading ? "Cancel generation and close" : "Close"}
+            aria-label="Close"
           >
             <X size={18} />
           </button>
@@ -378,6 +399,16 @@ export function TheologicaAiCanvasModal({
               <div className="text-[11px] text-zinc-500 text-center">
                 Theologica AI assigns collision-free layout coordinates so cards snap neatly into position.
               </div>
+
+              {/* Explicit Cancel Generation Button */}
+              <button
+                type="button"
+                onClick={handleCancelOrClose}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white hover:bg-zinc-800 border border-zinc-700/60 transition-all flex items-center gap-2 cursor-pointer shadow-sm active:scale-95"
+              >
+                <X size={14} />
+                <span>Cancel Generation</span>
+              </button>
             </div>
           ) : (
             /* STATE: NORMAL INTERACTIVE FORM */

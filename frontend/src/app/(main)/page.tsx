@@ -2802,6 +2802,7 @@ export default function App() {
             theme={theme as 'dark' | 'light'}
             incomingNode={canvasIncomingNode}
             onIncomingNodeHandled={() => setCanvasIncomingNode(null)}
+            isActiveTab={activeTab === 'canvas'}
           />
         </div>
       </main>

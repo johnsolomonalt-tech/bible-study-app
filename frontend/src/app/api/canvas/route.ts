@@ -117,6 +117,7 @@ export async function GET(req: Request) {
         payload: {
           nodes: parsed.nodes || [],
           edges: parsed.edges || [],
+          viewport: parsed.viewport,
         },
       };
       return NextResponse.json(parsed);
@@ -143,7 +144,7 @@ export async function POST(req: Request) {
     const activeUserId = await getSafeUserId();
 
     const body = await req.json();
-    const { id = 'default', title = 'Untitled Canvas', nodes = [], edges = [] } = body;
+    const { id = 'default', title = 'Untitled Canvas', nodes = [], edges = [], viewport } = body;
 
     const cacheKey = `${activeUserId}_${id}`;
     const updatedAt = new Date().toISOString();
@@ -153,13 +154,14 @@ export async function POST(req: Request) {
       title,
       nodes,
       edges,
+      viewport,
       updatedAt,
     };
 
     memoryCache[cacheKey] = {
       title,
       updatedAt,
-      payload: { nodes, edges },
+      payload: { nodes, edges, viewport },
     };
 
     // Persist to disk (non-fatal if disk is read-only)

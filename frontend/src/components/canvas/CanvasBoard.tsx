@@ -62,6 +62,7 @@ interface CanvasBoardProps {
     category?: NodeCategory;
   } | null;
   onIncomingNodeHandled?: () => void;
+  isActiveTab?: boolean;
 }
 
 interface HistorySnapshot {
@@ -187,10 +188,30 @@ function InnerCanvasBoard({
   theme = 'dark',
   incomingNode,
   onIncomingNodeHandled,
+  isActiveTab = true,
 }: CanvasBoardProps) {
-  const { fitView, screenToFlowPosition } = useReactFlow();
+  const { fitView, setViewport, getViewport, screenToFlowPosition } = useReactFlow();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const currentViewportRef = useRef<{ x: number; y: number; zoom: number } | null>(null);
   const isDark = theme === 'dark';
   const mod = useModifierKey();
+
+  // Viewport restoration & activation when switching to the canvas tab
+  useEffect(() => {
+    if (!isActiveTab) return;
+
+    const timer = setTimeout(() => {
+      if (!containerRef.current || containerRef.current.clientWidth <= 100) return;
+
+      if (currentViewportRef.current && currentViewportRef.current.zoom >= 0.25) {
+        setViewport(currentViewportRef.current, { duration: 250 });
+      } else {
+        fitView({ padding: 0.25, duration: 400, minZoom: 0.35, maxZoom: 1.1 });
+      }
+    }, 120);
+
+    return () => clearTimeout(timer);
+  }, [isActiveTab, fitView, setViewport]);
 
   // Pane Context Menu state
   const [paneContextMenu, setPaneContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -614,7 +635,9 @@ function InnerCanvasBoard({
     pushSnapshot(arrangedNodes, arrangedEdges);
 
     setTimeout(() => {
-      fitView({ padding: 0.28, duration: 600 });
+      if (containerRef.current && containerRef.current.clientWidth > 100) {
+        fitView({ padding: 0.28, duration: 600, minZoom: 0.35, maxZoom: 1.1 });
+      }
     }, 100);
   }, [arrangeGraph, fitView, pushSnapshot, setEdges, setNodes]);
 
@@ -673,11 +696,21 @@ function InnerCanvasBoard({
       const serializableEdges = toSerializableEdges(edgesToSave);
       const updatedAt = new Date().toISOString();
 
+      let vp = currentViewportRef.current;
+      try {
+        const liveVp = getViewport();
+        if (liveVp && typeof liveVp.zoom === 'number' && liveVp.zoom >= 0.2) {
+          vp = liveVp;
+          currentViewportRef.current = liveVp;
+        }
+      } catch {}
+
       const payload: CanvasStatePayload & { id: string; title: string; updatedAt: string } = {
         id: targetBoardId,
         title: titleToSave,
         nodes: serializableNodes,
         edges: serializableEdges,
+        viewport: vp || undefined,
         updatedAt,
       };
 
@@ -718,6 +751,7 @@ function InnerCanvasBoard({
           title: titleToSave,
           nodes: serializableNodes,
           edges: serializableEdges,
+          viewport: vp || undefined,
         }),
       }).catch((err) => {
         console.warn('Canvas API sync error (offline preserved):', err);
@@ -729,7 +763,7 @@ function InnerCanvasBoard({
       console.error('Error saving board immediately:', err);
       setSaveStatus('unsaved');
     }
-  }, [toSerializableNodes, toSerializableEdges]);
+  }, [toSerializableNodes, toSerializableEdges, getViewport]);
 
   // Manual save trigger (e.g. Cmd+S or save button)
   const handleManualSave = useCallback(() => {
@@ -766,6 +800,7 @@ function InnerCanvasBoard({
     let loadedEdges: SerializableEdge[] = [];
     let loadedTitle = 'Untitled Canvas';
     let foundLocalData = false;
+    let savedViewport: { x: number; y: number; zoom: number } | null = null;
 
     // Check boards list for metadata title
     try {
@@ -788,6 +823,10 @@ function InnerCanvasBoard({
         loadedNodes = parsed.nodes || [];
         loadedEdges = parsed.edges || [];
         if (parsed.title) loadedTitle = parsed.title;
+        if (parsed.viewport && typeof parsed.viewport.zoom === 'number' && parsed.viewport.zoom >= 0.2) {
+          savedViewport = parsed.viewport;
+          currentViewportRef.current = savedViewport;
+        }
       }
     } catch (e) {
       console.warn('LocalStorage canvas parse error:', e);
@@ -825,6 +864,10 @@ function InnerCanvasBoard({
             const rNodes = (remote.nodes || []).map(prepareNode);
             const rEdges = (remote.edges || []).map(prepareEdge);
             const rTitle = remote.title || loadedTitle;
+            if (remote.viewport && typeof remote.viewport.zoom === 'number' && remote.viewport.zoom >= 0.2) {
+              savedViewport = remote.viewport;
+              currentViewportRef.current = savedViewport;
+            }
             setNodes(rNodes);
             setEdges(rEdges);
             setBoardTitle(rTitle);
@@ -843,6 +886,7 @@ function InnerCanvasBoard({
                 title: rTitle,
                 nodes: remote.nodes || [],
                 edges: remote.edges || [],
+                viewport: savedViewport || undefined,
                 updatedAt: remote.updatedAt || new Date().toISOString(),
               }));
             } catch {}
@@ -854,9 +898,13 @@ function InnerCanvasBoard({
     }
 
     setTimeout(() => {
-      fitView({ padding: 0.25, duration: 500 });
+      if (savedViewport && typeof savedViewport.zoom === 'number' && savedViewport.zoom >= 0.25) {
+        setViewport(savedViewport, { duration: 300 });
+      } else if (containerRef.current && containerRef.current.clientWidth > 100) {
+        fitView({ padding: 0.25, duration: 500, minZoom: 0.35, maxZoom: 1.1 });
+      }
     }, 120);
-  }, [fitView, prepareEdge, prepareNode, toSerializableEdges, toSerializableNodes, updateHistoryState, setNodes, setEdges]);
+  }, [fitView, setViewport, prepareEdge, prepareNode, toSerializableEdges, toSerializableNodes, updateHistoryState, setNodes, setEdges]);
 
   // Load boards list and initial board on mount with smart-merge
   useEffect(() => {
@@ -1271,7 +1319,9 @@ function InnerCanvasBoard({
     }
 
     setTimeout(() => {
-      fitView({ padding: 0.25, duration: 600 });
+      if (containerRef.current && containerRef.current.clientWidth > 100) {
+        fitView({ padding: 0.25, duration: 600, minZoom: 0.35, maxZoom: 1.1 });
+      }
     }, 120);
   }, [incomingNode, handleCreateBoard, nodes, theme, handleUpdateNode, handleDuplicateNode, handleDeleteNode, onIncomingNodeHandled, pushSnapshot, fitView, setNodes]);
 
@@ -1511,7 +1561,9 @@ function InnerCanvasBoard({
     setTimeout(() => setAiToast(null), 6000);
 
     setTimeout(() => {
-      fitView({ padding: 0.28, duration: 800 });
+      if (containerRef.current && containerRef.current.clientWidth > 100) {
+        fitView({ padding: 0.28, duration: 800, minZoom: 0.35, maxZoom: 1.1 });
+      }
     }, 150);
   }, [arrangeGraph, fitView, handleCreateBoard, prepareEdge, prepareNode, pushSnapshot, setEdges, setNodes]);
 
@@ -1569,6 +1621,7 @@ function InnerCanvasBoard({
 
   return (
     <div 
+      ref={containerRef}
       className="relative w-full h-full overflow-hidden select-none transition-colors duration-200"
       style={{
         backgroundColor: isDark ? '#161618' : '#F6F6F6',
@@ -1597,7 +1650,11 @@ function InnerCanvasBoard({
         onRedo={handleRedo}
         canUndo={canUndo}
         canRedo={canRedo}
-        onFitView={() => fitView({ padding: 0.2, duration: 600 })}
+        onFitView={() => {
+          if (containerRef.current && containerRef.current.clientWidth > 100) {
+            fitView({ padding: 0.2, duration: 600, minZoom: 0.35, maxZoom: 1.1 });
+          }
+        }}
         onAutoArrange={handleAutoArrange}
         onClear={handleClear}
         isSidebarOpen={isSidebarOpen}
@@ -1628,10 +1685,16 @@ function InnerCanvasBoard({
         onPaneClick={() => {
           if (paneContextMenu) setPaneContextMenu(null);
         }}
+        onMoveEnd={(event, viewport) => {
+          if (viewport && typeof viewport.zoom === 'number' && viewport.zoom >= 0.2) {
+            currentViewportRef.current = viewport;
+          }
+        }}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-        minZoom={0.1}
+        minZoom={0.25}
         maxZoom={2.0}
+        defaultViewport={{ x: 80, y: 60, zoom: 0.85 }}
         selectionMode={SelectionMode.Partial}
         panOnScroll={false}
         selectionOnDrag={true}
@@ -1880,7 +1943,9 @@ function InnerCanvasBoard({
             type="button"
             onClick={() => {
               setPaneContextMenu(null);
-              fitView({ padding: 0.2, duration: 600 });
+              if (containerRef.current && containerRef.current.clientWidth > 100) {
+                fitView({ padding: 0.2, duration: 600, minZoom: 0.35, maxZoom: 1.1 });
+              }
             }}
             className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
               isDark ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-zinc-100 text-zinc-800'

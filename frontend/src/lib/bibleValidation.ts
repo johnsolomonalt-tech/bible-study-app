@@ -22,7 +22,7 @@ const INAPPROPRIATE_PATTERNS = [
 // Secular domains that are explicitly unrelated to Bible study (unless combined with biblical context)
 const UNRELATED_PATTERNS = [
   // Programming & tech code
-  /\b(write (python|javascript|typescript|html|css|java|c\+\+|rust|php|sql) code|react component|docker container|npm install|debug this error|git push|fix this bug|regex for)\b/i,
+  /\b(write (a |an )?(python|javascript|typescript|html|css|java|c\+\+|rust|php|sql|bash|ruby|go|swift) (code|script|program|app|bot|scraper)?|python (script|code|scraper)|javascript code|react component|docker container|npm install|debug this error|git push|fix this bug|regex for)\b/i,
   // Crypto & day trading
   /\b(bitcoin price|ethereum prediction|crypto trading|forex signals|buy calls|stock market options|memecoin)\b/i,
   // Sports & pop culture
@@ -101,39 +101,21 @@ export function validateBiblePrompt(
     return { isValid: true };
   }
 
-  // 4. For 'generate' mode: Ensure the prompt is related to the Bible / Christian theology
-  // A. Check for verse citations (e.g. 3:16, 8:28)
-  if (VERSE_CITATION_REGEX.test(trimmed)) {
-    return { isValid: true };
-  }
-
-  // B. Check for any canonical Bible book name or abbreviation
-  const lower = trimmed.toLowerCase();
-  for (const key of Object.keys(CANONICAL_BOOKS)) {
-    const bookRegex = new RegExp(`\\b${key.replace(/ /g, '\\s+')}\\b`, 'i');
-    if (bookRegex.test(lower)) {
-      return { isValid: true };
-    }
-  }
-
-  // C. Check for theological terms, biblical figures, doctrines
-  if (BIBLICAL_TOPICS_REGEX.test(trimmed)) {
-    return { isValid: true };
-  }
-
-  // D. Check for clearly unrelated secular queries
+  // 4. For 'generate' mode: Ensure the prompt is appropriate and not purely off-topic
+  // Check for clearly unrelated secular queries (pure code, sports scores, recipes, crypto)
   for (const unPattern of UNRELATED_PATTERNS) {
     if (unPattern.test(trimmed)) {
-      return {
-        isValid: false,
-        error: 'Theologica AI is designed for Bible study. Please enter a topic, question, or passage related to Scripture or Christian theology.',
-      };
+      // If the prompt also mentions a biblical/theological term (e.g. "what does the Bible say about money/stocks"), allow it!
+      if (!BIBLICAL_TOPICS_REGEX.test(trimmed)) {
+        return {
+          isValid: false,
+          error: 'Theologica AI is designed for Bible study. Please enter a topic, question, or passage related to Scripture or Christian theology.',
+        };
+      }
     }
   }
 
-  // E. Fallback: Prompt is too generic or does not mention recognizable biblical context
-  return {
-    isValid: false,
-    error: 'Please enter a topic, question, or passage related to the Bible or Christian theology (e.g., a scripture passage, doctrine, or biblical character).',
-  };
+  // Accept any prompt that has any theological, scripture, moral, life, or spiritual context.
+  // Theologica AI will contextualize and ground the study guide in Scripture and Christian doctrine.
+  return { isValid: true };
 }

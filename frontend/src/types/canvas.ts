@@ -42,6 +42,7 @@ export interface SerializableEdge {
 export interface CanvasStatePayload {
   nodes: SerializableNode[];
   edges: SerializableEdge[];
+  viewport?: { x: number; y: number; zoom: number };
 }
 
 export interface CanvasBoardMetadata {
