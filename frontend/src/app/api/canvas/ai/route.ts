@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { SerializableNode, SerializableEdge, NodeCategory } from '@/types/canvas';
+import { validateBiblePrompt } from '@/lib/bibleValidation';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
@@ -92,6 +93,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Prompt is required.' }, { status: 400 });
     }
 
+    const validation = validateBiblePrompt(prompt, mode);
+    if (!validation.isValid) {
+      return NextResponse.json(
+        { error: validation.error || 'Please enter a topic, question, or passage related to Scripture.' },
+        { status: 400 }
+      );
+    }
+
     const existingNodes = currentGraph?.nodes || [];
     const existingEdges = currentGraph?.edges || [];
 
@@ -153,10 +162,16 @@ INSTRUCTIONS:
    - Provide a comprehensive "synthesis" in markdown format synthesizing the nodes and ideas on the canvas.
    - You may still optionally generate summary cards.
 4. Always provide an "explanation" string summarizing what you created or analyzed.
+5. If the user's prompt is completely unrelated to the Bible, Christian theology, Scripture, or biblical history, return:
+   {
+     "action": "unrelated_topic",
+     "explanation": "Topic is not related to biblical study.",
+     "error": "Please enter a topic, question, or passage related to Scripture or biblical study."
+   }
 
 JSON Format:
 {
-  "action": "add_nodes" | "expand_node" | "synthesize_graph",
+  "action": "add_nodes" | "expand_node" | "synthesize_graph" | "unrelated_topic",
   "explanation": "Summary of visual graph operations...",
   "nodes": [
     {
@@ -187,6 +202,13 @@ JSON Format:
       return response.text ?? '';
     });
 
+    if (!aiResponseText || !aiResponseText.trim()) {
+      return NextResponse.json(
+        { error: "Sorry, we couldn't process your request at this time. Please try again or rephrase your topic." },
+        { status: 500 }
+      );
+    }
+
     let parsed: AiResponsePayload;
     try {
       // Strip any accidental markdown formatting if present
@@ -198,8 +220,15 @@ JSON Format:
     } catch (parseErr) {
       console.error('Failed to parse Theologica Canvas JSON:', parseErr, aiResponseText);
       return NextResponse.json(
-        { error: 'Invalid JSON response from AI assistant. Please try again.' },
+        { error: "Sorry, we couldn't process your request at this time. Please try again or rephrase your topic." },
         { status: 500 }
+      );
+    }
+
+    if ((parsed as any).action === 'unrelated_topic' || (parsed as any).error) {
+      return NextResponse.json(
+        { error: (parsed as any).error || 'Please enter a topic, question, or passage related to Scripture or biblical study.' },
+        { status: 400 }
       );
     }
 
@@ -526,7 +555,7 @@ JSON Format:
   } catch (error: any) {
     console.error('Error in /api/canvas/ai:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to process AI canvas request.' },
+      { error: "Sorry, we couldn't process your request at this time. Please try again or rephrase your topic." },
       { status: 500 }
     );
   }

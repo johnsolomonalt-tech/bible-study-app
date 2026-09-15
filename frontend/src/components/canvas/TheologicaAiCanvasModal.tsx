@@ -24,6 +24,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { SerializableNode, SerializableEdge, CanvasStatePayload } from '@/types/canvas';
 import { useModifierKey } from '@/lib/os';
+import { validateBiblePrompt } from '@/lib/bibleValidation';
 
 interface TheologicaAiCanvasModalProps {
   isOpen: boolean;
@@ -142,6 +143,13 @@ export function TheologicaAiCanvasModal({
     const finalPrompt = (overridePrompt || prompt).trim();
     if (!finalPrompt || isLoading) return;
 
+    // Validate prompt appropriateness and biblical relevance BEFORE showing loading screen
+    const validation = validateBiblePrompt(finalPrompt, activeMode);
+    if (!validation.isValid) {
+      setError(validation.error || 'Please enter a topic, question, or passage related to Scripture.');
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     setSynthesisResult(null);
@@ -161,7 +169,10 @@ export function TheologicaAiCanvasModal({
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || 'Theologica AI encountered an issue generating this board.');
+        const errorMsg = data.error && !/json|syntax|parse|token|internal/i.test(data.error)
+          ? data.error
+          : "Sorry, we couldn't process your request at this time. Please try again or rephrase your topic.";
+        throw new Error(errorMsg);
       }
 
       if (data.nodes && data.nodes.length > 0) {
@@ -176,7 +187,12 @@ export function TheologicaAiCanvasModal({
       }
     } catch (err: any) {
       console.error('Theologica AI Canvas Error:', err);
-      setError(err.message || 'Failed to connect to Theologica AI. Please verify your connection.');
+      const rawMsg = err.message || '';
+      const isTechnicalError = /json|syntax|parse|token|fetch|failed to fetch|internal server|unexpected/i.test(rawMsg);
+      const friendlyMsg = isTechnicalError || !rawMsg
+        ? "Sorry, we couldn't process your request at this time. Please try again or rephrase your topic."
+        : rawMsg;
+      setError(friendlyMsg);
     } finally {
       setIsLoading(false);
     }
@@ -423,7 +439,10 @@ export function TheologicaAiCanvasModal({
                 </label>
                 <textarea
                   value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
+                  onChange={(e) => {
+                    setPrompt(e.target.value);
+                    if (error) setError(null);
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                       handleSubmit();
