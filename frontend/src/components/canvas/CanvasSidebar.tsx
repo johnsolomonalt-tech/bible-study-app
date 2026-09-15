@@ -157,9 +157,29 @@ export function CanvasSidebar({
         </div>
 
         {filteredBoards.length === 0 ? (
-          <div className="py-8 text-center text-xs text-zinc-500 px-4">
-            {searchQuery ? 'No boards matching search.' : 'No canvas boards found. Create your first board above!'}
-          </div>
+          searchQuery ? (
+            <div className="py-8 text-center text-xs text-zinc-500 px-4">
+              No boards matching &quot;{searchQuery}&quot;.
+            </div>
+          ) : (
+            <div className="py-10 flex flex-col items-center justify-center text-center px-4 space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
+                <Workflow size={20} />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-zinc-200">No canvas boards yet</p>
+                <p className="text-[11px] text-zinc-500 mt-1">Start fresh with a blank canvas.</p>
+              </div>
+              <button
+                type="button"
+                onClick={onCreateBoard}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent text-white text-xs font-semibold hover:bg-accent/90 transition-all cursor-pointer shadow-sm active:scale-95"
+              >
+                <Plus size={13} />
+                <span>Create Canvas</span>
+              </button>
+            </div>
+          )
         ) : (
           filteredBoards.map((board) => {
             const isActive = board.id === activeBoardId;
@@ -234,21 +254,19 @@ export function CanvasSidebar({
                       >
                         <Edit2 size={12} />
                       </button>
-                      {boards.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (window.confirm(`Delete canvas "${board.title}"?`)) {
-                              onDeleteBoard(board.id);
-                            }
-                          }}
-                          className="p-1 rounded hover:bg-rose-500/20 text-zinc-400 hover:text-rose-400"
-                          title="Delete canvas"
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`Delete canvas "${board.title || 'Untitled Canvas'}"?`)) {
+                            onDeleteBoard(board.id);
+                          }
+                        }}
+                        className="p-1 rounded hover:bg-rose-500/20 text-zinc-400 hover:text-rose-400"
+                        title="Delete canvas"
+                      >
+                        <Trash2 size={12} />
+                      </button>
                     </div>
                   )}
                 </div>

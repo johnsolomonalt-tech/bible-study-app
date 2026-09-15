@@ -39,6 +39,8 @@ interface CanvasToolbarProps {
   onSave?: () => void;
   theme: 'dark' | 'light';
   nodeCount: number;
+  hasActiveBoard?: boolean;
+  onCreateBoard?: () => void;
 }
 
 const CATEGORY_ICONS: Record<NodeCategory, React.ElementType> = {
@@ -68,6 +70,8 @@ export function CanvasToolbar({
   onSave,
   theme,
   nodeCount,
+  hasActiveBoard = true,
+  onCreateBoard,
 }: CanvasToolbarProps) {
   const mod = useModifierKey();
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
@@ -132,63 +136,83 @@ export function CanvasToolbar({
 
         {/* Board Title */}
         <div className="flex items-center gap-1.5">
-          {isEditingTitle ? (
-            <input
-              type="text"
-              value={titleInput}
-              onChange={(e) => setTitleInput(e.target.value)}
-              onBlur={handleTitleSubmit}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleTitleSubmit();
-                if (e.key === 'Escape') {
-                  setTitleInput(boardTitle);
-                  setIsEditingTitle(false);
-                }
-              }}
-              autoFocus
-              className={`text-xs sm:text-sm font-semibold px-2 py-0.5 rounded border focus:outline-none focus:ring-1 focus:ring-accent ${
-                isDark 
-                  ? 'bg-zinc-800 border-zinc-600 text-white' 
-                  : 'bg-zinc-100 border-zinc-300 text-zinc-900'
-              }`}
-            />
+          {hasActiveBoard ? (
+            isEditingTitle ? (
+              <input
+                type="text"
+                value={titleInput}
+                onChange={(e) => setTitleInput(e.target.value)}
+                onBlur={handleTitleSubmit}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleTitleSubmit();
+                  if (e.key === 'Escape') {
+                    setTitleInput(boardTitle);
+                    setIsEditingTitle(false);
+                  }
+                }}
+                autoFocus
+                className={`text-xs sm:text-sm font-semibold px-2 py-0.5 rounded border focus:outline-none focus:ring-1 focus:ring-accent ${
+                  isDark 
+                    ? 'bg-zinc-800 border-zinc-600 text-white' 
+                    : 'bg-zinc-100 border-zinc-300 text-zinc-900'
+                }`}
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsEditingTitle(true)}
+                className="text-xs sm:text-sm font-bold tracking-tight hover:text-accent transition-colors truncate max-w-[140px] sm:max-w-[220px] text-left cursor-pointer"
+                title="Click to rename canvas"
+              >
+                <span className="truncate">{boardTitle || 'Untitled Canvas'}</span>
+              </button>
+            )
           ) : (
-            <button
-              type="button"
-              onClick={() => setIsEditingTitle(true)}
-              className="text-xs sm:text-sm font-bold tracking-tight hover:text-accent transition-colors truncate max-w-[140px] sm:max-w-[220px] text-left cursor-pointer"
-              title="Click to rename canvas"
-            >
-              <span className="truncate">{boardTitle || 'Untitled Canvas'}</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-zinc-400">No Canvas</span>
+              {onCreateBoard && (
+                <button
+                  type="button"
+                  onClick={onCreateBoard}
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-accent text-white text-[11px] font-semibold hover:bg-accent/90 transition-all cursor-pointer"
+                >
+                  <Plus size={12} />
+                  <span>Create</span>
+                </button>
+              )}
+            </div>
           )}
         </div>
 
-        <div className="h-4 w-[1px] bg-zinc-700/40 hidden sm:block" />
+        {hasActiveBoard && (
+          <>
+            <div className="h-4 w-[1px] bg-zinc-700/40 hidden sm:block" />
 
-        {/* Node count and save indicator */}
-        <div className="hidden sm:flex items-center gap-2.5 text-xs text-zinc-400">
-          <span className="font-mono text-[11px]">{nodeCount} {nodeCount === 1 ? 'card' : 'cards'}</span>
-          <button
-            type="button"
-            onClick={onSave}
-            className="flex items-center gap-1.5 px-1.5 py-0.5 rounded hover:bg-zinc-700/20 transition-colors cursor-pointer"
-            title={saveStatus === 'saving' ? 'Saving changes...' : saveStatus === 'unsaved' ? 'Unsaved changes (Click or Cmd+S to save)' : 'All changes saved (Click or Cmd+S to save)'}
-          >
-            <span 
-              className={`w-2 h-2 rounded-full transition-all ${
-                saveStatus === 'saving' 
-                  ? 'bg-amber-400 animate-ping' 
-                  : saveStatus === 'unsaved'
-                    ? 'bg-rose-500'
-                    : 'bg-emerald-500'
-              }`} 
-            />
-            <span className="text-[11px] font-medium capitalize text-zinc-400">
-              {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'unsaved' ? 'Unsaved' : 'Saved'}
-            </span>
-          </button>
-        </div>
+            {/* Node count and save indicator */}
+            <div className="hidden sm:flex items-center gap-2.5 text-xs text-zinc-400">
+              <span className="font-mono text-[11px]">{nodeCount} {nodeCount === 1 ? 'card' : 'cards'}</span>
+              <button
+                type="button"
+                onClick={onSave}
+                className="flex items-center gap-1.5 px-1.5 py-0.5 rounded hover:bg-zinc-700/20 transition-colors cursor-pointer"
+                title={saveStatus === 'saving' ? 'Saving changes...' : saveStatus === 'unsaved' ? 'Unsaved changes (Click or Cmd+S to save)' : 'All changes saved (Click or Cmd+S to save)'}
+              >
+                <span 
+                  className={`w-2 h-2 rounded-full transition-all ${
+                    saveStatus === 'saving' 
+                      ? 'bg-amber-400 animate-ping' 
+                      : saveStatus === 'unsaved'
+                        ? 'bg-rose-500'
+                        : 'bg-emerald-500'
+                  }`} 
+                />
+                <span className="text-[11px] font-medium capitalize text-zinc-400">
+                  {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'unsaved' ? 'Unsaved' : 'Saved'}
+                </span>
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Right: Actions Toolbar */}
@@ -272,9 +296,9 @@ export function CanvasToolbar({
         <button
           type="button"
           onClick={onUndo}
-          disabled={!canUndo}
+          disabled={!hasActiveBoard || !canUndo}
           className={`p-1.5 rounded-lg transition-colors ${
-            canUndo 
+            hasActiveBoard && canUndo 
               ? 'hover:bg-zinc-700/30 text-zinc-200 cursor-pointer active:scale-90 hover:text-white' 
               : 'opacity-30 cursor-not-allowed text-zinc-500'
           }`}
@@ -287,9 +311,9 @@ export function CanvasToolbar({
         <button
           type="button"
           onClick={onRedo}
-          disabled={!canRedo}
+          disabled={!hasActiveBoard || !canRedo}
           className={`p-1.5 rounded-lg transition-colors ${
-            canRedo 
+            hasActiveBoard && canRedo 
               ? 'hover:bg-zinc-700/30 text-zinc-200 cursor-pointer active:scale-90 hover:text-white' 
               : 'opacity-30 cursor-not-allowed text-zinc-500'
           }`}
@@ -305,7 +329,12 @@ export function CanvasToolbar({
           <button
             type="button"
             onClick={onAutoArrange}
-            className="p-1.5 rounded-lg hover:bg-zinc-700/30 text-zinc-300 hover:text-white transition-colors cursor-pointer active:scale-90"
+            disabled={!hasActiveBoard || nodeCount === 0}
+            className={`p-1.5 rounded-lg transition-colors ${
+              hasActiveBoard && nodeCount > 0
+                ? 'hover:bg-zinc-700/30 text-zinc-300 hover:text-white cursor-pointer active:scale-90'
+                : 'opacity-30 cursor-not-allowed text-zinc-500'
+            }`}
             title="Auto Arrange Cards (Tidy layout)"
           >
             <LayoutGrid size={16} />
@@ -316,7 +345,12 @@ export function CanvasToolbar({
         <button
           type="button"
           onClick={onFitView}
-          className="p-1.5 rounded-lg hover:bg-zinc-700/30 text-zinc-300 hover:text-white transition-colors cursor-pointer active:scale-90"
+          disabled={!hasActiveBoard || nodeCount === 0}
+          className={`p-1.5 rounded-lg transition-colors ${
+            hasActiveBoard && nodeCount > 0
+              ? 'hover:bg-zinc-700/30 text-zinc-300 hover:text-white cursor-pointer active:scale-90'
+              : 'opacity-30 cursor-not-allowed text-zinc-500'
+          }`}
           title="Fit view to all cards"
         >
           <Maximize2 size={16} />
@@ -326,7 +360,12 @@ export function CanvasToolbar({
         <button
           type="button"
           onClick={onClear}
-          className="p-1.5 rounded-lg hover:bg-rose-500/20 text-zinc-400 hover:text-rose-400 transition-colors cursor-pointer active:scale-90"
+          disabled={!hasActiveBoard || nodeCount === 0}
+          className={`p-1.5 rounded-lg transition-colors ${
+            hasActiveBoard && nodeCount > 0
+              ? 'hover:bg-rose-500/20 text-zinc-400 hover:text-rose-400 cursor-pointer active:scale-90'
+              : 'opacity-30 cursor-not-allowed text-zinc-500'
+          }`}
           title="Clear canvas"
         >
           <Trash2 size={16} />

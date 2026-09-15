@@ -49,7 +49,8 @@ import {
   HelpCircle, 
   Lightbulb, 
   FileText,
-  ChevronRight
+  ChevronRight,
+  Workflow
 } from 'lucide-react';
 import { useModifierKey } from '@/lib/os';
 
@@ -62,56 +63,6 @@ interface CanvasBoardProps {
   } | null;
   onIncomingNodeHandled?: () => void;
 }
-
-const INITIAL_DEMO_NODES: SerializableNode[] = [
-  {
-    id: 'demo-scripture-1',
-    type: 'customCard',
-    position: { x: 140, y: 140 },
-    data: {
-      title: 'Romans 8:28',
-      content: '> "And we know that in all things God works for the good of those who love him, who have been called according to his purpose."\n\n*Paul\'s foundational assurance of sovereign grace.*',
-      category: 'scripture',
-    },
-  },
-  {
-    id: 'demo-theology-1',
-    type: 'customCard',
-    position: { x: 560, y: 80 },
-    data: {
-      title: 'Sovereign Providence',
-      content: 'God orchestrates all earthly affairs, both pleasant and sorrowful, toward the eternal spiritual good of His elect. **All things** are subordinate to His sovereign redemptive decree.',
-      category: 'theological_point',
-    },
-  },
-  {
-    id: 'demo-app-1',
-    type: 'customCard',
-    position: { x: 560, y: 340 },
-    data: {
-      title: 'Trust in Trials',
-      content: '- Surrender anxiety over earthly uncertainties.\n- Cultivate persevering praise in hardship.\n- Anchor identity in God\'s eternal calling.',
-      category: 'application',
-    },
-  },
-];
-
-const INITIAL_DEMO_EDGES: SerializableEdge[] = [
-  {
-    id: 'demo-edge-1',
-    source: 'demo-scripture-1',
-    target: 'demo-theology-1',
-    label: 'Doctrinal Basis',
-    animated: true,
-  },
-  {
-    id: 'demo-edge-2',
-    source: 'demo-theology-1',
-    target: 'demo-app-1',
-    label: 'Living Faith',
-    animated: true,
-  },
-];
 
 interface HistorySnapshot {
   nodes: SerializableNode[];
@@ -161,14 +112,12 @@ function InnerCanvasBoard({
   // React Flow state
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<CanvasNodeData>>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
-  const [activeBoardId, setActiveBoardId] = useState('default');
-  const [boardTitle, setBoardTitle] = useState('Romans 8 Study');
+  const [activeBoardId, setActiveBoardId] = useState('');
+  const [boardTitle, setBoardTitle] = useState('');
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
 
   // Boards List state
-  const [boards, setBoards] = useState<CanvasBoardMetadata[]>([
-    { id: 'default', title: 'Romans 8 Study', updatedAt: new Date().toISOString(), nodeCount: 3 }
-  ]);
+  const [boards, setBoards] = useState<CanvasBoardMetadata[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Theologica AI Modal state
@@ -178,8 +127,8 @@ function InnerCanvasBoard({
   // Keep references to latest nodes, edges, activeBoardId, boardTitle, and state flags
   const nodesRef = useRef<Node<CanvasNodeData>[]>([]);
   const edgesRef = useRef<Edge[]>([]);
-  const activeBoardIdRef = useRef<string>('default');
-  const boardTitleRef = useRef<string>('Romans 8 Study');
+  const activeBoardIdRef = useRef<string>('');
+  const boardTitleRef = useRef<string>('');
   const isBoardLoadingRef = useRef<boolean>(false);
   const isDirtyRef = useRef<boolean>(false);
 
@@ -598,6 +547,22 @@ function InnerCanvasBoard({
 
   // Load a specific board by ID with full local & remote fallback
   const loadBoardData = useCallback(async (boardId: string) => {
+    if (!boardId) {
+      isBoardLoadingRef.current = false;
+      isDirtyRef.current = false;
+      setNodes([]);
+      setEdges([]);
+      nodesRef.current = [];
+      edgesRef.current = [];
+      setBoardTitle('');
+      boardTitleRef.current = '';
+      historyRef.current = [];
+      historyIndexRef.current = -1;
+      updateHistoryState();
+      setSaveStatus('saved');
+      return;
+    }
+
     isBoardLoadingRef.current = true;
     isDirtyRef.current = false;
 
@@ -632,23 +597,6 @@ function InnerCanvasBoard({
       console.warn('LocalStorage canvas parse error:', e);
     }
 
-    // If no local record exists at all and it's the 'default' board, populate initial demo nodes
-    if (!foundLocalData && boardId === 'default') {
-      loadedNodes = INITIAL_DEMO_NODES;
-      loadedEdges = INITIAL_DEMO_EDGES;
-      loadedTitle = 'Romans 8 Study';
-      foundLocalData = true;
-      try {
-        localStorage.setItem(`${STORAGE_KEY_BOARD_PREFIX}default`, JSON.stringify({
-          id: 'default',
-          title: loadedTitle,
-          nodes: loadedNodes,
-          edges: loadedEdges,
-          updatedAt: new Date().toISOString(),
-        }));
-      } catch {}
-    }
-
     // Set state & refs
     const pNodes = loadedNodes.map(prepareNode);
     const pEdges = loadedEdges.map(prepareEdge);
@@ -672,7 +620,7 @@ function InnerCanvasBoard({
     setSaveStatus('saved');
 
     // 2. Fetch remote update in background if local didn't exist
-    if (!foundLocalData && boardId !== 'default') {
+    if (!foundLocalData && boardId) {
       try {
         const res = await fetch(`/api/canvas?id=${boardId}`);
         if (res.ok) {
@@ -716,33 +664,79 @@ function InnerCanvasBoard({
 
   // Load boards list and initial board on mount with smart-merge
   useEffect(() => {
-    // 1. Read initial active board ID from localStorage
-    const savedActiveId = localStorage.getItem(STORAGE_KEY_ACTIVE_BOARD) || 'default';
-    setActiveBoardId(savedActiveId);
-    activeBoardIdRef.current = savedActiveId;
-
-    // 2. Load boards index from localStorage
+    // 1. Read initial boards index from localStorage
+    let initialBoards: CanvasBoardMetadata[] = [];
     try {
       const localList = localStorage.getItem(STORAGE_KEY_BOARDS_LIST);
       if (localList) {
         const parsed = JSON.parse(localList);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setBoards(parsed);
+        if (Array.isArray(parsed)) {
+          // If the list only has the old canned demo 'default' with 'Romans 8 Study', purge it!
+          initialBoards = parsed.filter((b) => !(b.id === 'default' && b.title === 'Romans 8 Study'));
+          if (initialBoards.length !== parsed.length) {
+            localStorage.setItem(STORAGE_KEY_BOARDS_LIST, JSON.stringify(initialBoards));
+            localStorage.removeItem(`${STORAGE_KEY_BOARD_PREFIX}default`);
+          }
         }
       }
     } catch {
       // Ignore
+    }
+    setBoards(initialBoards);
+
+    // 2. Read initial active board ID from localStorage
+    let savedActiveId = localStorage.getItem(STORAGE_KEY_ACTIVE_BOARD) || '';
+    if (savedActiveId === 'default' && !initialBoards.some((b) => b.id === 'default')) {
+      savedActiveId = initialBoards.length > 0 ? initialBoards[0].id : '';
+      try {
+        if (savedActiveId) {
+          localStorage.setItem(STORAGE_KEY_ACTIVE_BOARD, savedActiveId);
+        } else {
+          localStorage.removeItem(STORAGE_KEY_ACTIVE_BOARD);
+        }
+      } catch {}
+    }
+
+    if (savedActiveId && initialBoards.some((b) => b.id === savedActiveId)) {
+      setActiveBoardId(savedActiveId);
+      activeBoardIdRef.current = savedActiveId;
+      loadBoardData(savedActiveId);
+    } else if (initialBoards.length > 0) {
+      const firstId = initialBoards[0].id;
+      setActiveBoardId(firstId);
+      activeBoardIdRef.current = firstId;
+      try {
+        localStorage.setItem(STORAGE_KEY_ACTIVE_BOARD, firstId);
+      } catch {}
+      loadBoardData(firstId);
+    } else {
+      setActiveBoardId('');
+      activeBoardIdRef.current = '';
+      setBoardTitle('');
+      boardTitleRef.current = '';
+      setNodes([]);
+      setEdges([]);
+      nodesRef.current = [];
+      edgesRef.current = [];
+      historyRef.current = [];
+      historyIndexRef.current = -1;
+      updateHistoryState();
+      try {
+        localStorage.removeItem(STORAGE_KEY_ACTIVE_BOARD);
+      } catch {}
     }
 
     // 3. Fetch boards list from API and SMART-MERGE (never delete user's local boards!)
     fetch('/api/canvas?list=true')
       .then((res) => res.json())
       .then((remoteList) => {
-        if (Array.isArray(remoteList) && remoteList.length > 0) {
+        if (Array.isArray(remoteList)) {
+          // Filter out any canned Romans 8 Study from remoteList too
+          const cleanedRemote = remoteList.filter((b: CanvasBoardMetadata) => !(b.id === 'default' && b.title === 'Romans 8 Study'));
           setBoards((prev) => {
             const map = new Map<string, CanvasBoardMetadata>();
             // Remote items
-            remoteList.forEach((b: CanvasBoardMetadata) => {
+            cleanedRemote.forEach((b: CanvasBoardMetadata) => {
               if (b?.id) map.set(b.id, b);
             });
             // Local items take precedence if updated more recently or newly created
@@ -762,10 +756,7 @@ function InnerCanvasBoard({
         }
       })
       .catch(() => {});
-
-    // 4. Load initial active board
-    loadBoardData(savedActiveId);
-  }, []); // Run once on mount
+  }, [loadBoardData, updateHistoryState, setNodes, setEdges]); // Run once on mount
 
   // Sync theme changes to nodes
   useEffect(() => {
@@ -785,8 +776,8 @@ function InnerCanvasBoard({
 
   // Synchronous auto-save debounce for current board
   useEffect(() => {
-    // Never auto-save while loading a board
-    if (isBoardLoadingRef.current) return;
+    // Never auto-save while loading a board or if no active board exists
+    if (isBoardLoadingRef.current || !activeBoardId) return;
 
     // Keep refs in sync
     nodesRef.current = nodes;
@@ -799,7 +790,7 @@ function InnerCanvasBoard({
     setSaveStatus('saving');
 
     const timer = setTimeout(() => {
-      if (isBoardLoadingRef.current) return;
+      if (isBoardLoadingRef.current || !activeBoardId) return;
       saveBoardImmediate(activeBoardId, boardTitle, nodes, edges);
     }, 600);
 
@@ -833,9 +824,211 @@ function InnerCanvasBoard({
     };
   }, [toSerializableNodes, toSerializableEdges]);
 
+  // Sidebar Board Switcher Handlers (with atomic flushing and race-condition prevention)
+  const handleSelectBoard = useCallback((newBoardId: string) => {
+    if (newBoardId === activeBoardIdRef.current) return;
+
+    // 1. Flush & save current board immediately if dirty
+    if (isDirtyRef.current && activeBoardIdRef.current) {
+      saveBoardImmediate(
+        activeBoardIdRef.current,
+        boardTitleRef.current,
+        nodesRef.current,
+        edgesRef.current
+      );
+    }
+
+    // 2. Persist newly active board ID
+    try {
+      localStorage.setItem(STORAGE_KEY_ACTIVE_BOARD, newBoardId);
+    } catch {}
+    setActiveBoardId(newBoardId);
+    activeBoardIdRef.current = newBoardId;
+
+    // 3. Load target board data
+    loadBoardData(newBoardId);
+  }, [saveBoardImmediate, loadBoardData]);
+
+  const handleCreateBoard = useCallback((customTitle?: string) => {
+    // 1. Flush current board if dirty
+    if (isDirtyRef.current && activeBoardIdRef.current) {
+      saveBoardImmediate(
+        activeBoardIdRef.current,
+        boardTitleRef.current,
+        nodesRef.current,
+        edgesRef.current
+      );
+    }
+
+    const timestamp = Date.now();
+    const newId = `board-${timestamp}`;
+    const newTitle = customTitle || 'New Canvas';
+    const now = new Date().toISOString();
+
+    const newBoardMeta: CanvasBoardMetadata = {
+      id: newId,
+      title: newTitle,
+      updatedAt: now,
+      nodeCount: 0,
+    };
+
+    // 2. Immediately write new board record to localStorage
+    try {
+      localStorage.setItem(`${STORAGE_KEY_BOARD_PREFIX}${newId}`, JSON.stringify({
+        id: newId,
+        title: newTitle,
+        nodes: [],
+        edges: [],
+        updatedAt: now,
+      }));
+    } catch (e) {
+      console.warn('Failed to initialize new board storage:', e);
+    }
+
+    // 3. Update boards index list
+    setBoards((prev) => {
+      const next = [newBoardMeta, ...prev];
+      try {
+        localStorage.setItem(STORAGE_KEY_BOARDS_LIST, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    // 4. Update active board ID
+    try {
+      localStorage.setItem(STORAGE_KEY_ACTIVE_BOARD, newId);
+    } catch {}
+    activeBoardIdRef.current = newId;
+    setActiveBoardId(newId);
+
+    // 5. Update state
+    setBoardTitle(newTitle);
+    boardTitleRef.current = newTitle;
+    setNodes([]);
+    setEdges([]);
+    nodesRef.current = [];
+    edgesRef.current = [];
+
+    historyRef.current = [{ nodes: [], edges: [] }];
+    historyIndexRef.current = 0;
+    updateHistoryState();
+    isDirtyRef.current = false;
+    setSaveStatus('saved');
+
+    // 6. Sync new board to API
+    fetch('/api/canvas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: newId,
+        title: newTitle,
+        nodes: [],
+        edges: [],
+      }),
+    }).catch(() => {});
+
+    return newId;
+  }, [saveBoardImmediate, updateHistoryState, setNodes, setEdges]);
+
+  const handleRenameBoard = useCallback((id: string, newTitle: string) => {
+    const trimmed = newTitle.trim() || 'Untitled Canvas';
+
+    // 1. Update boards index list in state & localStorage
+    setBoards((prev) => {
+      const next = prev.map((b) => (b.id === id ? { ...b, title: trimmed } : b));
+      try {
+        localStorage.setItem(STORAGE_KEY_BOARDS_LIST, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    // 2. If active board, update title state and immediate save
+    if (id === activeBoardIdRef.current) {
+      setBoardTitle(trimmed);
+      boardTitleRef.current = trimmed;
+      saveBoardImmediate(id, trimmed, nodesRef.current, edgesRef.current);
+    } else {
+      // If inactive board, safely load that board's record, update title, and write back
+      try {
+        const existingRaw = localStorage.getItem(`${STORAGE_KEY_BOARD_PREFIX}${id}`);
+        if (existingRaw) {
+          const parsed = JSON.parse(existingRaw);
+          parsed.title = trimmed;
+          parsed.updatedAt = new Date().toISOString();
+          localStorage.setItem(`${STORAGE_KEY_BOARD_PREFIX}${id}`, JSON.stringify(parsed));
+
+          // Sync to API with inactive board's own nodes (never active board's nodes!)
+          fetch('/api/canvas', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id,
+              title: trimmed,
+              nodes: parsed.nodes || [],
+              edges: parsed.edges || [],
+            }),
+          }).catch(() => {});
+        }
+      } catch (e) {
+        console.warn('Failed to rename inactive board in storage:', e);
+      }
+    }
+  }, [saveBoardImmediate]);
+
+  const handleDeleteBoard = useCallback((id: string) => {
+    let nextBoardsList: CanvasBoardMetadata[] = [];
+    setBoards((prev) => {
+      const remaining = prev.filter((b) => b.id !== id);
+      nextBoardsList = remaining;
+      try {
+        localStorage.setItem(STORAGE_KEY_BOARDS_LIST, JSON.stringify(remaining));
+        localStorage.removeItem(`${STORAGE_KEY_BOARD_PREFIX}${id}`);
+      } catch {}
+      return remaining;
+    });
+
+    // Delete from API
+    fetch(`/api/canvas?id=${id}`, { method: 'DELETE' }).catch(() => {});
+
+    // If active was deleted
+    if (id === activeBoardIdRef.current) {
+      if (nextBoardsList.length > 0) {
+        const nextActiveId = nextBoardsList[0].id;
+        try {
+          localStorage.setItem(STORAGE_KEY_ACTIVE_BOARD, nextActiveId);
+        } catch {}
+        activeBoardIdRef.current = nextActiveId;
+        setActiveBoardId(nextActiveId);
+        loadBoardData(nextActiveId);
+      } else {
+        // Zero boards left!
+        try {
+          localStorage.removeItem(STORAGE_KEY_ACTIVE_BOARD);
+        } catch {}
+        activeBoardIdRef.current = '';
+        setActiveBoardId('');
+        boardTitleRef.current = '';
+        setBoardTitle('');
+        nodesRef.current = [];
+        edgesRef.current = [];
+        setNodes([]);
+        setEdges([]);
+        historyRef.current = [];
+        historyIndexRef.current = -1;
+        updateHistoryState();
+        isDirtyRef.current = false;
+        setSaveStatus('saved');
+      }
+    }
+  }, [loadBoardData, updateHistoryState, setNodes, setEdges]);
+
   // Handle incoming node from Bible reader or AI chat
   useEffect(() => {
     if (!incomingNode) return;
+
+    if (!activeBoardIdRef.current) {
+      handleCreateBoard(incomingNode.title || 'Scripture Reference');
+    }
 
     const timestamp = Date.now();
     const newId = `card-incoming-${timestamp}`;
@@ -883,18 +1076,22 @@ function InnerCanvasBoard({
     setTimeout(() => {
       fitView({ padding: 0.25, duration: 600 });
     }, 120);
-  }, [incomingNode, nodes, theme, handleUpdateNode, handleDuplicateNode, handleDeleteNode, onIncomingNodeHandled, pushSnapshot, fitView, setNodes]);
+  }, [incomingNode, handleCreateBoard, nodes, theme, handleUpdateNode, handleDuplicateNode, handleDeleteNode, onIncomingNodeHandled, pushSnapshot, fitView, setNodes]);
 
   // Add card from toolbar or context menu
   const handleAddNode = useCallback((category: NodeCategory, customPos?: { x: number; y: number }) => {
+    if (!activeBoardIdRef.current) {
+      handleCreateBoard();
+    }
+
     const timestamp = Date.now();
     const newId = `card-${timestamp}`;
 
     let posX = customPos ? customPos.x : 200;
     let posY = customPos ? customPos.y : 200;
 
-    if (!customPos && nodes.length > 0) {
-      const last = nodes[nodes.length - 1];
+    if (!customPos && nodesRef.current.length > 0) {
+      const last = nodesRef.current[nodesRef.current.length - 1];
       posX = last.position.x + 60;
       posY = last.position.y + 60;
     }
@@ -932,7 +1129,7 @@ function InnerCanvasBoard({
       pushSnapshot(next, edgesRef.current);
       return next;
     });
-  }, [nodes, theme, handleUpdateNode, handleDuplicateNode, handleDeleteNode, pushSnapshot, setNodes]);
+  }, [handleCreateBoard, theme, handleUpdateNode, handleDuplicateNode, handleDeleteNode, pushSnapshot, setNodes]);
 
   // Connecting edges
   const onConnect = useCallback((connection: Connection) => {
@@ -1081,196 +1278,16 @@ function InnerCanvasBoard({
     }
   }, [nodes.length, pushSnapshot, setEdges, setNodes]);
 
-  // Sidebar Board Switcher Handlers (with atomic flushing and race-condition prevention)
-  const handleSelectBoard = useCallback((newBoardId: string) => {
-    if (newBoardId === activeBoardIdRef.current) return;
-
-    // 1. Flush & save current board immediately if dirty
-    if (isDirtyRef.current) {
-      saveBoardImmediate(
-        activeBoardIdRef.current,
-        boardTitleRef.current,
-        nodesRef.current,
-        edgesRef.current
-      );
-    }
-
-    // 2. Persist newly active board ID
-    try {
-      localStorage.setItem(STORAGE_KEY_ACTIVE_BOARD, newBoardId);
-    } catch {}
-    setActiveBoardId(newBoardId);
-    activeBoardIdRef.current = newBoardId;
-
-    // 3. Load target board data
-    loadBoardData(newBoardId);
-  }, [saveBoardImmediate, loadBoardData]);
-
-  const handleCreateBoard = useCallback(() => {
-    // 1. Flush current board if dirty
-    if (isDirtyRef.current) {
-      saveBoardImmediate(
-        activeBoardIdRef.current,
-        boardTitleRef.current,
-        nodesRef.current,
-        edgesRef.current
-      );
-    }
-
-    const timestamp = Date.now();
-    const newId = `board-${timestamp}`;
-    const newTitle = 'New Canvas';
-    const now = new Date().toISOString();
-
-    const newBoardMeta: CanvasBoardMetadata = {
-      id: newId,
-      title: newTitle,
-      updatedAt: now,
-      nodeCount: 0,
-    };
-
-    // 2. Immediately write new board record to localStorage
-    try {
-      localStorage.setItem(`${STORAGE_KEY_BOARD_PREFIX}${newId}`, JSON.stringify({
-        id: newId,
-        title: newTitle,
-        nodes: [],
-        edges: [],
-        updatedAt: now,
-      }));
-    } catch (e) {
-      console.warn('Failed to initialize new board storage:', e);
-    }
-
-    // 3. Update boards index list
-    setBoards((prev) => {
-      const next = [newBoardMeta, ...prev];
-      try {
-        localStorage.setItem(STORAGE_KEY_BOARDS_LIST, JSON.stringify(next));
-      } catch {}
-      return next;
-    });
-
-    // 4. Update active board ID
-    try {
-      localStorage.setItem(STORAGE_KEY_ACTIVE_BOARD, newId);
-    } catch {}
-    activeBoardIdRef.current = newId;
-    setActiveBoardId(newId);
-
-    // 5. Update state
-    setBoardTitle(newTitle);
-    boardTitleRef.current = newTitle;
-    setNodes([]);
-    setEdges([]);
-    nodesRef.current = [];
-    edgesRef.current = [];
-
-    historyRef.current = [{ nodes: [], edges: [] }];
-    historyIndexRef.current = 0;
-    updateHistoryState();
-    isDirtyRef.current = false;
-    setSaveStatus('saved');
-
-    // 6. Sync new board to API
-    fetch('/api/canvas', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: newId,
-        title: newTitle,
-        nodes: [],
-        edges: [],
-      }),
-    }).catch(() => {});
-  }, [saveBoardImmediate, updateHistoryState, setNodes, setEdges]);
-
-  const handleRenameBoard = useCallback((id: string, newTitle: string) => {
-    const trimmed = newTitle.trim() || 'Untitled Canvas';
-
-    // 1. Update boards index list in state & localStorage
-    setBoards((prev) => {
-      const next = prev.map((b) => (b.id === id ? { ...b, title: trimmed } : b));
-      try {
-        localStorage.setItem(STORAGE_KEY_BOARDS_LIST, JSON.stringify(next));
-      } catch {}
-      return next;
-    });
-
-    // 2. If active board, update title state and immediate save
-    if (id === activeBoardIdRef.current) {
-      setBoardTitle(trimmed);
-      boardTitleRef.current = trimmed;
-      saveBoardImmediate(id, trimmed, nodesRef.current, edgesRef.current);
-    } else {
-      // If inactive board, safely load that board's record, update title, and write back
-      try {
-        const existingRaw = localStorage.getItem(`${STORAGE_KEY_BOARD_PREFIX}${id}`);
-        if (existingRaw) {
-          const parsed = JSON.parse(existingRaw);
-          parsed.title = trimmed;
-          parsed.updatedAt = new Date().toISOString();
-          localStorage.setItem(`${STORAGE_KEY_BOARD_PREFIX}${id}`, JSON.stringify(parsed));
-
-          // Sync to API with inactive board's own nodes (never active board's nodes!)
-          fetch('/api/canvas', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              id,
-              title: trimmed,
-              nodes: parsed.nodes || [],
-              edges: parsed.edges || [],
-            }),
-          }).catch(() => {});
-        }
-      } catch (e) {
-        console.warn('Failed to rename inactive board in storage:', e);
-      }
-    }
-  }, [saveBoardImmediate]);
-
-  const handleDeleteBoard = useCallback((id: string) => {
-    setBoards((prev) => {
-      const remaining = prev.filter((b) => b.id !== id);
-      if (remaining.length === 0) return prev; // Do not delete the last board
-      try {
-        localStorage.setItem(STORAGE_KEY_BOARDS_LIST, JSON.stringify(remaining));
-        localStorage.removeItem(`${STORAGE_KEY_BOARD_PREFIX}${id}`);
-      } catch {}
-      return remaining;
-    });
-
-    // Delete from API
-    fetch(`/api/canvas?id=${id}`, { method: 'DELETE' }).catch(() => {});
-
-    // If active was deleted, switch to first remaining board
-    if (id === activeBoardIdRef.current) {
-      const localListRaw = localStorage.getItem(STORAGE_KEY_BOARDS_LIST);
-      let nextActiveId = 'default';
-      try {
-        if (localListRaw) {
-          const parsed = JSON.parse(localListRaw);
-          const valid = parsed.filter((b: any) => b.id !== id);
-          if (valid.length > 0) nextActiveId = valid[0].id;
-        }
-      } catch {}
-
-      try {
-        localStorage.setItem(STORAGE_KEY_ACTIVE_BOARD, nextActiveId);
-      } catch {}
-      activeBoardIdRef.current = nextActiveId;
-      setActiveBoardId(nextActiveId);
-      loadBoardData(nextActiveId);
-    }
-  }, [loadBoardData]);
-
   // Apply updates from Theologica AI
   const handleApplyAiGraph = useCallback((
     newNodes: SerializableNode[],
     newEdges: SerializableEdge[],
     explanation: string
   ) => {
+    if (!activeBoardIdRef.current) {
+      handleCreateBoard('Theologica Study Canvas');
+    }
+
     const preparedNewNodes = newNodes.map(prepareNode);
     const preparedNewEdges = newEdges.map(prepareEdge);
 
@@ -1382,6 +1399,8 @@ function InnerCanvasBoard({
         onSave={handleManualSave}
         theme={theme}
         nodeCount={nodes.length}
+        hasActiveBoard={Boolean(activeBoardId && boards.length > 0)}
+        onCreateBoard={() => handleCreateBoard()}
       />
 
       {/* React Flow Canvas Engine */}
@@ -1428,38 +1447,103 @@ function InnerCanvasBoard({
         />
 
         {/* MiniMap */}
-        <MiniMap
-          position="bottom-right"
-          nodeStrokeWidth={3}
-          nodeColor={(node) => {
-            const cat = (node.data as any)?.category as NodeCategory;
-            switch (cat) {
-              case 'scripture': return '#F59E0B';
-              case 'theological_point': return '#06B6D4';
-              case 'historical_context': return '#8B5CF6';
-              case 'illustration': return '#10B981';
-              case 'application': return '#F43F5E';
-              default: return isDark ? '#52525b' : '#a1a1aa';
-            }
-          }}
-          maskColor={isDark ? 'rgba(22, 22, 24, 0.75)' : 'rgba(246, 246, 246, 0.75)'}
-          className={`!rounded-xl !border shadow-xl !overflow-hidden ${
-            isDark ? '!bg-[#1e1e22] !border-zinc-700/70' : '!bg-white !border-zinc-200'
-          }`}
-          style={{ width: 160, height: 110 }}
-        />
+        {boards.length > 0 && nodes.length > 0 && (
+          <MiniMap
+            position="bottom-right"
+            nodeStrokeWidth={3}
+            nodeColor={(node) => {
+              const cat = (node.data as any)?.category as NodeCategory;
+              switch (cat) {
+                case 'scripture': return '#F59E0B';
+                case 'theological_point': return '#06B6D4';
+                case 'historical_context': return '#8B5CF6';
+                case 'illustration': return '#10B981';
+                case 'application': return '#F43F5E';
+                default: return isDark ? '#52525b' : '#a1a1aa';
+              }
+            }}
+            maskColor={isDark ? 'rgba(22, 22, 24, 0.75)' : 'rgba(246, 246, 246, 0.75)'}
+            className={`!rounded-xl !border shadow-xl !overflow-hidden ${
+              isDark ? '!bg-[#1e1e22] !border-zinc-700/70' : '!bg-white !border-zinc-200'
+            }`}
+            style={{ width: 160, height: 110 }}
+          />
+        )}
 
         {/* Zoom Controls */}
-        <Controls
-          position="bottom-left"
-          showInteractive={false}
-          className={`!rounded-xl !border shadow-xl !overflow-hidden ${
-            isDark 
-              ? '!bg-[#1e1e22] !border-zinc-700/70 !text-zinc-200 [&>button]:!border-zinc-700 [&>button]:!bg-[#1e1e22] [&>button]:!fill-zinc-300 hover:[&>button]:!bg-zinc-800' 
-              : '!bg-white !border-zinc-200 !text-zinc-700 [&>button]:!border-zinc-200 [&>button]:!bg-white [&>button]:!fill-zinc-600 hover:[&>button]:!bg-zinc-50'
-          }`}
-        />
+        {boards.length > 0 && (
+          <Controls
+            position="bottom-left"
+            showInteractive={false}
+            className={`!rounded-xl !border shadow-xl !overflow-hidden ${
+              isDark 
+                ? '!bg-[#1e1e22] !border-zinc-700/70 !text-zinc-200 [&>button]:!border-zinc-700 [&>button]:!bg-[#1e1e22] [&>button]:!fill-zinc-300 hover:[&>button]:!bg-zinc-800' 
+                : '!bg-white !border-zinc-200 !text-zinc-700 [&>button]:!border-zinc-200 [&>button]:!bg-white [&>button]:!fill-zinc-600 hover:[&>button]:!bg-zinc-50'
+            }`}
+          />
+        )}
       </ReactFlow>
+
+      {/* Empty State Overlay in the Board Space (When there are 0 boards) */}
+      {boards.length === 0 && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center p-6 pointer-events-none">
+          <div 
+            className={`pointer-events-auto max-w-md w-full p-8 rounded-3xl border shadow-2xl backdrop-blur-xl text-center space-y-6 animate-in fade-in-50 zoom-in-95 transition-all duration-300 ${
+              isDark 
+                ? 'bg-[#1c1c20]/90 border-zinc-800/80 text-zinc-100 shadow-black/50' 
+                : 'bg-white/95 border-zinc-200/80 text-zinc-900 shadow-zinc-200/60'
+            }`}
+          >
+            {/* Icon badge with glow */}
+            <div className="mx-auto w-16 h-16 rounded-2xl bg-accent/15 border border-accent/30 flex items-center justify-center text-accent shadow-inner relative group">
+              <Workflow size={32} className="transition-transform duration-300 group-hover:scale-110" />
+              <div className="absolute -inset-1 rounded-2xl bg-accent/20 blur-md -z-10 animate-pulse" />
+            </div>
+
+            {/* Header & Description */}
+            <div className="space-y-2">
+              <h2 className="text-xl sm:text-2xl font-bold tracking-tight">
+                No Canvas Boards
+              </h2>
+              <p className={`text-xs sm:text-sm leading-relaxed ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
+                Create a canvas to start organizing scripture passages, theological points, and study notes into an interactive visual graph.
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => handleCreateBoard()}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-accent hover:bg-accent/90 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-accent/25 active:scale-95 transition-all cursor-pointer"
+              >
+                <Plus size={16} />
+                <span>Create Canvas Board</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsAiModalOpen(true)}
+                className={`w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border text-xs sm:text-sm font-medium active:scale-95 transition-all cursor-pointer ${
+                  isDark 
+                    ? 'border-zinc-700 hover:bg-zinc-800/60 text-zinc-200 hover:text-white' 
+                    : 'border-zinc-200 hover:bg-zinc-100 text-zinc-700'
+                }`}
+              >
+                <Sparkles size={15} className="text-amber-400" />
+                <span>Generate with AI</span>
+              </button>
+            </div>
+
+            {/* Helper Footer */}
+            <div className={`pt-3 border-t text-[11px] flex items-center justify-center gap-4 ${isDark ? 'border-zinc-800 text-zinc-500' : 'border-zinc-100 text-zinc-400'}`}>
+              <span>Right-click for options</span>
+              <span>•</span>
+              <span>Press &quot;Boards&quot; to manage</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Canvas Pane Right-Click Context Menu */}
       {paneContextMenu && (
@@ -1478,47 +1562,79 @@ function InnerCanvasBoard({
             Canvas Options
           </div>
 
-          {/* Add Card Submenu */}
-          <div>
-            <button
-              type="button"
-              onClick={() => setPaneAddSubmenuOpen(!paneAddSubmenuOpen)}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-                isDark ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-zinc-100 text-zinc-800'
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <Plus size={16} className="text-accent" />
-                <span>Add Card...</span>
-              </div>
-              <ChevronRight size={15} className={`text-zinc-400 transition-transform duration-150 ${paneAddSubmenuOpen ? 'rotate-90' : ''}`} />
-            </button>
+          {boards.length === 0 ? (
+            <div className="space-y-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setPaneContextMenu(null);
+                  handleCreateBoard();
+                }}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+                  isDark ? 'hover:bg-zinc-800 text-accent' : 'hover:bg-accent/10 text-accent'
+                }`}
+              >
+                <Plus size={16} className="shrink-0" />
+                <span>New Canvas Board</span>
+              </button>
 
-            {paneAddSubmenuOpen && (
-              <div className={`my-1.5 py-1.5 pl-3 border-l-2 space-y-1 ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
-                {(Object.keys(CATEGORY_METADATA) as NodeCategory[]).map((cat) => {
-                  const meta = CATEGORY_METADATA[cat];
-                  return (
-                    <button
-                      key={cat}
-                      type="button"
-                      onClick={() => {
-                        const flowPos = screenToFlowPosition({ x: paneContextMenu.x, y: paneContextMenu.y });
-                        handleAddNode(cat, flowPos);
-                        setPaneContextMenu(null);
-                      }}
-                      className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors cursor-pointer text-left ${
-                        isDark ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-zinc-100 text-zinc-800'
-                      }`}
-                    >
-                      <span className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: meta.accent }} />
-                      <span>{meta.label}</span>
-                    </button>
-                  );
-                })}
+              <button
+                type="button"
+                onClick={() => {
+                  setPaneContextMenu(null);
+                  setIsAiModalOpen(true);
+                }}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+                  isDark ? 'hover:bg-zinc-800 text-amber-300' : 'hover:bg-amber-50 text-amber-700'
+                }`}
+              >
+                <Sparkles size={16} className="text-amber-400 shrink-0" />
+                <span>Theologica AI</span>
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Add Card Submenu */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setPaneAddSubmenuOpen(!paneAddSubmenuOpen)}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+                    isDark ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-zinc-100 text-zinc-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Plus size={16} className="text-accent" />
+                    <span>Add Card...</span>
+                  </div>
+                  <ChevronRight size={15} className={`text-zinc-400 transition-transform duration-150 ${paneAddSubmenuOpen ? 'rotate-90' : ''}`} />
+                </button>
+
+                {paneAddSubmenuOpen && (
+                  <div className={`my-1.5 py-1.5 pl-3 border-l-2 space-y-1 ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
+                    {(Object.keys(CATEGORY_METADATA) as NodeCategory[]).map((cat) => {
+                      const meta = CATEGORY_METADATA[cat];
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => {
+                            const flowPos = screenToFlowPosition({ x: paneContextMenu.x, y: paneContextMenu.y });
+                            handleAddNode(cat, flowPos);
+                            setPaneContextMenu(null);
+                          }}
+                          className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors cursor-pointer text-left ${
+                            isDark ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-zinc-100 text-zinc-800'
+                          }`}
+                        >
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: meta.accent }} />
+                          <span>{meta.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
           {/* Theologica AI */}
           <button
@@ -1610,8 +1726,10 @@ function InnerCanvasBoard({
             </div>
             <span className="text-xs text-zinc-500 font-mono">{mod.symbol}{mod.shift}Z</span>
           </button>
-        </div>
+        </>
       )}
+    </div>
+  )}
 
       {/* Floating Theologica AI Success Toast */}
       {aiToast && (

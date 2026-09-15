@@ -46,7 +46,7 @@ const memoryCache: Record<string, { payload: CanvasStatePayload; title: string; 
 const indexCache: Record<string, CanvasBoardMetadata[]> = {};
 
 async function readUserIndex(userId: string): Promise<CanvasBoardMetadata[]> {
-  if (indexCache[userId] && indexCache[userId].length > 0) {
+  if (indexCache[userId]) {
     return indexCache[userId];
   }
   await ensureDir();
@@ -54,7 +54,7 @@ async function readUserIndex(userId: string): Promise<CanvasBoardMetadata[]> {
   try {
     const raw = await fs.readFile(filePath, 'utf-8');
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) {
+    if (Array.isArray(parsed)) {
       indexCache[userId] = parsed;
       return parsed;
     }
@@ -62,21 +62,8 @@ async function readUserIndex(userId: string): Promise<CanvasBoardMetadata[]> {
     // Ignore read failure
   }
 
-  const defaultIndex: CanvasBoardMetadata[] = [
-    {
-      id: 'default',
-      title: 'Romans 8 Study',
-      updatedAt: new Date().toISOString(),
-      nodeCount: 3,
-    },
-  ];
-  indexCache[userId] = defaultIndex;
-  try {
-    await fs.writeFile(filePath, JSON.stringify(defaultIndex, null, 2), 'utf-8');
-  } catch {
-    // Ignore write failure
-  }
-  return defaultIndex;
+  indexCache[userId] = [];
+  return [];
 }
 
 async function writeUserIndex(userId: string, list: CanvasBoardMetadata[]) {
@@ -102,7 +89,10 @@ export async function GET(req: Request) {
       return NextResponse.json(list);
     }
 
-    const boardId = url.searchParams.get('id') || 'default';
+    const boardId = url.searchParams.get('id');
+    if (!boardId) {
+      return NextResponse.json({ error: 'Board ID is required.' }, { status: 400 });
+    }
     const cacheKey = `${activeUserId}_${boardId}`;
 
     // 1. Check memory cache
@@ -133,7 +123,7 @@ export async function GET(req: Request) {
     } catch {
       return NextResponse.json({
         id: boardId,
-        title: boardId === 'default' ? 'Romans 8 Study' : 'Untitled Canvas',
+        title: 'Untitled Canvas',
         nodes: [],
         edges: [],
         updatedAt: new Date().toISOString(),
@@ -142,8 +132,8 @@ export async function GET(req: Request) {
   } catch (error: any) {
     console.error('Error in GET /api/canvas:', error);
     return NextResponse.json(
-      { id: 'default', title: 'Theological Study Canvas', nodes: [], edges: [] },
-      { status: 200 }
+      { error: 'Failed to retrieve canvas state.' },
+      { status: 500 }
     );
   }
 }
