@@ -87,7 +87,7 @@ export function TheologicaAiCanvasModal({
   const MILESTONES = [
     "Analyzing biblical passages & systematic theology...",
     "Tracing cross-references & doctrinal connections...",
-    "Formulating structured Obsidian markdown cards...",
+    "Formulating structured theological cards...",
     "Computing collision-free spatial layout coordinates...",
   ];
 

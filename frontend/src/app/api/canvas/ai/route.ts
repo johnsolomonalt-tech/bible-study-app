@@ -112,7 +112,7 @@ export async function POST(req: Request) {
 
     const systemPrompt = `You are the "Theologica Canvas Architect" (Theologica AI), an expert Christian theological scholar, expositor, and visual graph architect.
 STRICT IDENTITY RULES: You are exclusively "Theologica AI", created specifically for this Bible study application. Under NO CIRCUMSTANCES should you ever mention Google, Gemini, or underlying AI model infrastructure. If asked, you are Theologica AI.
-Your role is to build and manipulate an interactive Obsidian-style Infinite Canvas for Bible study.
+Your role is to build and manipulate an interactive Infinite Canvas for Bible study.
 
 Categories available for cards:
 - "scripture": Biblical texts, quotations, verse references.
@@ -240,11 +240,39 @@ JSON Format:
       return Math.max(190, Math.min(estimated, 1800));
     };
 
-    // Standard generous layout constants
+    // Optimal handle selector: connects side-to-side across columns or top-to-bottom in same column
+    const getOptimalHandles = (
+      sourcePos: { x: number; y: number },
+      targetPos: { x: number; y: number }
+    ): { sourceHandle: string; targetHandle: string } => {
+      const dx = targetPos.x - sourcePos.x;
+      const dy = targetPos.y - sourcePos.y;
+
+      // When target is to the right (standard column progression)
+      if (dx >= 150) {
+        return { sourceHandle: 'right-source', targetHandle: 'left-target' };
+      }
+      // When target is to the left
+      if (dx <= -150) {
+        return { sourceHandle: 'left-source', targetHandle: 'right-target' };
+      }
+      // When in same column and target is below
+      if (dy >= 40) {
+        return { sourceHandle: 'bottom-source', targetHandle: 'top-target' };
+      }
+      // When in same column and target is above
+      if (dy <= -40) {
+        return { sourceHandle: 'top-source', targetHandle: 'bottom-target' };
+      }
+
+      return { sourceHandle: 'right-source', targetHandle: 'left-target' };
+    };
+
+    // Standard generous layout constants: 340px width + 140px open gap between columns
     const CARD_WIDTH = 340;
-    const HORIZONTAL_GAP = 120; // column step = 460px
+    const HORIZONTAL_GAP = 140; // column step = 480px
     const VERTICAL_GAP = 55;
-    const COL_STEP = CARD_WIDTH + HORIZONTAL_GAP; // 460px
+    const COL_STEP = CARD_WIDTH + HORIZONTAL_GAP; // 480px
 
     if (selectedNode) {
       // MODE: Expanding a selected node - fan out cleanly to the right
@@ -292,17 +320,20 @@ JSON Format:
       // Connect parent node to all newly expanded nodes if no edges provided
       if ((!parsed.edges || parsed.edges.length === 0) && createdNodes.length > 0) {
         createdNodes.forEach((node, idx) => {
+          const handles = getOptimalHandles(selectedNode.position, node.position);
           createdEdges.push({
             id: `edge-${timestamp}-conn-${idx}`,
             source: selectedNode.id,
             target: node.id,
+            sourceHandle: handles.sourceHandle,
+            targetHandle: handles.targetHandle,
             label: idx === 0 ? 'Expands' : 'Related Point',
             animated: true,
           });
         });
       }
     } else {
-      // MODE: Generating a new knowledge graph / topic exploration
+      // MODE: Generating a new knowledge graph - Organize into topological columns matching edge flow
       let baseX = 100;
       let baseY = 100;
 
@@ -311,45 +342,87 @@ JSON Format:
         for (const n of existingNodes) {
           if (n.position.x > maxX) maxX = n.position.x;
         }
-        baseX = maxX + 500;
+        baseX = maxX + 520;
       }
 
-      // Group nodes into 3 progressive columns:
-      // Column 0 (Scripture Foundation): 'scripture', 'historical_context'
-      // Column 1 (Doctrinal Core): 'theological_point', 'general'
-      // Column 2 (Application & Reflection): 'illustration', 'application'
-      const colBuckets: number[][] = [[], [], []];
-
-      rawNodes.forEach((rawNode, index) => {
-        const cat = rawNode.category || 'theological_point';
-        if (cat === 'scripture' || cat === 'historical_context') {
-          colBuckets[0].push(index);
-        } else if (cat === 'illustration' || cat === 'application') {
-          colBuckets[2].push(index);
-        } else {
-          colBuckets[1].push(index);
-        }
-      });
-
-      // If categories are heavily skewed or all in one bucket, balance into 2-3 even columns
-      const nonEmptyCols = colBuckets.filter(b => b.length > 0);
-      const isSkewed = nonEmptyCols.length === 1 || colBuckets.some(b => b.length > 4);
-
-      const columns: number[][] = [];
-
-      if (isSkewed || rawNodes.length <= 3) {
-        const maxPerCol = rawNodes.length <= 4 ? 2 : 3;
-        rawNodes.forEach((_, index) => {
-          const col = Math.floor(index / maxPerCol);
-          while (columns.length <= col) columns.push([]);
-          columns[col].push(index);
-        });
-      } else {
-        colBuckets.forEach(b => {
-          if (b.length > 0) {
-            columns.push(b);
+      // Calculate in-degrees for topological rank from generated edges
+      const inDegree: Record<number, number> = {};
+      rawNodes.forEach((_, i) => { inDegree[i] = 0; });
+      if (parsed.edges && Array.isArray(parsed.edges)) {
+        parsed.edges.forEach((e: any) => {
+          if (typeof e.targetIndex === 'number' && inDegree[e.targetIndex] !== undefined) {
+            inDegree[e.targetIndex] = (inDegree[e.targetIndex] || 0) + 1;
           }
         });
+      }
+
+      const parsedEdges: any[] = (parsed.edges && Array.isArray(parsed.edges)) ? parsed.edges : [];
+      const hasEdges = parsedEdges.length > 0;
+      const columns: number[][] = [];
+
+      if (hasEdges) {
+        const ranks: Record<number, number> = {};
+        const queue: number[] = [];
+
+        rawNodes.forEach((_, i) => {
+          if (inDegree[i] === 0) {
+            ranks[i] = 0;
+            queue.push(i);
+          }
+        });
+
+        if (queue.length === 0 && rawNodes.length > 0) {
+          ranks[0] = 0;
+          queue.push(0);
+        }
+
+        while (queue.length > 0) {
+          const curr = queue.shift()!;
+          const currRank = ranks[curr];
+          parsedEdges
+            .filter((e: any) => e.sourceIndex === curr)
+            .forEach((e: any) => {
+              if (typeof e.targetIndex === 'number') {
+                const nextRank = Math.max(ranks[e.targetIndex] || 0, currRank + 1);
+                ranks[e.targetIndex] = nextRank;
+                if (!queue.includes(e.targetIndex)) {
+                  queue.push(e.targetIndex);
+                }
+              }
+            });
+        }
+
+        rawNodes.forEach((rawNode, i) => {
+          if (ranks[i] === undefined) {
+            const cat = rawNode.category;
+            if (cat === 'scripture' || cat === 'historical_context') ranks[i] = 0;
+            else if (cat === 'illustration' || cat === 'application') ranks[i] = 2;
+            else ranks[i] = 1;
+          }
+        });
+
+        rawNodes.forEach((_, i) => {
+          const r = Math.min(ranks[i] || 0, 3);
+          while (columns.length <= r) columns.push([]);
+          columns[r].push(i);
+        });
+      } else {
+        const col0: number[] = [];
+        const col1: number[] = [];
+        const col2: number[] = [];
+
+        rawNodes.forEach((rawNode, index) => {
+          const cat = rawNode.category || 'theological_point';
+          if (cat === 'scripture' || cat === 'historical_context') {
+            col0.push(index);
+          } else if (cat === 'illustration' || cat === 'application') {
+            col2.push(index);
+          } else {
+            col1.push(index);
+          }
+        });
+
+        [col0, col1, col2].filter(c => c.length > 0).forEach(c => columns.push(c));
       }
 
       if (columns.length === 0) {
@@ -398,7 +471,7 @@ JSON Format:
       });
     }
 
-    // Map raw edges
+    // Map raw edges with optimal side-to-side and top-to-bottom connection handles
     if (parsed.edges && Array.isArray(parsed.edges)) {
       parsed.edges.forEach((rawEdge, edgeIndex) => {
         let sourceId: string | undefined;
@@ -422,10 +495,19 @@ JSON Format:
         }
 
         if (sourceId && targetId && sourceId !== targetId) {
+          const sNode = createdNodes.find(n => n.id === sourceId) || existingNodes.find(n => n.id === sourceId);
+          const tNode = createdNodes.find(n => n.id === targetId) || existingNodes.find(n => n.id === targetId);
+
+          const handles = sNode && tNode
+            ? getOptimalHandles(sNode.position, tNode.position)
+            : { sourceHandle: 'right-source', targetHandle: 'left-target' };
+
           createdEdges.push({
             id: `edge-${timestamp}-${edgeIndex}-${Math.random().toString(36).substring(2, 6)}`,
             source: sourceId,
             target: targetId,
+            sourceHandle: handles.sourceHandle,
+            targetHandle: handles.targetHandle,
             label: rawEdge.label && String(rawEdge.label).trim() !== '' ? rawEdge.label : 'Relates to',
             animated: true,
           });

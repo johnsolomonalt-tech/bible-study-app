@@ -139,6 +139,34 @@ function getNodeHeight(node: Node<CanvasNodeData> | SerializableNode): number {
   return Math.max(190, Math.min(estimatedHeight, 1800));
 }
 
+// Optimal handle selector: connects side-to-side across columns or top-to-bottom in same column
+function getOptimalHandles(
+  sourcePos: { x: number; y: number },
+  targetPos: { x: number; y: number }
+): { sourceHandle: string; targetHandle: string } {
+  const dx = targetPos.x - sourcePos.x;
+  const dy = targetPos.y - sourcePos.y;
+
+  // When target is to the right (standard column progression)
+  if (dx >= 150) {
+    return { sourceHandle: 'right-source', targetHandle: 'left-target' };
+  }
+  // When target is to the left
+  if (dx <= -150) {
+    return { sourceHandle: 'left-source', targetHandle: 'right-target' };
+  }
+  // When in same column and target is below
+  if (dy >= 40) {
+    return { sourceHandle: 'bottom-source', targetHandle: 'top-target' };
+  }
+  // When in same column and target is above
+  if (dy <= -40) {
+    return { sourceHandle: 'top-source', targetHandle: 'bottom-target' };
+  }
+
+  return { sourceHandle: 'right-source', targetHandle: 'left-target' };
+}
+
 function InnerCanvasBoard({
   theme = 'dark',
   incomingNode,
@@ -243,6 +271,8 @@ function InnerCanvasBoard({
       id: e.id,
       source: e.source,
       target: e.target,
+      sourceHandle: e.sourceHandle ?? undefined,
+      targetHandle: e.targetHandle ?? undefined,
       label: e.label as string | undefined,
       animated: e.animated,
     }));
@@ -356,11 +386,19 @@ function InnerCanvasBoard({
   // Connect source card to target card (from card options menu)
   const handleConnectTo = useCallback((sourceId: string, targetId: string) => {
     if (sourceId === targetId) return;
+    const sourceNode = nodesRef.current.find((n) => n.id === sourceId);
+    const targetNode = nodesRef.current.find((n) => n.id === targetId);
+    const handles = sourceNode && targetNode
+      ? getOptimalHandles(sourceNode.position, targetNode.position)
+      : { sourceHandle: 'right-source', targetHandle: 'left-target' };
+
     const edgeId = `edge-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const newEdge: Edge = {
       id: edgeId,
       source: sourceId,
       target: targetId,
+      sourceHandle: handles.sourceHandle,
+      targetHandle: handles.targetHandle,
       type: 'customEdge',
       label: 'Connected',
       animated: true,
@@ -383,14 +421,16 @@ function InnerCanvasBoard({
     });
   }, [isDark, theme, pushSnapshot, setEdges]);
 
-  // Auto Arrange all cards into clean hierarchical columns without vertical stacking/overlapping
-  const handleAutoArrange = useCallback(() => {
-    if (nodesRef.current.length === 0) return;
+  // Core Auto Arrange Algorithm: computes collision-free topological columns & optimal connection handles
+  const arrangeGraph = useCallback((
+    currentNodes: Node<CanvasNodeData>[],
+    currentEdges: Edge[]
+  ): { arrangedNodes: Node<CanvasNodeData>[]; arrangedEdges: Edge[] } => {
+    if (currentNodes.length === 0) {
+      return { arrangedNodes: currentNodes, arrangedEdges: currentEdges };
+    }
 
-    const currentNodes = nodesRef.current;
-    const currentEdges = edgesRef.current;
-
-    const COL_STEP = 460;
+    const COL_STEP = 480;
     const VERTICAL_GAP = 55; // Generous vertical breathing room between cards in a column
 
     // Lookup map of current nodes for quick dimension queries
@@ -439,7 +479,10 @@ function InnerCanvasBoard({
 
       currentNodes.forEach((n) => {
         if (ranks[n.id] === undefined) {
-          ranks[n.id] = 0;
+          const cat = n.data?.category;
+          if (cat === 'scripture' || cat === 'historical_context') ranks[n.id] = 0;
+          else if (cat === 'illustration' || cat === 'application') ranks[n.id] = 2;
+          else ranks[n.id] = 1;
         }
       });
 
@@ -490,7 +533,6 @@ function InnerCanvasBoard({
     const nodePosMap: Record<string, { x: number; y: number }> = {};
     columns.forEach((colNodes, colIndex) => {
       const colHeight = colTotalHeights[colIndex] || 0;
-      // Gentle vertical alignment (subtle offset so shorter columns look balanced with taller ones)
       const startY = baseY + Math.max(0, Math.round((maxColHeight - colHeight) * 0.15));
 
       let currentY = startY;
@@ -507,19 +549,41 @@ function InnerCanvasBoard({
       });
     });
 
-    setNodes((nds) => {
-      const arranged = nds.map((n) => {
-        const newPos = nodePosMap[n.id];
-        return newPos ? { ...n, position: newPos } : n;
-      });
-      pushSnapshot(arranged, edgesRef.current);
-      return arranged;
+    const arrangedNodes = currentNodes.map((n) => {
+      const newPos = nodePosMap[n.id];
+      return newPos ? { ...n, position: newPos } : n;
     });
+
+    // Update all edges to connect from optimal handles so lines never loop or obscure cards
+    const arrangedEdges = currentEdges.map((edge) => {
+      const sNode = arrangedNodes.find((n) => n.id === edge.source);
+      const tNode = arrangedNodes.find((n) => n.id === edge.target);
+      if (sNode && tNode) {
+        const handles = getOptimalHandles(sNode.position, tNode.position);
+        return {
+          ...edge,
+          sourceHandle: handles.sourceHandle,
+          targetHandle: handles.targetHandle,
+        };
+      }
+      return edge;
+    });
+
+    return { arrangedNodes, arrangedEdges };
+  }, []);
+
+  // Auto Arrange all cards into clean hierarchical columns without vertical stacking/overlapping
+  const handleAutoArrange = useCallback(() => {
+    if (nodesRef.current.length === 0) return;
+    const { arrangedNodes, arrangedEdges } = arrangeGraph(nodesRef.current, edgesRef.current);
+    setNodes(arrangedNodes);
+    setEdges(arrangedEdges);
+    pushSnapshot(arrangedNodes, arrangedEdges);
 
     setTimeout(() => {
       fitView({ padding: 0.2, duration: 600 });
     }, 100);
-  }, [fitView, pushSnapshot, setNodes]);
+  }, [arrangeGraph, fitView, pushSnapshot, setEdges, setNodes]);
 
   // Format node helper
   const prepareNode = useCallback((raw: SerializableNode): Node<CanvasNodeData> => {
@@ -545,6 +609,8 @@ function InnerCanvasBoard({
       id: raw.id,
       source: raw.source,
       target: raw.target,
+      sourceHandle: raw.sourceHandle,
+      targetHandle: raw.targetHandle,
       type: 'customEdge',
       label: raw.label || 'Relates to',
       animated: raw.animated ?? true,
@@ -1393,9 +1459,12 @@ function InnerCanvasBoard({
     ];
     const nextEdges = edgesRef.current.concat(preparedNewEdges);
 
-    setNodes(nextNodes);
-    setEdges(nextEdges);
-    pushSnapshot(nextNodes, nextEdges);
+    // Automatically organize into clean, collision-free topological columns with optimal edge handles!
+    const { arrangedNodes, arrangedEdges } = arrangeGraph(nextNodes, nextEdges);
+
+    setNodes(arrangedNodes);
+    setEdges(arrangedEdges);
+    pushSnapshot(arrangedNodes, arrangedEdges);
 
     setAiToast({
       message: explanation || `Theologica AI added ${newNodes.length} cards to your canvas.`,
@@ -1406,7 +1475,7 @@ function InnerCanvasBoard({
     setTimeout(() => {
       fitView({ padding: 0.25, duration: 800 });
     }, 150);
-  }, [fitView, prepareEdge, prepareNode, pushSnapshot, setEdges, setNodes]);
+  }, [arrangeGraph, fitView, handleCreateBoard, prepareEdge, prepareNode, pushSnapshot, setEdges, setNodes]);
 
   // Target selected node for AI expansion
   const selectedNode = useMemo(() => {

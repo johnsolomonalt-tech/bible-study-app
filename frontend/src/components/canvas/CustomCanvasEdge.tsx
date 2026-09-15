@@ -135,18 +135,18 @@ export function CustomCanvasEdge({
                 setIsEditing(true);
               }}
               title={typeof label === 'string' ? `${label} (Double-click to edit)` : 'Connector link'}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold tracking-wide border shadow-md backdrop-blur-md cursor-pointer transition-all select-none ${
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold tracking-wide border shadow-lg cursor-pointer transition-all select-none ${
                 selected || isHovered
                   ? isDark
-                    ? 'bg-zinc-900 border-accent text-accent ring-2 ring-accent/25 scale-105 shadow-lg'
-                    : 'bg-white border-accent text-accent ring-2 ring-accent/25 scale-105 shadow-lg'
+                    ? 'bg-zinc-900 border-accent text-accent ring-2 ring-accent/30 scale-105 shadow-xl'
+                    : 'bg-white border-accent text-accent ring-2 ring-accent/30 scale-105 shadow-xl'
                   : isDark
-                    ? 'bg-[#1e1e22]/95 border-zinc-600/90 text-zinc-100 hover:border-zinc-400 shadow-sm'
-                    : 'bg-white/95 border-zinc-300 text-zinc-800 hover:border-zinc-400 shadow-sm'
+                    ? 'bg-[#1c1c20] border-zinc-600 text-zinc-100 hover:border-accent/70 hover:text-white shadow-md'
+                    : 'bg-white border-zinc-300 text-zinc-800 hover:border-accent/70 hover:text-black shadow-md'
               }`}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
-              <span className="max-w-[220px] truncate">{label}</span>
+              <span className="max-w-[260px] truncate">{label}</span>
 
               {(isHovered || selected) && (
                 <button
