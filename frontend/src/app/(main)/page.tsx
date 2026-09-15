@@ -3,11 +3,13 @@ const API_URL = '';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth, UserButton, SignIn } from '@clerk/nextjs';
-import { Send, Plus, Layout, Edit, Sparkles, Target, Check, ChevronRight, ChevronLeft, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings } from 'lucide-react';
+import { Send, Plus, Layout, Edit, Sparkles, Target, Check, ChevronRight, ChevronLeft, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import TextareaAutosize from 'react-textarea-autosize';
 import { getDevotionalForDay, DevotionalEntry } from '../../lib/devotionals';
 import PWAInstallPrompt from '../PWAInstallPrompt';
+import { CanvasBoard } from '@/components/canvas/CanvasBoard';
+import { NodeCategory } from '@/types/canvas';
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from 'react-resizable-panels';
 import type { PanelImperativeHandle } from 'react-resizable-panels';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -194,7 +196,12 @@ export default function App() {
       }
     });
   }, [getToken]);
-  const [activeTab, setActiveTab] = useState('study'); // study, notes, chats, tracker, devotional
+  const [activeTab, setActiveTab] = useState('study'); // study, notes, chats, tracker, devotional, canvas
+  const [canvasIncomingNode, setCanvasIncomingNode] = useState<{
+    title: string;
+    content: string;
+    category?: NodeCategory;
+  } | null>(null);
   
   // Devotional State
   const [displayDay, setDisplayDay] = useState(1);
@@ -649,6 +656,41 @@ export default function App() {
     
     setToolbarPosition(null);
     window.getSelection()?.removeAllRanges();
+  };
+
+  const addHighlightToCanvas = () => {
+    const rawText = selectedText || selectionRange?.toString().trim() || '';
+    if (!rawText || !selectionVerse) return;
+    
+    const startVerse = Math.min(selectionVerse, endVerseNumber || selectionVerse);
+    const endVerse = Math.max(selectionVerse, endVerseNumber || selectionVerse);
+    const refVerses = startVerse === endVerse 
+      ? `${startVerse}` 
+      : `${startVerse}-${endVerse}`;
+
+    const cleanText = cleanVerseText(rawText, startVerse, endVerse);
+    const reference = `${activeBook.name} ${activeChapter}:${refVerses}`;
+    
+    setCanvasIncomingNode({
+      title: reference,
+      content: `> "${cleanText}"\n\n*${reference}*`,
+      category: 'scripture',
+    });
+    
+    setToolbarPosition(null);
+    window.getSelection()?.removeAllRanges();
+    setActiveTab('canvas');
+  };
+
+  const sendChatMessageToCanvas = (content: string, title?: string) => {
+    const { textContent } = parseAiMessage(content);
+    if (!textContent) return;
+    setCanvasIncomingNode({
+      title: title ? `Insight: ${title}` : 'AI Theological Insight',
+      content: textContent,
+      category: 'theological_point',
+    });
+    setActiveTab('canvas');
   };
 
 
@@ -1255,13 +1297,14 @@ export default function App() {
 
         {/* Center: Tabs (Desktop) */}
         <div className="hidden lg:flex absolute left-1/2 -translate-x-1/2 gap-1.5 p-1.5 bg-surface rounded-xl ring-shadow">
-          {['study', 'devotional', 'notes', 'chats', 'tracker'].map(tab => (
+          {['study', 'canvas', 'devotional', 'notes', 'chats', 'tracker'].map(tab => (
             <button 
               key={tab} 
               onClick={() => setActiveTab(tab)}
               className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${activeTab === tab ? 'bg-border-soft text-white shadow-sm' : 'text-muted hover:text-fg'}`}
             >
               {tab === 'study' && <Layout size={16} />}
+              {tab === 'canvas' && <Workflow size={16} />}
               {tab === 'devotional' && <BookOpen size={16} />}
               {tab === 'notes' && <Edit size={16} />}
               {tab === 'chats' && <Sparkles size={16} />}
@@ -1786,6 +1829,19 @@ export default function App() {
                               </>
                             );
                           })()}
+                        {m.role === 'model' && (
+                          <div className="flex items-center justify-end gap-1 mt-2 pt-1.5 border-t border-border/40">
+                            <button
+                              type="button"
+                              onClick={() => sendChatMessageToCanvas(m.content, activeChat?.title)}
+                              className="flex items-center gap-1 text-[10px] font-medium text-muted hover:text-accent transition-colors px-1.5 py-0.5 rounded hover:bg-surface-hover cursor-pointer"
+                              title="Send to Canvas"
+                            >
+                              <Workflow size={11} />
+                              <span>Canvas</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))
@@ -1960,6 +2016,16 @@ export default function App() {
               <MessageSquarePlus size={13} />
               <span className="text-[11px] font-semibold">Quote</span>
             </button>
+            <button 
+              type="button"
+              onMouseDown={(e) => e.preventDefault()} 
+              onClick={addHighlightToCanvas} 
+              className="flex items-center justify-center h-8 px-2.5 rounded-lg bg-surface border border-border-soft text-fg hover:bg-border-soft active:scale-95 transition-all text-xs font-semibold shadow-sm gap-1 cursor-pointer shrink-0" 
+              title="Send to Canvas"
+            >
+              <Workflow size={13} />
+              <span className="text-[11px] font-semibold">Canvas</span>
+            </button>
             {toolbarPosition.highlightId && (
               <>
                 <div className="w-[1px] h-5 bg-border-soft mx-0.5" />
@@ -2130,6 +2196,19 @@ export default function App() {
                               </>
                             );
                           })()}
+                          {m.role === 'model' && (
+                            <div className="flex items-center justify-end gap-1 mt-2.5 pt-2 border-t border-border/40">
+                              <button
+                                type="button"
+                                onClick={() => sendChatMessageToCanvas(m.content, activeChat?.title)}
+                                className="flex items-center gap-1.5 text-[11px] font-medium text-muted hover:text-accent transition-colors px-2 py-1 rounded-md hover:bg-surface-hover cursor-pointer"
+                                title="Send this theological insight to Canvas as a card"
+                              >
+                                <Workflow size={12} />
+                                <span>Send to Canvas</span>
+                              </button>
+                            </div>
+                          )}
                           </div>
                         </div>
                       ))
@@ -2492,19 +2571,31 @@ export default function App() {
             </section>
           </div>
         )}
+
+        {/* CANVAS TAB */}
+        {activeTab === 'canvas' && (
+          <div className="flex-1 w-full h-full relative overflow-hidden">
+            <CanvasBoard
+              theme={theme as 'dark' | 'light'}
+              incomingNode={canvasIncomingNode}
+              onIncomingNodeHandled={() => setCanvasIncomingNode(null)}
+            />
+          </div>
+        )}
       </main>
         {/* Mobile Bottom Navigation */}
         <div 
           className="lg:hidden shrink-0 h-[calc(64px+env(safe-area-inset-bottom))] bg-bg border-t border-border flex items-center justify-around px-2 z-50 w-full"
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
-          {['study', 'devotional', 'notes', 'chats', 'tracker'].map(tab => (
+          {['study', 'canvas', 'devotional', 'notes', 'chats', 'tracker'].map(tab => (
             <button 
               key={tab} 
               onClick={() => setActiveTab(tab)}
               className={`flex flex-col items-center justify-center w-full h-full min-h-[44px] transition-colors ${activeTab === tab ? 'text-accent' : 'text-muted hover:text-fg'}`}
             >
               {tab === 'study' && <Layout size={20} className="mb-1" />}
+              {tab === 'canvas' && <Workflow size={20} className="mb-1" />}
               {tab === 'devotional' && <BookOpen size={20} className="mb-1" />}
               {tab === 'notes' && <Edit size={20} className="mb-1" />}
               {tab === 'chats' && <Sparkles size={20} className="mb-1" />}
