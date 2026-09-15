@@ -227,7 +227,7 @@ JSON Format:
             visualLines += 0.6;
             continue;
           }
-          const wrapped = Math.max(1, Math.ceil(trimmed.length / 36));
+          const wrapped = Math.max(1, Math.ceil(trimmed.length / 40));
           visualLines += wrapped;
           if (trimmed.startsWith('#')) visualLines += 0.8;
           if (trimmed.startsWith('>')) visualLines += 0.6;
@@ -249,30 +249,30 @@ JSON Format:
       const dy = targetPos.y - sourcePos.y;
 
       // When target is to the right (standard column progression)
-      if (dx >= 150) {
+      if (dx >= 160) {
         return { sourceHandle: 'right-source', targetHandle: 'left-target' };
       }
       // When target is to the left
-      if (dx <= -150) {
+      if (dx <= -160) {
         return { sourceHandle: 'left-source', targetHandle: 'right-target' };
       }
       // When in same column and target is below
-      if (dy >= 40) {
+      if (dy >= 50) {
         return { sourceHandle: 'bottom-source', targetHandle: 'top-target' };
       }
       // When in same column and target is above
-      if (dy <= -40) {
+      if (dy <= -50) {
         return { sourceHandle: 'top-source', targetHandle: 'bottom-target' };
       }
 
       return { sourceHandle: 'right-source', targetHandle: 'left-target' };
     };
 
-    // Standard generous layout constants: 340px width + 140px open gap between columns
-    const CARD_WIDTH = 340;
-    const HORIZONTAL_GAP = 140; // column step = 480px
-    const VERTICAL_GAP = 55;
-    const COL_STEP = CARD_WIDTH + HORIZONTAL_GAP; // 480px
+    // Obsidian Canvas spacious layout constants: 360px width + 240px open channel between columns
+    const CARD_WIDTH = 360;
+    const HORIZONTAL_GAP = 240; // column step = 600px
+    const VERTICAL_GAP = 110;
+    const COL_STEP = CARD_WIDTH + HORIZONTAL_GAP; // 600px
 
     if (selectedNode) {
       // MODE: Expanding a selected node - fan out cleanly to the right
@@ -334,15 +334,15 @@ JSON Format:
       }
     } else {
       // MODE: Generating a new knowledge graph - Organize into topological columns matching edge flow
-      let baseX = 100;
-      let baseY = 100;
+      let baseX = 140;
+      let baseY = 120;
 
       if (existingNodes.length > 0) {
         let maxX = -Infinity;
         for (const n of existingNodes) {
           if (n.position.x > maxX) maxX = n.position.x;
         }
-        baseX = maxX + 520;
+        baseX = maxX + COL_STEP;
       }
 
       // Calculate in-degrees for topological rank from generated edges
@@ -443,8 +443,7 @@ JSON Format:
       const maxColHeight = Math.max(...colTotalHeights, 1);
 
       columns.forEach((colIndices, colIdx) => {
-        const colH = colTotalHeights[colIdx] || 0;
-        const startY = baseY + Math.max(0, Math.round((maxColHeight - colH) * 0.15));
+        const startY = baseY; // Clean, disciplined top alignment across all columns
 
         let currentY = startY;
         colIndices.forEach((nodeIdx) => {

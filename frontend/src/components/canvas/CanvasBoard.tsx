@@ -110,8 +110,8 @@ function getNodeHeight(node: Node<CanvasNodeData> | SerializableNode): number {
         visualLines += 0.6; // paragraph spacing
         continue;
       }
-      // In a 340px wide card with 14px font, average ~36 characters fit per line
-      const wrapped = Math.max(1, Math.ceil(trimmed.length / 36));
+      // In a 360px wide card with 14px font, average ~40 characters fit per line
+      const wrapped = Math.max(1, Math.ceil(trimmed.length / 40));
       visualLines += wrapped;
 
       // Markdown headings have larger font and margin
@@ -128,15 +128,15 @@ function getNodeHeight(node: Node<CanvasNodeData> | SerializableNode): number {
       }
     }
 
-    // Line height is approximately 22px in Tailwind prose-sm
-    estimatedHeight += Math.round(visualLines * 22);
+    // Line height is approximately 24px in Tailwind prose-sm
+    estimatedHeight += Math.round(visualLines * 24);
   } else {
     // Empty placeholder height
     estimatedHeight += 60;
   }
 
   // Bounded minimum card height and upper safety limit
-  return Math.max(190, Math.min(estimatedHeight, 1800));
+  return Math.max(200, Math.min(estimatedHeight, 1800));
 }
 
 // Optimal handle selector: connects side-to-side across columns or top-to-bottom in same column
@@ -147,20 +147,20 @@ function getOptimalHandles(
   const dx = targetPos.x - sourcePos.x;
   const dy = targetPos.y - sourcePos.y;
 
-  // When target is to the right (standard column progression)
-  if (dx >= 150) {
+  // When target is distinctly to the right (standard column progression across generous 240px gap)
+  if (dx >= 160) {
     return { sourceHandle: 'right-source', targetHandle: 'left-target' };
   }
-  // When target is to the left
-  if (dx <= -150) {
+  // When target is distinctly to the left
+  if (dx <= -160) {
     return { sourceHandle: 'left-source', targetHandle: 'right-target' };
   }
   // When in same column and target is below
-  if (dy >= 40) {
+  if (dy >= 50) {
     return { sourceHandle: 'bottom-source', targetHandle: 'top-target' };
   }
   // When in same column and target is above
-  if (dy <= -40) {
+  if (dy <= -50) {
     return { sourceHandle: 'top-source', targetHandle: 'bottom-target' };
   }
 
@@ -430,8 +430,8 @@ function InnerCanvasBoard({
       return { arrangedNodes: currentNodes, arrangedEdges: currentEdges };
     }
 
-    const COL_STEP = 480;
-    const VERTICAL_GAP = 55; // Generous vertical breathing room between cards in a column
+    const COL_STEP = 600; // 360px card width + 240px open channel between columns
+    const VERTICAL_GAP = 110; // Spacious breathing room between cards in a column
 
     // Lookup map of current nodes for quick dimension queries
     const nodeMap: Record<string, Node<CanvasNodeData>> = {};
@@ -514,26 +514,12 @@ function InnerCanvasBoard({
       columns.push(currentNodes.map(n => n.id));
     }
 
-    // Dynamic height calculation per column
-    const colTotalHeights: number[] = columns.map((colNodes) => {
-      let hSum = 0;
-      colNodes.forEach((nodeId, i) => {
-        const node = nodeMap[nodeId];
-        const h = node ? getNodeHeight(node) : 260;
-        hSum += h;
-        if (i < colNodes.length - 1) hSum += VERTICAL_GAP;
-      });
-      return hSum;
-    });
-
-    const maxColHeight = Math.max(...colTotalHeights, 1);
-    const baseX = 100;
-    const baseY = 100;
+    const baseX = 140;
+    const baseY = 120;
 
     const nodePosMap: Record<string, { x: number; y: number }> = {};
     columns.forEach((colNodes, colIndex) => {
-      const colHeight = colTotalHeights[colIndex] || 0;
-      const startY = baseY + Math.max(0, Math.round((maxColHeight - colHeight) * 0.15));
+      const startY = baseY; // Clean, disciplined top alignment across all columns
 
       let currentY = startY;
       colNodes.forEach((nodeId) => {
@@ -581,7 +567,7 @@ function InnerCanvasBoard({
     pushSnapshot(arrangedNodes, arrangedEdges);
 
     setTimeout(() => {
-      fitView({ padding: 0.2, duration: 600 });
+      fitView({ padding: 0.28, duration: 600 });
     }, 100);
   }, [arrangeGraph, fitView, pushSnapshot, setEdges, setNodes]);
 
@@ -1473,7 +1459,7 @@ function InnerCanvasBoard({
     setTimeout(() => setAiToast(null), 6000);
 
     setTimeout(() => {
-      fitView({ padding: 0.25, duration: 800 });
+      fitView({ padding: 0.28, duration: 800 });
     }, 150);
   }, [arrangeGraph, fitView, handleCreateBoard, prepareEdge, prepareNode, pushSnapshot, setEdges, setNodes]);
 
