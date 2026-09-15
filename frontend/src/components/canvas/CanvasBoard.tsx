@@ -69,6 +69,22 @@ interface HistorySnapshot {
   edges: SerializableEdge[];
 }
 
+// Calculate dynamic node width based on React Flow DOM measurements, style, or standard card base width
+function getNodeWidth(node: Node<CanvasNodeData> | SerializableNode): number {
+  if ('measured' in node && typeof node.measured?.width === 'number' && node.measured.width > 100) {
+    return Math.round(node.measured.width);
+  }
+  const styleW = node.style?.width;
+  if (typeof styleW === 'number' && styleW > 100) {
+    return Math.round(styleW);
+  }
+  if (typeof styleW === 'string') {
+    const parsed = parseFloat(styleW);
+    if (!isNaN(parsed) && parsed > 100) return Math.round(parsed);
+  }
+  return 380;
+}
+
 // Calculate dynamic node height based on React Flow DOM measurements or content-length estimation
 function getNodeHeight(node: Node<CanvasNodeData> | SerializableNode): number {
   // 1. If React Flow has measured the node DOM height, use it directly
@@ -110,8 +126,8 @@ function getNodeHeight(node: Node<CanvasNodeData> | SerializableNode): number {
         visualLines += 0.6; // paragraph spacing
         continue;
       }
-      // In a 360px wide card with 14px font, average ~40 characters fit per line
-      const wrapped = Math.max(1, Math.ceil(trimmed.length / 40));
+      // In a 380px wide card with 14px font, average ~44 characters fit per line
+      const wrapped = Math.max(1, Math.ceil(trimmed.length / 44));
       visualLines += wrapped;
 
       // Markdown headings have larger font and margin
@@ -430,7 +446,7 @@ function InnerCanvasBoard({
       return { arrangedNodes: currentNodes, arrangedEdges: currentEdges };
     }
 
-    const COL_STEP = 600; // 360px card width + 240px open channel between columns
+    const HORIZONTAL_GAP = 320; // Generous Obsidian-style breathing room between side-to-side columns
     const VERTICAL_GAP = 110; // Spacious breathing room between cards in a column
 
     // Lookup map of current nodes for quick dimension queries
@@ -517,9 +533,31 @@ function InnerCanvasBoard({
     const baseX = 140;
     const baseY = 120;
 
+    // Calculate dynamic column widths based on the widest node in each column
+    const colWidths: number[] = columns.map((colNodes) => {
+      let maxW = 380;
+      colNodes.forEach((nodeId) => {
+        const node = nodeMap[nodeId];
+        if (node) {
+          const w = getNodeWidth(node);
+          if (w > maxW) maxW = w;
+        }
+      });
+      return maxW;
+    });
+
+    // Compute exact X starting position for each column, guaranteeing HORIZONTAL_GAP (320px) between columns
+    const colXPositions: number[] = [];
+    let currColX = baseX;
+    for (let c = 0; c < columns.length; c++) {
+      colXPositions.push(currColX);
+      currColX += colWidths[c] + HORIZONTAL_GAP;
+    }
+
     const nodePosMap: Record<string, { x: number; y: number }> = {};
     columns.forEach((colNodes, colIndex) => {
       const startY = baseY; // Clean, disciplined top alignment across all columns
+      const colX = colXPositions[colIndex] ?? (baseX + colIndex * (380 + HORIZONTAL_GAP));
 
       let currentY = startY;
       colNodes.forEach((nodeId) => {
@@ -527,7 +565,7 @@ function InnerCanvasBoard({
         const h = node ? getNodeHeight(node) : 260;
 
         nodePosMap[nodeId] = {
-          x: Math.round(baseX + colIndex * COL_STEP),
+          x: Math.round(colX),
           y: Math.round(currentY),
         };
 
@@ -537,7 +575,16 @@ function InnerCanvasBoard({
 
     const arrangedNodes = currentNodes.map((n) => {
       const newPos = nodePosMap[n.id];
-      return newPos ? { ...n, position: newPos } : n;
+      return newPos
+        ? {
+            ...n,
+            position: newPos,
+            style: {
+              width: n.style?.width || 380,
+              ...n.style,
+            },
+          }
+        : n;
     });
 
     // Update all edges to connect from optimal handles so lines never loop or obscure cards
@@ -585,7 +632,10 @@ function InnerCanvasBoard({
         onDelete: handleDeleteNode,
         onConnectTo: handleConnectTo,
       },
-      style: raw.style,
+      style: {
+        width: raw.style?.width || 380,
+        ...raw.style,
+      },
     };
   }, [handleDeleteNode, handleDuplicateNode, handleUpdateNode, handleConnectTo, theme]);
 
@@ -1186,7 +1236,7 @@ function InnerCanvasBoard({
       for (const n of nodes) {
         if (n.position.x > maxX) maxX = n.position.x;
       }
-      posX = maxX + 380;
+      posX = maxX + 700; // 380px card width + 320px open horizontal channel
       posY = 140;
     }
 
@@ -1195,6 +1245,7 @@ function InnerCanvasBoard({
       type: 'customCard',
       position: { x: posX, y: posY },
       selected: true,
+      style: { width: 380 },
       data: {
         title: incomingNode.title || 'Scripture Reference',
         content: incomingNode.content || '',
@@ -1256,6 +1307,7 @@ function InnerCanvasBoard({
       type: 'customCard',
       position: { x: posX, y: posY },
       selected: true,
+      style: { width: 380 },
       data: {
         title: titles[category],
         content: '',
@@ -1499,6 +1551,10 @@ function InnerCanvasBoard({
 
     return nodes.map((n) => ({
       ...n,
+      style: {
+        width: n.style?.width || 380,
+        ...n.style,
+      },
       data: {
         ...n.data,
         theme,

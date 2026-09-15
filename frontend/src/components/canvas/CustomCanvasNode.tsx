@@ -32,11 +32,10 @@ const CATEGORY_ICONS: Record<NodeCategory, React.ElementType> = {
   general: FileText,
 };
 
-export const CustomCanvasNode = memo(function CustomCanvasNode({
-  id,
-  data,
-  selected,
-}: NodeProps & { data: CanvasNodeData }) {
+export const CustomCanvasNode = memo(function CustomCanvasNode(
+  props: NodeProps & { data: CanvasNodeData; style?: React.CSSProperties }
+) {
+  const { id, data, selected, width, style } = props;
   const mod = useModifierKey();
   const { zoom } = useViewport();
   const { setNodes } = useReactFlow();
@@ -117,7 +116,7 @@ export const CustomCanvasNode = memo(function CustomCanvasNode({
         setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, selected: true } : n)));
         setIsMenuOpen(true);
       }}
-      className={`relative group rounded-xl transition-all duration-200 select-none w-[360px] max-w-full ${
+      className={`relative group rounded-xl transition-all duration-200 select-none w-[380px] max-w-full ${
         isMenuOpen ? '!z-50' : selected ? 'z-30' : 'z-0'
       } ${
         isDark 
@@ -129,9 +128,8 @@ export const CustomCanvasNode = memo(function CustomCanvasNode({
           : 'hover:border-zinc-500/50 hover:shadow-xl'
       }`}
       style={{
-        width: '100%',
+        width: width || (style as any)?.width || 380,
         minWidth: 280,
-        maxWidth: 560,
         minHeight: 180,
       }}
     >

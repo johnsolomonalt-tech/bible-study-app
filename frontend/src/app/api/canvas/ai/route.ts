@@ -227,7 +227,7 @@ JSON Format:
             visualLines += 0.6;
             continue;
           }
-          const wrapped = Math.max(1, Math.ceil(trimmed.length / 40));
+          const wrapped = Math.max(1, Math.ceil(trimmed.length / 44));
           visualLines += wrapped;
           if (trimmed.startsWith('#')) visualLines += 0.8;
           if (trimmed.startsWith('>')) visualLines += 0.6;
@@ -268,11 +268,11 @@ JSON Format:
       return { sourceHandle: 'right-source', targetHandle: 'left-target' };
     };
 
-    // Obsidian Canvas spacious layout constants: 360px width + 240px open channel between columns
-    const CARD_WIDTH = 360;
-    const HORIZONTAL_GAP = 240; // column step = 600px
+    // Obsidian Canvas spacious layout constants: 380px width + 320px open channel between side-to-side columns
+    const CARD_WIDTH = 380;
+    const HORIZONTAL_GAP = 320; // column step = 700px
     const VERTICAL_GAP = 110;
-    const COL_STEP = CARD_WIDTH + HORIZONTAL_GAP; // 600px
+    const COL_STEP = CARD_WIDTH + HORIZONTAL_GAP; // 700px
 
     if (selectedNode) {
       // MODE: Expanding a selected node - fan out cleanly to the right
@@ -308,6 +308,7 @@ JSON Format:
             id: uniqueId,
             type: 'customCard',
             position: { x: Math.round(posX), y: Math.round(posY) },
+            style: { width: CARD_WIDTH },
             data: {
               title: rawNode.title || 'Theological Insight',
               content: rawNode.content || '',
@@ -460,6 +461,7 @@ JSON Format:
             id: uniqueId,
             type: 'customCard',
             position: { x: Math.round(posX), y: Math.round(posY) },
+            style: { width: CARD_WIDTH },
             data: {
               title: rawNode.title || 'Theological Insight',
               content: rawNode.content || '',
