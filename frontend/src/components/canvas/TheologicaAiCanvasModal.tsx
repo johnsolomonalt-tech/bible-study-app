@@ -83,7 +83,7 @@ export function TheologicaAiCanvasModal({
     }
   }, [selectedNode]);
 
-  // Dynamic status milestones for the AI making the board
+  // Dynamic status milestones for the AI making the board (progresses over 20s without looping)
   const MILESTONES = [
     "Analyzing biblical passages & systematic theology...",
     "Tracing cross-references & doctrinal connections...",
@@ -91,17 +91,49 @@ export function TheologicaAiCanvasModal({
     "Computing collision-free spatial layout coordinates...",
   ];
 
+  const [isFinishingUp, setIsFinishingUp] = useState(false);
+
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let timer1: NodeJS.Timeout;
+    let timer2: NodeJS.Timeout;
+    let timer3: NodeJS.Timeout;
+    let timerFinish: NodeJS.Timeout;
+
     if (isLoading) {
       setLoadingStep(0);
-      let step = 0;
-      interval = setInterval(() => {
-        step = (step + 1) % MILESTONES.length;
-        setLoadingStep(step);
-      }, 1500);
+      setIsFinishingUp(false);
+
+      // Milestone 1 at 5s
+      timer1 = setTimeout(() => {
+        setLoadingStep(1);
+      }, 5000);
+
+      // Milestone 2 at 10s
+      timer2 = setTimeout(() => {
+        setLoadingStep(2);
+      }, 10000);
+
+      // Milestone 3 at 15s
+      timer3 = setTimeout(() => {
+        setLoadingStep(3);
+      }, 15000);
+
+      // After 20s: Replace milestones with "Finishing up..."
+      timerFinish = setTimeout(() => {
+        setLoadingStep(4);
+        setIsFinishingUp(true);
+      }, 20000);
+    } else {
+      setLoadingStep(0);
+      setIsFinishingUp(false);
     }
-    return () => clearInterval(interval);
+
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      clearTimeout(timer3);
+      clearTimeout(timerFinish);
+    };
   }, [isLoading]);
 
   if (!isOpen) return null;
@@ -278,40 +310,54 @@ export function TheologicaAiCanvasModal({
               {/* Status Header */}
               <div className="text-center space-y-1.5">
                 <h3 className="text-sm font-bold text-zinc-100 tracking-tight">
-                  Architecting Your Canvas Board
+                  {isFinishingUp ? 'Finishing Up Your Canvas Board' : 'Architecting Your Canvas Board'}
                 </h3>
                 <p className="text-xs text-accent font-medium animate-pulse">
-                  {MILESTONES[loadingStep]}
+                  {isFinishingUp ? 'Finalizing theological canvas layout...' : (MILESTONES[loadingStep] || 'Generating...')}
                 </p>
               </div>
 
-              {/* Progress Milestones Checklist */}
-              <div className={`w-full max-w-md p-4 rounded-xl border space-y-2.5 text-xs ${
-                isDark ? 'bg-zinc-900/70 border-zinc-800' : 'bg-zinc-50 border-zinc-200'
-              }`}>
-                {MILESTONES.map((milestone, idx) => {
-                  const isDone = idx < loadingStep;
-                  const isCurrent = idx === loadingStep;
+              {/* Progress Milestones or Finishing Up Replacement */}
+              {isFinishingUp ? (
+                <div className={`w-full max-w-md p-5 rounded-xl border text-center space-y-2.5 animate-in fade-in duration-300 ${
+                  isDark ? 'bg-zinc-900/70 border-zinc-800' : 'bg-zinc-50 border-zinc-200'
+                }`}>
+                  <div className="flex items-center justify-center gap-2 text-accent font-semibold text-xs">
+                    <Loader2 size={16} className="animate-spin text-accent" />
+                    <span>Finishing up...</span>
+                  </div>
+                  <p className="text-xs text-zinc-400">
+                    Finalizing card formatting, connections, and placing cards on your canvas. Almost ready!
+                  </p>
+                </div>
+              ) : (
+                <div className={`w-full max-w-md p-4 rounded-xl border space-y-2.5 text-xs ${
+                  isDark ? 'bg-zinc-900/70 border-zinc-800' : 'bg-zinc-50 border-zinc-200'
+                }`}>
+                  {MILESTONES.map((milestone, idx) => {
+                    const isDone = idx < loadingStep;
+                    const isCurrent = idx === loadingStep;
 
-                  return (
-                    <div 
-                      key={idx} 
-                      className={`flex items-center gap-2.5 transition-all duration-300 ${
-                        isDone ? 'text-emerald-400' : isCurrent ? 'text-accent font-semibold' : 'text-zinc-600'
-                      }`}
-                    >
-                      {isDone ? (
-                        <CheckCircle2 size={15} className="shrink-0 text-emerald-400" />
-                      ) : isCurrent ? (
-                        <Loader2 size={15} className="shrink-0 animate-spin text-accent" />
-                      ) : (
-                        <div className="w-3.5 h-3.5 rounded-full border border-zinc-700 shrink-0 ml-0.5" />
-                      )}
-                      <span className="truncate">{milestone}</span>
-                    </div>
-                  );
-                })}
-              </div>
+                    return (
+                      <div 
+                        key={idx} 
+                        className={`flex items-center gap-2.5 transition-all duration-300 ${
+                          isDone ? 'text-emerald-400' : isCurrent ? 'text-accent font-semibold' : 'text-zinc-600'
+                        }`}
+                      >
+                        {isDone ? (
+                          <CheckCircle2 size={15} className="shrink-0 text-emerald-400" />
+                        ) : isCurrent ? (
+                          <Loader2 size={15} className="shrink-0 animate-spin text-accent" />
+                        ) : (
+                          <div className="w-3.5 h-3.5 rounded-full border border-zinc-700 shrink-0 ml-0.5" />
+                        )}
+                        <span className="truncate">{milestone}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
               <div className="text-[11px] text-zinc-500 text-center">
                 Theologica AI assigns collision-free layout coordinates so cards snap neatly into position.
