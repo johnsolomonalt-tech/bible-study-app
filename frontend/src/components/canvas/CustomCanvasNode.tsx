@@ -16,9 +16,12 @@ import {
   HelpCircle,
   Lightbulb,
   Compass,
-  FileText
+  FileText,
+  Link2,
+  ChevronRight
 } from 'lucide-react';
 import { CanvasNodeData, NodeCategory, CATEGORY_METADATA } from '@/types/canvas';
+import { useModifierKey } from '@/lib/os';
 
 const CATEGORY_ICONS: Record<NodeCategory, React.ElementType> = {
   scripture: BookOpen,
@@ -34,11 +37,13 @@ export const CustomCanvasNode = memo(function CustomCanvasNode({
   data,
   selected,
 }: NodeProps & { data: CanvasNodeData }) {
+  const mod = useModifierKey();
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(data.content || '');
   const [editTitle, setEditTitle] = useState(data.title || '');
   const [showPreviewToggle, setShowPreviewToggle] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isConnectSubmenuOpen, setIsConnectSubmenuOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -98,6 +103,11 @@ export const CustomCanvasNode = memo(function CustomCanvasNode({
 
   return (
     <div
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsMenuOpen(true);
+      }}
       className={`relative group rounded-xl transition-all duration-200 select-none ${
         isDark 
           ? 'bg-[#1a1a1c]/90 text-zinc-100 border-zinc-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.35)] backdrop-blur-md' 
@@ -290,6 +300,59 @@ export const CustomCanvasNode = memo(function CustomCanvasNode({
 
               <div className={`border-t my-1 ${isDark ? 'border-zinc-700/60' : 'border-zinc-100'}`} />
 
+              {/* Add Connection */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setIsConnectSubmenuOpen(!isConnectSubmenuOpen)}
+                  className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    isDark ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-zinc-50 text-zinc-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Link2 size={13} className="text-accent" />
+                    <span>Add Connection...</span>
+                  </div>
+                  <ChevronRight size={12} className={`text-zinc-400 transition-transform ${isConnectSubmenuOpen ? 'rotate-90' : ''}`} />
+                </button>
+
+                {isConnectSubmenuOpen && (
+                  <div className={`my-1 py-1 pl-2 border-l max-h-36 overflow-y-auto space-y-0.5 custom-scroll ${
+                    isDark ? 'border-zinc-700' : 'border-zinc-200'
+                  }`}>
+                    {data.otherNodes && data.otherNodes.filter((n: any) => n.id !== id).length > 0 ? (
+                      data.otherNodes.filter((n: any) => n.id !== id).map((target: any) => (
+                        <button
+                          key={target.id}
+                          type="button"
+                          onClick={() => {
+                            setIsMenuOpen(false);
+                            setIsConnectSubmenuOpen(false);
+                            if (data.onConnectTo) data.onConnectTo(id, target.id);
+                          }}
+                          className={`w-full flex items-center gap-2 px-2 py-1 rounded text-[11px] truncate text-left transition-colors cursor-pointer ${
+                            isDark ? 'hover:bg-zinc-800 text-zinc-300 hover:text-white' : 'hover:bg-zinc-100 text-zinc-700 hover:text-black'
+                          }`}
+                          title={`Connect to ${target.title}`}
+                        >
+                          <span 
+                            className="w-2 h-2 rounded-full shrink-0" 
+                            style={{ backgroundColor: (CATEGORY_METADATA as any)[target.category]?.accent || '#71717a' }}
+                          />
+                          <span className="truncate">{target.title}</span>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-2 py-1 text-[10px] text-zinc-500 italic">
+                        No other cards on canvas
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className={`border-t my-1 ${isDark ? 'border-zinc-700/60' : 'border-zinc-100'}`} />
+
               <button
                 type="button"
                 onClick={() => {
@@ -364,7 +427,7 @@ export const CustomCanvasNode = memo(function CustomCanvasNode({
                   }
                 }}
                 onBlur={commitChanges}
-                placeholder="Write markdown here... (Cmd+Enter to save)"
+                placeholder={`Write markdown here... (${mod.text}+Enter to save)`}
                 className={`w-full min-h-[120px] resize-y font-mono text-xs p-2.5 rounded-lg border focus:outline-none focus:ring-1 focus:ring-accent transition-all ${
                   isDark 
                     ? 'bg-[#121214] border-zinc-700 text-zinc-200 placeholder-zinc-600' 
@@ -372,7 +435,7 @@ export const CustomCanvasNode = memo(function CustomCanvasNode({
                 }`}
               />
               <div className="flex items-center justify-between text-[11px] text-zinc-400">
-                <span>Tip: Press <kbd className="px-1 py-0.5 bg-zinc-700/30 rounded text-[10px] font-mono">⌘+Enter</kbd> to save</span>
+                <span>Tip: Press <kbd className="px-1 py-0.5 bg-zinc-700/30 rounded text-[10px] font-mono">{mod.symbol}+Enter</kbd> to save</span>
                 <button
                   type="button"
                   onMouseDown={(e) => {

@@ -207,62 +207,144 @@ JSON Format:
     const createdNodes: SerializableNode[] = [];
     const createdEdges: SerializableEdge[] = [];
     const timestamp = Date.now();
-
-    // Determine base placement coordinates
-    let baseX = 100;
-    let baseY = 100;
-
-    if (selectedNode) {
-      // Position to the right of selected node
-      baseX = selectedNode.position.x + 420;
-      baseY = selectedNode.position.y - 120;
-    } else if (existingNodes.length > 0) {
-      // Find bounding box of existing nodes
-      let maxX = -Infinity;
-      let maxY = -Infinity;
-      for (const n of existingNodes) {
-        if (n.position.x > maxX) maxX = n.position.x;
-        if (n.position.y > maxY) maxY = n.position.y;
-      }
-      baseX = maxX + 450;
-      baseY = 100;
-    }
-
     const rawNodes = parsed.nodes || [];
     const nodeIdMap: Record<number | string, string> = {};
 
-    rawNodes.forEach((rawNode, index) => {
-      const uniqueId = `node-${timestamp}-${index}-${Math.random().toString(36).substring(2, 6)}`;
-      nodeIdMap[index] = uniqueId;
+    // Standard generous layout constants
+    const CARD_WIDTH = 340;
+    const HORIZONTAL_GAP = 120; // column step = 460px
+    const VERTICAL_GAP = 60;
+    const ESTIMATED_CARD_HEIGHT = 280; // row step ~ 340px
+    const ROW_STEP = ESTIMATED_CARD_HEIGHT + VERTICAL_GAP; // 340px
+    const COL_STEP = CARD_WIDTH + HORIZONTAL_GAP; // 460px
 
-      // Intelligent column/grid distribution
-      // Column width: 380px, row height: 280px
-      const col = Math.floor(index / 3);
-      const row = index % 3;
+    if (selectedNode) {
+      // MODE: Expanding a selected node - fan out cleanly to the right
+      const total = rawNodes.length;
+      const maxRowsPerCol = total <= 4 ? total : Math.ceil(total / 2);
+      const baseX = selectedNode.position.x + COL_STEP;
+      
+      rawNodes.forEach((rawNode, index) => {
+        const uniqueId = `node-${timestamp}-${index}-${Math.random().toString(36).substring(2, 6)}`;
+        nodeIdMap[index] = uniqueId;
 
-      const posX = baseX + (col * 380);
-      const posY = baseY + (row * 280);
+        const col = Math.floor(index / maxRowsPerCol);
+        const row = index % maxRowsPerCol;
+        const countInThisCol = col === 0 ? Math.min(maxRowsPerCol, total) : total - maxRowsPerCol;
 
-      createdNodes.push({
-        id: uniqueId,
-        type: 'customCard',
-        position: { x: posX, y: posY },
-        data: {
-          title: rawNode.title || 'Theological Insight',
-          content: rawNode.content || '',
-          category: rawNode.category || 'theological_point',
-        },
+        const startY = selectedNode.position.y - ((countInThisCol - 1) * ROW_STEP) / 2;
+        const posX = baseX + (col * COL_STEP);
+        const posY = startY + (row * ROW_STEP);
+
+        createdNodes.push({
+          id: uniqueId,
+          type: 'customCard',
+          position: { x: Math.round(posX), y: Math.round(posY) },
+          data: {
+            title: rawNode.title || 'Theological Insight',
+            content: rawNode.content || '',
+            category: rawNode.category || 'theological_point',
+          },
+        });
       });
-    });
 
-    // If expanding a selected node and no edges specified, connect selected node to first new node
-    if (selectedNode && (!parsed.edges || parsed.edges.length === 0) && createdNodes.length > 0) {
-      createdEdges.push({
-        id: `edge-${timestamp}-conn-0`,
-        source: selectedNode.id,
-        target: createdNodes[0].id,
-        label: 'Expands',
-        animated: true,
+      // Connect parent node to all newly expanded nodes if no edges provided
+      if ((!parsed.edges || parsed.edges.length === 0) && createdNodes.length > 0) {
+        createdNodes.forEach((node, idx) => {
+          createdEdges.push({
+            id: `edge-${timestamp}-conn-${idx}`,
+            source: selectedNode.id,
+            target: node.id,
+            label: idx === 0 ? 'Expands' : 'Related Point',
+            animated: true,
+          });
+        });
+      }
+    } else {
+      // MODE: Generating a new knowledge graph / topic exploration
+      let baseX = 100;
+      let baseY = 100;
+
+      if (existingNodes.length > 0) {
+        let maxX = -Infinity;
+        for (const n of existingNodes) {
+          if (n.position.x > maxX) maxX = n.position.x;
+        }
+        baseX = maxX + 500;
+      }
+
+      // Group nodes into 3 progressive columns:
+      // Column 0 (Scripture Foundation): 'scripture', 'historical_context'
+      // Column 1 (Doctrinal Core): 'theological_point', 'general'
+      // Column 2 (Application & Reflection): 'illustration', 'application'
+      const colBuckets: number[][] = [[], [], []];
+
+      rawNodes.forEach((rawNode, index) => {
+        const cat = rawNode.category || 'theological_point';
+        if (cat === 'scripture' || cat === 'historical_context') {
+          colBuckets[0].push(index);
+        } else if (cat === 'illustration' || cat === 'application') {
+          colBuckets[2].push(index);
+        } else {
+          colBuckets[1].push(index);
+        }
+      });
+
+      // If categories are heavily skewed or all in one bucket, balance into 2-3 even columns
+      const nonEmptyCols = colBuckets.filter(b => b.length > 0);
+      const isSkewed = nonEmptyCols.length === 1 || colBuckets.some(b => b.length > 4);
+
+      const assignments: { index: number; col: number; row: number }[] = [];
+
+      if (isSkewed || rawNodes.length <= 3) {
+        const maxPerCol = rawNodes.length <= 4 ? 2 : 3;
+        rawNodes.forEach((_, index) => {
+          const col = Math.floor(index / maxPerCol);
+          const row = index % maxPerCol;
+          assignments.push({ index, col, row });
+        });
+      } else {
+        let targetCol = 0;
+        for (let c = 0; c < 3; c++) {
+          if (colBuckets[c].length > 0) {
+            colBuckets[c].forEach((nodeIndex, row) => {
+              assignments.push({ index: nodeIndex, col: targetCol, row });
+            });
+            targetCol++;
+          }
+        }
+      }
+
+      // Calculate max rows across all columns for clean vertical centering
+      const colCounts: Record<number, number> = {};
+      assignments.forEach(a => {
+        colCounts[a.col] = (colCounts[a.col] || 0) + 1;
+      });
+      const maxRows = Math.max(...Object.values(colCounts), 1);
+      const totalHeight = (maxRows - 1) * ROW_STEP;
+
+      assignments.forEach(({ index, col, row }) => {
+        const rawNode = rawNodes[index];
+        const uniqueId = `node-${timestamp}-${index}-${Math.random().toString(36).substring(2, 6)}`;
+        nodeIdMap[index] = uniqueId;
+
+        const countInCol = colCounts[col] || 1;
+        const colHeight = (countInCol - 1) * ROW_STEP;
+        const startY = baseY + (totalHeight - colHeight) / 2;
+
+        const posX = baseX + (col * COL_STEP);
+        const posY = startY + (row * ROW_STEP);
+
+        createdNodes.push({
+          id: uniqueId,
+          type: 'customCard',
+          position: { x: Math.round(posX), y: Math.round(posY) },
+          data: {
+            title: rawNode.title || 'Theological Insight',
+            content: rawNode.content || '',
+            category: rawNode.category || 'theological_point',
+          },
+        });
       });
     }
 

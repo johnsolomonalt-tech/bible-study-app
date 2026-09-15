@@ -1,7 +1,7 @@
 "use client";
 const API_URL = '';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuth, UserButton, SignIn } from '@clerk/nextjs';
 import { Send, Plus, Layout, Edit, Sparkles, Target, Check, ChevronRight, ChevronLeft, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -13,6 +13,7 @@ import { NodeCategory } from '@/types/canvas';
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from 'react-resizable-panels';
 import type { PanelImperativeHandle } from 'react-resizable-panels';
 import { motion, AnimatePresence } from 'framer-motion';
+import { linkifyBibleReferences, parseVerseReference, VerseClickHandler } from '@/lib/bibleReferences';
 
 // --- All 66 Books ---
 const otStr = "Genesis:50,Exodus:40,Leviticus:27,Numbers:36,Deuteronomy:34,Joshua:24,Judges:21,Ruth:4,1 Samuel:31,2 Samuel:24,1 Kings:22,2 Kings:25,1 Chronicles:29,2 Chronicles:36,Ezra:10,Nehemiah:13,Esther:10,Job:42,Psalms:150,Proverbs:31,Ecclesiastes:12,Song of Solomon:8,Isaiah:66,Jeremiah:52,Lamentations:5,Ezekiel:48,Daniel:12,Hosea:14,Joel:3,Amos:9,Obadiah:1,Jonah:4,Micah:7,Nahum:3,Habakkuk:3,Zephaniah:3,Haggai:2,Zechariah:14,Malachi:4";
@@ -21,23 +22,41 @@ const ntStr = "Matthew:28,Mark:16,Luke:24,John:21,Acts:28,Romans:16,1 Corinthian
 const OT_BOOKS = otStr.split(',').map(s => { const [n, c] = s.split(':'); return { name: n, chapters: parseInt(c) }; });
 const NT_BOOKS = ntStr.split(',').map(s => { const [n, c] = s.split(':'); return { name: n, chapters: parseInt(c) }; });
 
-const markdownComponents = {
-  p: ({ children }: any) => <p className="mb-4 last:mb-0 leading-[1.7] text-[15px]">{children}</p>,
+const createMarkdownComponents = (onVerseClick?: VerseClickHandler) => ({
+  p: ({ children }: any) => (
+    <p className="mb-4 last:mb-0 leading-[1.7] text-[15px]">
+      {onVerseClick ? linkifyBibleReferences(children, onVerseClick) : children}
+    </p>
+  ),
   blockquote: ({ children }: any) => (
     <blockquote className="border-l-[3px] border-[#c96442] bg-accent/10 py-3 px-5 my-5 italic rounded-r-xl shadow-sm text-fg-hover text-[15px]">
-      {children}
+      {onVerseClick ? linkifyBibleReferences(children, onVerseClick) : children}
     </blockquote>
   ),
-  strong: ({ children }: any) => <strong className="font-semibold text-fg">{children}</strong>,
-  em: ({ children }: any) => <em className="italic text-fg-hover">{children}</em>,
+  strong: ({ children }: any) => (
+    <strong className="font-semibold text-fg">
+      {onVerseClick ? linkifyBibleReferences(children, onVerseClick) : children}
+    </strong>
+  ),
+  em: ({ children }: any) => (
+    <em className="italic text-fg-hover">
+      {onVerseClick ? linkifyBibleReferences(children, onVerseClick) : children}
+    </em>
+  ),
+  li: ({ children }: any) => (
+    <li className="leading-[1.7] text-[15px]">
+      {onVerseClick ? linkifyBibleReferences(children, onVerseClick) : children}
+    </li>
+  ),
   ul: ({ children }: any) => <ul className="list-disc pl-6 mb-4 space-y-2">{children}</ul>,
   ol: ({ children }: any) => <ol className="list-decimal pl-6 mb-4 space-y-2">{children}</ol>,
-  li: ({ children }: any) => <li className="leading-[1.7] text-[15px]">{children}</li>,
   h1: ({ children }: any) => <h1 className="text-xl font-bold mb-4 mt-6 text-fg">{children}</h1>,
   h2: ({ children }: any) => <h2 className="text-[18px] font-bold mb-3 mt-5 text-fg">{children}</h2>,
   h3: ({ children }: any) => <h3 className="text-[16px] font-bold mb-2 mt-4 text-fg-hover">{children}</h3>,
   a: ({ children, href }: any) => <a href={href} className="text-accent hover:underline" target="_blank" rel="noreferrer">{children}</a>,
-};
+});
+
+const markdownComponents = createMarkdownComponents();
 
 const userMarkdownComponents = {
   p: ({ children }: any) => <p className="mb-4 last:mb-0 leading-[1.7] text-[15px]">{children}</p>,
@@ -100,9 +119,10 @@ const TypewriterTitle = ({ title }: { title: string }) => {
   return <>{displayed}</>;
 };
 
-const TypewriterMessage = ({ content }: { content: string }) => {
+const TypewriterMessage = ({ content, onVerseClick }: { content: string; onVerseClick?: VerseClickHandler }) => {
   const { imageBase64, textContent } = parseAiMessage(content);
   const [displayed, setDisplayed] = useState(() => seenMessages.has(content) ? textContent : '');
+  const mdComponents = useMemo(() => createMarkdownComponents(onVerseClick), [onVerseClick]);
   
   useEffect(() => {
     if (seenMessages.has(content)) {
@@ -149,7 +169,7 @@ const TypewriterMessage = ({ content }: { content: string }) => {
           </a>
         </div>
       )}
-      {displayed && <ReactMarkdown components={markdownComponents}>{displayed}</ReactMarkdown>}
+      {displayed && <ReactMarkdown components={mdComponents}>{displayed}</ReactMarkdown>}
     </>
   );
 };
@@ -239,6 +259,105 @@ export default function App() {
   const [translation, setTranslation] = useState("kjv");
   const [bibleVerses, setBibleVerses] = useState<{verse: number, text: string}[]>([]);
   const [completedChapters, setCompletedChapters] = useState<string[]>([]);
+  
+  // Verse navigation & interactive highlighting
+  const pendingScrollVerseRef = useRef<number | null>(null);
+
+  const scrollToAndHighlightVerse = useCallback((verseNum: number) => {
+    const tryScroll = (attemptsLeft: number) => {
+      const verseElements = document.querySelectorAll(`[data-verse="${verseNum}"]`);
+      if (verseElements.length > 0) {
+        const el = (Array.from(verseElements).find(e => (e as HTMLElement).offsetParent !== null) || verseElements[0]) as HTMLElement;
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.remove('verse-nav-highlight');
+        void el.offsetWidth;
+        el.classList.add('verse-nav-highlight');
+        setTimeout(() => {
+          el.classList.remove('verse-nav-highlight');
+        }, 3000);
+      } else if (attemptsLeft > 0) {
+        setTimeout(() => tryScroll(attemptsLeft - 1), 100);
+      }
+    };
+
+    setTimeout(() => tryScroll(6), 80);
+  }, []);
+
+  const navigateToVerse = useCallback((bookName: string, chapter: number, verse: number) => {
+    const allBooks = [...OT_BOOKS, ...NT_BOOKS];
+    const targetBook = allBooks.find(
+      b => b.name.toLowerCase() === bookName.toLowerCase()
+    );
+    if (!targetBook) return;
+
+    setActiveTab('study');
+    setMobileStudyView('reader');
+
+    const isSameBook = activeBook.name.toLowerCase() === targetBook.name.toLowerCase();
+    const isSameChapter = activeChapter === chapter;
+
+    if (isSameBook && isSameChapter) {
+      scrollToAndHighlightVerse(verse);
+    } else {
+      pendingScrollVerseRef.current = verse;
+      setActiveBook(targetBook);
+      setActiveChapter(chapter);
+    }
+  }, [activeBook.name, activeChapter, scrollToAndHighlightVerse]);
+
+  useEffect(() => {
+    if (pendingScrollVerseRef.current && bibleVerses.length > 0) {
+      const targetVerse = pendingScrollVerseRef.current;
+      pendingScrollVerseRef.current = null;
+      scrollToAndHighlightVerse(targetVerse);
+    }
+  }, [bibleVerses, scrollToAndHighlightVerse]);
+
+  const aiMarkdownComponents = useMemo(() => {
+    return createMarkdownComponents(navigateToVerse);
+  }, [navigateToVerse]);
+
+  const handleReaderContextMenu = useCallback((e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    const verseEl = target.closest('[data-verse]');
+    if (!verseEl) return;
+
+    const verseNumAttr = verseEl.getAttribute('data-verse');
+    if (!verseNumAttr) return;
+    const verseNum = parseInt(verseNumAttr, 10);
+
+    e.preventDefault();
+
+    const selection = window.getSelection();
+    const selectedStr = selection?.toString().trim();
+
+    if (!selectedStr || !selection || selection.isCollapsed) {
+      const range = document.createRange();
+      range.selectNodeContents(verseEl);
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+      setSelectionRange(range);
+      setSelectionVerse(verseNum);
+      setEndVerseNumber(verseNum);
+      setSelectedText(verseEl.textContent || '');
+    }
+
+    const toolbarHalfWidth = 165;
+    const x = Math.max(toolbarHalfWidth + 12, Math.min(window.innerWidth - toolbarHalfWidth - 12, e.clientX));
+    const isNearTop = e.clientY < 110;
+    const y = isNearTop ? e.clientY + 24 : e.clientY - 12;
+
+    const existingHighlight = highlights.find(
+      h => h.book === activeBook.name && h.chapter === activeChapter && h.verse === verseNum
+    );
+
+    setToolbarPosition({
+      x,
+      y,
+      highlightId: existingHighlight?.id,
+      isBelow: isNearTop,
+    });
+  }, [activeBook.name, activeChapter, highlights]);
   
   // Tracker State
   const [expandedTestaments, setExpandedTestaments] = useState<string[]>([]);
@@ -1472,7 +1591,7 @@ export default function App() {
                 </div>
               </header>
 
-              <div className="bible-reader-content flex-1 overflow-y-auto custom-scroll p-6" onMouseUp={handleSelection} onTouchEnd={handleSelection}>
+              <div className="bible-reader-content flex-1 overflow-y-auto custom-scroll p-6" onMouseUp={handleSelection} onTouchEnd={handleSelection} onContextMenu={handleReaderContextMenu}>
                 <article className="max-w-3xl mx-auto">
                   <p className="font-serif text-[18px] leading-[1.8] text-fg whitespace-pre-wrap">
                     {bibleVerses.length > 0 ? (
@@ -1522,9 +1641,9 @@ export default function App() {
                         {m.role === 'model' && <span className="text-[11px] text-muted mb-1.5 ml-1 font-semibold tracking-wide uppercase">Study AI</span>}
                         <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-[14px] leading-relaxed ${m.role === 'user' ? 'bg-accent text-white' : 'bg-surface text-fg-hover'}`}>
                           {m.role === 'model' && i === activeChat.messages.length - 1 ? (
-                            <TypewriterMessage content={m.content} />
+                            <TypewriterMessage content={m.content} onVerseClick={navigateToVerse} />
                           ) : (
-                            <ReactMarkdown components={m.role === 'user' ? userMarkdownComponents : markdownComponents}>{m.content}</ReactMarkdown>
+                            <ReactMarkdown components={m.role === 'user' ? userMarkdownComponents : aiMarkdownComponents}>{m.content}</ReactMarkdown>
                           )}
                         </div>
                       </div>
@@ -1746,7 +1865,7 @@ export default function App() {
                   </div>
                 </div>
               </header>
-              <div className="bible-reader-content flex-1 overflow-y-auto custom-scroll p-10 lg:p-16" onMouseUp={handleSelection} onTouchEnd={handleSelection}>
+              <div className="bible-reader-content flex-1 overflow-y-auto custom-scroll p-10 lg:p-16" onMouseUp={handleSelection} onTouchEnd={handleSelection} onContextMenu={handleReaderContextMenu}>
                 <article className="max-w-3xl mx-auto">
                   <p className="font-serif text-[18px] leading-[1.8] text-fg whitespace-pre-wrap">
                     {bibleVerses.length > 0 ? (
@@ -1828,7 +1947,7 @@ export default function App() {
                           <img src={(m as any).imagePreview} alt="attached" className="max-h-40 rounded-xl mb-2 object-contain" />
                         )}
                         {m.role === 'model' && i === activeChat.messages.length - 1 ? (
-                            <TypewriterMessage content={m.content} />
+                            <TypewriterMessage content={m.content} onVerseClick={navigateToVerse} />
                           ) : (() => {
                             const { imageBase64, textContent } = parseAiMessage(m.content);
                             return (
@@ -1839,7 +1958,7 @@ export default function App() {
                                     <a href={`data:image/png;base64,${imageBase64}`} download="theologica-image.png" className="inline-flex items-center gap-1 mt-1 text-[10px] text-muted hover:text-fg-hover transition-colors">↓ Download</a>
                                   </div>
                                 )}
-                                {textContent ? <ReactMarkdown components={m.role === 'user' ? userMarkdownComponents : markdownComponents}>{textContent}</ReactMarkdown> : null}
+                                {textContent ? <ReactMarkdown components={m.role === 'user' ? userMarkdownComponents : aiMarkdownComponents}>{textContent}</ReactMarkdown> : null}
                               </>
                             );
                           })()}
@@ -2145,8 +2264,19 @@ export default function App() {
                               Day {displayDay} of {totalDays}
                             </span>
                           </div>
-                          <h2 className="text-accent font-display text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight">
-                            {devotionalTime === 'morning' ? devotionalEntry.morningVerse : devotionalEntry.eveningVerse}
+                          <h2 
+                            onClick={() => {
+                              const ref = devotionalTime === 'morning' ? devotionalEntry.morningVerse : devotionalEntry.eveningVerse;
+                              const parsed = parseVerseReference(ref);
+                              if (parsed) {
+                                navigateToVerse(parsed.book, parsed.chapter, parsed.verse);
+                              }
+                            }}
+                            className="text-accent font-display text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight cursor-pointer hover:underline flex items-center gap-2 group/devo"
+                            title="Open in Bible reader"
+                          >
+                            <span>{devotionalTime === 'morning' ? devotionalEntry.morningVerse : devotionalEntry.eveningVerse}</span>
+                            <BookOpen size={20} className="opacity-0 group-hover/devo:opacity-75 transition-opacity shrink-0" />
                           </h2>
                         </div>
 
@@ -2275,7 +2405,7 @@ export default function App() {
                               <img src={(m as any).imagePreview} alt="attached" className="max-h-52 rounded-xl mb-3 object-contain" />
                             )}
                             {m.role === 'model' && i === activeChat.messages.length - 1 ? (
-                            <TypewriterMessage content={m.content} />
+                            <TypewriterMessage content={m.content} onVerseClick={navigateToVerse} />
                           ) : (() => {
                             const { imageBase64, textContent } = parseAiMessage(m.content);
                             return (
@@ -2286,7 +2416,7 @@ export default function App() {
                                     <a href={`data:image/png;base64,${imageBase64}`} download="theologica-image.png" className="inline-flex items-center gap-1.5 mt-2 text-[11px] text-muted hover:text-fg-hover transition-colors">↓ Download image</a>
                                   </div>
                                 )}
-                                {textContent ? <ReactMarkdown components={m.role === 'user' ? userMarkdownComponents : markdownComponents}>{textContent}</ReactMarkdown> : null}
+                                {textContent ? <ReactMarkdown components={m.role === 'user' ? userMarkdownComponents : aiMarkdownComponents}>{textContent}</ReactMarkdown> : null}
                               </>
                             );
                           })()}

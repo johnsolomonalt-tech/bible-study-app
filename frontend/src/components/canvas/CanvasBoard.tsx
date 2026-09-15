@@ -34,8 +34,24 @@ import {
   SerializableEdge,
   CanvasStatePayload,
   CanvasBoardMetadata,
+  CATEGORY_METADATA,
 } from '@/types/canvas';
-import { Sparkles, Undo2 } from 'lucide-react';
+import { 
+  Sparkles, 
+  Undo2, 
+  Redo2, 
+  Plus, 
+  LayoutGrid, 
+  Maximize2, 
+  Trash2, 
+  BookOpen, 
+  Compass, 
+  HelpCircle, 
+  Lightbulb, 
+  FileText,
+  ChevronRight
+} from 'lucide-react';
+import { useModifierKey } from '@/lib/os';
 
 interface CanvasBoardProps {
   theme?: 'dark' | 'light';
@@ -107,8 +123,35 @@ function InnerCanvasBoard({
   incomingNode,
   onIncomingNodeHandled,
 }: CanvasBoardProps) {
-  const { fitView } = useReactFlow();
+  const { fitView, screenToFlowPosition } = useReactFlow();
   const isDark = theme === 'dark';
+  const mod = useModifierKey();
+
+  // Pane Context Menu state
+  const [paneContextMenu, setPaneContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [paneAddSubmenuOpen, setPaneAddSubmenuOpen] = useState(false);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleOutside = (e: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as HTMLElement)) {
+        setPaneContextMenu(null);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setPaneContextMenu(null);
+      }
+    };
+    if (paneContextMenu) {
+      document.addEventListener('mousedown', handleOutside);
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [paneContextMenu]);
 
   // React Flow state
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<CanvasNodeData>>([]);
@@ -279,6 +322,151 @@ function InnerCanvasBoard({
     });
   }, [handleDeleteNode, handleUpdateNode, pushSnapshot, setNodes, theme]);
 
+  // Connect source card to target card (from card options menu)
+  const handleConnectTo = useCallback((sourceId: string, targetId: string) => {
+    if (sourceId === targetId) return;
+    const edgeId = `edge-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const newEdge: Edge = {
+      id: edgeId,
+      source: sourceId,
+      target: targetId,
+      type: 'customEdge',
+      label: 'Connected',
+      animated: true,
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        color: isDark ? '#a1a1aa' : '#71717a',
+        width: 16,
+        height: 16,
+      },
+    };
+
+    setEdges((eds) => {
+      if (eds.some((e) => e.source === sourceId && e.target === targetId)) {
+        return eds;
+      }
+      const next = [...eds, newEdge];
+      pushSnapshot(nodesRef.current, next);
+      return next;
+    });
+  }, [isDark, pushSnapshot, setEdges]);
+
+  // Auto Arrange all cards into clean hierarchical columns
+  const handleAutoArrange = useCallback(() => {
+    if (nodesRef.current.length === 0) return;
+
+    const currentNodes = nodesRef.current;
+    const currentEdges = edgesRef.current;
+
+    const COL_STEP = 460;
+    const ROW_STEP = 340;
+
+    // Calculate in-degrees for topological rank
+    const inDegree: Record<string, number> = {};
+    currentNodes.forEach((n) => { inDegree[n.id] = 0; });
+    currentEdges.forEach((e) => {
+      if (inDegree[e.target] !== undefined) {
+        inDegree[e.target] = (inDegree[e.target] || 0) + 1;
+      }
+    });
+
+    const columns: string[][] = [];
+    const hasEdges = currentEdges.length > 0;
+
+    if (hasEdges) {
+      const ranks: Record<string, number> = {};
+      const queue: string[] = [];
+
+      currentNodes.forEach((n) => {
+        if (inDegree[n.id] === 0) {
+          ranks[n.id] = 0;
+          queue.push(n.id);
+        }
+      });
+
+      if (queue.length === 0 && currentNodes.length > 0) {
+        ranks[currentNodes[0].id] = 0;
+        queue.push(currentNodes[0].id);
+      }
+
+      while (queue.length > 0) {
+        const curr = queue.shift()!;
+        const currRank = ranks[curr];
+        currentEdges.filter(e => e.source === curr).forEach(e => {
+          const nextRank = Math.max(ranks[e.target] || 0, currRank + 1);
+          ranks[e.target] = nextRank;
+          if (!queue.includes(e.target)) {
+            queue.push(e.target);
+          }
+        });
+      }
+
+      currentNodes.forEach((n) => {
+        if (ranks[n.id] === undefined) {
+          ranks[n.id] = 0;
+        }
+      });
+
+      currentNodes.forEach((n) => {
+        const r = Math.min(ranks[n.id] || 0, 4);
+        while (columns.length <= r) columns.push([]);
+        columns[r].push(n.id);
+      });
+    } else {
+      const col0: string[] = [];
+      const col1: string[] = [];
+      const col2: string[] = [];
+
+      currentNodes.forEach((n) => {
+        const cat = n.data.category;
+        if (cat === 'scripture' || cat === 'historical_context') {
+          col0.push(n.id);
+        } else if (cat === 'illustration' || cat === 'application') {
+          col2.push(n.id);
+        } else {
+          col1.push(n.id);
+        }
+      });
+
+      [col0, col1, col2].filter(c => c.length > 0).forEach(c => columns.push(c));
+    }
+
+    if (columns.length === 0) {
+      columns.push(currentNodes.map(n => n.id));
+    }
+
+    const maxRows = Math.max(...columns.map(c => c.length), 1);
+    const totalHeight = (maxRows - 1) * ROW_STEP;
+    const baseX = 100;
+    const baseY = 100;
+
+    const nodePosMap: Record<string, { x: number; y: number }> = {};
+    columns.forEach((colNodes, colIndex) => {
+      const colHeight = (colNodes.length - 1) * ROW_STEP;
+      const startY = baseY + (totalHeight - colHeight) / 2;
+
+      colNodes.forEach((nodeId, rowIndex) => {
+        nodePosMap[nodeId] = {
+          x: Math.round(baseX + colIndex * COL_STEP),
+          y: Math.round(startY + rowIndex * ROW_STEP),
+        };
+      });
+    });
+
+    setNodes((nds) => {
+      const arranged = nds.map((n) => {
+        const newPos = nodePosMap[n.id];
+        return newPos ? { ...n, position: newPos } : n;
+      });
+      pushSnapshot(arranged, edgesRef.current);
+      return arranged;
+    });
+
+    setTimeout(() => {
+      fitView({ padding: 0.2, duration: 600 });
+    }, 100);
+  }, [fitView, pushSnapshot, setNodes]);
+
   // Format node helper
   const prepareNode = useCallback((raw: SerializableNode): Node<CanvasNodeData> => {
     return {
@@ -291,10 +479,11 @@ function InnerCanvasBoard({
         onUpdate: handleUpdateNode,
         onDuplicate: handleDuplicateNode,
         onDelete: handleDeleteNode,
+        onConnectTo: handleConnectTo,
       },
       style: raw.style,
     };
-  }, [handleDeleteNode, handleDuplicateNode, handleUpdateNode, theme]);
+  }, [handleDeleteNode, handleDuplicateNode, handleUpdateNode, handleConnectTo, theme]);
 
   // Format edge helper
   const prepareEdge = useCallback((raw: SerializableEdge): Edge => {
@@ -527,15 +716,15 @@ function InnerCanvasBoard({
     }, 120);
   }, [incomingNode, nodes, theme, handleUpdateNode, handleDuplicateNode, handleDeleteNode, onIncomingNodeHandled, pushSnapshot, fitView, setNodes]);
 
-  // Add card from toolbar
-  const handleAddNode = useCallback((category: NodeCategory) => {
+  // Add card from toolbar or context menu
+  const handleAddNode = useCallback((category: NodeCategory, customPos?: { x: number; y: number }) => {
     const timestamp = Date.now();
     const newId = `card-${timestamp}`;
 
-    let posX = 200;
-    let posY = 200;
+    let posX = customPos ? customPos.x : 200;
+    let posY = customPos ? customPos.y : 200;
 
-    if (nodes.length > 0) {
+    if (!customPos && nodes.length > 0) {
       const last = nodes[nodes.length - 1];
       posX = last.position.x + 60;
       posY = last.position.y + 60;
@@ -860,6 +1049,28 @@ function InnerCanvasBoard({
   const nodeTypes = useMemo(() => ({ customCard: CustomCanvasNode }), []);
   const edgeTypes = useMemo(() => ({ customEdge: CustomCanvasEdge }), []);
 
+  // Enrich live nodes with otherNodes summary list for the "Add Connection" card menu
+  const displayNodes = useMemo(() => {
+    const summary = nodes.map((n) => ({
+      id: n.id,
+      title: n.data.title || 'Untitled Card',
+      category: (n.data.category || 'general') as NodeCategory,
+    }));
+
+    return nodes.map((n) => ({
+      ...n,
+      data: {
+        ...n.data,
+        theme,
+        onUpdate: handleUpdateNode,
+        onDuplicate: handleDuplicateNode,
+        onDelete: handleDeleteNode,
+        onConnectTo: handleConnectTo,
+        otherNodes: summary.filter((s) => s.id !== n.id),
+      },
+    }));
+  }, [nodes, theme, handleUpdateNode, handleDuplicateNode, handleDeleteNode, handleConnectTo]);
+
   return (
     <div 
       className="relative w-full h-full overflow-hidden select-none transition-colors duration-200"
@@ -891,6 +1102,7 @@ function InnerCanvasBoard({
         canUndo={canUndo}
         canRedo={canRedo}
         onFitView={() => fitView({ padding: 0.2, duration: 600 })}
+        onAutoArrange={handleAutoArrange}
         onClear={handleClear}
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -901,7 +1113,7 @@ function InnerCanvasBoard({
 
       {/* React Flow Canvas Engine */}
       <ReactFlow<Node<CanvasNodeData>, Edge>
-        nodes={nodes}
+        nodes={displayNodes}
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
@@ -909,6 +1121,14 @@ function InnerCanvasBoard({
         onNodeDragStop={onNodeDragStop}
         onNodesDelete={onNodesDelete}
         onEdgesDelete={onEdgesDelete}
+        onPaneContextMenu={(event) => {
+          event.preventDefault();
+          setPaneContextMenu({ x: event.clientX, y: event.clientY });
+          setPaneAddSubmenuOpen(false);
+        }}
+        onPaneClick={() => {
+          if (paneContextMenu) setPaneContextMenu(null);
+        }}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         minZoom={0.1}
@@ -967,6 +1187,158 @@ function InnerCanvasBoard({
           }`}
         />
       </ReactFlow>
+
+      {/* Canvas Pane Right-Click Context Menu */}
+      {paneContextMenu && (
+        <div
+          ref={contextMenuRef}
+          style={{ 
+            left: Math.min(paneContextMenu.x, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 220), 
+            top: Math.min(paneContextMenu.y, (typeof window !== 'undefined' ? window.innerHeight : 800) - 280) 
+          }}
+          className={`fixed z-50 w-52 rounded-xl shadow-2xl border p-1.5 animate-in fade-in-50 zoom-in-95 backdrop-blur-md select-none ${
+            isDark ? 'bg-[#222226]/95 border-zinc-700 text-zinc-200' : 'bg-white/95 border-zinc-200 text-zinc-800 shadow-xl'
+          }`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider px-2 py-1">
+            Canvas Options
+          </div>
+
+          {/* Add Card Submenu */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setPaneAddSubmenuOpen(!paneAddSubmenuOpen)}
+              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                isDark ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-zinc-100 text-zinc-800'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Plus size={14} className="text-accent" />
+                <span>Add Card...</span>
+              </div>
+              <ChevronRight size={12} className={`text-zinc-400 transition-transform ${paneAddSubmenuOpen ? 'rotate-90' : ''}`} />
+            </button>
+
+            {paneAddSubmenuOpen && (
+              <div className={`my-1 py-1 pl-2 border-l space-y-0.5 ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
+                {(Object.keys(CATEGORY_METADATA) as NodeCategory[]).map((cat) => {
+                  const meta = CATEGORY_METADATA[cat];
+                  return (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => {
+                        const flowPos = screenToFlowPosition({ x: paneContextMenu.x, y: paneContextMenu.y });
+                        handleAddNode(cat, flowPos);
+                        setPaneContextMenu(null);
+                      }}
+                      className={`w-full flex items-center gap-2 px-2 py-1 rounded text-xs transition-colors cursor-pointer text-left ${
+                        isDark ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-zinc-100 text-zinc-800'
+                      }`}
+                    >
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: meta.accent }} />
+                      <span>{meta.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Theologica AI */}
+          <button
+            type="button"
+            onClick={() => {
+              setPaneContextMenu(null);
+              setIsAiModalOpen(true);
+            }}
+            className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+              isDark ? 'hover:bg-zinc-800 text-amber-300' : 'hover:bg-amber-50 text-amber-700'
+            }`}
+          >
+            <Sparkles size={14} className="text-amber-400" />
+            <span>Theologica AI</span>
+          </button>
+
+          <div className={`border-t my-1 ${isDark ? 'border-zinc-700/60' : 'border-zinc-200'}`} />
+
+          {/* Auto Arrange */}
+          <button
+            type="button"
+            onClick={() => {
+              setPaneContextMenu(null);
+              handleAutoArrange();
+            }}
+            className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+              isDark ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-zinc-100 text-zinc-800'
+            }`}
+          >
+            <LayoutGrid size={14} />
+            <span>Auto Arrange</span>
+          </button>
+
+          {/* Fit View */}
+          <button
+            type="button"
+            onClick={() => {
+              setPaneContextMenu(null);
+              fitView({ padding: 0.2, duration: 600 });
+            }}
+            className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+              isDark ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-zinc-100 text-zinc-800'
+            }`}
+          >
+            <Maximize2 size={14} />
+            <span>Fit to View</span>
+          </button>
+
+          <div className={`border-t my-1 ${isDark ? 'border-zinc-700/60' : 'border-zinc-200'}`} />
+
+          {/* Undo */}
+          <button
+            type="button"
+            disabled={!canUndo}
+            onClick={() => {
+              setPaneContextMenu(null);
+              handleUndo();
+            }}
+            className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              canUndo 
+                ? (isDark ? 'hover:bg-zinc-800 text-zinc-300 cursor-pointer' : 'hover:bg-zinc-100 text-zinc-800 cursor-pointer')
+                : 'opacity-40 cursor-not-allowed text-zinc-500'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Undo2 size={14} />
+              <span>Undo</span>
+            </div>
+            <span className="text-[10px] text-zinc-500 font-mono">{mod.symbol}Z</span>
+          </button>
+
+          {/* Redo */}
+          <button
+            type="button"
+            disabled={!canRedo}
+            onClick={() => {
+              setPaneContextMenu(null);
+              handleRedo();
+            }}
+            className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              canRedo 
+                ? (isDark ? 'hover:bg-zinc-800 text-zinc-300 cursor-pointer' : 'hover:bg-zinc-100 text-zinc-800 cursor-pointer')
+                : 'opacity-40 cursor-not-allowed text-zinc-500'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Redo2 size={14} />
+              <span>Redo</span>
+            </div>
+            <span className="text-[10px] text-zinc-500 font-mono">{mod.symbol}{mod.shift}Z</span>
+          </button>
+        </div>
+      )}
 
       {/* Floating Theologica AI Success Toast */}
       {aiToast && (

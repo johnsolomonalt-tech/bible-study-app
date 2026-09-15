@@ -23,6 +23,7 @@ import {
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { SerializableNode, SerializableEdge, CanvasStatePayload } from '@/types/canvas';
+import { useModifierKey } from '@/lib/os';
 
 interface TheologicaAiCanvasModalProps {
   isOpen: boolean;
@@ -63,6 +64,7 @@ export function TheologicaAiCanvasModal({
   onApplyGraphUpdate,
   theme,
 }: TheologicaAiCanvasModalProps) {
+  const mod = useModifierKey();
   const [activeMode, setActiveMode] = useState<Mode>(selectedNode ? 'expand' : 'generate');
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -446,7 +448,7 @@ export function TheologicaAiCanvasModal({
             isDark ? 'border-zinc-800 bg-[#141416]' : 'border-zinc-100 bg-zinc-50'
           }`}>
             <span className="text-[11px] text-zinc-500 hidden sm:inline">
-              Press <kbd className="px-1 py-0.5 rounded bg-zinc-800 border border-zinc-700 font-mono text-[10px]">⌘+Enter</kbd> to generate
+              Press <kbd className="px-1 py-0.5 rounded bg-zinc-800 border border-zinc-700 font-mono text-[10px]">{mod.symbol}+Enter</kbd> to generate
             </span>
             <div className="flex items-center gap-2 ml-auto">
               <button

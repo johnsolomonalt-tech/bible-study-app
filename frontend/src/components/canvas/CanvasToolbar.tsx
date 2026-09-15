@@ -15,9 +15,11 @@ import {
   FileText,
   ChevronDown,
   PanelLeft,
-  Layers
+  Layers,
+  LayoutGrid
 } from 'lucide-react';
 import { NodeCategory, CATEGORY_METADATA } from '@/types/canvas';
+import { useModifierKey } from '@/lib/os';
 
 interface CanvasToolbarProps {
   boardTitle: string;
@@ -29,6 +31,7 @@ interface CanvasToolbarProps {
   canUndo: boolean;
   canRedo: boolean;
   onFitView: () => void;
+  onAutoArrange?: () => void;
   onClear: () => void;
   isSidebarOpen: boolean;
   onToggleSidebar: () => void;
@@ -56,6 +59,7 @@ export function CanvasToolbar({
   canUndo,
   canRedo,
   onFitView,
+  onAutoArrange,
   onClear,
   isSidebarOpen,
   onToggleSidebar,
@@ -63,6 +67,7 @@ export function CanvasToolbar({
   theme,
   nodeCount,
 }: CanvasToolbarProps) {
+  const mod = useModifierKey();
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState(boardTitle);
@@ -176,25 +181,16 @@ export function CanvasToolbar({
       >
         {/* Add Card Dropdown */}
         <div className="relative" ref={addMenuRef}>
-          <div className="flex items-center">
-            <button
-              type="button"
-              onClick={() => onAddNode('general')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-l-lg bg-accent text-white text-xs font-semibold hover:bg-accent/90 active:scale-95 transition-all shadow-sm cursor-pointer"
-              title="Add general card"
-            >
-              <Plus size={14} />
-              <span className="hidden sm:inline">Add Card</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsAddMenuOpen(!isAddMenuOpen)}
-              className="p-1.5 rounded-r-lg bg-accent/90 text-white text-xs hover:bg-accent border-l border-white/20 active:scale-95 transition-all cursor-pointer"
-              title="Select card category"
-            >
-              <ChevronDown size={14} />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setIsAddMenuOpen(!isAddMenuOpen)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-semibold hover:bg-accent/90 active:scale-95 transition-all shadow-sm cursor-pointer"
+            title="Add card to canvas"
+          >
+            <Plus size={14} />
+            <span className="hidden sm:inline">Add Card</span>
+            <ChevronDown size={13} className={`transition-transform duration-200 ${isAddMenuOpen ? 'rotate-180' : ''}`} />
+          </button>
 
           {isAddMenuOpen && (
             <div 
@@ -205,7 +201,7 @@ export function CanvasToolbar({
               }`}
             >
               <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider px-2 py-1">
-                Card Categories
+                Add Card
               </div>
               {(Object.keys(CATEGORY_METADATA) as NodeCategory[]).map((cat) => {
                 const meta = CATEGORY_METADATA[cat];
@@ -224,12 +220,12 @@ export function CanvasToolbar({
                   >
                     <div className="flex items-center gap-2">
                       <span 
-                        className="w-2.5 h-2.5 rounded-full" 
+                        className="w-2.5 h-2.5 rounded-full shrink-0" 
                         style={{ backgroundColor: meta.accent }}
                       />
                       <span>{meta.label}</span>
                     </div>
-                    <Icon size={13} className="text-zinc-400" />
+                    <Icon size={13} className="text-zinc-400 shrink-0" />
                   </button>
                 );
               })}
@@ -260,7 +256,7 @@ export function CanvasToolbar({
               ? 'hover:bg-zinc-700/30 text-zinc-200 cursor-pointer active:scale-90 hover:text-white' 
               : 'opacity-30 cursor-not-allowed text-zinc-500'
           }`}
-          title="Undo (⌘Z)"
+          title={`Undo (${mod.symbol}Z)`}
         >
           <Undo2 size={16} />
         </button>
@@ -275,12 +271,24 @@ export function CanvasToolbar({
               ? 'hover:bg-zinc-700/30 text-zinc-200 cursor-pointer active:scale-90 hover:text-white' 
               : 'opacity-30 cursor-not-allowed text-zinc-500'
           }`}
-          title="Redo (⌘⇧Z)"
+          title={`Redo (${mod.symbol}${mod.shift}Z)`}
         >
           <Redo2 size={16} />
         </button>
 
         <div className="h-4 w-[1px] bg-zinc-700/40 mx-0.5" />
+
+        {/* Auto Arrange */}
+        {onAutoArrange && (
+          <button
+            type="button"
+            onClick={onAutoArrange}
+            className="p-1.5 rounded-lg hover:bg-zinc-700/30 text-zinc-300 hover:text-white transition-colors cursor-pointer active:scale-90"
+            title="Auto Arrange Cards (Tidy layout)"
+          >
+            <LayoutGrid size={16} />
+          </button>
+        )}
 
         {/* Fit View */}
         <button

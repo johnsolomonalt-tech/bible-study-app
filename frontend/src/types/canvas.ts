@@ -16,6 +16,8 @@ export interface CanvasNodeData extends Record<string, unknown> {
   onUpdate?: (id: string, updates: Partial<CanvasNodeData>) => void;
   onDuplicate?: (id: string) => void;
   onDelete?: (id: string) => void;
+  onConnectTo?: (sourceId: string, targetId: string) => void;
+  otherNodes?: Array<{ id: string; title: string; category: NodeCategory }>;
   theme?: 'dark' | 'light';
 }
 
