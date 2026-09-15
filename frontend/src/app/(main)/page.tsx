@@ -342,7 +342,7 @@ export default function App() {
       setSelectedText(verseEl.textContent || '');
     }
 
-    const toolbarHalfWidth = 165;
+    const toolbarHalfWidth = 195;
     const x = Math.max(toolbarHalfWidth + 12, Math.min(window.innerWidth - toolbarHalfWidth - 12, e.clientX));
     const isNearTop = e.clientY < 110;
     const y = isNearTop ? e.clientY + 24 : e.clientY - 12;
@@ -586,7 +586,7 @@ export default function App() {
         }
       }
 
-      const toolbarHalfWidth = 165;
+      const toolbarHalfWidth = 195;
       const x = Math.max(toolbarHalfWidth + 12, Math.min(window.innerWidth - toolbarHalfWidth - 12, rect.left + rect.width / 2));
       const isNearTop = rect.top < 110;
       const y = isNearTop ? rect.bottom + 8 : rect.top - 6;
@@ -2089,7 +2089,7 @@ export default function App() {
         {toolbarPosition && (
           <div 
             onMouseDown={(e) => e.preventDefault()}
-            className={`floating-verse-toolbar fixed z-50 flex items-center gap-1.5 bg-surface border border-border-soft p-1.5 rounded-xl shadow-2xl backdrop-blur-md transform -translate-x-1/2 max-w-[95vw] ${
+            className={`floating-verse-toolbar fixed z-50 flex items-center gap-2 bg-surface border border-border-soft p-2 rounded-2xl shadow-2xl backdrop-blur-md transform -translate-x-1/2 max-w-[95vw] ${
               toolbarPosition.isBelow ? 'translate-y-2' : '-translate-y-full'
             }`}
             style={{ left: toolbarPosition.x, top: toolbarPosition.y }}
@@ -2098,78 +2098,78 @@ export default function App() {
               type="button" 
               onMouseDown={(e) => e.preventDefault()} 
               onClick={() => saveHighlight('yellow')} 
-              className="w-7 h-7 min-w-[28px] rounded-full bg-yellow-500 hover:scale-110 active:scale-95 transition-transform shadow-sm cursor-pointer" 
+              className="w-7 h-7 sm:w-8 sm:h-8 min-w-[28px] sm:min-w-[32px] rounded-full bg-yellow-500 hover:scale-110 active:scale-95 transition-transform shadow-sm cursor-pointer" 
               title="Highlight Yellow" 
             />
             <button 
               type="button" 
               onMouseDown={(e) => e.preventDefault()} 
               onClick={() => saveHighlight('green')} 
-              className="w-7 h-7 min-w-[28px] rounded-full bg-green-500 hover:scale-110 active:scale-95 transition-transform shadow-sm cursor-pointer" 
+              className="w-7 h-7 sm:w-8 sm:h-8 min-w-[28px] sm:min-w-[32px] rounded-full bg-green-500 hover:scale-110 active:scale-95 transition-transform shadow-sm cursor-pointer" 
               title="Highlight Green" 
             />
             <button 
               type="button" 
               onMouseDown={(e) => e.preventDefault()} 
               onClick={() => saveHighlight('blue')} 
-              className="w-7 h-7 min-w-[28px] rounded-full bg-blue-500 hover:scale-110 active:scale-95 transition-transform shadow-sm cursor-pointer" 
+              className="w-7 h-7 sm:w-8 sm:h-8 min-w-[28px] sm:min-w-[32px] rounded-full bg-blue-500 hover:scale-110 active:scale-95 transition-transform shadow-sm cursor-pointer" 
               title="Highlight Blue" 
             />
             <button 
               type="button" 
               onMouseDown={(e) => e.preventDefault()} 
               onClick={() => saveHighlight('pink')} 
-              className="w-7 h-7 min-w-[28px] rounded-full bg-pink-500 hover:scale-110 active:scale-95 transition-transform shadow-sm cursor-pointer" 
+              className="w-7 h-7 sm:w-8 sm:h-8 min-w-[28px] sm:min-w-[32px] rounded-full bg-pink-500 hover:scale-110 active:scale-95 transition-transform shadow-sm cursor-pointer" 
               title="Highlight Pink" 
             />
             <button 
               type="button" 
               onMouseDown={(e) => e.preventDefault()} 
               onClick={() => saveHighlight('purple')} 
-              className="w-7 h-7 min-w-[28px] rounded-full bg-purple-500 hover:scale-110 active:scale-95 transition-transform shadow-sm cursor-pointer" 
+              className="w-7 h-7 sm:w-8 sm:h-8 min-w-[28px] sm:min-w-[32px] rounded-full bg-purple-500 hover:scale-110 active:scale-95 transition-transform shadow-sm cursor-pointer" 
               title="Highlight Purple" 
             />
-            <div className="w-[1px] h-5 bg-border-soft mx-0.5" />
+            <div className="w-[1px] h-6 bg-border-soft mx-0.5" />
             <button 
               type="button"
               onMouseDown={(e) => e.preventDefault()} 
               onClick={askAiAboutHighlight} 
-              className="flex items-center justify-center h-8 px-2.5 rounded-lg bg-accent text-white hover:bg-[#d87654] active:scale-95 transition-all text-xs font-semibold shadow-sm gap-1 cursor-pointer shrink-0"
+              className="flex items-center justify-center h-8 sm:h-9 px-3 rounded-xl bg-accent text-white hover:bg-[#d87654] active:scale-95 transition-all text-xs sm:text-sm font-semibold shadow-sm gap-1.5 cursor-pointer shrink-0"
               title="Ask AI about this verse"
             >
-              <Sparkles size={13} /> Ask AI
+              <Sparkles size={15} /> <span>Ask AI</span>
             </button>
             <button 
               type="button"
               onMouseDown={(e) => e.preventDefault()} 
               onClick={addHighlightToChat} 
-              className="flex items-center justify-center h-8 px-2.5 rounded-lg bg-surface border border-border-soft text-fg hover:bg-border-soft active:scale-95 transition-all text-xs font-semibold shadow-sm gap-1 cursor-pointer shrink-0" 
+              className="flex items-center justify-center h-8 sm:h-9 px-3 rounded-xl bg-surface border border-border-soft text-fg hover:bg-border-soft active:scale-95 transition-all text-xs sm:text-sm font-semibold shadow-sm gap-1.5 cursor-pointer shrink-0" 
               title="Add to Chat"
             >
-              <MessageSquarePlus size={13} />
-              <span className="text-[11px] font-semibold">Quote</span>
+              <MessageSquarePlus size={15} />
+              <span>Quote</span>
             </button>
             <button 
               type="button"
               onMouseDown={(e) => e.preventDefault()} 
               onClick={addHighlightToCanvas} 
-              className="flex items-center justify-center h-8 px-2.5 rounded-lg bg-surface border border-border-soft text-fg hover:bg-border-soft active:scale-95 transition-all text-xs font-semibold shadow-sm gap-1 cursor-pointer shrink-0" 
+              className="flex items-center justify-center h-8 sm:h-9 px-3 rounded-xl bg-surface border border-border-soft text-fg hover:bg-border-soft active:scale-95 transition-all text-xs sm:text-sm font-semibold shadow-sm gap-1.5 cursor-pointer shrink-0" 
               title="Send to Canvas"
             >
-              <Workflow size={13} />
-              <span className="text-[11px] font-semibold">Canvas</span>
+              <Workflow size={15} />
+              <span>Canvas</span>
             </button>
             {toolbarPosition.highlightId && (
               <>
-                <div className="w-[1px] h-5 bg-border-soft mx-0.5" />
+                <div className="w-[1px] h-6 bg-border-soft mx-0.5" />
                 <button 
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => deleteHighlight(toolbarPosition.highlightId!)} 
-                  className="flex items-center justify-center h-8 px-2 rounded-lg bg-surface border border-border-soft text-error hover:bg-error hover:text-white transition-all shadow-sm cursor-pointer shrink-0"
+                  className="flex items-center justify-center h-8 sm:h-9 px-2.5 rounded-xl bg-surface border border-border-soft text-error hover:bg-error hover:text-white transition-all shadow-sm cursor-pointer shrink-0"
                   title="Delete Highlight"
                 >
-                  <Trash2 size={13} />
+                  <Trash2 size={15} />
                 </button>
               </>
             )}

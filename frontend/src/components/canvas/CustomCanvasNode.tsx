@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, memo } from 'react';
-import { Handle, Position, NodeResizer, NodeProps } from '@xyflow/react';
+import { Handle, Position, NodeResizer, NodeProps, useViewport, useReactFlow } from '@xyflow/react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { 
@@ -38,6 +38,13 @@ export const CustomCanvasNode = memo(function CustomCanvasNode({
   selected,
 }: NodeProps & { data: CanvasNodeData }) {
   const mod = useModifierKey();
+  const { zoom } = useViewport();
+  const { setNodes } = useReactFlow();
+
+  // Dynamic counter-scale: when canvas is zoomed out (zoom < 1), counter-scale up
+  // so options menu never shrinks below comfortable, legible size on the user's screen.
+  const menuScale = Math.min(Math.max(1 / Math.max(zoom, 0.1), 1), 3.2);
+
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(data.content || '');
   const [editTitle, setEditTitle] = useState(data.title || '');
@@ -70,6 +77,7 @@ export const CustomCanvasNode = memo(function CustomCanvasNode({
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setIsMenuOpen(false);
+        setIsConnectSubmenuOpen(false);
       }
     };
     if (isMenuOpen) {
@@ -106,9 +114,12 @@ export const CustomCanvasNode = memo(function CustomCanvasNode({
       onContextMenu={(e) => {
         e.preventDefault();
         e.stopPropagation();
+        setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, selected: true } : n)));
         setIsMenuOpen(true);
       }}
       className={`relative group rounded-xl transition-all duration-200 select-none ${
+        isMenuOpen ? '!z-50' : selected ? 'z-30' : 'z-0'
+      } ${
         isDark 
           ? 'bg-[#1a1a1c]/90 text-zinc-100 border-zinc-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.35)] backdrop-blur-md' 
           : 'bg-white/95 text-zinc-800 border-zinc-200/90 shadow-[0_8px_30px_rgb(0,0,0,0.06)] backdrop-blur-md'
@@ -248,28 +259,32 @@ export const CustomCanvasNode = memo(function CustomCanvasNode({
             <button
               type="button"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className={`p-1 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/30 transition-colors ${
+              className={`p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/30 transition-colors cursor-pointer ${
                 isMenuOpen ? 'bg-zinc-700/30 text-zinc-200' : ''
               }`}
               title="Card options"
             >
-              <MoreVertical size={15} />
+              <MoreVertical size={16} />
             </button>
           )}
 
           {/* Quick Action Dropdown */}
           {isMenuOpen && (
             <div 
-              className={`absolute right-0 top-full mt-1 w-52 rounded-xl shadow-2xl border p-1.5 z-50 animate-in fade-in-50 zoom-in-95 ${
+              className={`absolute right-0 top-full mt-1.5 w-64 rounded-2xl shadow-2xl border p-2 z-50 animate-in fade-in-50 zoom-in-95 ${
                 isDark 
                   ? 'bg-[#222226] border-zinc-700 text-zinc-200' 
                   : 'bg-white border-zinc-200 text-zinc-800 shadow-xl'
               }`}
+              style={{
+                transform: `scale(${menuScale})`,
+                transformOrigin: 'top right',
+              }}
             >
-              <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider px-2 py-1">
+              <div className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider px-3 py-1.5">
                 Change Category
               </div>
-              <div className="space-y-0.5 mb-1.5">
+              <div className="space-y-1 mb-1.5">
                 {(Object.keys(CATEGORY_METADATA) as NodeCategory[]).map((cat) => {
                   const meta = CATEGORY_METADATA[cat];
                   const Icon = CATEGORY_ICONS[cat];
@@ -279,45 +294,45 @@ export const CustomCanvasNode = memo(function CustomCanvasNode({
                       key={cat}
                       type="button"
                       onClick={() => handleCategoryChange(cat)}
-                      className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
                         isSelected 
-                          ? isDark ? 'bg-zinc-700/50 text-white' : 'bg-zinc-100 text-black font-semibold'
-                          : isDark ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-zinc-50 text-zinc-700'
+                          ? isDark ? 'bg-zinc-700/60 text-white font-semibold' : 'bg-zinc-100 text-black font-semibold'
+                          : isDark ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-zinc-100 text-zinc-700'
                       }`}
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2.5">
                         <span 
-                          className="w-2.5 h-2.5 rounded-full" 
+                          className="w-3 h-3 rounded-full shrink-0 shadow-sm" 
                           style={{ backgroundColor: meta.accent }}
                         />
                         <span>{meta.label}</span>
                       </div>
-                      <Icon size={12} className="text-zinc-400" />
+                      <Icon size={15} className="text-zinc-400 shrink-0" />
                     </button>
                   );
                 })}
               </div>
 
-              <div className={`border-t my-1 ${isDark ? 'border-zinc-700/60' : 'border-zinc-100'}`} />
+              <div className={`border-t my-1.5 ${isDark ? 'border-zinc-700/60' : 'border-zinc-100'}`} />
 
               {/* Add Connection */}
               <div>
                 <button
                   type="button"
                   onClick={() => setIsConnectSubmenuOpen(!isConnectSubmenuOpen)}
-                  className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    isDark ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-zinc-50 text-zinc-700'
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+                    isDark ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-zinc-100 text-zinc-700'
                   }`}
                 >
-                  <div className="flex items-center gap-2">
-                    <Link2 size={13} className="text-accent" />
+                  <div className="flex items-center gap-2.5">
+                    <Link2 size={16} className="text-accent shrink-0" />
                     <span>Add Connection...</span>
                   </div>
-                  <ChevronRight size={12} className={`text-zinc-400 transition-transform ${isConnectSubmenuOpen ? 'rotate-90' : ''}`} />
+                  <ChevronRight size={15} className={`text-zinc-400 transition-transform duration-150 ${isConnectSubmenuOpen ? 'rotate-90' : ''}`} />
                 </button>
 
                 {isConnectSubmenuOpen && (
-                  <div className={`my-1 py-1 pl-2 border-l max-h-36 overflow-y-auto space-y-0.5 custom-scroll ${
+                  <div className={`my-1.5 py-1.5 pl-3 border-l-2 max-h-48 overflow-y-auto space-y-1 custom-scroll ${
                     isDark ? 'border-zinc-700' : 'border-zinc-200'
                   }`}>
                     {data.otherNodes && data.otherNodes.filter((n: any) => n.id !== id).length > 0 ? (
@@ -330,20 +345,20 @@ export const CustomCanvasNode = memo(function CustomCanvasNode({
                             setIsConnectSubmenuOpen(false);
                             if (data.onConnectTo) data.onConnectTo(id, target.id);
                           }}
-                          className={`w-full flex items-center gap-2 px-2 py-1 rounded text-[11px] truncate text-left transition-colors cursor-pointer ${
+                          className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-medium truncate text-left transition-colors cursor-pointer ${
                             isDark ? 'hover:bg-zinc-800 text-zinc-300 hover:text-white' : 'hover:bg-zinc-100 text-zinc-700 hover:text-black'
                           }`}
                           title={`Connect to ${target.title}`}
                         >
                           <span 
-                            className="w-2 h-2 rounded-full shrink-0" 
+                            className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm" 
                             style={{ backgroundColor: (CATEGORY_METADATA as any)[target.category]?.accent || '#71717a' }}
                           />
                           <span className="truncate">{target.title}</span>
                         </button>
                       ))
                     ) : (
-                      <div className="px-2 py-1 text-[10px] text-zinc-500 italic">
+                      <div className="px-2.5 py-1.5 text-xs text-zinc-500 italic">
                         No other cards on canvas
                       </div>
                     )}
@@ -351,7 +366,7 @@ export const CustomCanvasNode = memo(function CustomCanvasNode({
                 )}
               </div>
 
-              <div className={`border-t my-1 ${isDark ? 'border-zinc-700/60' : 'border-zinc-100'}`} />
+              <div className={`border-t my-1.5 ${isDark ? 'border-zinc-700/60' : 'border-zinc-100'}`} />
 
               <button
                 type="button"
@@ -359,11 +374,11 @@ export const CustomCanvasNode = memo(function CustomCanvasNode({
                   setIsMenuOpen(false);
                   setIsEditing(true);
                 }}
-                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  isDark ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-zinc-50 text-zinc-700'
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+                  isDark ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-zinc-100 text-zinc-700'
                 }`}
               >
-                <Edit3 size={13} />
+                <Edit3 size={15} className="shrink-0" />
                 <span>Edit Markdown</span>
               </button>
 
@@ -373,11 +388,11 @@ export const CustomCanvasNode = memo(function CustomCanvasNode({
                   setIsMenuOpen(false);
                   if (data.onDuplicate) data.onDuplicate(id);
                 }}
-                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  isDark ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-zinc-50 text-zinc-700'
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+                  isDark ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-zinc-100 text-zinc-700'
                 }`}
               >
-                <Copy size={13} />
+                <Copy size={15} className="shrink-0" />
                 <span>Duplicate Card</span>
               </button>
 
@@ -387,9 +402,9 @@ export const CustomCanvasNode = memo(function CustomCanvasNode({
                   setIsMenuOpen(false);
                   if (data.onDelete) data.onDelete(id);
                 }}
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs font-medium text-rose-500 hover:bg-rose-500/10 transition-colors"
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
               >
-                <Trash2 size={13} />
+                <Trash2 size={15} className="shrink-0" />
                 <span>Delete Card</span>
               </button>
             </div>

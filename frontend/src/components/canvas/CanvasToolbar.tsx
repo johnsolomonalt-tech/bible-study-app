@@ -184,51 +184,53 @@ export function CanvasToolbar({
           <button
             type="button"
             onClick={() => setIsAddMenuOpen(!isAddMenuOpen)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-semibold hover:bg-accent/90 active:scale-95 transition-all shadow-sm cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-white text-xs sm:text-sm font-semibold hover:bg-accent/90 active:scale-95 transition-all shadow-sm cursor-pointer"
             title="Add card to canvas"
           >
-            <Plus size={14} />
+            <Plus size={15} />
             <span className="hidden sm:inline">Add Card</span>
-            <ChevronDown size={13} className={`transition-transform duration-200 ${isAddMenuOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown size={14} className={`transition-transform duration-200 ${isAddMenuOpen ? 'rotate-180' : ''}`} />
           </button>
 
           {isAddMenuOpen && (
             <div 
-              className={`absolute right-0 sm:left-0 top-full mt-1.5 w-56 rounded-xl shadow-2xl border p-1.5 z-50 animate-in fade-in-50 zoom-in-95 ${
+              className={`absolute right-0 sm:left-0 top-full mt-2 w-64 rounded-2xl shadow-2xl border p-2 z-50 animate-in fade-in-50 zoom-in-95 ${
                 isDark 
                   ? 'bg-[#222226] border-zinc-700 text-zinc-200' 
                   : 'bg-white border-zinc-200 text-zinc-800 shadow-xl'
               }`}
             >
-              <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider px-2 py-1">
+              <div className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider px-3 py-1.5">
                 Add Card
               </div>
-              {(Object.keys(CATEGORY_METADATA) as NodeCategory[]).map((cat) => {
-                const meta = CATEGORY_METADATA[cat];
-                const Icon = CATEGORY_ICONS[cat];
-                return (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => {
-                      onAddNode(cat);
-                      setIsAddMenuOpen(false);
-                    }}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                      isDark ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-zinc-100 text-zinc-800'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span 
-                        className="w-2.5 h-2.5 rounded-full shrink-0" 
-                        style={{ backgroundColor: meta.accent }}
-                      />
-                      <span>{meta.label}</span>
-                    </div>
-                    <Icon size={13} className="text-zinc-400 shrink-0" />
-                  </button>
-                );
-              })}
+              <div className="space-y-1">
+                {(Object.keys(CATEGORY_METADATA) as NodeCategory[]).map((cat) => {
+                  const meta = CATEGORY_METADATA[cat];
+                  const Icon = CATEGORY_ICONS[cat];
+                  return (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => {
+                        onAddNode(cat);
+                        setIsAddMenuOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+                        isDark ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-zinc-100 text-zinc-800'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span 
+                          className="w-3 h-3 rounded-full shrink-0 shadow-sm" 
+                          style={{ backgroundColor: meta.accent }}
+                        />
+                        <span>{meta.label}</span>
+                      </div>
+                      <Icon size={15} className="text-zinc-400 shrink-0" />
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
