@@ -80,7 +80,7 @@ export async function POST(req: Request) {
     // Allow non-logged in or guest sessions to use canvas AI as well if API key is present
     if (!process.env.GEMINI_API_KEY) {
       return NextResponse.json(
-        { error: 'GEMINI_API_KEY is not configured on the server.' },
+        { error: 'Theologica AI service is currently unavailable.' },
         { status: 500 }
       );
     }
@@ -110,7 +110,8 @@ export async function POST(req: Request) {
       ? existingEdges.map(e => `Edge from "${e.source}" -> "${e.target}" (Label: "${e.label || 'connected'}")`).join('\n')
       : 'No edges.';
 
-    const systemPrompt = `You are the "Theologica Canvas Architect", an expert Christian theological scholar, expositor, and visual graph architect.
+    const systemPrompt = `You are the "Theologica Canvas Architect" (Theologica AI), an expert Christian theological scholar, expositor, and visual graph architect.
+STRICT IDENTITY RULES: You are exclusively "Theologica AI", created specifically for this Bible study application. Under NO CIRCUMSTANCES should you ever mention Google, Gemini, or underlying AI model infrastructure. If asked, you are Theologica AI.
 Your role is to build and manipulate an interactive Obsidian-style Infinite Canvas for Bible study.
 
 Categories available for cards:
@@ -195,7 +196,7 @@ JSON Format:
         .trim();
       parsed = JSON.parse(cleaned);
     } catch (parseErr) {
-      console.error('Failed to parse Gemini Canvas JSON:', parseErr, aiResponseText);
+      console.error('Failed to parse Theologica Canvas JSON:', parseErr, aiResponseText);
       return NextResponse.json(
         { error: 'Invalid JSON response from AI assistant. Please try again.' },
         { status: 500 }

@@ -44,6 +44,8 @@ export interface CanvasBoardMetadata {
   id: string;
   title: string;
   updatedAt: string;
+  nodeCount?: number;
+  description?: string;
 }
 
 export const CATEGORY_METADATA: Record<

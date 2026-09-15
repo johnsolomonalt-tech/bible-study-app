@@ -17,20 +17,25 @@ import {
   Node,
   MarkerType,
   SelectionMode,
+  NodeChange,
+  EdgeChange,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
 import { CustomCanvasNode } from './CustomCanvasNode';
 import { CustomCanvasEdge } from './CustomCanvasEdge';
 import { CanvasToolbar } from './CanvasToolbar';
-import { GeminiCanvasModal } from './GeminiCanvasModal';
+import { CanvasSidebar } from './CanvasSidebar';
+import { TheologicaAiCanvasModal } from './TheologicaAiCanvasModal';
 import {
   NodeCategory,
   CanvasNodeData,
   SerializableNode,
   SerializableEdge,
   CanvasStatePayload,
+  CanvasBoardMetadata,
 } from '@/types/canvas';
+import { Sparkles, Undo2 } from 'lucide-react';
 
 interface CanvasBoardProps {
   theme?: 'dark' | 'light';
@@ -42,12 +47,11 @@ interface CanvasBoardProps {
   onIncomingNodeHandled?: () => void;
 }
 
-// Initial sample nodes if user canvas is totally empty
 const INITIAL_DEMO_NODES: SerializableNode[] = [
   {
     id: 'demo-scripture-1',
     type: 'customCard',
-    position: { x: 100, y: 150 },
+    position: { x: 140, y: 140 },
     data: {
       title: 'Romans 8:28',
       content: '> "And we know that in all things God works for the good of those who love him, who have been called according to his purpose."\n\n*Paul\'s foundational assurance of sovereign grace.*',
@@ -57,20 +61,20 @@ const INITIAL_DEMO_NODES: SerializableNode[] = [
   {
     id: 'demo-theology-1',
     type: 'customCard',
-    position: { x: 520, y: 80 },
+    position: { x: 560, y: 80 },
     data: {
       title: 'Sovereign Providence',
-      content: 'God orchestrates all earthly affairs, both pleasant and sorrowful, toward the eternal spiritual good of His elect. **All things** are subordinate to His sovereign will.',
+      content: 'God orchestrates all earthly affairs, both pleasant and sorrowful, toward the eternal spiritual good of His elect. **All things** are subordinate to His sovereign redemptive decree.',
       category: 'theological_point',
     },
   },
   {
     id: 'demo-app-1',
     type: 'customCard',
-    position: { x: 520, y: 340 },
+    position: { x: 560, y: 340 },
     data: {
-      title: 'Trust Amidst Trials',
-      content: '- Surrender anxiety over uncertain circumstances.\n- Cultivate praise in trials, knowing God is working good.\n- Realign personal desires with His redemptive purpose.',
+      title: 'Trust in Trials',
+      content: '- Surrender anxiety over earthly uncertainties.\n- Cultivate persevering praise in hardship.\n- Anchor identity in God\'s eternal calling.',
       category: 'application',
     },
   },
@@ -93,65 +97,127 @@ const INITIAL_DEMO_EDGES: SerializableEdge[] = [
   },
 ];
 
-const STORAGE_KEY = 'theologica_canvas_state_v1';
+interface HistorySnapshot {
+  nodes: SerializableNode[];
+  edges: SerializableEdge[];
+}
 
 function InnerCanvasBoard({
   theme = 'dark',
   incomingNode,
   onIncomingNodeHandled,
 }: CanvasBoardProps) {
-  const { fitView, zoomIn, zoomOut, getViewport, setViewport } = useReactFlow();
+  const { fitView } = useReactFlow();
   const isDark = theme === 'dark';
 
   // React Flow state
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<CanvasNodeData>>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
-  const [boardTitle, setBoardTitle] = useState('My Theological Canvas');
+  const [activeBoardId, setActiveBoardId] = useState('default');
+  const [boardTitle, setBoardTitle] = useState('Romans 8 Study');
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
 
-  // Modal state
-  const [isGeminiOpen, setIsGeminiOpen] = useState(false);
+  // Boards List state
+  const [boards, setBoards] = useState<CanvasBoardMetadata[]>([
+    { id: 'default', title: 'Romans 8 Study', updatedAt: new Date().toISOString(), nodeCount: 3 }
+  ]);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Undo / Redo stacks
-  const historyRef = useRef<Array<{ nodes: Node<CanvasNodeData>[]; edges: Edge[] }>>([]);
+  // Theologica AI Modal state
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const [aiToast, setAiToast] = useState<{ message: string; count: number } | null>(null);
+
+  // Keep references to latest nodes & edges for stable callbacks
+  const nodesRef = useRef<Node<CanvasNodeData>[]>([]);
+  const edgesRef = useRef<Edge[]>([]);
+  nodesRef.current = nodes;
+  edgesRef.current = edges;
+
+  // Undo / Redo history engine
+  const historyRef = useRef<HistorySnapshot[]>([]);
   const historyIndexRef = useRef<number>(-1);
-  const isUndoRedoAction = useRef(false);
+  const isUndoRedoActive = useRef(false);
 
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
 
-  const updateHistoryButtons = useCallback(() => {
+  const updateHistoryState = useCallback(() => {
     setCanUndo(historyIndexRef.current > 0);
     setCanRedo(historyIndexRef.current < historyRef.current.length - 1);
   }, []);
 
-  const pushHistorySnapshot = useCallback((newNodes: Node<CanvasNodeData>[], newEdges: Edge[]) => {
-    if (isUndoRedoAction.current) {
-      isUndoRedoAction.current = false;
+  // Converts live React Flow nodes to lightweight SerializableNode[]
+  const toSerializableNodes = useCallback((nds: Node<CanvasNodeData>[]): SerializableNode[] => {
+    return nds.map((n) => ({
+      id: n.id,
+      type: 'customCard',
+      position: { x: Math.round(n.position.x), y: Math.round(n.position.y) },
+      data: {
+        title: n.data.title,
+        content: n.data.content,
+        category: n.data.category,
+        color: n.data.color,
+        tags: n.data.tags,
+      },
+      style: n.style as React.CSSProperties | undefined,
+    }));
+  }, []);
+
+  // Converts live React Flow edges to lightweight SerializableEdge[]
+  const toSerializableEdges = useCallback((eds: Edge[]): SerializableEdge[] => {
+    return eds.map((e) => ({
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      label: e.label as string | undefined,
+      animated: e.animated,
+    }));
+  }, []);
+
+  // Push snapshot to undo stack
+  const pushSnapshot = useCallback((
+    newNodes?: Node<CanvasNodeData>[],
+    newEdges?: Edge[]
+  ) => {
+    if (isUndoRedoActive.current) {
+      isUndoRedoActive.current = false;
       return;
     }
 
-    // Clean forward history
-    const trimmed = historyRef.current.slice(0, historyIndexRef.current + 1);
-    trimmed.push({
-      nodes: JSON.parse(JSON.stringify(newNodes)),
-      edges: JSON.parse(JSON.stringify(newEdges)),
-    });
+    const currentNodes = newNodes || nodesRef.current;
+    const currentEdges = newEdges || edgesRef.current;
 
-    // Limit stack size to 30
-    if (trimmed.length > 30) {
+    const snapNodes = toSerializableNodes(currentNodes);
+    const snapEdges = toSerializableEdges(currentEdges);
+
+    // Don't push duplicate if identical to last snapshot
+    const lastSnap = historyRef.current[historyIndexRef.current];
+    if (lastSnap) {
+      const isSameNodes = JSON.stringify(lastSnap.nodes) === JSON.stringify(snapNodes);
+      const isSameEdges = JSON.stringify(lastSnap.edges) === JSON.stringify(snapEdges);
+      if (isSameNodes && isSameEdges) {
+        return;
+      }
+    }
+
+    // Slice history at current index
+    const trimmed = historyRef.current.slice(0, historyIndexRef.current + 1);
+    trimmed.push({ nodes: snapNodes, edges: snapEdges });
+
+    // Limit stack size to 35
+    if (trimmed.length > 35) {
       trimmed.shift();
     }
 
     historyRef.current = trimmed;
     historyIndexRef.current = trimmed.length - 1;
-    updateHistoryButtons();
-  }, [updateHistoryButtons]);
+    updateHistoryState();
+  }, [toSerializableNodes, toSerializableEdges, updateHistoryState]);
 
-  // Node actions
+  // Node action callbacks (memoized with stable references)
   const handleUpdateNode = useCallback((id: string, updates: Partial<CanvasNodeData>) => {
     setNodes((nds) => {
-      const updated = nds.map((n) => {
+      const next = nds.map((n) => {
         if (n.id === id) {
           return {
             ...n,
@@ -163,66 +229,57 @@ function InnerCanvasBoard({
         }
         return n;
       });
-      pushHistorySnapshot(updated, edges);
-      return updated;
+      pushSnapshot(next, edgesRef.current);
+      return next;
     });
-  }, [edges, pushHistorySnapshot, setNodes]);
+  }, [pushSnapshot, setNodes]);
 
   const handleDeleteNode = useCallback((id: string) => {
     setNodes((nds) => {
-      const updatedNodes = nds.filter((n) => n.id !== id);
+      const remainingNodes = nds.filter((n) => n.id !== id);
       setEdges((eds) => {
-        const updatedEdges = eds.filter((e) => e.source !== id && e.target !== id);
-        pushHistorySnapshot(updatedNodes, updatedEdges);
-        return updatedEdges;
+        const remainingEdges = eds.filter((e) => e.source !== id && e.target !== id);
+        pushSnapshot(remainingNodes, remainingEdges);
+        return remainingEdges;
       });
-      return updatedNodes;
+      return remainingNodes;
     });
-  }, [pushHistorySnapshot, setEdges, setNodes]);
+  }, [pushSnapshot, setEdges, setNodes]);
 
   const handleDuplicateNode: (id: string) => void = useCallback((id: string) => {
+    const target = nodesRef.current.find((n) => n.id === id);
+    if (!target) return;
+
+    const newId = `card-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const duplicated: Node<CanvasNodeData> = {
+      ...target,
+      id: newId,
+      position: {
+        x: target.position.x + 40,
+        y: target.position.y + 40,
+      },
+      selected: true,
+      data: {
+        ...target.data,
+        title: `${target.data.title} (Copy)`,
+        onUpdate: handleUpdateNode,
+        onDuplicate: handleDuplicateNode,
+        onDelete: handleDeleteNode,
+        theme,
+      },
+    };
+
     setNodes((nds) => {
-      const target = nds.find((n) => n.id === id);
-      if (!target) return nds;
-
-      const newId = `card-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-      const duplicated: Node<CanvasNodeData> = {
-        ...target,
-        id: newId,
-        position: {
-          x: target.position.x + 40,
-          y: target.position.y + 40,
-        },
-        selected: true,
-        data: {
-          ...target.data,
-          title: `${target.data.title} (Copy)`,
-          onUpdate: handleUpdateNode,
-          onDuplicate: handleDuplicateNode,
-          onDelete: handleDeleteNode,
-          theme,
-        },
-      };
-
-      const updated: Node<CanvasNodeData>[] = [
+      const next: Node<CanvasNodeData>[] = [
         ...nds.map((n) => ({ ...n, selected: false })),
         duplicated,
       ];
-      pushHistorySnapshot(updated, edges);
-      return updated;
+      pushSnapshot(next, edgesRef.current);
+      return next;
     });
-  }, [edges, handleDeleteNode, handleUpdateNode, pushHistorySnapshot, setNodes, theme]);
+  }, [handleDeleteNode, handleUpdateNode, pushSnapshot, setNodes, theme]);
 
-  // Node & Edge types
-  const nodeTypes = useMemo(() => ({
-    customCard: CustomCanvasNode,
-  }), []);
-
-  const edgeTypes = useMemo(() => ({
-    customEdge: CustomCanvasEdge,
-  }), []);
-
-  // Format node helper with callbacks and theme
+  // Format node helper
   const prepareNode = useCallback((raw: SerializableNode): Node<CanvasNodeData> => {
     return {
       id: raw.id,
@@ -257,65 +314,102 @@ function InnerCanvasBoard({
     };
   }, [isDark]);
 
-  // Load canvas on mount
-  useEffect(() => {
-    let initialNodes: SerializableNode[] = INITIAL_DEMO_NODES;
-    let initialEdges: SerializableEdge[] = INITIAL_DEMO_EDGES;
-    let initialTitle = 'My Theological Canvas';
+  // Load a specific board by ID
+  const loadBoardData = useCallback(async (boardId: string) => {
+    let loadedNodes: SerializableNode[] = INITIAL_DEMO_NODES;
+    let loadedEdges: SerializableEdge[] = INITIAL_DEMO_EDGES;
+    let loadedTitle = 'Romans 8 Study';
 
-    // 1. Try local storage first
+    // 1. Try local storage
     try {
-      const local = localStorage.getItem(STORAGE_KEY);
+      const local = localStorage.getItem(`theologica_canvas_state_${boardId}`);
       if (local) {
         const parsed = JSON.parse(local);
         if (parsed.nodes && parsed.nodes.length > 0) {
-          initialNodes = parsed.nodes;
-          initialEdges = parsed.edges || [];
-          if (parsed.title) initialTitle = parsed.title;
+          loadedNodes = parsed.nodes;
+          loadedEdges = parsed.edges || [];
+          if (parsed.title) loadedTitle = parsed.title;
         }
       }
     } catch (e) {
-      console.warn('Could not read canvas from local storage:', e);
+      console.warn('LocalStorage canvas parse error:', e);
     }
 
-    const preparedNodes = initialNodes.map(prepareNode);
-    const preparedEdges = initialEdges.map(prepareEdge);
+    // Set state
+    const pNodes = loadedNodes.map(prepareNode);
+    const pEdges = loadedEdges.map(prepareEdge);
 
-    setNodes(preparedNodes);
-    setEdges(preparedEdges);
-    setBoardTitle(initialTitle);
+    setNodes(pNodes);
+    setEdges(pEdges);
+    setBoardTitle(loadedTitle);
 
-    // Initialize history stack
+    // Initialize history with this board's starting state
     historyRef.current = [{
-      nodes: JSON.parse(JSON.stringify(preparedNodes)),
-      edges: JSON.parse(JSON.stringify(preparedEdges)),
+      nodes: toSerializableNodes(pNodes),
+      edges: toSerializableEdges(pEdges),
     }];
     historyIndexRef.current = 0;
-    updateHistoryButtons();
+    updateHistoryState();
 
-    // 2. Background sync with /api/canvas
-    fetch('/api/canvas?id=default')
-      .then((res) => res.json())
-      .then((remote) => {
-        if (remote.nodes && remote.nodes.length > 0 && !localStorage.getItem(STORAGE_KEY)) {
+    // 2. Fetch remote update in background
+    try {
+      const res = await fetch(`/api/canvas?id=${boardId}`);
+      if (res.ok) {
+        const remote = await res.json();
+        if (remote.nodes && remote.nodes.length > 0 && !localStorage.getItem(`theologica_canvas_state_${boardId}`)) {
           const rNodes = remote.nodes.map(prepareNode);
           const rEdges = (remote.edges || []).map(prepareEdge);
           setNodes(rNodes);
           setEdges(rEdges);
           if (remote.title) setBoardTitle(remote.title);
-          historyRef.current = [{ nodes: rNodes, edges: rEdges }];
+          historyRef.current = [{
+            nodes: toSerializableNodes(rNodes),
+            edges: toSerializableEdges(rEdges),
+          }];
           historyIndexRef.current = 0;
-          updateHistoryButtons();
+          updateHistoryState();
         }
-      })
-      .catch((err) => console.warn('Canvas remote fetch offline/unavailable:', err));
+      }
+    } catch {
+      // Offline fallback is fine
+    }
 
     setTimeout(() => {
-      fitView({ padding: 0.25, duration: 600 });
-    }, 150);
+      fitView({ padding: 0.25, duration: 500 });
+    }, 120);
+  }, [fitView, prepareEdge, prepareNode, toSerializableEdges, toSerializableNodes, updateHistoryState, setNodes, setEdges]);
+
+  // Load boards list and initial board on mount
+  useEffect(() => {
+    // 1. Load boards index from localStorage
+    try {
+      const localList = localStorage.getItem('theologica_canvas_boards_list_v1');
+      if (localList) {
+        const parsed = JSON.parse(localList);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setBoards(parsed);
+        }
+      }
+    } catch {
+      // Ignore
+    }
+
+    // 2. Fetch boards list from API
+    fetch('/api/canvas?list=true')
+      .then((res) => res.json())
+      .then((remoteList) => {
+        if (Array.isArray(remoteList) && remoteList.length > 0) {
+          setBoards(remoteList);
+          localStorage.setItem('theologica_canvas_boards_list_v1', JSON.stringify(remoteList));
+        }
+      })
+      .catch(() => {});
+
+    // Load initial active board
+    loadBoardData('default');
   }, []); // Run once on mount
 
-  // Sync theme changes to existing nodes
+  // Sync theme changes to nodes
   useEffect(() => {
     setNodes((nds) =>
       nds.map((n) => ({
@@ -331,50 +425,45 @@ function InnerCanvasBoard({
     );
   }, [theme, handleUpdateNode, handleDuplicateNode, handleDeleteNode, setNodes]);
 
-  // Auto-save debounce (localStorage + /api/canvas)
+  // Auto-save debounce for current board
   useEffect(() => {
     if (nodes.length === 0) return;
 
     setSaveStatus('saving');
     const timer = setTimeout(() => {
       try {
-        const payload: CanvasStatePayload & { title: string } = {
+        const payload: CanvasStatePayload & { title: string; updatedAt: string } = {
           title: boardTitle,
-          nodes: nodes.map((n) => ({
-            id: n.id,
-            type: 'customCard',
-            position: n.position,
-            data: {
-              title: n.data.title,
-              content: n.data.content,
-              category: n.data.category,
-              color: n.data.color,
-              tags: n.data.tags,
-            },
-            style: n.style as React.CSSProperties | undefined,
-          })),
-          edges: edges.map((e) => ({
-            id: e.id,
-            source: e.source,
-            target: e.target,
-            label: e.label as string,
-            animated: e.animated,
-          })),
+          nodes: toSerializableNodes(nodes),
+          edges: toSerializableEdges(edges),
+          updatedAt: new Date().toISOString(),
         };
 
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+        // Cache locally
+        localStorage.setItem(`theologica_canvas_state_${activeBoardId}`, JSON.stringify(payload));
+
+        // Update boards index list
+        setBoards((prev) => {
+          const updated = prev.map((b) =>
+            b.id === activeBoardId
+              ? { ...b, title: boardTitle, nodeCount: nodes.length, updatedAt: payload.updatedAt }
+              : b
+          );
+          localStorage.setItem('theologica_canvas_boards_list_v1', JSON.stringify(updated));
+          return updated;
+        });
 
         // Sync with API
         fetch('/api/canvas', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            id: 'default',
+            id: activeBoardId,
             title: boardTitle,
             nodes: payload.nodes,
             edges: payload.edges,
           }),
-        }).catch((e) => console.warn('Canvas remote save offline fallback:', e));
+        }).catch(() => {});
 
         setSaveStatus('saved');
       } catch (err) {
@@ -384,25 +473,24 @@ function InnerCanvasBoard({
     }, 1200);
 
     return () => clearTimeout(timer);
-  }, [nodes, edges, boardTitle]);
+  }, [nodes, edges, boardTitle, activeBoardId, toSerializableNodes, toSerializableEdges]);
 
-  // Handle incoming node from Scripture Reader or Bible Chat
+  // Handle incoming node from Bible reader or AI chat
   useEffect(() => {
     if (!incomingNode) return;
 
     const timestamp = Date.now();
     const newId = `card-incoming-${timestamp}`;
 
-    // Find position near center or offset from existing nodes
-    let posX = 150;
-    let posY = 150;
+    let posX = 140;
+    let posY = 140;
     if (nodes.length > 0) {
       let maxX = -Infinity;
       for (const n of nodes) {
         if (n.position.x > maxX) maxX = n.position.x;
       }
       posX = maxX + 380;
-      posY = 150;
+      posY = 140;
     }
 
     const newNode: Node<CanvasNodeData> = {
@@ -422,12 +510,12 @@ function InnerCanvasBoard({
     };
 
     setNodes((nds) => {
-      const updated: Node<CanvasNodeData>[] = [
+      const next: Node<CanvasNodeData>[] = [
         ...nds.map((n) => ({ ...n, selected: false })),
         newNode,
       ];
-      pushHistorySnapshot(updated, edges);
-      return updated;
+      pushSnapshot(next, edgesRef.current);
+      return next;
     });
 
     if (onIncomingNodeHandled) {
@@ -436,15 +524,14 @@ function InnerCanvasBoard({
 
     setTimeout(() => {
       fitView({ padding: 0.25, duration: 600 });
-    }, 100);
-  }, [incomingNode, nodes, edges, theme, handleUpdateNode, handleDuplicateNode, handleDeleteNode, onIncomingNodeHandled, pushHistorySnapshot, fitView, setNodes]);
+    }, 120);
+  }, [incomingNode, nodes, theme, handleUpdateNode, handleDuplicateNode, handleDeleteNode, onIncomingNodeHandled, pushSnapshot, fitView, setNodes]);
 
-  // Add new node via toolbar
+  // Add card from toolbar
   const handleAddNode = useCallback((category: NodeCategory) => {
     const timestamp = Date.now();
     const newId = `card-${timestamp}`;
 
-    // Center in view or stagger
     let posX = 200;
     let posY = 200;
 
@@ -480,22 +567,21 @@ function InnerCanvasBoard({
     };
 
     setNodes((nds) => {
-      const updated: Node<CanvasNodeData>[] = [
+      const next: Node<CanvasNodeData>[] = [
         ...nds.map((n) => ({ ...n, selected: false })),
         newNode,
       ];
-      pushHistorySnapshot(updated, edges);
-      return updated;
+      pushSnapshot(next, edgesRef.current);
+      return next;
     });
-  }, [nodes, edges, theme, handleUpdateNode, handleDuplicateNode, handleDeleteNode, pushHistorySnapshot, setNodes]);
+  }, [nodes, theme, handleUpdateNode, handleDuplicateNode, handleDeleteNode, pushSnapshot, setNodes]);
 
-  // Connect edges with validation (no self-connections, no duplicate edges)
+  // Connecting edges
   const onConnect = useCallback((connection: Connection) => {
     if (!connection.source || !connection.target) return;
     if (connection.source === connection.target) return; // Prevent self-connections
 
     setEdges((eds) => {
-      // Check duplicates
       const exists = eds.some(
         (e) => e.source === connection.source && e.target === connection.target
       );
@@ -514,61 +600,73 @@ function InnerCanvasBoard({
         },
       } as Edge;
 
-      const updated = addEdge(newEdge, eds);
-      pushHistorySnapshot(nodes, updated);
-      return updated;
+      const next = addEdge(newEdge, eds);
+      pushSnapshot(nodesRef.current, next);
+      return next;
     });
-  }, [isDark, nodes, pushHistorySnapshot, setEdges]);
+  }, [isDark, pushSnapshot, setEdges]);
 
-  // Undo / Redo implementations
+  // Capture drag stop so moving nodes can be undone!
+  const onNodeDragStop = useCallback(() => {
+    pushSnapshot(nodesRef.current, edgesRef.current);
+  }, [pushSnapshot]);
+
+  // Capture node delete
+  const onNodesDelete = useCallback((deleted: Node[]) => {
+    const deletedIds = new Set(deleted.map((n) => n.id));
+    const nextNodes = nodesRef.current.filter((n) => !deletedIds.has(n.id));
+    const nextEdges = edgesRef.current.filter(
+      (e) => !deletedIds.has(e.source) && !deletedIds.has(e.target)
+    );
+    pushSnapshot(nextNodes, nextEdges);
+  }, [pushSnapshot]);
+
+  // Capture edge delete
+  const onEdgesDelete = useCallback((deleted: Edge[]) => {
+    const deletedIds = new Set(deleted.map((e) => e.id));
+    const nextEdges = edgesRef.current.filter((e) => !deletedIds.has(e.id));
+    pushSnapshot(nodesRef.current, nextEdges);
+  }, [pushSnapshot]);
+
+  // UNDO implementation
   const handleUndo = useCallback(() => {
     if (historyIndexRef.current <= 0) return;
-    isUndoRedoAction.current = true;
+
+    isUndoRedoActive.current = true;
     historyIndexRef.current -= 1;
     const snapshot = historyRef.current[historyIndexRef.current];
 
-    const restoredNodes = snapshot.nodes.map((n) => ({
-      ...n,
-      data: {
-        ...n.data,
-        theme,
-        onUpdate: handleUpdateNode,
-        onDuplicate: handleDuplicateNode,
-        onDelete: handleDeleteNode,
-      },
-    }));
+    if (!snapshot) return;
+
+    const restoredNodes = snapshot.nodes.map(prepareNode);
+    const restoredEdges = snapshot.edges.map(prepareEdge);
 
     setNodes(restoredNodes);
-    setEdges(snapshot.edges);
-    updateHistoryButtons();
-  }, [handleDeleteNode, handleDuplicateNode, handleUpdateNode, setEdges, setNodes, theme, updateHistoryButtons]);
+    setEdges(restoredEdges);
+    updateHistoryState();
+  }, [prepareEdge, prepareNode, setEdges, setNodes, updateHistoryState]);
 
+  // REDO implementation
   const handleRedo = useCallback(() => {
     if (historyIndexRef.current >= historyRef.current.length - 1) return;
-    isUndoRedoAction.current = true;
+
+    isUndoRedoActive.current = true;
     historyIndexRef.current += 1;
     const snapshot = historyRef.current[historyIndexRef.current];
 
-    const restoredNodes = snapshot.nodes.map((n) => ({
-      ...n,
-      data: {
-        ...n.data,
-        theme,
-        onUpdate: handleUpdateNode,
-        onDuplicate: handleDuplicateNode,
-        onDelete: handleDeleteNode,
-      },
-    }));
+    if (!snapshot) return;
+
+    const restoredNodes = snapshot.nodes.map(prepareNode);
+    const restoredEdges = snapshot.edges.map(prepareEdge);
 
     setNodes(restoredNodes);
-    setEdges(snapshot.edges);
-    updateHistoryButtons();
-  }, [handleDeleteNode, handleDuplicateNode, handleUpdateNode, setEdges, setNodes, theme, updateHistoryButtons]);
+    setEdges(restoredEdges);
+    updateHistoryState();
+  }, [prepareEdge, prepareNode, setEdges, setNodes, updateHistoryState]);
 
-  // Keyboard shortcuts (Cmd+Z, Cmd+Shift+Z, Delete/Backspace)
+  // Global Keyboard Shortcuts (Cmd+Z, Cmd+Shift+Z, Delete)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore hotkeys if user is typing in an input or textarea
       const target = e.target as HTMLElement;
       if (
         target.tagName === 'INPUT' ||
@@ -589,107 +687,125 @@ function InnerCanvasBoard({
         e.preventDefault();
         handleRedo();
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
-        // Delete selected nodes or edges
-        setNodes((nds) => {
-          const selectedNodes = nds.filter((n) => n.selected);
-          if (selectedNodes.length === 0) return nds;
+        const selectedNodes = nodesRef.current.filter((n) => n.selected);
+        const selectedEdges = edgesRef.current.filter((ed) => ed.selected);
 
-          const remainingNodes = nds.filter((n) => !n.selected);
-          const selectedIds = new Set(selectedNodes.map((n) => n.id));
+        if (selectedNodes.length === 0 && selectedEdges.length === 0) return;
 
-          setEdges((eds) => {
-            const remainingEdges = eds.filter(
-              (ed) => !ed.selected && !selectedIds.has(ed.source) && !selectedIds.has(ed.target)
-            );
-            pushHistorySnapshot(remainingNodes, remainingEdges);
-            return remainingEdges;
-          });
+        const selectedNodeIds = new Set(selectedNodes.map((n) => n.id));
+        const selectedEdgeIds = new Set(selectedEdges.map((e) => e.id));
 
-          return remainingNodes;
-        });
+        const nextNodes = nodesRef.current.filter((n) => !selectedNodeIds.has(n.id));
+        const nextEdges = edgesRef.current.filter(
+          (e) => !selectedEdgeIds.has(e.id) && !selectedNodeIds.has(e.source) && !selectedNodeIds.has(e.target)
+        );
+
+        setNodes(nextNodes);
+        setEdges(nextEdges);
+        pushSnapshot(nextNodes, nextEdges);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleUndo, handleRedo, pushHistorySnapshot, setEdges, setNodes]);
+  }, [handleUndo, handleRedo, pushSnapshot, setEdges, setNodes]);
 
   // Clear Canvas
   const handleClear = useCallback(() => {
     if (nodes.length === 0) return;
-    if (window.confirm('Are you sure you want to clear this entire canvas?')) {
+    if (window.confirm('Clear all cards on this board? You can undo this action.')) {
       setNodes([]);
       setEdges([]);
-      pushHistorySnapshot([], []);
-      localStorage.removeItem(STORAGE_KEY);
+      pushSnapshot([], []);
     }
-  }, [nodes.length, pushHistorySnapshot, setEdges, setNodes]);
+  }, [nodes.length, pushSnapshot, setEdges, setNodes]);
 
-  // Export JSON
-  const handleExport = useCallback(() => {
-    const payload = {
-      title: boardTitle,
-      exportedAt: new Date().toISOString(),
-      nodes: nodes.map((n) => ({
-        id: n.id,
-        type: n.type,
-        position: n.position,
-        data: {
-          title: n.data.title,
-          content: n.data.content,
-          category: n.data.category,
-        },
-      })),
-      edges: edges.map((e) => ({
-        id: e.id,
-        source: e.source,
-        target: e.target,
-        label: e.label,
-      })),
+  // Sidebar Board Switcher Handlers
+  const handleSelectBoard = useCallback((boardId: string) => {
+    if (boardId === activeBoardId) return;
+    setActiveBoardId(boardId);
+    loadBoardData(boardId);
+  }, [activeBoardId, loadBoardData]);
+
+  const handleCreateBoard = useCallback(() => {
+    const timestamp = Date.now();
+    const newId = `board-${timestamp}`;
+    const newBoardMeta: CanvasBoardMetadata = {
+      id: newId,
+      title: 'New Canvas',
+      updatedAt: new Date().toISOString(),
+      nodeCount: 0,
     };
 
-    const blob = new Blob([JSON.stringify(payload, null, 2)], {
-      type: 'application/json',
+    const nextBoards = [newBoardMeta, ...boards];
+    setBoards(nextBoards);
+    localStorage.setItem('theologica_canvas_boards_list_v1', JSON.stringify(nextBoards));
+
+    setActiveBoardId(newId);
+    setBoardTitle('New Canvas');
+    setNodes([]);
+    setEdges([]);
+
+    historyRef.current = [{ nodes: [], edges: [] }];
+    historyIndexRef.current = 0;
+    updateHistoryState();
+
+    // Persist empty board to API
+    fetch('/api/canvas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: newId,
+        title: 'New Canvas',
+        nodes: [],
+        edges: [],
+      }),
+    }).catch(() => {});
+  }, [boards, updateHistoryState, setNodes, setEdges]);
+
+  const handleRenameBoard = useCallback((id: string, newTitle: string) => {
+    if (id === activeBoardId) {
+      setBoardTitle(newTitle);
+    }
+    setBoards((prev) => {
+      const next = prev.map((b) => (b.id === id ? { ...b, title: newTitle } : b));
+      localStorage.setItem('theologica_canvas_boards_list_v1', JSON.stringify(next));
+      return next;
     });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${boardTitle.toLowerCase().replace(/\s+/g, '_')}_canvas.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [boardTitle, edges, nodes]);
 
-  // Import JSON
-  const handleImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    fetch('/api/canvas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id,
+        title: newTitle,
+        nodes: toSerializableNodes(nodesRef.current),
+        edges: toSerializableEdges(edgesRef.current),
+      }),
+    }).catch(() => {});
+  }, [activeBoardId, toSerializableEdges, toSerializableNodes]);
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const parsed = JSON.parse(event.target?.result as string);
-        if (parsed.nodes && Array.isArray(parsed.nodes)) {
-          const importedNodes = parsed.nodes.map(prepareNode);
-          const importedEdges = (parsed.edges || []).map(prepareEdge);
+  const handleDeleteBoard = useCallback((id: string) => {
+    const remaining = boards.filter((b) => b.id !== id);
+    if (remaining.length === 0) return;
 
-          setNodes(importedNodes);
-          setEdges(importedEdges);
-          if (parsed.title) setBoardTitle(parsed.title);
-          pushHistorySnapshot(importedNodes, importedEdges);
+    setBoards(remaining);
+    localStorage.setItem('theologica_canvas_boards_list_v1', JSON.stringify(remaining));
+    localStorage.removeItem(`theologica_canvas_state_${id}`);
 
-          setTimeout(() => {
-            fitView({ padding: 0.25, duration: 600 });
-          }, 100);
-        }
-      } catch (err) {
-        alert('Invalid canvas JSON file.');
-      }
-    };
-    reader.readAsText(file);
-  }, [fitView, prepareEdge, prepareNode, pushHistorySnapshot, setEdges, setNodes]);
+    // Call API delete
+    fetch(`/api/canvas?id=${id}`, { method: 'DELETE' }).catch(() => {});
 
-  // Apply updates from Gemini 3 Flash
-  const handleApplyGeminiGraph = useCallback((
+    // If active was deleted, switch to first remaining board
+    if (id === activeBoardId) {
+      const nextActive = remaining[0].id;
+      setActiveBoardId(nextActive);
+      loadBoardData(nextActive);
+    }
+  }, [boards, activeBoardId, loadBoardData]);
+
+  // Apply updates from Theologica AI
+  const handleApplyAiGraph = useCallback((
     newNodes: SerializableNode[],
     newEdges: SerializableEdge[],
     explanation: string
@@ -697,29 +813,28 @@ function InnerCanvasBoard({
     const preparedNewNodes = newNodes.map(prepareNode);
     const preparedNewEdges = newEdges.map(prepareEdge);
 
-    setNodes((nds) => {
-      // Unselect existing
-      const unselected = nds.map((n) => ({ ...n, selected: false }));
-      // Highlight new nodes
-      const withNew = unselected.concat(
-        preparedNewNodes.map((n) => ({ ...n, selected: true }))
-      );
+    const nextNodes: Node<CanvasNodeData>[] = [
+      ...nodesRef.current.map((n) => ({ ...n, selected: false })),
+      ...preparedNewNodes.map((n) => ({ ...n, selected: true })),
+    ];
+    const nextEdges = edgesRef.current.concat(preparedNewEdges);
 
-      setEdges((eds) => {
-        const combinedEdges = eds.concat(preparedNewEdges);
-        pushHistorySnapshot(withNew, combinedEdges);
-        return combinedEdges;
-      });
+    setNodes(nextNodes);
+    setEdges(nextEdges);
+    pushSnapshot(nextNodes, nextEdges);
 
-      return withNew;
+    setAiToast({
+      message: explanation || `Theologica AI added ${newNodes.length} cards to your canvas.`,
+      count: newNodes.length,
     });
+    setTimeout(() => setAiToast(null), 6000);
 
     setTimeout(() => {
       fitView({ padding: 0.25, duration: 800 });
     }, 150);
-  }, [fitView, prepareEdge, prepareNode, pushHistorySnapshot, setEdges, setNodes]);
+  }, [fitView, prepareEdge, prepareNode, pushSnapshot, setEdges, setNodes]);
 
-  // Find currently selected node (if exactly 1 selected) for Gemini modal context
+  // Target selected node for AI expansion
   const selectedNode = useMemo(() => {
     const selected = nodes.filter((n) => n.selected);
     if (selected.length === 1) {
@@ -736,24 +851,14 @@ function InnerCanvasBoard({
 
   const currentGraphPayload = useMemo((): CanvasStatePayload => {
     return {
-      nodes: nodes.map((n) => ({
-        id: n.id,
-        type: 'customCard',
-        position: n.position,
-        data: {
-          title: n.data.title,
-          content: n.data.content,
-          category: n.data.category,
-        },
-      })),
-      edges: edges.map((e) => ({
-        id: e.id,
-        source: e.source,
-        target: e.target,
-        label: e.label as string,
-      })),
+      nodes: toSerializableNodes(nodes),
+      edges: toSerializableEdges(edges),
     };
-  }, [nodes, edges]);
+  }, [nodes, edges, toSerializableNodes, toSerializableEdges]);
+
+  // Node & Edge types
+  const nodeTypes = useMemo(() => ({ customCard: CustomCanvasNode }), []);
+  const edgeTypes = useMemo(() => ({ customEdge: CustomCanvasEdge }), []);
 
   return (
     <div 
@@ -762,32 +867,48 @@ function InnerCanvasBoard({
         backgroundColor: isDark ? '#161618' : '#F6F6F6',
       }}
     >
+      {/* Canvases Sidebar */}
+      <CanvasSidebar
+        isOpen={isSidebarOpen}
+        onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+        boards={boards}
+        activeBoardId={activeBoardId}
+        onSelectBoard={handleSelectBoard}
+        onCreateBoard={handleCreateBoard}
+        onRenameBoard={handleRenameBoard}
+        onDeleteBoard={handleDeleteBoard}
+        theme={theme}
+      />
+
       {/* Top Action Toolbar */}
       <CanvasToolbar
         boardTitle={boardTitle}
-        onTitleChange={setBoardTitle}
+        onTitleChange={(t) => handleRenameBoard(activeBoardId, t)}
         onAddNode={handleAddNode}
-        onOpenGemini={() => setIsGeminiOpen(true)}
+        onOpenAi={() => setIsAiModalOpen(true)}
         onUndo={handleUndo}
         onRedo={handleRedo}
         canUndo={canUndo}
         canRedo={canRedo}
         onFitView={() => fitView({ padding: 0.2, duration: 600 })}
         onClear={handleClear}
-        onExport={handleExport}
-        onImport={handleImport}
+        isSidebarOpen={isSidebarOpen}
+        onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         saveStatus={saveStatus}
         theme={theme}
         nodeCount={nodes.length}
       />
 
-      {/* React Flow Infinite Canvas Engine */}
+      {/* React Flow Canvas Engine */}
       <ReactFlow<Node<CanvasNodeData>, Edge>
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onNodeDragStop={onNodeDragStop}
+        onNodesDelete={onNodesDelete}
+        onEdgesDelete={onEdgesDelete}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         minZoom={0.1}
@@ -795,7 +916,7 @@ function InnerCanvasBoard({
         selectionMode={SelectionMode.Partial}
         panOnScroll={false}
         selectionOnDrag={true}
-        panOnDrag={[1, 2]} // Middle click or right click drag, or space drag
+        panOnDrag={[1, 2]}
         zoomOnPinch={true}
         zoomOnScroll={true}
         proOptions={{ hideAttribution: true }}
@@ -805,7 +926,7 @@ function InnerCanvasBoard({
         }}
         className="w-full h-full"
       >
-        {/* High-Precision Dot Grid */}
+        {/* Dot Grid */}
         <Background
           variant={BackgroundVariant.Dots}
           gap={20}
@@ -813,7 +934,7 @@ function InnerCanvasBoard({
           color={isDark ? '#323236' : '#D4D4D8'}
         />
 
-        {/* MiniMap (Bottom Right) */}
+        {/* MiniMap */}
         <MiniMap
           position="bottom-right"
           nodeStrokeWidth={3}
@@ -835,7 +956,7 @@ function InnerCanvasBoard({
           style={{ width: 160, height: 110 }}
         />
 
-        {/* Zoom Controls (Bottom Left) */}
+        {/* Zoom Controls */}
         <Controls
           position="bottom-left"
           showInteractive={false}
@@ -847,13 +968,32 @@ function InnerCanvasBoard({
         />
       </ReactFlow>
 
-      {/* Gemini 3 Flash Bidirectional Visual Assistant Modal */}
-      <GeminiCanvasModal
-        isOpen={isGeminiOpen}
-        onClose={() => setIsGeminiOpen(false)}
+      {/* Floating Theologica AI Success Toast */}
+      {aiToast && (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-[#1e1e22]/95 border border-accent/60 shadow-2xl text-xs text-white backdrop-blur-md animate-in fade-in slide-in-from-bottom-3">
+          <Sparkles size={15} className="text-accent animate-pulse shrink-0" />
+          <span className="font-medium">{aiToast.message}</span>
+          <button
+            type="button"
+            onClick={() => {
+              handleUndo();
+              setAiToast(null);
+            }}
+            className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-colors cursor-pointer"
+          >
+            <Undo2 size={12} />
+            <span>Undo</span>
+          </button>
+        </div>
+      )}
+
+      {/* Theologica AI Canvas Architect Modal */}
+      <TheologicaAiCanvasModal
+        isOpen={isAiModalOpen}
+        onClose={() => setIsAiModalOpen(false)}
         currentGraph={currentGraphPayload}
         selectedNode={selectedNode}
-        onApplyGraphUpdate={handleApplyGeminiGraph}
+        onApplyGraphUpdate={handleApplyAiGraph}
         theme={theme}
       />
     </div>

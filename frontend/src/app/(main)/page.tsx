@@ -210,6 +210,20 @@ export default function App() {
   const [devotionalEntry, setDevotionalEntry] = useState<DevotionalEntry | null>(null);
   const [isDevoSpeaking, setIsDevoSpeaking] = useState(false);
   const isDevoSpeakingRef = useRef(false);
+  const todayDayRef = useRef(1);
+
+  const changeDevotionalDay = (targetDay: number) => {
+    let nextDay = targetDay;
+    if (nextDay < 1) nextDay = totalDays;
+    if (nextDay > totalDays) nextDay = 1;
+    setDisplayDay(nextDay);
+    setDevotionalEntry(getDevotionalForDay(nextDay));
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    setIsDevoSpeaking(false);
+    isDevoSpeakingRef.current = false;
+  };
 
   // Bible State
   const [highlights, setHighlights] = useState<{id: number, book: string, chapter: number, verse: number, text: string, color: string}[]>([]);
@@ -842,7 +856,7 @@ export default function App() {
     // Check if current year is a leap year for UI total
     const isLeapYear = (tzYear % 4 === 0 && tzYear % 100 !== 0) || (tzYear % 400 === 0);
     
-    // eslint-disable-next-line
+    todayDayRef.current = actualDoy;
     setDisplayDay(actualDoy);
     setTotalDays(isLeapYear ? 366 : 365);
     setDevotionalEntry(getDevotionalForDay(alignedDoy));
@@ -2045,62 +2059,142 @@ export default function App() {
 
         {/* DEVOTIONAL TAB */}
         {activeTab === 'devotional' && (
-          <div className="flex-1 flex flex-col items-center overflow-y-auto custom-scroll p-4 lg:p-8 bg-bg">
-            <div className="w-full max-w-2xl bg-bg">
-              {/* Toggle switch */}
-              <div className="flex justify-center mb-8 shrink-0">
-                <div className="flex p-1 bg-surface rounded-full ring-shadow">
+          <div className="flex-1 flex flex-col items-center overflow-y-auto custom-scroll p-4 sm:p-6 lg:p-10 bg-bg">
+            <div className="w-full max-w-4xl xl:max-w-5xl space-y-6">
+              {/* Day navigation & Time toggle header */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0 pb-2 border-b border-border/50">
+                {/* Prev / Today / Next Day Navigation */}
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => changeDevotionalDay(displayDay - 1)}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl border border-border bg-surface hover:bg-surface-hover text-xs font-semibold transition-all text-fg cursor-pointer active:scale-95"
+                    title="Previous Day"
+                  >
+                    <ChevronLeft size={16} />
+                    <span>Previous</span>
+                  </button>
+
+                  <div className="px-3 py-1.5 rounded-xl bg-surface/60 border border-border/50 text-xs font-bold text-fg-hover tracking-wide">
+                    Day {displayDay} <span className="text-muted font-normal">/ {totalDays}</span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => changeDevotionalDay(displayDay + 1)}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl border border-border bg-surface hover:bg-surface-hover text-xs font-semibold transition-all text-fg cursor-pointer active:scale-95"
+                    title="Next Day"
+                  >
+                    <span>Next</span>
+                    <ChevronRight size={16} />
+                  </button>
+
+                  {displayDay !== todayDayRef.current && (
+                    <button
+                      type="button"
+                      onClick={() => changeDevotionalDay(todayDayRef.current)}
+                      className="ml-1 px-2.5 py-1.5 rounded-xl bg-accent/15 border border-accent/30 text-accent text-xs font-semibold hover:bg-accent/25 transition-all cursor-pointer"
+                    >
+                      Today
+                    </button>
+                  )}
+                </div>
+
+                {/* Morning / Evening Toggle switch */}
+                <div className="flex p-1 bg-surface rounded-xl ring-shadow border border-border/40">
                   <button 
                     onClick={() => setDevotionalTime('morning')}
-                    className={`flex items-center gap-2 px-6 py-2 rounded-full text-sm font-medium transition-colors ${devotionalTime === 'morning' ? 'bg-accent text-white shadow-sm' : 'text-muted hover:text-fg'}`}
+                    className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      devotionalTime === 'morning' ? 'bg-accent text-white shadow-sm' : 'text-muted hover:text-fg'
+                    }`}
                   >
-                    <Sun size={16} /> Morning
+                    <Sun size={14} />
+                    <span>Morning</span>
                   </button>
                   <button 
                     onClick={() => setDevotionalTime('evening')}
-                    className={`flex items-center gap-2 px-6 py-2 rounded-full text-sm font-medium transition-colors ${devotionalTime === 'evening' ? 'bg-accent text-white shadow-sm' : 'text-muted hover:text-fg'}`}
+                    className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      devotionalTime === 'evening' ? 'bg-accent text-white shadow-sm' : 'text-muted hover:text-fg'
+                    }`}
                   >
-                    <Moon size={16} /> Evening
+                    <Moon size={14} />
+                    <span>Evening</span>
                   </button>
                 </div>
               </div>
 
-              {/* Devotional Card */}
+              {/* Devotional Article Card with smooth non-overflowing transition */}
               {devotionalEntry && (
-                <article className="border border-border rounded-2xl p-6 lg:p-10 shadow-sm bg-bg ring-shadow overflow-hidden">
-                  <AnimatePresence mode="popLayout" initial={false}>
+                <article className="border border-border/80 rounded-2xl p-6 sm:p-10 lg:p-14 shadow-lg bg-surface/25 backdrop-blur-sm ring-shadow w-full">
+                  <AnimatePresence mode="wait">
                     <motion.div
-                      key={devotionalTime}
-                      initial={{ x: devotionalTime === 'morning' ? -100 : 100, opacity: 0 }}
-                      animate={{ x: 0, opacity: 1 }}
-                      exit={{ x: devotionalTime === 'morning' ? -100 : 100, opacity: 0 }}
-                      transition={{ duration: 0.4, ease: "easeInOut" }}
+                      key={`${displayDay}-${devotionalTime}`}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.22, ease: "easeOut" }}
+                      className="w-full"
                     >
-                      <header className="flex justify-between items-start mb-6">
-                        <div>
-                          <h2 className="text-accent font-display text-2xl lg:text-3xl mb-2">
+                      <header className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6">
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-md bg-accent/15 text-accent border border-accent/30 tracking-widest uppercase">
+                              {devotionalTime === 'morning' ? 'Morning Devotion' : 'Evening Devotion'}
+                            </span>
+                            <span className="text-muted text-xs font-medium">
+                              Day {displayDay} of {totalDays}
+                            </span>
+                          </div>
+                          <h2 className="text-accent font-display text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight">
                             {devotionalTime === 'morning' ? devotionalEntry.morningVerse : devotionalEntry.eveningVerse}
                           </h2>
-                          <p className="text-muted text-sm uppercase tracking-widest font-bold">
-                            Day {displayDay} of {totalDays}
-                          </p>
                         </div>
-                        <button 
-                          onClick={toggleDevoSpeech}
-                          className="p-3 bg-surface text-fg rounded-full hover:bg-border-soft transition-colors shrink-0 ring-shadow"
-                        >
-                          {isDevoSpeaking ? <VolumeX size={20} /> : <Volume2 size={20} />}
-                        </button>
+
+                        {/* Action controls */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const v = devotionalTime === 'morning' ? devotionalEntry.morningVerse : devotionalEntry.eveningVerse;
+                              const t = devotionalTime === 'morning' ? devotionalEntry.morningText : devotionalEntry.eveningText;
+                              setCanvasIncomingNode({
+                                title: `Devotional: ${v}`,
+                                content: `### ${v}\n\n${t}\n\n*${devotionalEntry.citation}*`,
+                                category: 'application',
+                              });
+                              setActiveTab('canvas');
+                            }}
+                            className="flex items-center gap-1 px-3 py-2 bg-surface hover:bg-surface-hover text-fg text-xs font-semibold rounded-xl border border-border transition-colors cursor-pointer"
+                            title="Send Devotional to Canvas"
+                          >
+                            <Workflow size={14} className="text-accent" />
+                            <span className="hidden sm:inline">Canvas</span>
+                          </button>
+
+                          <button 
+                            type="button"
+                            onClick={toggleDevoSpeech}
+                            className={`p-2.5 rounded-xl border transition-colors shrink-0 cursor-pointer ${
+                              isDevoSpeaking 
+                                ? 'bg-accent text-white border-accent' 
+                                : 'bg-surface text-fg hover:bg-surface-hover border-border'
+                            }`}
+                            title={isDevoSpeaking ? 'Stop Audio' : 'Listen to Devotional'}
+                          >
+                            {isDevoSpeaking ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                          </button>
+                        </div>
                       </header>
-                      
-                      <div className="w-full h-px bg-surface mb-8" />
-                      
-                      <div className="text-[17px] leading-[1.8] text-fg font-serif mb-10 whitespace-pre-wrap">
+
+                      <div className="w-full h-px bg-border/60 mb-8" />
+
+                      <div className="text-[18px] lg:text-[20px] leading-[2.0] text-fg font-serif mb-10 whitespace-pre-wrap selection:bg-accent/20">
                         {devotionalTime === 'morning' ? devotionalEntry.morningText : devotionalEntry.eveningText}
                       </div>
-                      
-                      <footer className="text-muted text-sm italic border-t border-border pt-4">
-                        {devotionalEntry.citation}
+
+                      <footer className="text-muted text-sm font-medium italic border-t border-border/60 pt-5 flex items-center justify-between">
+                        <span>{devotionalEntry.citation}</span>
+                        <span className="text-xs text-muted/80">Spurgeon’s Morning and Evening</span>
                       </footer>
                     </motion.div>
                   </AnimatePresence>
