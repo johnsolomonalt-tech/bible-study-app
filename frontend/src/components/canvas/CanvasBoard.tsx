@@ -69,6 +69,76 @@ interface HistorySnapshot {
   edges: SerializableEdge[];
 }
 
+// Calculate dynamic node height based on React Flow DOM measurements or content-length estimation
+function getNodeHeight(node: Node<CanvasNodeData> | SerializableNode): number {
+  // 1. If React Flow has measured the node DOM height, use it directly
+  if ('measured' in node && typeof node.measured?.height === 'number' && node.measured.height > 80) {
+    return Math.round(node.measured.height);
+  }
+
+  // 2. If style height was explicitly set (e.g. via resizer)
+  if (node.style && typeof node.style.height === 'number' && node.style.height > 80) {
+    return Math.round(node.style.height);
+  }
+
+  // 3. Fallback content-based height estimation for unmeasured or newly added cards
+  const title = node.data?.title || '';
+  const content = node.data?.content || '';
+  const tags = (node.data as any)?.tags || [];
+
+  // Base card chrome: header (~54px) + body padding (~28px) + footer accent strip (4px) + borders
+  let estimatedHeight = 90;
+
+  // Title wrapping (average ~25 characters per line in title input)
+  if (title.length > 25) {
+    estimatedHeight += Math.ceil((title.length - 25) / 25) * 22;
+  }
+
+  // Tags pill row
+  if (Array.isArray(tags) && tags.length > 0) {
+    estimatedHeight += 32;
+  }
+
+  // Markdown body content
+  if (content.trim()) {
+    const rawLines = content.split('\n');
+    let visualLines = 0;
+
+    for (const line of rawLines) {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        visualLines += 0.6; // paragraph spacing
+        continue;
+      }
+      // In a 340px wide card with 14px font, average ~36 characters fit per line
+      const wrapped = Math.max(1, Math.ceil(trimmed.length / 36));
+      visualLines += wrapped;
+
+      // Markdown headings have larger font and margin
+      if (trimmed.startsWith('#')) {
+        visualLines += 0.8;
+      }
+      // Blockquotes and callouts have vertical padding
+      if (trimmed.startsWith('>')) {
+        visualLines += 0.6;
+      }
+      // Bullet items have slight vertical spacing
+      if (trimmed.startsWith('- ') || trimmed.startsWith('* ') || /^\d+\./.test(trimmed)) {
+        visualLines += 0.3;
+      }
+    }
+
+    // Line height is approximately 22px in Tailwind prose-sm
+    estimatedHeight += Math.round(visualLines * 22);
+  } else {
+    // Empty placeholder height
+    estimatedHeight += 60;
+  }
+
+  // Bounded minimum card height and upper safety limit
+  return Math.max(190, Math.min(estimatedHeight, 1800));
+}
+
 function InnerCanvasBoard({
   theme = 'dark',
   incomingNode,
@@ -294,6 +364,7 @@ function InnerCanvasBoard({
       type: 'customEdge',
       label: 'Connected',
       animated: true,
+      data: { theme },
       markerEnd: {
         type: MarkerType.ArrowClosed,
         color: isDark ? '#a1a1aa' : '#71717a',
@@ -310,9 +381,9 @@ function InnerCanvasBoard({
       pushSnapshot(nodesRef.current, next);
       return next;
     });
-  }, [isDark, pushSnapshot, setEdges]);
+  }, [isDark, theme, pushSnapshot, setEdges]);
 
-  // Auto Arrange all cards into clean hierarchical columns
+  // Auto Arrange all cards into clean hierarchical columns without vertical stacking/overlapping
   const handleAutoArrange = useCallback(() => {
     if (nodesRef.current.length === 0) return;
 
@@ -320,7 +391,11 @@ function InnerCanvasBoard({
     const currentEdges = edgesRef.current;
 
     const COL_STEP = 460;
-    const ROW_STEP = 340;
+    const VERTICAL_GAP = 55; // Generous vertical breathing room between cards in a column
+
+    // Lookup map of current nodes for quick dimension queries
+    const nodeMap: Record<string, Node<CanvasNodeData>> = {};
+    currentNodes.forEach((n) => { nodeMap[n.id] = n; });
 
     // Calculate in-degrees for topological rank
     const inDegree: Record<string, number> = {};
@@ -396,21 +471,39 @@ function InnerCanvasBoard({
       columns.push(currentNodes.map(n => n.id));
     }
 
-    const maxRows = Math.max(...columns.map(c => c.length), 1);
-    const totalHeight = (maxRows - 1) * ROW_STEP;
+    // Dynamic height calculation per column
+    const colTotalHeights: number[] = columns.map((colNodes) => {
+      let hSum = 0;
+      colNodes.forEach((nodeId, i) => {
+        const node = nodeMap[nodeId];
+        const h = node ? getNodeHeight(node) : 260;
+        hSum += h;
+        if (i < colNodes.length - 1) hSum += VERTICAL_GAP;
+      });
+      return hSum;
+    });
+
+    const maxColHeight = Math.max(...colTotalHeights, 1);
     const baseX = 100;
     const baseY = 100;
 
     const nodePosMap: Record<string, { x: number; y: number }> = {};
     columns.forEach((colNodes, colIndex) => {
-      const colHeight = (colNodes.length - 1) * ROW_STEP;
-      const startY = baseY + (totalHeight - colHeight) / 2;
+      const colHeight = colTotalHeights[colIndex] || 0;
+      // Gentle vertical alignment (subtle offset so shorter columns look balanced with taller ones)
+      const startY = baseY + Math.max(0, Math.round((maxColHeight - colHeight) * 0.15));
 
-      colNodes.forEach((nodeId, rowIndex) => {
+      let currentY = startY;
+      colNodes.forEach((nodeId) => {
+        const node = nodeMap[nodeId];
+        const h = node ? getNodeHeight(node) : 260;
+
         nodePosMap[nodeId] = {
           x: Math.round(baseX + colIndex * COL_STEP),
-          y: Math.round(startY + rowIndex * ROW_STEP),
+          y: Math.round(currentY),
         };
+
+        currentY += h + VERTICAL_GAP;
       });
     });
 
@@ -453,8 +546,9 @@ function InnerCanvasBoard({
       source: raw.source,
       target: raw.target,
       type: 'customEdge',
-      label: raw.label,
+      label: raw.label || 'Relates to',
       animated: raw.animated ?? true,
+      data: { theme },
       markerEnd: {
         type: MarkerType.ArrowClosed,
         color: isDark ? '#a1a1aa' : '#71717a',
@@ -462,7 +556,7 @@ function InnerCanvasBoard({
         height: 16,
       },
     };
-  }, [isDark]);
+  }, [isDark, theme]);
 
   // Immediate board persistence helper (sync to localStorage, background sync to API)
   const saveBoardImmediate = useCallback((
@@ -1146,7 +1240,9 @@ function InnerCanvasBoard({
         ...connection,
         id: `edge-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         type: 'customEdge',
+        label: 'Relates to',
         animated: true,
+        data: { theme },
         markerEnd: {
           type: MarkerType.ArrowClosed,
           color: isDark ? '#a1a1aa' : '#71717a',
@@ -1159,7 +1255,7 @@ function InnerCanvasBoard({
       pushSnapshot(nodesRef.current, next);
       return next;
     });
-  }, [isDark, pushSnapshot, setEdges]);
+  }, [isDark, theme, pushSnapshot, setEdges]);
 
   // Capture drag stop so moving nodes can be undone!
   const onNodeDragStop = useCallback(() => {

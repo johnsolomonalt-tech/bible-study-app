@@ -117,7 +117,7 @@ export const CustomCanvasNode = memo(function CustomCanvasNode({
         setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, selected: true } : n)));
         setIsMenuOpen(true);
       }}
-      className={`relative group rounded-xl transition-all duration-200 select-none ${
+      className={`relative group rounded-xl transition-all duration-200 select-none w-[340px] max-w-full ${
         isMenuOpen ? '!z-50' : selected ? 'z-30' : 'z-0'
       } ${
         isDark 
@@ -131,6 +131,7 @@ export const CustomCanvasNode = memo(function CustomCanvasNode({
       style={{
         width: '100%',
         minWidth: 280,
+        maxWidth: 520,
         minHeight: 180,
       }}
     >

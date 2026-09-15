@@ -210,12 +210,40 @@ JSON Format:
     const rawNodes = parsed.nodes || [];
     const nodeIdMap: Record<number | string, string> = {};
 
+    // Helper function to estimate card height from title and content length
+    const estimateAiCardHeight = (title?: string, content?: string): number => {
+      let estimated = 90; // Header, body padding, accent strip
+      const t = title || '';
+      if (t.length > 25) {
+        estimated += Math.ceil((t.length - 25) / 25) * 22;
+      }
+      const c = content || '';
+      if (c.trim()) {
+        const rawLines = c.split('\n');
+        let visualLines = 0;
+        for (const line of rawLines) {
+          const trimmed = line.trim();
+          if (!trimmed) {
+            visualLines += 0.6;
+            continue;
+          }
+          const wrapped = Math.max(1, Math.ceil(trimmed.length / 36));
+          visualLines += wrapped;
+          if (trimmed.startsWith('#')) visualLines += 0.8;
+          if (trimmed.startsWith('>')) visualLines += 0.6;
+          if (trimmed.startsWith('- ') || trimmed.startsWith('* ') || /^\d+\./.test(trimmed)) visualLines += 0.3;
+        }
+        estimated += Math.round(visualLines * 22);
+      } else {
+        estimated += 60;
+      }
+      return Math.max(190, Math.min(estimated, 1800));
+    };
+
     // Standard generous layout constants
     const CARD_WIDTH = 340;
     const HORIZONTAL_GAP = 120; // column step = 460px
-    const VERTICAL_GAP = 60;
-    const ESTIMATED_CARD_HEIGHT = 280; // row step ~ 340px
-    const ROW_STEP = ESTIMATED_CARD_HEIGHT + VERTICAL_GAP; // 340px
+    const VERTICAL_GAP = 55;
     const COL_STEP = CARD_WIDTH + HORIZONTAL_GAP; // 460px
 
     if (selectedNode) {
@@ -224,27 +252,40 @@ JSON Format:
       const maxRowsPerCol = total <= 4 ? total : Math.ceil(total / 2);
       const baseX = selectedNode.position.x + COL_STEP;
       
-      rawNodes.forEach((rawNode, index) => {
-        const uniqueId = `node-${timestamp}-${index}-${Math.random().toString(36).substring(2, 6)}`;
-        nodeIdMap[index] = uniqueId;
+      // Group node indices into columns
+      const cols: number[][] = [];
+      rawNodes.forEach((_, index) => {
+        const c = Math.floor(index / maxRowsPerCol);
+        while (cols.length <= c) cols.push([]);
+        cols[c].push(index);
+      });
 
-        const col = Math.floor(index / maxRowsPerCol);
-        const row = index % maxRowsPerCol;
-        const countInThisCol = col === 0 ? Math.min(maxRowsPerCol, total) : total - maxRowsPerCol;
+      // Position each column using cumulative dynamic heights
+      cols.forEach((colIndices, colIdx) => {
+        const colHeights = colIndices.map(idx => estimateAiCardHeight(rawNodes[idx].title, rawNodes[idx].content));
+        const totalColH = colHeights.reduce((sum, h) => sum + h, 0) + Math.max(0, colIndices.length - 1) * VERTICAL_GAP;
+        const startY = selectedNode.position.y - (totalColH / 2);
 
-        const startY = selectedNode.position.y - ((countInThisCol - 1) * ROW_STEP) / 2;
-        const posX = baseX + (col * COL_STEP);
-        const posY = startY + (row * ROW_STEP);
+        let currentY = startY;
+        colIndices.forEach((nodeIdx, r) => {
+          const rawNode = rawNodes[nodeIdx];
+          const uniqueId = `node-${timestamp}-${nodeIdx}-${Math.random().toString(36).substring(2, 6)}`;
+          nodeIdMap[nodeIdx] = uniqueId;
 
-        createdNodes.push({
-          id: uniqueId,
-          type: 'customCard',
-          position: { x: Math.round(posX), y: Math.round(posY) },
-          data: {
-            title: rawNode.title || 'Theological Insight',
-            content: rawNode.content || '',
-            category: rawNode.category || 'theological_point',
-          },
+          const posX = baseX + (colIdx * COL_STEP);
+          const posY = currentY;
+          currentY += colHeights[r] + VERTICAL_GAP;
+
+          createdNodes.push({
+            id: uniqueId,
+            type: 'customCard',
+            position: { x: Math.round(posX), y: Math.round(posY) },
+            data: {
+              title: rawNode.title || 'Theological Insight',
+              content: rawNode.content || '',
+              category: rawNode.category || 'theological_point',
+            },
+          });
         });
       });
 
@@ -294,56 +335,65 @@ JSON Format:
       const nonEmptyCols = colBuckets.filter(b => b.length > 0);
       const isSkewed = nonEmptyCols.length === 1 || colBuckets.some(b => b.length > 4);
 
-      const assignments: { index: number; col: number; row: number }[] = [];
+      const columns: number[][] = [];
 
       if (isSkewed || rawNodes.length <= 3) {
         const maxPerCol = rawNodes.length <= 4 ? 2 : 3;
         rawNodes.forEach((_, index) => {
           const col = Math.floor(index / maxPerCol);
-          const row = index % maxPerCol;
-          assignments.push({ index, col, row });
+          while (columns.length <= col) columns.push([]);
+          columns[col].push(index);
         });
       } else {
-        let targetCol = 0;
-        for (let c = 0; c < 3; c++) {
-          if (colBuckets[c].length > 0) {
-            colBuckets[c].forEach((nodeIndex, row) => {
-              assignments.push({ index: nodeIndex, col: targetCol, row });
-            });
-            targetCol++;
+        colBuckets.forEach(b => {
+          if (b.length > 0) {
+            columns.push(b);
           }
-        }
+        });
       }
 
-      // Calculate max rows across all columns for clean vertical centering
-      const colCounts: Record<number, number> = {};
-      assignments.forEach(a => {
-        colCounts[a.col] = (colCounts[a.col] || 0) + 1;
+      if (columns.length === 0) {
+        columns.push(rawNodes.map((_, i) => i));
+      }
+
+      // Compute total cumulative height per column
+      const colTotalHeights: number[] = columns.map(colIndices => {
+        let sum = 0;
+        colIndices.forEach((idx, i) => {
+          const h = estimateAiCardHeight(rawNodes[idx].title, rawNodes[idx].content);
+          sum += h;
+          if (i < colIndices.length - 1) sum += VERTICAL_GAP;
+        });
+        return sum;
       });
-      const maxRows = Math.max(...Object.values(colCounts), 1);
-      const totalHeight = (maxRows - 1) * ROW_STEP;
 
-      assignments.forEach(({ index, col, row }) => {
-        const rawNode = rawNodes[index];
-        const uniqueId = `node-${timestamp}-${index}-${Math.random().toString(36).substring(2, 6)}`;
-        nodeIdMap[index] = uniqueId;
+      const maxColHeight = Math.max(...colTotalHeights, 1);
 
-        const countInCol = colCounts[col] || 1;
-        const colHeight = (countInCol - 1) * ROW_STEP;
-        const startY = baseY + (totalHeight - colHeight) / 2;
+      columns.forEach((colIndices, colIdx) => {
+        const colH = colTotalHeights[colIdx] || 0;
+        const startY = baseY + Math.max(0, Math.round((maxColHeight - colH) * 0.15));
 
-        const posX = baseX + (col * COL_STEP);
-        const posY = startY + (row * ROW_STEP);
+        let currentY = startY;
+        colIndices.forEach((nodeIdx) => {
+          const rawNode = rawNodes[nodeIdx];
+          const uniqueId = `node-${timestamp}-${nodeIdx}-${Math.random().toString(36).substring(2, 6)}`;
+          nodeIdMap[nodeIdx] = uniqueId;
 
-        createdNodes.push({
-          id: uniqueId,
-          type: 'customCard',
-          position: { x: Math.round(posX), y: Math.round(posY) },
-          data: {
-            title: rawNode.title || 'Theological Insight',
-            content: rawNode.content || '',
-            category: rawNode.category || 'theological_point',
-          },
+          const cardH = estimateAiCardHeight(rawNode.title, rawNode.content);
+          const posX = baseX + (colIdx * COL_STEP);
+          const posY = currentY;
+          currentY += cardH + VERTICAL_GAP;
+
+          createdNodes.push({
+            id: uniqueId,
+            type: 'customCard',
+            position: { x: Math.round(posX), y: Math.round(posY) },
+            data: {
+              title: rawNode.title || 'Theological Insight',
+              content: rawNode.content || '',
+              category: rawNode.category || 'theological_point',
+            },
+          });
         });
       });
     }
@@ -376,7 +426,7 @@ JSON Format:
             id: `edge-${timestamp}-${edgeIndex}-${Math.random().toString(36).substring(2, 6)}`,
             source: sourceId,
             target: targetId,
-            label: rawEdge.label || undefined,
+            label: rawEdge.label && String(rawEdge.label).trim() !== '' ? rawEdge.label : 'Relates to',
             animated: true,
           });
         }
