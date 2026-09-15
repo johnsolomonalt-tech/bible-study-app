@@ -2797,15 +2797,13 @@ export default function App() {
         )}
 
         {/* CANVAS TAB */}
-        {activeTab === 'canvas' && (
-          <div className="flex-1 w-full h-full relative overflow-hidden">
-            <CanvasBoard
-              theme={theme as 'dark' | 'light'}
-              incomingNode={canvasIncomingNode}
-              onIncomingNodeHandled={() => setCanvasIncomingNode(null)}
-            />
-          </div>
-        )}
+        <div className={`flex-1 w-full h-full relative overflow-hidden ${activeTab === 'canvas' ? 'flex flex-col' : 'hidden'}`}>
+          <CanvasBoard
+            theme={theme as 'dark' | 'light'}
+            incomingNode={canvasIncomingNode}
+            onIncomingNodeHandled={() => setCanvasIncomingNode(null)}
+          />
+        </div>
       </main>
         {/* Mobile Bottom Navigation */}
         <div 

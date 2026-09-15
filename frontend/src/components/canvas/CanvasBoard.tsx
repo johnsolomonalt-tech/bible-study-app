@@ -153,6 +153,11 @@ function InnerCanvasBoard({
     };
   }, [paneContextMenu]);
 
+  // Persistence storage key constants
+  const STORAGE_KEY_ACTIVE_BOARD = 'theologica_active_canvas_board_id';
+  const STORAGE_KEY_BOARDS_LIST = 'theologica_canvas_boards_list_v1';
+  const STORAGE_KEY_BOARD_PREFIX = 'theologica_canvas_state_';
+
   // React Flow state
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<CanvasNodeData>>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -170,11 +175,18 @@ function InnerCanvasBoard({
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [aiToast, setAiToast] = useState<{ message: string; count: number } | null>(null);
 
-  // Keep references to latest nodes & edges for stable callbacks
+  // Keep references to latest nodes, edges, activeBoardId, boardTitle, and state flags
   const nodesRef = useRef<Node<CanvasNodeData>[]>([]);
   const edgesRef = useRef<Edge[]>([]);
+  const activeBoardIdRef = useRef<string>('default');
+  const boardTitleRef = useRef<string>('Romans 8 Study');
+  const isBoardLoadingRef = useRef<boolean>(false);
+  const isDirtyRef = useRef<boolean>(false);
+
   nodesRef.current = nodes;
   edgesRef.current = edges;
+  activeBoardIdRef.current = activeBoardId;
+  boardTitleRef.current = boardTitle;
 
   // Undo / Redo history engine
   const historyRef = useRef<HistorySnapshot[]>([]);
@@ -503,34 +515,150 @@ function InnerCanvasBoard({
     };
   }, [isDark]);
 
-  // Load a specific board by ID
+  // Immediate board persistence helper (sync to localStorage, background sync to API)
+  const saveBoardImmediate = useCallback((
+    targetBoardId: string,
+    titleToSave: string,
+    nodesToSave: Node<CanvasNodeData>[],
+    edgesToSave: Edge[]
+  ) => {
+    if (!targetBoardId) return;
+    try {
+      const serializableNodes = toSerializableNodes(nodesToSave);
+      const serializableEdges = toSerializableEdges(edgesToSave);
+      const updatedAt = new Date().toISOString();
+
+      const payload: CanvasStatePayload & { id: string; title: string; updatedAt: string } = {
+        id: targetBoardId,
+        title: titleToSave,
+        nodes: serializableNodes,
+        edges: serializableEdges,
+        updatedAt,
+      };
+
+      // 1. Immediately persist to localStorage
+      try {
+        localStorage.setItem(`${STORAGE_KEY_BOARD_PREFIX}${targetBoardId}`, JSON.stringify(payload));
+      } catch (lsErr) {
+        console.warn('LocalStorage board save error:', lsErr);
+      }
+
+      // 2. Update boards index list in state & localStorage
+      setBoards((prev) => {
+        const idx = prev.findIndex((b) => b.id === targetBoardId);
+        const metaItem: CanvasBoardMetadata = {
+          id: targetBoardId,
+          title: titleToSave,
+          updatedAt,
+          nodeCount: serializableNodes.length,
+        };
+        let next: CanvasBoardMetadata[];
+        if (idx >= 0) {
+          next = prev.map((b, i) => (i === idx ? metaItem : b));
+        } else {
+          next = [metaItem, ...prev];
+        }
+        try {
+          localStorage.setItem(STORAGE_KEY_BOARDS_LIST, JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+
+      // 3. Background sync to API (safe offline fallback)
+      fetch('/api/canvas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: targetBoardId,
+          title: titleToSave,
+          nodes: serializableNodes,
+          edges: serializableEdges,
+        }),
+      }).catch((err) => {
+        console.warn('Canvas API sync error (offline preserved):', err);
+      });
+
+      setSaveStatus('saved');
+      isDirtyRef.current = false;
+    } catch (err) {
+      console.error('Error saving board immediately:', err);
+      setSaveStatus('unsaved');
+    }
+  }, [toSerializableNodes, toSerializableEdges]);
+
+  // Manual save trigger (e.g. Cmd+S or save button)
+  const handleManualSave = useCallback(() => {
+    saveBoardImmediate(
+      activeBoardIdRef.current,
+      boardTitleRef.current,
+      nodesRef.current,
+      edgesRef.current
+    );
+  }, [saveBoardImmediate]);
+
+  // Load a specific board by ID with full local & remote fallback
   const loadBoardData = useCallback(async (boardId: string) => {
-    let loadedNodes: SerializableNode[] = INITIAL_DEMO_NODES;
-    let loadedEdges: SerializableEdge[] = INITIAL_DEMO_EDGES;
-    let loadedTitle = 'Romans 8 Study';
+    isBoardLoadingRef.current = true;
+    isDirtyRef.current = false;
+
+    let loadedNodes: SerializableNode[] = [];
+    let loadedEdges: SerializableEdge[] = [];
+    let loadedTitle = 'Untitled Canvas';
+    let foundLocalData = false;
+
+    // Check boards list for metadata title
+    try {
+      const listRaw = localStorage.getItem(STORAGE_KEY_BOARDS_LIST);
+      if (listRaw) {
+        const parsedList: CanvasBoardMetadata[] = JSON.parse(listRaw);
+        const matched = parsedList.find((b) => b.id === boardId);
+        if (matched?.title) {
+          loadedTitle = matched.title;
+        }
+      }
+    } catch {}
 
     // 1. Try local storage
     try {
-      const local = localStorage.getItem(`theologica_canvas_state_${boardId}`);
+      const local = localStorage.getItem(`${STORAGE_KEY_BOARD_PREFIX}${boardId}`);
       if (local) {
         const parsed = JSON.parse(local);
-        if (parsed.nodes && parsed.nodes.length > 0) {
-          loadedNodes = parsed.nodes;
-          loadedEdges = parsed.edges || [];
-          if (parsed.title) loadedTitle = parsed.title;
-        }
+        foundLocalData = true;
+        loadedNodes = parsed.nodes || [];
+        loadedEdges = parsed.edges || [];
+        if (parsed.title) loadedTitle = parsed.title;
       }
     } catch (e) {
       console.warn('LocalStorage canvas parse error:', e);
     }
 
-    // Set state
+    // If no local record exists at all and it's the 'default' board, populate initial demo nodes
+    if (!foundLocalData && boardId === 'default') {
+      loadedNodes = INITIAL_DEMO_NODES;
+      loadedEdges = INITIAL_DEMO_EDGES;
+      loadedTitle = 'Romans 8 Study';
+      foundLocalData = true;
+      try {
+        localStorage.setItem(`${STORAGE_KEY_BOARD_PREFIX}default`, JSON.stringify({
+          id: 'default',
+          title: loadedTitle,
+          nodes: loadedNodes,
+          edges: loadedEdges,
+          updatedAt: new Date().toISOString(),
+        }));
+      } catch {}
+    }
+
+    // Set state & refs
     const pNodes = loadedNodes.map(prepareNode);
     const pEdges = loadedEdges.map(prepareEdge);
 
     setNodes(pNodes);
     setEdges(pEdges);
     setBoardTitle(loadedTitle);
+    boardTitleRef.current = loadedTitle;
+    nodesRef.current = pNodes;
+    edgesRef.current = pEdges;
 
     // Initialize history with this board's starting state
     historyRef.current = [{
@@ -540,27 +668,45 @@ function InnerCanvasBoard({
     historyIndexRef.current = 0;
     updateHistoryState();
 
-    // 2. Fetch remote update in background
-    try {
-      const res = await fetch(`/api/canvas?id=${boardId}`);
-      if (res.ok) {
-        const remote = await res.json();
-        if (remote.nodes && remote.nodes.length > 0 && !localStorage.getItem(`theologica_canvas_state_${boardId}`)) {
-          const rNodes = remote.nodes.map(prepareNode);
-          const rEdges = (remote.edges || []).map(prepareEdge);
-          setNodes(rNodes);
-          setEdges(rEdges);
-          if (remote.title) setBoardTitle(remote.title);
-          historyRef.current = [{
-            nodes: toSerializableNodes(rNodes),
-            edges: toSerializableEdges(rEdges),
-          }];
-          historyIndexRef.current = 0;
-          updateHistoryState();
+    isBoardLoadingRef.current = false;
+    setSaveStatus('saved');
+
+    // 2. Fetch remote update in background if local didn't exist
+    if (!foundLocalData && boardId !== 'default') {
+      try {
+        const res = await fetch(`/api/canvas?id=${boardId}`);
+        if (res.ok) {
+          const remote = await res.json();
+          if (remote && remote.id === boardId) {
+            const rNodes = (remote.nodes || []).map(prepareNode);
+            const rEdges = (remote.edges || []).map(prepareEdge);
+            const rTitle = remote.title || loadedTitle;
+            setNodes(rNodes);
+            setEdges(rEdges);
+            setBoardTitle(rTitle);
+            nodesRef.current = rNodes;
+            edgesRef.current = rEdges;
+            boardTitleRef.current = rTitle;
+            historyRef.current = [{
+              nodes: toSerializableNodes(rNodes),
+              edges: toSerializableEdges(rEdges),
+            }];
+            historyIndexRef.current = 0;
+            updateHistoryState();
+            try {
+              localStorage.setItem(`${STORAGE_KEY_BOARD_PREFIX}${boardId}`, JSON.stringify({
+                id: boardId,
+                title: rTitle,
+                nodes: remote.nodes || [],
+                edges: remote.edges || [],
+                updatedAt: remote.updatedAt || new Date().toISOString(),
+              }));
+            } catch {}
+          }
         }
+      } catch {
+        // Offline fallback
       }
-    } catch {
-      // Offline fallback is fine
     }
 
     setTimeout(() => {
@@ -568,11 +714,16 @@ function InnerCanvasBoard({
     }, 120);
   }, [fitView, prepareEdge, prepareNode, toSerializableEdges, toSerializableNodes, updateHistoryState, setNodes, setEdges]);
 
-  // Load boards list and initial board on mount
+  // Load boards list and initial board on mount with smart-merge
   useEffect(() => {
-    // 1. Load boards index from localStorage
+    // 1. Read initial active board ID from localStorage
+    const savedActiveId = localStorage.getItem(STORAGE_KEY_ACTIVE_BOARD) || 'default';
+    setActiveBoardId(savedActiveId);
+    activeBoardIdRef.current = savedActiveId;
+
+    // 2. Load boards index from localStorage
     try {
-      const localList = localStorage.getItem('theologica_canvas_boards_list_v1');
+      const localList = localStorage.getItem(STORAGE_KEY_BOARDS_LIST);
       if (localList) {
         const parsed = JSON.parse(localList);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -583,19 +734,37 @@ function InnerCanvasBoard({
       // Ignore
     }
 
-    // 2. Fetch boards list from API
+    // 3. Fetch boards list from API and SMART-MERGE (never delete user's local boards!)
     fetch('/api/canvas?list=true')
       .then((res) => res.json())
       .then((remoteList) => {
         if (Array.isArray(remoteList) && remoteList.length > 0) {
-          setBoards(remoteList);
-          localStorage.setItem('theologica_canvas_boards_list_v1', JSON.stringify(remoteList));
+          setBoards((prev) => {
+            const map = new Map<string, CanvasBoardMetadata>();
+            // Remote items
+            remoteList.forEach((b: CanvasBoardMetadata) => {
+              if (b?.id) map.set(b.id, b);
+            });
+            // Local items take precedence if updated more recently or newly created
+            prev.forEach((b: CanvasBoardMetadata) => {
+              if (!b?.id) return;
+              const existing = map.get(b.id);
+              if (!existing || (b.updatedAt && (!existing.updatedAt || new Date(b.updatedAt) >= new Date(existing.updatedAt)))) {
+                map.set(b.id, b);
+              }
+            });
+            const merged = Array.from(map.values());
+            try {
+              localStorage.setItem(STORAGE_KEY_BOARDS_LIST, JSON.stringify(merged));
+            } catch {}
+            return merged;
+          });
         }
       })
       .catch(() => {});
 
-    // Load initial active board
-    loadBoardData('default');
+    // 4. Load initial active board
+    loadBoardData(savedActiveId);
   }, []); // Run once on mount
 
   // Sync theme changes to nodes
@@ -614,55 +783,55 @@ function InnerCanvasBoard({
     );
   }, [theme, handleUpdateNode, handleDuplicateNode, handleDeleteNode, setNodes]);
 
-  // Auto-save debounce for current board
+  // Synchronous auto-save debounce for current board
   useEffect(() => {
-    if (nodes.length === 0) return;
+    // Never auto-save while loading a board
+    if (isBoardLoadingRef.current) return;
 
+    // Keep refs in sync
+    nodesRef.current = nodes;
+    edgesRef.current = edges;
+    boardTitleRef.current = boardTitle;
+    activeBoardIdRef.current = activeBoardId;
+
+    // Mark as dirty
+    isDirtyRef.current = true;
     setSaveStatus('saving');
+
     const timer = setTimeout(() => {
-      try {
-        const payload: CanvasStatePayload & { title: string; updatedAt: string } = {
-          title: boardTitle,
-          nodes: toSerializableNodes(nodes),
-          edges: toSerializableEdges(edges),
-          updatedAt: new Date().toISOString(),
-        };
-
-        // Cache locally
-        localStorage.setItem(`theologica_canvas_state_${activeBoardId}`, JSON.stringify(payload));
-
-        // Update boards index list
-        setBoards((prev) => {
-          const updated = prev.map((b) =>
-            b.id === activeBoardId
-              ? { ...b, title: boardTitle, nodeCount: nodes.length, updatedAt: payload.updatedAt }
-              : b
-          );
-          localStorage.setItem('theologica_canvas_boards_list_v1', JSON.stringify(updated));
-          return updated;
-        });
-
-        // Sync with API
-        fetch('/api/canvas', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            id: activeBoardId,
-            title: boardTitle,
-            nodes: payload.nodes,
-            edges: payload.edges,
-          }),
-        }).catch(() => {});
-
-        setSaveStatus('saved');
-      } catch (err) {
-        console.error('Error auto-saving canvas:', err);
-        setSaveStatus('unsaved');
-      }
-    }, 1200);
+      if (isBoardLoadingRef.current) return;
+      saveBoardImmediate(activeBoardId, boardTitle, nodes, edges);
+    }, 600);
 
     return () => clearTimeout(timer);
-  }, [nodes, edges, boardTitle, activeBoardId, toSerializableNodes, toSerializableEdges]);
+  }, [nodes, edges, boardTitle, activeBoardId, saveBoardImmediate]);
+
+  // Synchronously flush changes to localStorage on beforeunload, pagehide, and unmount
+  useEffect(() => {
+    const handlePageUnload = () => {
+      if (isDirtyRef.current && activeBoardIdRef.current) {
+        try {
+          const payload = {
+            id: activeBoardIdRef.current,
+            title: boardTitleRef.current,
+            nodes: toSerializableNodes(nodesRef.current),
+            edges: toSerializableEdges(edgesRef.current),
+            updatedAt: new Date().toISOString(),
+          };
+          localStorage.setItem(`${STORAGE_KEY_BOARD_PREFIX}${activeBoardIdRef.current}`, JSON.stringify(payload));
+        } catch {}
+      }
+    };
+
+    window.addEventListener('beforeunload', handlePageUnload);
+    window.addEventListener('pagehide', handlePageUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handlePageUnload);
+      window.removeEventListener('pagehide', handlePageUnload);
+      handlePageUnload();
+    };
+  }, [toSerializableNodes, toSerializableEdges]);
 
   // Handle incoming node from Bible reader or AI chat
   useEffect(() => {
@@ -853,7 +1022,7 @@ function InnerCanvasBoard({
     updateHistoryState();
   }, [prepareEdge, prepareNode, setEdges, setNodes, updateHistoryState]);
 
-  // Global Keyboard Shortcuts (Cmd+Z, Cmd+Shift+Z, Delete)
+  // Global Keyboard Shortcuts (Cmd+Z, Cmd+Shift+Z, Cmd+S, Delete)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
@@ -865,7 +1034,10 @@ function InnerCanvasBoard({
         return;
       }
 
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        handleManualSave();
+      } else if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         handleUndo();
       } else if (
@@ -897,7 +1069,7 @@ function InnerCanvasBoard({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleUndo, handleRedo, pushSnapshot, setEdges, setNodes]);
+  }, [handleUndo, handleRedo, handleManualSave, pushSnapshot, setEdges, setNodes]);
 
   // Clear Canvas
   const handleClear = useCallback(() => {
@@ -909,89 +1081,189 @@ function InnerCanvasBoard({
     }
   }, [nodes.length, pushSnapshot, setEdges, setNodes]);
 
-  // Sidebar Board Switcher Handlers
-  const handleSelectBoard = useCallback((boardId: string) => {
-    if (boardId === activeBoardId) return;
-    setActiveBoardId(boardId);
-    loadBoardData(boardId);
-  }, [activeBoardId, loadBoardData]);
+  // Sidebar Board Switcher Handlers (with atomic flushing and race-condition prevention)
+  const handleSelectBoard = useCallback((newBoardId: string) => {
+    if (newBoardId === activeBoardIdRef.current) return;
+
+    // 1. Flush & save current board immediately if dirty
+    if (isDirtyRef.current) {
+      saveBoardImmediate(
+        activeBoardIdRef.current,
+        boardTitleRef.current,
+        nodesRef.current,
+        edgesRef.current
+      );
+    }
+
+    // 2. Persist newly active board ID
+    try {
+      localStorage.setItem(STORAGE_KEY_ACTIVE_BOARD, newBoardId);
+    } catch {}
+    setActiveBoardId(newBoardId);
+    activeBoardIdRef.current = newBoardId;
+
+    // 3. Load target board data
+    loadBoardData(newBoardId);
+  }, [saveBoardImmediate, loadBoardData]);
 
   const handleCreateBoard = useCallback(() => {
+    // 1. Flush current board if dirty
+    if (isDirtyRef.current) {
+      saveBoardImmediate(
+        activeBoardIdRef.current,
+        boardTitleRef.current,
+        nodesRef.current,
+        edgesRef.current
+      );
+    }
+
     const timestamp = Date.now();
     const newId = `board-${timestamp}`;
+    const newTitle = 'New Canvas';
+    const now = new Date().toISOString();
+
     const newBoardMeta: CanvasBoardMetadata = {
       id: newId,
-      title: 'New Canvas',
-      updatedAt: new Date().toISOString(),
+      title: newTitle,
+      updatedAt: now,
       nodeCount: 0,
     };
 
-    const nextBoards = [newBoardMeta, ...boards];
-    setBoards(nextBoards);
-    localStorage.setItem('theologica_canvas_boards_list_v1', JSON.stringify(nextBoards));
+    // 2. Immediately write new board record to localStorage
+    try {
+      localStorage.setItem(`${STORAGE_KEY_BOARD_PREFIX}${newId}`, JSON.stringify({
+        id: newId,
+        title: newTitle,
+        nodes: [],
+        edges: [],
+        updatedAt: now,
+      }));
+    } catch (e) {
+      console.warn('Failed to initialize new board storage:', e);
+    }
 
+    // 3. Update boards index list
+    setBoards((prev) => {
+      const next = [newBoardMeta, ...prev];
+      try {
+        localStorage.setItem(STORAGE_KEY_BOARDS_LIST, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    // 4. Update active board ID
+    try {
+      localStorage.setItem(STORAGE_KEY_ACTIVE_BOARD, newId);
+    } catch {}
+    activeBoardIdRef.current = newId;
     setActiveBoardId(newId);
-    setBoardTitle('New Canvas');
+
+    // 5. Update state
+    setBoardTitle(newTitle);
+    boardTitleRef.current = newTitle;
     setNodes([]);
     setEdges([]);
+    nodesRef.current = [];
+    edgesRef.current = [];
 
     historyRef.current = [{ nodes: [], edges: [] }];
     historyIndexRef.current = 0;
     updateHistoryState();
+    isDirtyRef.current = false;
+    setSaveStatus('saved');
 
-    // Persist empty board to API
+    // 6. Sync new board to API
     fetch('/api/canvas', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         id: newId,
-        title: 'New Canvas',
+        title: newTitle,
         nodes: [],
         edges: [],
       }),
     }).catch(() => {});
-  }, [boards, updateHistoryState, setNodes, setEdges]);
+  }, [saveBoardImmediate, updateHistoryState, setNodes, setEdges]);
 
   const handleRenameBoard = useCallback((id: string, newTitle: string) => {
-    if (id === activeBoardId) {
-      setBoardTitle(newTitle);
-    }
+    const trimmed = newTitle.trim() || 'Untitled Canvas';
+
+    // 1. Update boards index list in state & localStorage
     setBoards((prev) => {
-      const next = prev.map((b) => (b.id === id ? { ...b, title: newTitle } : b));
-      localStorage.setItem('theologica_canvas_boards_list_v1', JSON.stringify(next));
+      const next = prev.map((b) => (b.id === id ? { ...b, title: trimmed } : b));
+      try {
+        localStorage.setItem(STORAGE_KEY_BOARDS_LIST, JSON.stringify(next));
+      } catch {}
       return next;
     });
 
-    fetch('/api/canvas', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id,
-        title: newTitle,
-        nodes: toSerializableNodes(nodesRef.current),
-        edges: toSerializableEdges(edgesRef.current),
-      }),
-    }).catch(() => {});
-  }, [activeBoardId, toSerializableEdges, toSerializableNodes]);
+    // 2. If active board, update title state and immediate save
+    if (id === activeBoardIdRef.current) {
+      setBoardTitle(trimmed);
+      boardTitleRef.current = trimmed;
+      saveBoardImmediate(id, trimmed, nodesRef.current, edgesRef.current);
+    } else {
+      // If inactive board, safely load that board's record, update title, and write back
+      try {
+        const existingRaw = localStorage.getItem(`${STORAGE_KEY_BOARD_PREFIX}${id}`);
+        if (existingRaw) {
+          const parsed = JSON.parse(existingRaw);
+          parsed.title = trimmed;
+          parsed.updatedAt = new Date().toISOString();
+          localStorage.setItem(`${STORAGE_KEY_BOARD_PREFIX}${id}`, JSON.stringify(parsed));
+
+          // Sync to API with inactive board's own nodes (never active board's nodes!)
+          fetch('/api/canvas', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id,
+              title: trimmed,
+              nodes: parsed.nodes || [],
+              edges: parsed.edges || [],
+            }),
+          }).catch(() => {});
+        }
+      } catch (e) {
+        console.warn('Failed to rename inactive board in storage:', e);
+      }
+    }
+  }, [saveBoardImmediate]);
 
   const handleDeleteBoard = useCallback((id: string) => {
-    const remaining = boards.filter((b) => b.id !== id);
-    if (remaining.length === 0) return;
+    setBoards((prev) => {
+      const remaining = prev.filter((b) => b.id !== id);
+      if (remaining.length === 0) return prev; // Do not delete the last board
+      try {
+        localStorage.setItem(STORAGE_KEY_BOARDS_LIST, JSON.stringify(remaining));
+        localStorage.removeItem(`${STORAGE_KEY_BOARD_PREFIX}${id}`);
+      } catch {}
+      return remaining;
+    });
 
-    setBoards(remaining);
-    localStorage.setItem('theologica_canvas_boards_list_v1', JSON.stringify(remaining));
-    localStorage.removeItem(`theologica_canvas_state_${id}`);
-
-    // Call API delete
+    // Delete from API
     fetch(`/api/canvas?id=${id}`, { method: 'DELETE' }).catch(() => {});
 
     // If active was deleted, switch to first remaining board
-    if (id === activeBoardId) {
-      const nextActive = remaining[0].id;
-      setActiveBoardId(nextActive);
-      loadBoardData(nextActive);
+    if (id === activeBoardIdRef.current) {
+      const localListRaw = localStorage.getItem(STORAGE_KEY_BOARDS_LIST);
+      let nextActiveId = 'default';
+      try {
+        if (localListRaw) {
+          const parsed = JSON.parse(localListRaw);
+          const valid = parsed.filter((b: any) => b.id !== id);
+          if (valid.length > 0) nextActiveId = valid[0].id;
+        }
+      } catch {}
+
+      try {
+        localStorage.setItem(STORAGE_KEY_ACTIVE_BOARD, nextActiveId);
+      } catch {}
+      activeBoardIdRef.current = nextActiveId;
+      setActiveBoardId(nextActiveId);
+      loadBoardData(nextActiveId);
     }
-  }, [boards, activeBoardId, loadBoardData]);
+  }, [loadBoardData]);
 
   // Apply updates from Theologica AI
   const handleApplyAiGraph = useCallback((
@@ -1107,6 +1379,7 @@ function InnerCanvasBoard({
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         saveStatus={saveStatus}
+        onSave={handleManualSave}
         theme={theme}
         nodeCount={nodes.length}
       />

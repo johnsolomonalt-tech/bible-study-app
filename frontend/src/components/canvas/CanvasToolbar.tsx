@@ -36,6 +36,7 @@ interface CanvasToolbarProps {
   isSidebarOpen: boolean;
   onToggleSidebar: () => void;
   saveStatus?: 'saved' | 'saving' | 'unsaved';
+  onSave?: () => void;
   theme: 'dark' | 'light';
   nodeCount: number;
 }
@@ -64,6 +65,7 @@ export function CanvasToolbar({
   isSidebarOpen,
   onToggleSidebar,
   saveStatus = 'saved',
+  onSave,
   theme,
   nodeCount,
 }: CanvasToolbarProps) {
@@ -165,9 +167,27 @@ export function CanvasToolbar({
         <div className="h-4 w-[1px] bg-zinc-700/40 hidden sm:block" />
 
         {/* Node count and save indicator */}
-        <div className="hidden sm:flex items-center gap-2 text-xs text-zinc-400">
+        <div className="hidden sm:flex items-center gap-2.5 text-xs text-zinc-400">
           <span className="font-mono text-[11px]">{nodeCount} {nodeCount === 1 ? 'card' : 'cards'}</span>
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" title="Saved" />
+          <button
+            type="button"
+            onClick={onSave}
+            className="flex items-center gap-1.5 px-1.5 py-0.5 rounded hover:bg-zinc-700/20 transition-colors cursor-pointer"
+            title={saveStatus === 'saving' ? 'Saving changes...' : saveStatus === 'unsaved' ? 'Unsaved changes (Click or Cmd+S to save)' : 'All changes saved (Click or Cmd+S to save)'}
+          >
+            <span 
+              className={`w-2 h-2 rounded-full transition-all ${
+                saveStatus === 'saving' 
+                  ? 'bg-amber-400 animate-ping' 
+                  : saveStatus === 'unsaved'
+                    ? 'bg-rose-500'
+                    : 'bg-emerald-500'
+              }`} 
+            />
+            <span className="text-[11px] font-medium capitalize text-zinc-400">
+              {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'unsaved' ? 'Unsaved' : 'Saved'}
+            </span>
+          </button>
         </div>
       </div>
 

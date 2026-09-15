@@ -1,17 +1,22 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import fs from 'fs/promises';
+import fsSync from 'fs';
 import path from 'path';
 import { CanvasStatePayload, CanvasBoardMetadata } from '@/types/canvas';
 
-// Local storage directory fallback for persistence
-const STORAGE_DIR = path.join(process.cwd(), '.canvas_storage');
+function getStorageDir(): string {
+  const candidate = path.join(process.cwd(), 'frontend');
+  const base = fsSync.existsSync(candidate) ? candidate : process.cwd();
+  return path.join(base, '.canvas_storage');
+}
 
 async function ensureDir() {
   try {
-    await fs.mkdir(STORAGE_DIR, { recursive: true });
+    const dir = getStorageDir();
+    await fs.mkdir(dir, { recursive: true });
   } catch {
-    // Already exists
+    // Already exists or non-fatal
   }
 }
 
@@ -20,19 +25,28 @@ function sanitize(str: string) {
 }
 
 function getIndexFilePath(userId: string) {
-  return path.join(STORAGE_DIR, `canvas_index_${sanitize(userId)}.json`);
+  return path.join(getStorageDir(), `canvas_index_${sanitize(userId)}.json`);
 }
 
 function getUserFilePath(userId: string, boardId: string = 'default') {
-  return path.join(STORAGE_DIR, `canvas_${sanitize(userId)}_${sanitize(boardId)}.json`);
+  return path.join(getStorageDir(), `canvas_${sanitize(userId)}_${sanitize(boardId)}.json`);
 }
 
-// In-memory cache for rapid access
+async function getSafeUserId(): Promise<string> {
+  try {
+    const clerkAuth = await auth();
+    return clerkAuth?.userId || 'anonymous_user';
+  } catch {
+    return 'anonymous_user';
+  }
+}
+
+// In-memory cache for ultra-fast access and serverless fallback
 const memoryCache: Record<string, { payload: CanvasStatePayload; title: string; updatedAt: string }> = {};
 const indexCache: Record<string, CanvasBoardMetadata[]> = {};
 
 async function readUserIndex(userId: string): Promise<CanvasBoardMetadata[]> {
-  if (indexCache[userId]) {
+  if (indexCache[userId] && indexCache[userId].length > 0) {
     return indexCache[userId];
   }
   await ensureDir();
@@ -40,25 +54,29 @@ async function readUserIndex(userId: string): Promise<CanvasBoardMetadata[]> {
   try {
     const raw = await fs.readFile(filePath, 'utf-8');
     const parsed = JSON.parse(raw);
-    indexCache[userId] = parsed;
-    return parsed;
-  } catch {
-    const defaultIndex: CanvasBoardMetadata[] = [
-      {
-        id: 'default',
-        title: 'Romans 8 Study',
-        updatedAt: new Date().toISOString(),
-        nodeCount: 3,
-      },
-    ];
-    indexCache[userId] = defaultIndex;
-    try {
-      await fs.writeFile(filePath, JSON.stringify(defaultIndex, null, 2), 'utf-8');
-    } catch {
-      // Ignore write errors
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      indexCache[userId] = parsed;
+      return parsed;
     }
-    return defaultIndex;
+  } catch {
+    // Ignore read failure
   }
+
+  const defaultIndex: CanvasBoardMetadata[] = [
+    {
+      id: 'default',
+      title: 'Romans 8 Study',
+      updatedAt: new Date().toISOString(),
+      nodeCount: 3,
+    },
+  ];
+  indexCache[userId] = defaultIndex;
+  try {
+    await fs.writeFile(filePath, JSON.stringify(defaultIndex, null, 2), 'utf-8');
+  } catch {
+    // Ignore write failure
+  }
+  return defaultIndex;
 }
 
 async function writeUserIndex(userId: string, list: CanvasBoardMetadata[]) {
@@ -68,14 +86,13 @@ async function writeUserIndex(userId: string, list: CanvasBoardMetadata[]) {
   try {
     await fs.writeFile(filePath, JSON.stringify(list, null, 2), 'utf-8');
   } catch (err) {
-    console.error('Failed to write canvas index:', err);
+    console.warn('Canvas storage: Failed to write canvas index to disk (in-memory preserved):', err);
   }
 }
 
 export async function GET(req: Request) {
   try {
-    const { userId } = await auth();
-    const activeUserId = userId || 'anonymous_user';
+    const activeUserId = await getSafeUserId();
 
     const url = new URL(req.url);
     const isList = url.searchParams.get('list') === 'true';
@@ -133,8 +150,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const { userId } = await auth();
-    const activeUserId = userId || 'anonymous_user';
+    const activeUserId = await getSafeUserId();
 
     const body = await req.json();
     const { id = 'default', title = 'Untitled Canvas', nodes = [], edges = [] } = body;
@@ -156,27 +172,35 @@ export async function POST(req: Request) {
       payload: { nodes, edges },
     };
 
-    // Persist to file
-    await ensureDir();
-    const filePath = getUserFilePath(activeUserId, id);
-    await fs.writeFile(filePath, JSON.stringify(record, null, 2), 'utf-8');
+    // Persist to disk (non-fatal if disk is read-only)
+    try {
+      await ensureDir();
+      const filePath = getUserFilePath(activeUserId, id);
+      await fs.writeFile(filePath, JSON.stringify(record, null, 2), 'utf-8');
+    } catch (fsErr) {
+      console.warn('Canvas storage: Disk write failed, relying on memory cache:', fsErr);
+    }
 
     // Update boards index
-    const index = await readUserIndex(activeUserId);
-    const existingIdx = index.findIndex((b) => b.id === id);
-    const metaItem: CanvasBoardMetadata = {
-      id,
-      title,
-      updatedAt,
-      nodeCount: nodes.length,
-    };
+    try {
+      const index = await readUserIndex(activeUserId);
+      const existingIdx = index.findIndex((b) => b.id === id);
+      const metaItem: CanvasBoardMetadata = {
+        id,
+        title,
+        updatedAt,
+        nodeCount: nodes.length,
+      };
 
-    if (existingIdx >= 0) {
-      index[existingIdx] = metaItem;
-    } else {
-      index.unshift(metaItem);
+      if (existingIdx >= 0) {
+        index[existingIdx] = metaItem;
+      } else {
+        index.unshift(metaItem);
+      }
+      await writeUserIndex(activeUserId, index);
+    } catch (idxErr) {
+      console.warn('Canvas storage: Index write failed:', idxErr);
     }
-    await writeUserIndex(activeUserId, index);
 
     return NextResponse.json({ success: true, id, title, updatedAt });
   } catch (error: any) {
@@ -190,8 +214,7 @@ export async function POST(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
-    const { userId } = await auth();
-    const activeUserId = userId || 'anonymous_user';
+    const activeUserId = await getSafeUserId();
 
     const url = new URL(req.url);
     const id = url.searchParams.get('id');
@@ -211,9 +234,13 @@ export async function DELETE(req: Request) {
     }
 
     // Update index
-    const index = await readUserIndex(activeUserId);
-    const updated = index.filter((b) => b.id !== id);
-    await writeUserIndex(activeUserId, updated);
+    try {
+      const index = await readUserIndex(activeUserId);
+      const updated = index.filter((b) => b.id !== id);
+      await writeUserIndex(activeUserId, updated);
+    } catch (idxErr) {
+      console.warn('Canvas storage: Index update failed:', idxErr);
+    }
 
     return NextResponse.json({ success: true, deletedId: id });
   } catch (error: any) {
