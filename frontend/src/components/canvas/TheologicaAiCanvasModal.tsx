@@ -34,7 +34,9 @@ interface TheologicaAiCanvasModalProps {
   onApplyGraphUpdate: (
     newNodes: SerializableNode[], 
     newEdges: SerializableEdge[], 
-    explanation: string
+    explanation: string,
+    boardTitle?: string,
+    mode?: Mode
   ) => void;
   theme: 'dark' | 'light';
 }
@@ -191,7 +193,7 @@ export function TheologicaAiCanvasModal({
       }
 
       if (data.nodes && data.nodes.length > 0) {
-        onApplyGraphUpdate(data.nodes, data.edges || [], data.explanation);
+        onApplyGraphUpdate(data.nodes, data.edges || [], data.explanation, data.boardTitle, activeMode);
       }
 
       if (data.synthesis) {

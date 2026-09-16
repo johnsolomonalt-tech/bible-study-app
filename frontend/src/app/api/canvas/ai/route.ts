@@ -76,11 +76,28 @@ interface RawGeneratedEdge {
 }
 
 interface AiResponsePayload {
+  boardTitle?: string;
   explanation: string;
   action: 'add_nodes' | 'expand_node' | 'synthesize_graph' | 'answer';
   nodes?: RawGeneratedNode[];
   edges?: RawGeneratedEdge[];
   synthesis?: string;
+}
+
+function deriveFallbackBoardTitle(prompt: string): string {
+  if (!prompt) return 'Scripture Study Canvas';
+  let cleaned = prompt
+    .replace(/^(can you |please )?(make|create|build|generate|give me|show me|draw|outline|map|explain)( a| an)?( canvas| board| study guide| mind map| visual graph)?( on| about| for| of)?/i, '')
+    .trim();
+  if (!cleaned) cleaned = prompt.trim();
+  cleaned = cleaned.replace(/^["'`\s]+|["'`\s]+$/g, '');
+  if (cleaned.length > 40) {
+    cleaned = cleaned.substring(0, 40).trim() + '...';
+  }
+  if (cleaned.length > 0) {
+    cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+  }
+  return cleaned || 'Scripture Study Canvas';
 }
 
 export async function POST(req: Request) {
@@ -155,7 +172,8 @@ USER INSTRUCTION:
 
 INSTRUCTIONS:
 1. Return a STRICT JSON object with no wrapping outside the JSON.
-2. If the user wants to generate or expand a knowledge graph (e.g. topic, passage, expanding a node):
+2. Provide a "boardTitle": A concise, descriptive, memorable title for the canvas board (3-6 words, e.g. "Romans 8: The Golden Chain", "The Abrahamic Covenant", "Beatitudes & Kingdom Ethics", "Messianic Types in Exodus").
+3. If the user wants to generate or expand a knowledge graph (e.g. topic, passage, expanding a node):
    - Provide high quality, substantive markdown content for each card. Include scripture references and rich formatting (bullet points, quotes, bold).
    - Return an array of "nodes" with:
      - "title": concise clear title
@@ -165,14 +183,15 @@ INSTRUCTIONS:
      - "sourceIndex": index of source node (0-indexed) or existing node ID
      - "targetIndex": index of target node (0-indexed) or existing node ID
      - "label": brief relationship label (e.g., "Scriptural Basis", "Historic Context", "Fulfills", "Application", "Contrasts With")
-3. If the user wants to synthesize or ask a question about the canvas ("synthesize_graph" or "answer"):
+4. If the user wants to synthesize or ask a question about the canvas ("synthesize_graph" or "answer"):
    - Set "action": "synthesize_graph"
    - Provide a comprehensive "synthesis" in markdown format synthesizing the nodes and ideas on the canvas.
    - You may still optionally generate summary cards.
-4. Always provide an "explanation" string summarizing what you created or analyzed.
-5. If the user's prompt is completely unrelated to the Bible, Christian theology, Scripture, or biblical history, return:
+5. Always provide an "explanation" string summarizing what you created or analyzed.
+6. If the user's prompt is completely unrelated to the Bible, Christian theology, Scripture, or biblical history, return:
    {
      "action": "unrelated_topic",
+     "boardTitle": "Untitled Study",
      "explanation": "Topic is not related to biblical study.",
      "error": "Please enter a topic, question, or passage related to Scripture or biblical study."
    }
@@ -180,6 +199,7 @@ INSTRUCTIONS:
 JSON Format:
 {
   "action": "add_nodes" | "expand_node" | "synthesize_graph" | "unrelated_topic",
+  "boardTitle": "Concise Descriptive Title for Canvas Board",
   "explanation": "Summary of visual graph operations...",
   "nodes": [
     {
@@ -558,8 +578,12 @@ JSON Format:
       });
     }
 
+    const rawAiBoardTitle = typeof parsed.boardTitle === 'string' ? parsed.boardTitle.trim() : '';
+    const effectiveBoardTitle = rawAiBoardTitle || deriveFallbackBoardTitle(prompt);
+
     return NextResponse.json({
       action: parsed.action || 'add_nodes',
+      boardTitle: effectiveBoardTitle,
       explanation: parsed.explanation || 'Visual graph generated successfully.',
       nodes: createdNodes,
       edges: createdEdges,

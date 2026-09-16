@@ -1537,10 +1537,30 @@ function InnerCanvasBoard({
   const handleApplyAiGraph = useCallback((
     newNodes: SerializableNode[],
     newEdges: SerializableEdge[],
-    explanation: string
+    explanation: string,
+    suggestedBoardTitle?: string,
+    mode?: 'generate' | 'expand' | 'synthesize'
   ) => {
+    const cleanTitle = (typeof suggestedBoardTitle === 'string' && suggestedBoardTitle.trim())
+      ? suggestedBoardTitle.trim()
+      : '';
+
+    // 1. If no board is active, create a new board with the AI's title
     if (!activeBoardIdRef.current) {
-      handleCreateBoard('Theologica Study Canvas');
+      handleCreateBoard(cleanTitle || 'Theologica Study Canvas');
+    } else if (cleanTitle) {
+      // 2. If board is active, automatically rename the canvas if:
+      //    - mode is 'generate' (user asked AI to generate a study canvas)
+      //    - or the board is empty (brand new blank board)
+      //    - or the board still has a default placeholder title
+      const currentTitle = (boardTitleRef.current || '').trim().toLowerCase();
+      const isDefaultPlaceholder = !currentTitle || 
+        ['new canvas', 'untitled canvas', 'untitled', 'theologica study canvas', 'new canvas board'].includes(currentTitle);
+      const isCleanBoard = nodesRef.current.length === 0;
+
+      if (mode === 'generate' || isCleanBoard || isDefaultPlaceholder) {
+        handleRenameBoard(activeBoardIdRef.current, cleanTitle);
+      }
     }
 
     const preparedNewNodes = newNodes.map(prepareNode);
@@ -1559,8 +1579,12 @@ function InnerCanvasBoard({
     setEdges(arrangedEdges);
     pushSnapshot(arrangedNodes, arrangedEdges);
 
+    const toastMessage = explanation || (cleanTitle 
+      ? `Theologica AI generated "${cleanTitle}" with ${newNodes.length} cards.`
+      : `Theologica AI added ${newNodes.length} cards to your canvas.`);
+
     setAiToast({
-      message: explanation || `Theologica AI added ${newNodes.length} cards to your canvas.`,
+      message: toastMessage,
       count: newNodes.length,
     });
     setTimeout(() => setAiToast(null), 6000);
@@ -1570,7 +1594,7 @@ function InnerCanvasBoard({
         fitView({ padding: 0.28, duration: 800, minZoom: 0.35, maxZoom: 1.1 });
       }
     }, 150);
-  }, [arrangeGraph, fitView, handleCreateBoard, prepareEdge, prepareNode, pushSnapshot, setEdges, setNodes]);
+  }, [arrangeGraph, fitView, handleCreateBoard, handleRenameBoard, prepareEdge, prepareNode, pushSnapshot, setEdges, setNodes]);
 
   // Target selected node for AI expansion
   const selectedNode = useMemo(() => {
