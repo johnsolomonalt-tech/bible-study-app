@@ -60,6 +60,34 @@ const withPWA = withPWAInit({
 
 const nextConfig: NextConfig = {
   turbopack: {},
+  async rewrites() {
+    return [
+      {
+        source: '/canvas',
+        destination: '/?tab=canvas',
+      },
+      {
+        source: '/canvas/:path*',
+        destination: '/?tab=canvas',
+      },
+      {
+        source: '/board',
+        destination: '/?tab=canvas',
+      },
+      {
+        source: '/boards',
+        destination: '/?tab=canvas',
+      },
+      {
+        source: '/board/:path*',
+        destination: '/?tab=canvas',
+      },
+      {
+        source: '/boards/:path*',
+        destination: '/?tab=canvas',
+      },
+    ];
+  },
 };
 
 export default withPWA(nextConfig);

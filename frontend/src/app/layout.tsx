@@ -67,6 +67,24 @@ export default function RootLayout({
                 if (fav) fav.href = iconPath;
                 var appleFav = document.getElementById('dynamic-apple-icon') || document.querySelector("link[rel~='apple-touch-icon']");
                 if (appleFav) appleFav.href = iconPath;
+
+                // Evict obsolete PWA service worker and clear stale cache if on localhost/dev or if old hashes exist
+                if ('serviceWorker' in navigator && (location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+                  navigator.serviceWorker.getRegistrations().then(function(regs) {
+                    for (var r of regs) {
+                      r.unregister();
+                    }
+                  }).catch(function() {});
+                  if ('caches' in window) {
+                    caches.keys().then(function(keys) {
+                      for (var k of keys) {
+                        if (k.indexOf('workbox') !== -1 || k.indexOf('pages') !== -1 || k.indexOf('next-') !== -1) {
+                          caches.delete(k);
+                        }
+                      }
+                    }).catch(function() {});
+                  }
+                }
               } catch (e) {}
             `,
           }}

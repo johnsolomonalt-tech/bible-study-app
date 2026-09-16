@@ -222,6 +222,33 @@ export default function App() {
     content: string;
     category?: NodeCategory;
   } | null>(null);
+
+  // Initialize active tab from URL query params (e.g. /?tab=canvas or via /canvas rewrite)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab');
+      if (tabParam && ['study', 'canvas', 'devotional', 'notes', 'chats', 'tracker'].includes(tabParam)) {
+        setActiveTab(tabParam);
+      }
+    }
+  }, []);
+
+  // Synchronize activeTab to URL query params for reliable refresh & bookmarking
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      if (activeTab === 'study') {
+        url.searchParams.delete('tab');
+      } else {
+        url.searchParams.set('tab', activeTab);
+      }
+      const newPath = url.pathname + (url.search ? url.search : '') + url.hash;
+      if (window.location.pathname + window.location.search !== url.pathname + (url.search ? url.search : '')) {
+        window.history.replaceState(null, '', newPath);
+      }
+    }
+  }, [activeTab]);
   
   // Devotional State
   const [displayDay, setDisplayDay] = useState(1);

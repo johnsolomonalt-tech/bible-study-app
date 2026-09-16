@@ -39,3 +39,10 @@ next-env.d.ts
 # backend
 dist/
 *.db
+
+# canvas storage
+frontend/.canvas_storage/
+
+# PWA service worker build artifacts
+frontend/public/sw.js*
+frontend/public/workbox-*.js

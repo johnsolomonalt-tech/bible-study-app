@@ -117,7 +117,7 @@ export function CanvasSidebar({
       <div className="p-3 space-y-2 shrink-0">
         <button
           type="button"
-          onClick={onCreateBoard}
+          onClick={() => onCreateBoard()}
           className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-accent text-white text-xs font-semibold hover:bg-accent/90 active:scale-[0.98] transition-all shadow-md cursor-pointer"
         >
           <Plus size={15} />
@@ -172,7 +172,7 @@ export function CanvasSidebar({
               </div>
               <button
                 type="button"
-                onClick={onCreateBoard}
+                onClick={() => onCreateBoard()}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent text-white text-xs font-semibold hover:bg-accent/90 transition-all cursor-pointer shadow-sm active:scale-95"
               >
                 <Plus size={13} />

@@ -1,3 +1,10 @@
 
 # clerk configuration (can include secrets)
 /.clerk/
+
+# canvas storage
+.canvas_storage/
+
+# PWA service worker build artifacts
+public/sw.js*
+public/workbox-*.js

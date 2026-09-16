@@ -1106,7 +1106,7 @@ function InnerCanvasBoard({
 
     const timestamp = Date.now();
     const newId = `board-${timestamp}`;
-    const newTitle = customTitle || 'New Canvas';
+    const newTitle = (typeof customTitle === 'string' && customTitle.trim()) ? customTitle.trim() : 'New Canvas';
     const now = new Date().toISOString();
 
     const newBoardMeta: CanvasBoardMetadata = {

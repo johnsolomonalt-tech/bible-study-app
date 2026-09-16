@@ -6,23 +6,31 @@ import { validateBiblePrompt } from '@/lib/bibleValidation';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
-// Fallback chain for Gemini 3 Flash
+// Operational fallback chain for Gemini models
 const AI_MODELS = [
-  'gemini-3.8-flash',
   'gemini-3.7-flash',
   'gemini-3.6-flash',
   'gemini-3.5-flash',
-  'gemini-2.5-flash',
-  'gemini-1.5-flash'
+  'gemini-3.8-flash',
 ];
 
 function isRetryable(e: unknown): boolean {
   try {
     const msg = (e as Error).message || '';
-    const code = JSON.parse(msg)?.error?.code;
-    return code === 503 || code === 429;
+    // Check if error message contains JSON with error code
+    try {
+      const parsed = JSON.parse(msg);
+      const code = parsed?.error?.code;
+      if (code === 503 || code === 429 || code === 404 || code === 500) return true;
+    } catch {}
+    // Check direct status property
+    const status = (e as any)?.status || (e as any)?.code;
+    if (status === 503 || status === 429 || status === 404 || status === 500 || status === 'NOT_FOUND' || status === 'UNAVAILABLE') return true;
+    // Always retry on model availability, quota, or not found issues
+    if (/not found|unavailable|overloaded|high demand|quota|rate limit|resource exhausted|503|429|404/i.test(msg)) return true;
+    return true; // For AI model fallback, always try subsequent models in the chain
   } catch {
-    return false;
+    return true;
   }
 }
 
@@ -37,7 +45,7 @@ async function withModelFallback<T>(
     } catch (e) {
       lastError = e;
       if (!isRetryable(e)) throw e;
-      console.warn(`Model ${model} unavailable for canvas, trying next...`);
+      console.warn(`Model ${model} unavailable for canvas, trying next in fallback chain...`);
     }
   }
   throw lastError;
