@@ -174,6 +174,32 @@ const TypewriterMessage = ({ content, onVerseClick }: { content: string; onVerse
   );
 };
 
+const AiThinkingIndicator = ({ status, isFullView }: { status: string; isFullView?: boolean }) => {
+  return (
+    <div className={`flex flex-col items-start ${isFullView ? 'max-w-3xl w-full mx-auto' : ''}`}>
+      <span className={`text-[11px] text-muted font-semibold tracking-wide uppercase ml-1 ${isFullView ? 'mb-2' : 'mb-1.5'}`}>
+        Study AI
+      </span>
+      <div
+        className={`${
+          isFullView
+            ? 'px-5 py-3.5 text-[14px] rounded-[20px]'
+            : 'px-4 py-3 max-w-[90%] text-[13.5px] rounded-2xl'
+        } leading-relaxed bg-surface text-fg rounded-bl-sm ring-1 ring-border-soft shadow-sm flex flex-col gap-2 transition-all duration-200`}
+      >
+        <div className="flex gap-1.5 items-center py-0.5">
+          <div className="w-1.5 h-1.5 rounded-full bg-[#87867f] animate-bounce" style={{ animationDelay: '0ms' }} />
+          <div className="w-1.5 h-1.5 rounded-full bg-[#87867f] animate-bounce" style={{ animationDelay: '150ms' }} />
+          <div className="w-1.5 h-1.5 rounded-full bg-[#87867f] animate-bounce" style={{ animationDelay: '300ms' }} />
+        </div>
+        <div className="text-[12px] text-muted flex items-center gap-2 font-medium tracking-tight select-none">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-accent animate-pulse shrink-0" />
+          <span className="animate-fade-in transition-all duration-200">{status}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default function App() {
   useEffect(() => {
@@ -480,7 +506,44 @@ export default function App() {
   const imageFileRef = useRef<HTMLInputElement>(null);
   const [cooldown, setCooldown] = useState(0);
   const [isAiTyping, setIsAiTyping] = useState(false);
+  const [aiActivityStatus, setAiActivityStatus] = useState('Thinking...');
+  const [aiActivityType, setAiActivityType] = useState<'study' | 'image'>('study');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isAiTyping) {
+      setAiActivityStatus('Thinking...');
+      return;
+    }
+
+    if (aiActivityType === 'image') {
+      setAiActivityStatus('Thinking...');
+      const t1 = setTimeout(() => setAiActivityStatus('Envisioning biblical scene...'), 2000);
+      const t2 = setTimeout(() => setAiActivityStatus('Composing sacred artwork...'), 5000);
+      const t3 = setTimeout(() => setAiActivityStatus('Rendering image details...'), 9000);
+      const t4 = setTimeout(() => setAiActivityStatus('Finalizing artwork...'), 14000);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+        clearTimeout(t4);
+      };
+    }
+
+    // Default: Bible study query progression
+    setAiActivityStatus('Thinking...');
+    const t1 = setTimeout(() => setAiActivityStatus('Finding verses...'), 1800);
+    const t2 = setTimeout(() => setAiActivityStatus('Looking for Greek & Hebrew roots...'), 4200);
+    const t3 = setTimeout(() => setAiActivityStatus('Analyzing scriptural context & theology...'), 7200);
+    const t4 = setTimeout(() => setAiActivityStatus('Formulating response...'), 11000);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      clearTimeout(t4);
+    };
+  }, [isAiTyping, aiActivityType]);
 
   // Load Data
   useEffect(() => {
@@ -1293,6 +1356,14 @@ export default function App() {
     const currentInput = textToSend;
     if (!overrideText) setChatInput(''); else setChatInput('');
     setCooldown(30); // 30s cooldown
+    const isImageReq = [
+      'draw', 'generate an image', 'create an image', 'make an image', 'paint',
+      'illustrate', 'visualize', 'show me a picture', 'create a picture',
+      'generate a picture', 'make a picture', 'create a visual', 'depict',
+      'render', 'generate art', 'create art', 'make art',
+      'show me what', 'generate a photo', 'create a photo', 'make a photo'
+    ].some(kw => currentInput.toLowerCase().includes(kw)) && !currentImage;
+    setAiActivityType(isImageReq ? 'image' : 'study');
     setIsAiTyping(true);
     setTimeout(scrollToBottom, 50);
 
@@ -1677,14 +1748,7 @@ export default function App() {
                     ))
                   )}
                   {isAiTyping && (
-                    <div className="flex flex-col items-start">
-                      <span className="text-[11px] text-muted mb-1.5 ml-1 font-semibold tracking-wide uppercase">Study AI</span>
-                      <div className="px-4 py-3 max-w-[90%] text-[14px] leading-relaxed bg-surface text-fg rounded-2xl rounded-bl-sm ring-1 ring-border-soft shadow-sm flex gap-1.5 items-center h-[46px]">
-                        <div className="w-1.5 h-1.5 rounded-full bg-[#87867f] animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <div className="w-1.5 h-1.5 rounded-full bg-[#87867f] animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <div className="w-1.5 h-1.5 rounded-full bg-[#87867f] animate-bounce" style={{ animationDelay: '300ms' }} />
-                      </div>
-                    </div>
+                    <AiThinkingIndicator status={aiActivityStatus} />
                   )}
                   <div ref={messagesEndRef} />
                 </div>
@@ -2007,14 +2071,7 @@ export default function App() {
                   ))
                 )}
                 {isAiTyping && (
-                  <div className="flex flex-col items-start">
-                    <span className="text-[11px] text-muted mb-1.5 ml-1 font-semibold tracking-wide uppercase">Study AI</span>
-                    <div className="px-4 py-3 max-w-[90%] text-[14px] leading-relaxed bg-surface text-fg rounded-2xl rounded-bl-sm ring-1 ring-border-soft shadow-sm flex gap-1.5 items-center h-[46px]">
-                      <div className="w-1.5 h-1.5 rounded-full bg-[#87867f] animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <div className="w-1.5 h-1.5 rounded-full bg-[#87867f] animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <div className="w-1.5 h-1.5 rounded-full bg-[#87867f] animate-bounce" style={{ animationDelay: '300ms' }} />
-                    </div>
-                  </div>
+                  <AiThinkingIndicator status={aiActivityStatus} />
                 )}
                 <div ref={messagesEndRef} />
               </div>
@@ -2465,14 +2522,7 @@ export default function App() {
                       ))
                     )}
                     {isAiTyping && (
-                      <div className="flex flex-col max-w-3xl w-full mx-auto items-start">
-                        <span className="text-[11px] text-muted mb-2 ml-1 font-semibold tracking-wide uppercase">Study AI</span>
-                        <div className="px-5 py-4 text-[15px] leading-[1.7] bg-surface text-fg rounded-[20px] rounded-bl-sm ring-1 ring-border-soft shadow-sm flex gap-1.5 items-center h-[58px]">
-                          <div className="w-1.5 h-1.5 rounded-full bg-[#87867f] animate-bounce" style={{ animationDelay: '0ms' }} />
-                          <div className="w-1.5 h-1.5 rounded-full bg-[#87867f] animate-bounce" style={{ animationDelay: '150ms' }} />
-                          <div className="w-1.5 h-1.5 rounded-full bg-[#87867f] animate-bounce" style={{ animationDelay: '300ms' }} />
-                        </div>
-                      </div>
+                      <AiThinkingIndicator status={aiActivityStatus} isFullView />
                     )}
                     <div ref={messagesEndRef} />
                   </div>

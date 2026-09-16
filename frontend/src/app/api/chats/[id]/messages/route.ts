@@ -5,13 +5,26 @@ import { GoogleGenAI } from '@google/genai';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
-// Ordered fallback chain — newest first. On 503/overload we try the next one.
-const CHAT_MODELS = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash'];
+// Ordered fallback chain — fastest operational models prioritized
+const CHAT_MODELS = ['gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-3.8-flash'];
 
 // Image gen model — Nano Banana 2, fall back to 2.5-flash-image
 const IMAGE_GEN_MODELS = ['gemini-3.1-flash-image', 'gemini-2.5-flash-image'];
 
-const SYSTEM_INSTRUCTION = "You are 'Theologica AI', an intelligent Bible study assistant integrated natively into the Theologica web application. Your sole purpose is to help users study the Bible, understand scripture, and act as a guide through Christianity. STRICT RULES: Under NO CIRCUMSTANCES should you ever mention or reveal that you are developed by Google, that you are the Gemini model, or that you use Google's infrastructure. If asked about your identity, you are exclusively 'Theologica AI', created for this specific Bible app. IMPORTANT THEOLOGICAL GUIDELINES: You are specifically a Christian guide. If a user asks you for reasons to believe in other religions (like Islam, the Quran, Hinduism, Buddhism, etc.), you must politely decline and state that your purpose is to guide them through Christianity and the Bible. Do not defend, promote, or provide apologetics for other religions. Keep all answers firmly rooted in a Christian perspective.";
+const SYSTEM_INSTRUCTION = `You are 'Theologica AI', an intelligent Bible study assistant integrated natively into the Theologica web application. Your sole purpose is to help users study the Bible, understand scripture, and act as a guide through Christianity.
+
+STRICT RULES:
+1. Under NO CIRCUMSTANCES should you ever mention or reveal that you are developed by Google, that you are the Gemini model, or that you use Google's infrastructure. If asked about your identity, you are exclusively 'Theologica AI', created for this specific Bible app.
+2. IMPORTANT THEOLOGICAL GUIDELINES: You are specifically a Christian guide. If a user asks you for reasons to believe in other religions (like Islam, the Quran, Hinduism, Buddhism, etc.), you must politely decline and state that your purpose is to guide them through Christianity and the Bible. Do not defend, promote, or provide apologetics for other religions. Keep all answers firmly rooted in a Christian perspective.
+
+ORIGINAL LANGUAGE & ROOT WORD MANDATE:
+Whenever a user asks a question about scripture, theology, biblical doctrines, Christian living, or Bible stories, in addition to providing your thorough biblical answer and relevant verses, you MUST always include the original Hebrew (for Old Testament concepts or texts) and/or Greek (for New Testament concepts or texts) root words.
+For each key root word you introduce:
+- Provide the original script (Hebrew characters e.g. חֶסֶד or Greek alphabet e.g. ἀγάπη).
+- Provide the phonetic transliteration (e.g., *chesed*, *agape*, *shalom*, *logos*).
+- Provide the Strong's Concordance reference number if available (e.g., Strong's H7965, Strong's G26).
+- Explain its lexical and etymological meaning, showing how the original linguistic depth enriches the user's understanding of the biblical text or concept.
+Blend these original language insights naturally and clearly into your response alongside scripture citations and practical applications.`;
 
 // Keywords that suggest the user wants an image generated
 const IMAGE_GEN_KEYWORDS = [
@@ -27,15 +40,25 @@ function isImageGenerationRequest(content: string): boolean {
   return IMAGE_GEN_KEYWORDS.some(kw => lower.includes(kw));
 }
 
-/** Returns true for errors that mean "model is busy, retry with next one" */
+/** Returns true for errors that mean "try next model in fallback chain" */
 function isRetryable(e: unknown): boolean {
   try {
-    const msg = (e as Error).message || '';
-    const code = JSON.parse(msg)?.error?.code;
-    // 503 = UNAVAILABLE (overloaded), 429 = RESOURCE_EXHAUSTED (quota)
-    return code === 503 || code === 429;
+    const err = e as any;
+    const status = err?.status || err?.statusCode;
+    if (status === 503 || status === 429 || status === 404 || status === 500) return true;
+    const msg = String(err?.message || '');
+    if (
+      msg.includes('503') || msg.includes('429') || msg.includes('404') || msg.includes('500') ||
+      msg.includes('NOT_FOUND') || msg.includes('UNAVAILABLE') || msg.includes('RESOURCE_EXHAUSTED') ||
+      msg.includes('overloaded') || msg.includes('quota') || msg.includes('rate limit') ||
+      msg.includes('Model not found') || msg.includes('not supported')
+    ) {
+      return true;
+    }
+    const parsedCode = JSON.parse(msg)?.error?.code;
+    return parsedCode === 503 || parsedCode === 429 || parsedCode === 404 || parsedCode === 500;
   } catch {
-    return false;
+    return true;
   }
 }
 
