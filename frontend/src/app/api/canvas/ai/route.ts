@@ -251,8 +251,13 @@ JSON Format:
     const estimateAiCardHeight = (title?: string, content?: string): number => {
       let estimated = 90; // Header, body padding, accent strip
       const t = title || '';
-      if (t.length > 25) {
-        estimated += Math.ceil((t.length - 25) / 25) * 22;
+      const rawTitleLines = t.split('\n');
+      let titleLines = 0;
+      for (const tLine of rawTitleLines) {
+        titleLines += Math.max(1, Math.ceil(tLine.length / 26));
+      }
+      if (titleLines > 1) {
+        estimated += (titleLines - 1) * 22;
       }
       const c = content || '';
       if (c.trim()) {

@@ -106,9 +106,14 @@ function getNodeHeight(node: Node<CanvasNodeData> | SerializableNode): number {
   // Base card chrome: header (~54px) + body padding (~28px) + footer accent strip (4px) + borders
   let estimatedHeight = 90;
 
-  // Title wrapping (average ~25 characters per line in title input)
-  if (title.length > 25) {
-    estimatedHeight += Math.ceil((title.length - 25) / 25) * 22;
+  // Title wrapping (explicit newlines or average ~26 characters per line in title textarea)
+  const rawTitleLines = title.split('\n');
+  let titleLines = 0;
+  for (const tLine of rawTitleLines) {
+    titleLines += Math.max(1, Math.ceil(tLine.length / 26));
+  }
+  if (titleLines > 1) {
+    estimatedHeight += (titleLines - 1) * 22;
   }
 
   // Tags pill row

@@ -51,7 +51,16 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isConnectSubmenuOpen, setIsConnectSubmenuOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const titleTextareaRef = useRef<HTMLTextAreaElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const adjustTitleHeight = () => {
+    const el = titleTextareaRef.current;
+    if (el) {
+      el.style.height = 'auto';
+      el.style.height = `${Math.max(26, el.scrollHeight)}px`;
+    }
+  };
 
   const theme = data.theme || 'dark';
   const isDark = theme === 'dark';
@@ -63,6 +72,13 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
     setEditContent(data.content || '');
     setEditTitle(data.title || '');
   }, [data.content, data.title]);
+
+  // Adjust title height automatically when text or card width changes
+  useEffect(() => {
+    adjustTitleHeight();
+    const frame = requestAnimationFrame(adjustTitleHeight);
+    return () => cancelAnimationFrame(frame);
+  }, [editTitle, width]);
 
   // Focus textarea on edit mode start
   useEffect(() => {
@@ -201,15 +217,15 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
 
       {/* Card Header */}
       <div 
-        className={`flex items-center justify-between px-3.5 py-2.5 border-b rounded-t-xl gap-2 ${
+        className={`flex items-start justify-between px-3.5 py-2.5 border-b rounded-t-xl gap-2 ${
           isDark ? 'border-zinc-800/80 bg-zinc-900/40' : 'border-zinc-100 bg-zinc-50/70'
         }`}
       >
-        {/* Category Badge & Title Input */}
-        <div className="flex items-center gap-2 flex-1 min-w-0">
+        {/* Category Badge & Title Textarea */}
+        <div className="flex items-start gap-2 flex-1 min-w-0">
           {/* Badge */}
           <div 
-            className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold tracking-wide uppercase shrink-0 border ${
+            className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold tracking-wide uppercase shrink-0 border mt-0.5 ${
               isDark ? `${categoryMeta.bgDark} ${categoryMeta.borderDark} ${categoryMeta.textDark}` : `${categoryMeta.bgLight} ${categoryMeta.borderLight} ${categoryMeta.textLight}`
             }`}
             style={{ borderColor: categoryMeta.accent }}
@@ -218,21 +234,37 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
             <span>{categoryMeta.label}</span>
           </div>
 
-          {/* Inline Title Input */}
-          <input
-            type="text"
+          {/* Inline Multi-Line Title Input */}
+          <textarea
+            ref={titleTextareaRef}
+            rows={1}
             value={editTitle}
-            onChange={(e) => setEditTitle(e.target.value)}
+            onChange={(e) => {
+              setEditTitle(e.target.value);
+              adjustTitleHeight();
+            }}
             onBlur={handleTitleBlur}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                e.preventDefault();
+                handleTitleBlur();
+                (e.target as HTMLTextAreaElement).blur();
+              }
+            }}
             placeholder="Card Title..."
-            className={`flex-1 min-w-0 bg-transparent text-[13px] font-semibold focus:outline-none focus:ring-1 focus:ring-accent/50 rounded px-1.5 py-0.5 truncate ${
+            className={`nodrag flex-1 min-w-0 bg-transparent text-[13px] font-semibold leading-snug focus:outline-none focus:ring-1 focus:ring-accent/50 rounded px-1.5 py-0.5 resize-none overflow-hidden break-words whitespace-pre-wrap ${
               isDark ? 'text-zinc-200 placeholder-zinc-500' : 'text-zinc-800 placeholder-zinc-400'
             }`}
+            style={{
+              height: 'auto',
+              minHeight: '26px',
+            }}
           />
         </div>
 
         {/* Action Buttons & Dropdown */}
-        <div className="relative shrink-0 flex items-center gap-1" ref={menuRef}>
+        <div className="relative shrink-0 flex items-center gap-1 mt-0.5" ref={menuRef}>
           {isEditing ? (
             <div className="flex items-center gap-1">
               <button
