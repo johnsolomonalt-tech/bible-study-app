@@ -27,6 +27,7 @@ import { CustomCanvasEdge } from './CustomCanvasEdge';
 import { CanvasToolbar } from './CanvasToolbar';
 import { CanvasSidebar } from './CanvasSidebar';
 import { TheologicaAiCanvasModal } from './TheologicaAiCanvasModal';
+import { AddVerseToCanvasModal } from './AddVerseToCanvasModal';
 import {
   NodeCategory,
   CanvasNodeData,
@@ -63,6 +64,7 @@ interface CanvasBoardProps {
   } | null;
   onIncomingNodeHandled?: () => void;
   isActiveTab?: boolean;
+  onNavigateToVerse?: (book: string, chapter: number, verse: number) => void;
 }
 
 interface HistorySnapshot {
@@ -194,12 +196,14 @@ function InnerCanvasBoard({
   incomingNode,
   onIncomingNodeHandled,
   isActiveTab = true,
+  onNavigateToVerse,
 }: CanvasBoardProps) {
   const { fitView, setViewport, getViewport, screenToFlowPosition } = useReactFlow();
   const containerRef = useRef<HTMLDivElement>(null);
   const currentViewportRef = useRef<{ x: number; y: number; zoom: number } | null>(null);
   const isDark = theme === 'dark';
   const mod = useModifierKey();
+  const [isAddVerseModalOpen, setIsAddVerseModalOpen] = useState(false);
 
   // Viewport restoration & activation when switching to the canvas tab
   useEffect(() => {
@@ -659,13 +663,14 @@ function InnerCanvasBoard({
         onDuplicate: handleDuplicateNode,
         onDelete: handleDeleteNode,
         onConnectTo: handleConnectTo,
+        onVerseClick: onNavigateToVerse,
       },
       style: {
         width: raw.style?.width || 380,
         ...raw.style,
       },
     };
-  }, [handleDeleteNode, handleDuplicateNode, handleUpdateNode, handleConnectTo, theme]);
+  }, [handleDeleteNode, handleDuplicateNode, handleUpdateNode, handleConnectTo, onNavigateToVerse, theme]);
 
   // Format edge helper
   const prepareEdge = useCallback((raw: SerializableEdge): Edge => {
@@ -1304,6 +1309,7 @@ function InnerCanvasBoard({
         content: incomingNode.content || '',
         category: incomingNode.category || 'scripture',
         theme,
+        onVerseClick: onNavigateToVerse,
         onUpdate: handleUpdateNode,
         onDuplicate: handleDuplicateNode,
         onDelete: handleDeleteNode,
@@ -1328,7 +1334,7 @@ function InnerCanvasBoard({
         fitView({ padding: 0.25, duration: 600, minZoom: 0.35, maxZoom: 1.1 });
       }
     }, 120);
-  }, [incomingNode, handleCreateBoard, nodes, theme, handleUpdateNode, handleDuplicateNode, handleDeleteNode, onIncomingNodeHandled, pushSnapshot, fitView, setNodes]);
+  }, [incomingNode, handleCreateBoard, nodes, theme, onNavigateToVerse, handleUpdateNode, handleDuplicateNode, handleDeleteNode, onIncomingNodeHandled, pushSnapshot, fitView, setNodes]);
 
   // Add card from toolbar or context menu
   const handleAddNode = useCallback((category: NodeCategory, customPos?: { x: number; y: number }) => {
@@ -1368,6 +1374,7 @@ function InnerCanvasBoard({
         content: '',
         category,
         theme,
+        onVerseClick: onNavigateToVerse,
         onUpdate: handleUpdateNode,
         onDuplicate: handleDuplicateNode,
         onDelete: handleDeleteNode,
@@ -1382,7 +1389,61 @@ function InnerCanvasBoard({
       pushSnapshot(next, edgesRef.current);
       return next;
     });
-  }, [handleCreateBoard, theme, handleUpdateNode, handleDuplicateNode, handleDeleteNode, pushSnapshot, setNodes]);
+  }, [handleCreateBoard, theme, onNavigateToVerse, handleUpdateNode, handleDuplicateNode, handleDeleteNode, pushSnapshot, setNodes]);
+
+  // Add scripture verse directly to canvas from lookup modal
+  const handleAddVerse = useCallback((verseData: { title: string; content: string; reference: string }) => {
+    if (!activeBoardIdRef.current) {
+      handleCreateBoard(verseData.title);
+    }
+
+    const timestamp = Date.now();
+    const newId = `card-verse-${timestamp}`;
+
+    let posX = 200;
+    let posY = 200;
+
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const centerPos = screenToFlowPosition({
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      });
+      posX = Math.round(centerPos.x - 190);
+      posY = Math.round(centerPos.y - 120);
+    } else if (nodesRef.current.length > 0) {
+      const last = nodesRef.current[nodesRef.current.length - 1];
+      posX = last.position.x + 60;
+      posY = last.position.y + 60;
+    }
+
+    const newNode: Node<CanvasNodeData> = {
+      id: newId,
+      type: 'customCard',
+      position: { x: posX, y: posY },
+      selected: true,
+      style: { width: 380 },
+      data: {
+        title: verseData.title,
+        content: verseData.content,
+        category: 'scripture',
+        theme,
+        onVerseClick: onNavigateToVerse,
+        onUpdate: handleUpdateNode,
+        onDuplicate: handleDuplicateNode,
+        onDelete: handleDeleteNode,
+      },
+    };
+
+    setNodes((nds) => {
+      const next: Node<CanvasNodeData>[] = [
+        ...nds.map((n) => ({ ...n, selected: false })),
+        newNode,
+      ];
+      pushSnapshot(next, edgesRef.current);
+      return next;
+    });
+  }, [handleCreateBoard, screenToFlowPosition, theme, onNavigateToVerse, handleUpdateNode, handleDuplicateNode, handleDeleteNode, pushSnapshot, setNodes]);
 
   // Connecting edges
   const onConnect = useCallback((connection: Connection) => {
@@ -1643,10 +1704,11 @@ function InnerCanvasBoard({
         onDuplicate: handleDuplicateNode,
         onDelete: handleDeleteNode,
         onConnectTo: handleConnectTo,
+        onVerseClick: onNavigateToVerse,
         otherNodes: summary.filter((s) => s.id !== n.id),
       },
     }));
-  }, [nodes, theme, handleUpdateNode, handleDuplicateNode, handleDeleteNode, handleConnectTo]);
+  }, [nodes, theme, handleUpdateNode, handleDuplicateNode, handleDeleteNode, handleConnectTo, onNavigateToVerse]);
 
   return (
     <div 
@@ -1674,6 +1736,7 @@ function InnerCanvasBoard({
         boardTitle={boardTitle}
         onTitleChange={(t) => handleRenameBoard(activeBoardId, t)}
         onAddNode={handleAddNode}
+        onOpenAddVerse={() => setIsAddVerseModalOpen(true)}
         onOpenAi={() => setIsAiModalOpen(true)}
         onUndo={handleUndo}
         onRedo={handleRedo}
@@ -1893,6 +1956,21 @@ function InnerCanvasBoard({
             </div>
           ) : (
             <>
+              {/* Add Scripture Verse */}
+              <button
+                type="button"
+                onClick={() => {
+                  setPaneContextMenu(null);
+                  setIsAddVerseModalOpen(true);
+                }}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+                  isDark ? 'hover:bg-zinc-800 text-amber-300' : 'hover:bg-amber-50 text-amber-700'
+                }`}
+              >
+                <BookOpen size={16} className="text-amber-400 shrink-0" />
+                <span>Add Bible Verse...</span>
+              </button>
+
               {/* Add Card Submenu */}
               <div>
                 <button
@@ -1918,8 +1996,12 @@ function InnerCanvasBoard({
                           key={cat}
                           type="button"
                           onClick={() => {
-                            const flowPos = screenToFlowPosition({ x: paneContextMenu.x, y: paneContextMenu.y });
-                            handleAddNode(cat, flowPos);
+                            if (cat === 'scripture') {
+                              setIsAddVerseModalOpen(true);
+                            } else {
+                              const flowPos = screenToFlowPosition({ x: paneContextMenu.x, y: paneContextMenu.y });
+                              handleAddNode(cat, flowPos);
+                            }
                             setPaneContextMenu(null);
                           }}
                           className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors cursor-pointer text-left ${
@@ -2058,6 +2140,14 @@ function InnerCanvasBoard({
         currentGraph={currentGraphPayload}
         selectedNode={selectedNode}
         onApplyGraphUpdate={handleApplyAiGraph}
+        theme={theme}
+      />
+
+      {/* Add Scripture Verse Modal */}
+      <AddVerseToCanvasModal
+        isOpen={isAddVerseModalOpen}
+        onClose={() => setIsAddVerseModalOpen(false)}
+        onAddVerse={handleAddVerse}
         theme={theme}
       />
     </div>

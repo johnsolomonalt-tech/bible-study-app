@@ -314,13 +314,15 @@ export default function App() {
   const [completedChapters, setCompletedChapters] = useState<string[]>([]);
   
   // Verse navigation & interactive highlighting
-  const pendingScrollVerseRef = useRef<number | null>(null);
+  const pendingVerseRef = useRef<{ book: string; chapter: number; verse: number } | null>(null);
 
   const scrollToAndHighlightVerse = useCallback((verseNum: number) => {
     const tryScroll = (attemptsLeft: number) => {
       const verseElements = document.querySelectorAll(`[data-verse="${verseNum}"]`);
-      if (verseElements.length > 0) {
-        const el = (Array.from(verseElements).find(e => (e as HTMLElement).offsetParent !== null) || verseElements[0]) as HTMLElement;
+      const visibleEl = Array.from(verseElements).find(e => (e as HTMLElement).offsetParent !== null) as HTMLElement | undefined;
+      const el = visibleEl || (attemptsLeft === 0 && verseElements.length > 0 ? (verseElements[0] as HTMLElement) : null);
+
+      if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         el.classList.remove('verse-nav-highlight');
         void el.offsetWidth;
@@ -333,7 +335,7 @@ export default function App() {
       }
     };
 
-    setTimeout(() => tryScroll(6), 80);
+    setTimeout(() => tryScroll(15), 100);
   }, []);
 
   const navigateToVerse = useCallback((bookName: string, chapter: number, verse: number) => {
@@ -349,22 +351,28 @@ export default function App() {
     const isSameBook = activeBook.name.toLowerCase() === targetBook.name.toLowerCase();
     const isSameChapter = activeChapter === chapter;
 
-    if (isSameBook && isSameChapter) {
+    if (isSameBook && isSameChapter && bibleVerses.length > 0) {
       scrollToAndHighlightVerse(verse);
     } else {
-      pendingScrollVerseRef.current = verse;
+      pendingVerseRef.current = { book: targetBook.name, chapter, verse };
+      setBibleVerses([]);
       setActiveBook(targetBook);
       setActiveChapter(chapter);
     }
-  }, [activeBook.name, activeChapter, scrollToAndHighlightVerse]);
+  }, [activeBook.name, activeChapter, bibleVerses.length, scrollToAndHighlightVerse]);
 
   useEffect(() => {
-    if (pendingScrollVerseRef.current && bibleVerses.length > 0) {
-      const targetVerse = pendingScrollVerseRef.current;
-      pendingScrollVerseRef.current = null;
-      scrollToAndHighlightVerse(targetVerse);
+    if (pendingVerseRef.current && bibleVerses.length > 0) {
+      const target = pendingVerseRef.current;
+      if (
+        activeBook.name.toLowerCase() === target.book.toLowerCase() &&
+        activeChapter === target.chapter
+      ) {
+        pendingVerseRef.current = null;
+        scrollToAndHighlightVerse(target.verse);
+      }
     }
-  }, [bibleVerses, scrollToAndHighlightVerse]);
+  }, [bibleVerses, activeBook.name, activeChapter, scrollToAndHighlightVerse]);
 
   const aiMarkdownComponents = useMemo(() => {
     return createMarkdownComponents(navigateToVerse);
@@ -2880,6 +2888,7 @@ export default function App() {
             incomingNode={canvasIncomingNode}
             onIncomingNodeHandled={() => setCanvasIncomingNode(null)}
             isActiveTab={activeTab === 'canvas'}
+            onNavigateToVerse={navigateToVerse}
           />
         </div>
       </main>

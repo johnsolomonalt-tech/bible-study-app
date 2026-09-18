@@ -262,40 +262,106 @@ export const CANONICAL_BOOKS: Record<string, { name: string; chapters: number }>
 const SORTED_BOOK_NAMES = Object.keys(CANONICAL_BOOKS).sort((a, b) => b.length - a.length);
 const BOOK_REGEX_PART = SORTED_BOOK_NAMES.map(n => n.replace(/\s+/g, '\\s+')).join('|');
 
-// Matches: "Romans 8:28", "1 Corinthians 13:4-8", "Gen 1:1", "Song of Solomon 2:4"
+// Safe book names for standalone chapter references (avoids common English words like 'is', 'am')
+const AMBIGUOUS_WORDS = new Set(['all', 'can', 'jam', 'act', 'job', 'man', 'is', 'am', 'so', 'do', 'he', 're', 'no', 'as', 'to', 'in']);
+const SAFE_CHAPTER_BOOKS = Object.keys(CANONICAL_BOOKS)
+  .filter(b => b.length >= 3 && !AMBIGUOUS_WORDS.has(b))
+  .sort((a, b) => b.length - a.length);
+const SAFE_CHAPTER_BOOKS_PART = SAFE_CHAPTER_BOOKS.map(n => n.replace(/\s+/g, '\\s+')).join('|');
+
+// Matches: "Romans 8:28", "1 Corinthians 13:4-8", "Gen. 1:1", "Song of Solomon 2:4", "John 14: 27", "John 14:27–28"
 // Group 1: Book name, Group 2: Chapter, Group 3: Starting verse, Group 4: Optional ending verse
 export const BIBLE_VERSE_REGEX = new RegExp(
-  `\\b(${BOOK_REGEX_PART})\\s+(\\d+):(\\d+)(?:-(\\d+))?\\b`,
+  `\\b(${BOOK_REGEX_PART})\\.?\\s*(\\d+):\\s*(\\d+)(?:\\s*[\\-\\u2013\\u2014]\\s*(\\d+))?\\b`,
+  'gi'
+);
+
+// Matches standalone chapter citations like "Psalm 23", "Romans 8" when NOT followed by a colon
+export const BIBLE_CHAPTER_REGEX = new RegExp(
+  `\\b(${SAFE_CHAPTER_BOOKS_PART})\\.?\\s+(\\d+)(?!:\\s*\\d+)\\b`,
   'gi'
 );
 
 export function parseVerseReference(text: string): ParsedVerseRef | null {
-  const match = text.match(
-    new RegExp(`^(${BOOK_REGEX_PART})\\s+(\\d+):(\\d+)(?:-(\\d+))?$`, 'i')
+  if (!text) return null;
+  const trimmed = text.trim();
+
+  // 1. Try full verse citation: Book Chapter:Verse(-Verse)
+  const verseMatch = trimmed.match(
+    new RegExp(`^(${BOOK_REGEX_PART})\\.?\\s*(\\d+):\\s*(\\d+)(?:\\s*[\\-\\u2013\\u2014]\\s*(\\d+))?$`, 'i')
   );
-  if (!match) return null;
+  if (verseMatch) {
+    const rawBook = verseMatch[1].toLowerCase().replace(/\s+/g, ' ').trim();
+    const canonical = CANONICAL_BOOKS[rawBook];
+    if (canonical) {
+      const chapter = parseInt(verseMatch[2], 10);
+      const verse = parseInt(verseMatch[3], 10);
+      if (!isNaN(chapter) && !isNaN(verse) && chapter >= 1 && verse >= 1) {
+        return {
+          book: canonical.name,
+          chapter,
+          verse,
+          raw: trimmed,
+        };
+      }
+    }
+  }
 
-  const rawBook = match[1].toLowerCase().replace(/\s+/g, ' ').trim();
-  const canonical = CANONICAL_BOOKS[rawBook];
-  if (!canonical) return null;
+  // 2. Try standalone chapter citation: Book Chapter
+  const chapterMatch = trimmed.match(
+    new RegExp(`^(${SAFE_CHAPTER_BOOKS_PART})\\.?\\s+(\\d+)$`, 'i')
+  );
+  if (chapterMatch) {
+    const rawBook = chapterMatch[1].toLowerCase().replace(/\s+/g, ' ').trim();
+    const canonical = CANONICAL_BOOKS[rawBook];
+    if (canonical) {
+      const chapter = parseInt(chapterMatch[2], 10);
+      if (!isNaN(chapter) && chapter >= 1 && chapter <= canonical.chapters) {
+        return {
+          book: canonical.name,
+          chapter,
+          verse: 1,
+          raw: trimmed,
+        };
+      }
+    }
+  }
 
-  const chapter = parseInt(match[2], 10);
-  const verse = parseInt(match[3], 10);
-
-  if (isNaN(chapter) || isNaN(verse) || chapter < 1 || verse < 1) return null;
-
-  return {
-    book: canonical.name,
-    chapter,
-    verse,
-    raw: text,
-  };
+  return null;
 }
 
 export type VerseClickHandler = (book: string, chapter: number, verse: number) => void;
 
+function renderVerseButton(
+  rawMatch: string,
+  bookName: string,
+  chapter: number,
+  verse: number,
+  key: string,
+  onVerseClick: VerseClickHandler
+) {
+  return (
+    <button
+      key={key}
+      type="button"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onVerseClick(bookName, chapter, verse);
+      }}
+      className="inline-flex items-baseline gap-1 px-1.5 py-0.5 mx-0.5 rounded-md bg-accent/15 hover:bg-accent/25 text-accent font-semibold text-inherit border border-accent/25 hover:border-accent/40 transition-all cursor-pointer group/vlink align-baseline shadow-xs select-none"
+      title={`Open ${bookName} ${chapter}:${verse} in Bible reader`}
+    >
+      <BookOpen size={11} className="self-center opacity-70 group-hover/vlink:opacity-100 transition-opacity shrink-0" />
+      <span className="underline decoration-accent/40 group-hover/vlink:decoration-accent">
+        {rawMatch}
+      </span>
+    </button>
+  );
+}
+
 /**
- * Traverses ReactNode children recursively and replaces any detected Bible verse citations
+ * Traverses ReactNode children recursively and replaces any detected Bible verse or chapter citations
  * with an interactive clickable element that invokes onVerseClick(book, chapter, verse).
  */
 export function linkifyBibleReferences(
@@ -303,7 +369,7 @@ export function linkifyBibleReferences(
   onVerseClick: VerseClickHandler
 ): React.ReactNode {
   if (typeof node === 'string') {
-    // Reset regex index
+    // Phase 1: Match full verse citations: Book C:V(-V)
     BIBLE_VERSE_REGEX.lastIndex = 0;
     const parts: React.ReactNode[] = [];
     let lastIndex = 0;
@@ -319,45 +385,82 @@ export function linkifyBibleReferences(
 
       const canonical = CANONICAL_BOOKS[rawBook];
       if (canonical && !isNaN(chapter) && !isNaN(verse)) {
-        // Push preceding plain text
         if (matchStart > lastIndex) {
           parts.push(node.substring(lastIndex, matchStart));
         }
 
-        // Push clickable verse badge
-        const bookName = canonical.name;
         parts.push(
-          <button
-            key={`verse-link-${bookName}-${chapter}-${verse}-${matchStart}`}
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onVerseClick(bookName, chapter, verse);
-            }}
-            className="inline-flex items-baseline gap-1 px-1.5 py-0.5 mx-0.5 rounded-md bg-accent/15 hover:bg-accent/25 text-accent font-semibold text-inherit border border-accent/25 hover:border-accent/40 transition-all cursor-pointer group/vlink align-baseline shadow-xs"
-            title={`Navigate to ${bookName} ${chapter}:${verse} in Bible reader`}
-          >
-            <BookOpen size={11} className="self-center opacity-70 group-hover/vlink:opacity-100 transition-opacity" />
-            <span className="underline decoration-accent/40 group-hover/vlink:decoration-accent">
-              {rawMatch}
-            </span>
-          </button>
+          renderVerseButton(
+            rawMatch,
+            canonical.name,
+            chapter,
+            verse,
+            `verse-${canonical.name}-${chapter}-${verse}-${matchStart}`,
+            onVerseClick
+          )
         );
 
         lastIndex = matchEnd;
       }
     }
 
-    if (lastIndex === 0) {
-      return node; // No matches found, return raw string
-    }
-
     if (lastIndex < node.length) {
       parts.push(node.substring(lastIndex));
     }
 
-    return parts.length === 1 ? parts[0] : parts;
+    // Phase 2: On any plain string chunks, check for standalone chapter citations
+    const finalParts: React.ReactNode[] = [];
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      if (typeof part !== 'string') {
+        finalParts.push(part);
+        continue;
+      }
+
+      BIBLE_CHAPTER_REGEX.lastIndex = 0;
+      let chapterLastIdx = 0;
+      let chMatch: RegExpExecArray | null;
+
+      while ((chMatch = BIBLE_CHAPTER_REGEX.exec(part)) !== null) {
+        const chStart = chMatch.index;
+        const chEnd = BIBLE_CHAPTER_REGEX.lastIndex;
+        const rawChMatch = chMatch[0];
+        const rawChBook = chMatch[1].toLowerCase().replace(/\s+/g, ' ').trim();
+        const chapter = parseInt(chMatch[2], 10);
+
+        const canonical = CANONICAL_BOOKS[rawChBook];
+        if (canonical && !isNaN(chapter) && chapter >= 1 && chapter <= canonical.chapters) {
+          if (chStart > chapterLastIdx) {
+            finalParts.push(part.substring(chapterLastIdx, chStart));
+          }
+
+          finalParts.push(
+            renderVerseButton(
+              rawChMatch,
+              canonical.name,
+              chapter,
+              1,
+              `chap-${canonical.name}-${chapter}-${chStart}`,
+              onVerseClick
+            )
+          );
+
+          chapterLastIdx = chEnd;
+        }
+      }
+
+      if (chapterLastIdx === 0) {
+        finalParts.push(part);
+      } else if (chapterLastIdx < part.length) {
+        finalParts.push(part.substring(chapterLastIdx));
+      }
+    }
+
+    if (finalParts.length === 1 && typeof finalParts[0] === 'string') {
+      return node;
+    }
+
+    return finalParts.length === 1 ? finalParts[0] : finalParts;
   }
 
   if (Array.isArray(node)) {
@@ -365,8 +468,8 @@ export function linkifyBibleReferences(
   }
 
   if (React.isValidElement(node)) {
-    // Do not linkify inside interactive elements or code blocks
-    if (node.type === 'a' || node.type === 'button' || node.type === 'code' || node.type === 'pre') {
+    // Do not linkify inside buttons or code blocks
+    if (node.type === 'button' || node.type === 'code' || node.type === 'pre') {
       return node;
     }
 
@@ -382,3 +485,80 @@ export function linkifyBibleReferences(
 
   return node;
 }
+
+export const createMarkdownComponents = (onVerseClick?: VerseClickHandler) => ({
+  p: ({ children }: any) => (
+    <p className="mb-4 last:mb-0 leading-[1.7] text-[15px]">
+      {onVerseClick ? linkifyBibleReferences(children, onVerseClick) : children}
+    </p>
+  ),
+  blockquote: ({ children }: any) => (
+    <blockquote className="border-l-[3px] border-[#c96442] bg-accent/10 py-3 px-5 my-5 italic rounded-r-xl shadow-sm text-fg-hover text-[15px]">
+      {onVerseClick ? linkifyBibleReferences(children, onVerseClick) : children}
+    </blockquote>
+  ),
+  strong: ({ children }: any) => (
+    <strong className="font-semibold text-fg">
+      {onVerseClick ? linkifyBibleReferences(children, onVerseClick) : children}
+    </strong>
+  ),
+  em: ({ children }: any) => (
+    <em className="italic text-fg-hover">
+      {onVerseClick ? linkifyBibleReferences(children, onVerseClick) : children}
+    </em>
+  ),
+  li: ({ children }: any) => (
+    <li className="leading-[1.7] text-[15px]">
+      {onVerseClick ? linkifyBibleReferences(children, onVerseClick) : children}
+    </li>
+  ),
+  ul: ({ children }: any) => <ul className="list-disc pl-6 mb-4 space-y-2">{children}</ul>,
+  ol: ({ children }: any) => <ol className="list-decimal pl-6 mb-4 space-y-2">{children}</ol>,
+  h1: ({ children }: any) => (
+    <h1 className="text-xl font-bold mb-4 mt-6 text-fg">
+      {onVerseClick ? linkifyBibleReferences(children, onVerseClick) : children}
+    </h1>
+  ),
+  h2: ({ children }: any) => (
+    <h2 className="text-[18px] font-bold mb-3 mt-5 text-fg">
+      {onVerseClick ? linkifyBibleReferences(children, onVerseClick) : children}
+    </h2>
+  ),
+  h3: ({ children }: any) => (
+    <h3 className="text-[16px] font-bold mb-2 mt-4 text-fg-hover">
+      {onVerseClick ? linkifyBibleReferences(children, onVerseClick) : children}
+    </h3>
+  ),
+  h4: ({ children }: any) => (
+    <h4 className="text-[15px] font-bold mb-2 mt-3 text-fg">
+      {onVerseClick ? linkifyBibleReferences(children, onVerseClick) : children}
+    </h4>
+  ),
+  td: ({ children }: any) => (
+    <td className="p-2 border border-border">
+      {onVerseClick ? linkifyBibleReferences(children, onVerseClick) : children}
+    </td>
+  ),
+  th: ({ children }: any) => (
+    <th className="p-2 border border-border font-semibold">
+      {onVerseClick ? linkifyBibleReferences(children, onVerseClick) : children}
+    </th>
+  ),
+  a: ({ children, href }: any) => {
+    const rawText = typeof children === 'string' ? children : (Array.isArray(children) ? children.join('') : '');
+    const cleanRef = rawText.trim() || (href ? decodeURIComponent(href.replace(/^.*[#/]/, '')).trim() : '');
+    const parsed = parseVerseReference(cleanRef);
+    if (parsed && onVerseClick) {
+      return renderVerseButton(
+        rawText || parsed.raw,
+        parsed.book,
+        parsed.chapter,
+        parsed.verse,
+        `mdlink-${parsed.book}-${parsed.chapter}-${parsed.verse}`,
+        onVerseClick
+      );
+    }
+    return <a href={href} className="text-accent hover:underline" target="_blank" rel="noreferrer">{children}</a>;
+  },
+});
+

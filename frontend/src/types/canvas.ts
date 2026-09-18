@@ -19,6 +19,7 @@ export interface CanvasNodeData extends Record<string, unknown> {
   onConnectTo?: (sourceId: string, targetId: string) => void;
   otherNodes?: Array<{ id: string; title: string; category: NodeCategory }>;
   theme?: 'dark' | 'light';
+  onVerseClick?: (book: string, chapter: number, verse: number) => void;
 }
 
 export interface SerializableNode {

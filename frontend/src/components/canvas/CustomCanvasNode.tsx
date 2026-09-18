@@ -18,10 +18,12 @@ import {
   Compass,
   FileText,
   Link2,
-  ChevronRight
+  ChevronRight,
+  ExternalLink
 } from 'lucide-react';
 import { CanvasNodeData, NodeCategory, CATEGORY_METADATA } from '@/types/canvas';
 import { useModifierKey } from '@/lib/os';
+import { createMarkdownComponents, parseVerseReference } from '@/lib/bibleReferences';
 
 const CATEGORY_ICONS: Record<NodeCategory, React.ElementType> = {
   scripture: BookOpen,
@@ -66,6 +68,14 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
   const isDark = theme === 'dark';
   const categoryMeta = CATEGORY_METADATA[data.category] || CATEGORY_METADATA.general;
   const CategoryIcon = CATEGORY_ICONS[data.category] || FileText;
+
+  const markdownComponents = React.useMemo(() => {
+    return createMarkdownComponents(data.onVerseClick);
+  }, [data.onVerseClick]);
+
+  const parsedTitleRef = React.useMemo(() => {
+    return parseVerseReference(editTitle || data.title || '');
+  }, [editTitle, data.title]);
 
   // Keep local state synced if data updates externally
   useEffect(() => {
@@ -223,16 +233,37 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
       >
         {/* Category Badge & Title Textarea */}
         <div className="flex items-start gap-2 flex-1 min-w-0">
-          {/* Badge */}
-          <div 
-            className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold tracking-wide uppercase shrink-0 border mt-0.5 ${
-              isDark ? `${categoryMeta.bgDark} ${categoryMeta.borderDark} ${categoryMeta.textDark}` : `${categoryMeta.bgLight} ${categoryMeta.borderLight} ${categoryMeta.textLight}`
-            }`}
-            style={{ borderColor: categoryMeta.accent }}
-          >
-            <CategoryIcon size={12} style={{ color: categoryMeta.accent }} />
-            <span>{categoryMeta.label}</span>
-          </div>
+          {/* Badge: if card title is a scripture reference, make it an interactive verse shortcut */}
+          {parsedTitleRef && data.onVerseClick ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                data.onVerseClick?.(parsedTitleRef.book, parsedTitleRef.chapter, parsedTitleRef.verse);
+              }}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold tracking-wide uppercase shrink-0 border mt-0.5 transition-all hover:scale-105 cursor-pointer shadow-xs ${
+                isDark
+                  ? `${categoryMeta.bgDark} ${categoryMeta.borderDark} ${categoryMeta.textDark} hover:brightness-125`
+                  : `${categoryMeta.bgLight} ${categoryMeta.borderLight} ${categoryMeta.textLight} hover:brightness-95`
+              }`}
+              style={{ borderColor: categoryMeta.accent }}
+              title={`Open ${parsedTitleRef.book} ${parsedTitleRef.chapter}:${parsedTitleRef.verse} in Bible reader`}
+            >
+              <CategoryIcon size={12} style={{ color: categoryMeta.accent }} />
+              <span>{categoryMeta.label}</span>
+              <ExternalLink size={10} className="opacity-75 ml-0.5" />
+            </button>
+          ) : (
+            <div 
+              className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold tracking-wide uppercase shrink-0 border mt-0.5 ${
+                isDark ? `${categoryMeta.bgDark} ${categoryMeta.borderDark} ${categoryMeta.textDark}` : `${categoryMeta.bgLight} ${categoryMeta.borderLight} ${categoryMeta.textLight}`
+              }`}
+              style={{ borderColor: categoryMeta.accent }}
+            >
+              <CategoryIcon size={12} style={{ color: categoryMeta.accent }} />
+              <span>{categoryMeta.label}</span>
+            </div>
+          )}
 
           {/* Inline Multi-Line Title Input */}
           <textarea
@@ -455,7 +486,7 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
           showPreviewToggle ? (
             /* Live Markdown Preview */
             <div className={`prose prose-sm max-w-none break-words ${isDark ? 'prose-invert text-zinc-200' : 'text-zinc-800'}`}>
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                 {editContent || '*No content yet. Type something...*'}
               </ReactMarkdown>
             </div>
@@ -505,7 +536,7 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
             }`}
           >
             {data.content ? (
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                 {data.content}
               </ReactMarkdown>
             ) : (

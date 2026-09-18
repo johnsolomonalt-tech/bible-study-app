@@ -41,6 +41,7 @@ interface CanvasToolbarProps {
   nodeCount: number;
   hasActiveBoard?: boolean;
   onCreateBoard?: () => void;
+  onOpenAddVerse?: () => void;
 }
 
 const CATEGORY_ICONS: Record<NodeCategory, React.ElementType> = {
@@ -72,6 +73,7 @@ export function CanvasToolbar({
   nodeCount,
   hasActiveBoard = true,
   onCreateBoard,
+  onOpenAddVerse,
 }: CanvasToolbarProps) {
   const mod = useModifierKey();
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
@@ -256,8 +258,12 @@ export function CanvasToolbar({
                       key={cat}
                       type="button"
                       onClick={() => {
-                        onAddNode(cat);
                         setIsAddMenuOpen(false);
+                        if (cat === 'scripture' && onOpenAddVerse) {
+                          onOpenAddVerse();
+                        } else {
+                          onAddNode(cat);
+                        }
                       }}
                       className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
                         isDark ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-zinc-100 text-zinc-800'
@@ -268,7 +274,7 @@ export function CanvasToolbar({
                           className="w-3 h-3 rounded-full shrink-0 shadow-sm" 
                           style={{ backgroundColor: meta.accent }}
                         />
-                        <span>{meta.label}</span>
+                        <span>{cat === 'scripture' ? 'Scripture Verse...' : meta.label}</span>
                       </div>
                       <Icon size={15} className="text-zinc-400 shrink-0" />
                     </button>
@@ -278,6 +284,23 @@ export function CanvasToolbar({
             </div>
           )}
         </div>
+
+        {/* Quick Add Verse Button */}
+        {onOpenAddVerse && (
+          <button
+            type="button"
+            onClick={onOpenAddVerse}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs sm:text-sm font-semibold transition-all shadow-xs cursor-pointer ${
+              isDark
+                ? 'bg-amber-500/15 border-amber-500/35 text-amber-400 hover:bg-amber-500/25 active:scale-95'
+                : 'bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100 active:scale-95'
+            }`}
+            title="Search and add a Bible verse directly to Canvas"
+          >
+            <BookOpen size={14} className="shrink-0" />
+            <span className="hidden sm:inline">Add Verse</span>
+          </button>
+        )}
 
         {/* Theologica AI Assistant Button */}
         <button
