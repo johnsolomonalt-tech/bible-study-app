@@ -2,6 +2,10 @@ import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { GoogleGenAI } from '@google/genai';
+import fs from 'fs';
+import path from 'path';
+import { findCanonicalBook } from '@/lib/bibleCanon';
+import { BIBLE_VERSE_REGEX } from '@/lib/bibleReferences';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
@@ -83,6 +87,61 @@ async function withModelFallback<T>(
   throw lastError;
 }
 
+interface ScriptureContext {
+  reference: string;
+  text: string;
+  translation: string;
+}
+
+function resolveServerScripture(
+  content: string,
+  preferredTranslation = 'BSB'
+): ScriptureContext | null {
+  try {
+    if (!content) return null;
+    const regex = new RegExp(BIBLE_VERSE_REGEX.source, 'i');
+    const match = regex.exec(content);
+    if (!match) return null;
+
+    const rawBook = match[1];
+    const chapter = parseInt(match[2], 10);
+    const startVerse = parseInt(match[3], 10);
+    const endVerse = match[4] ? parseInt(match[4], 10) : startVerse;
+
+    const bookMeta = findCanonicalBook(rawBook);
+    if (!bookMeta) return null;
+
+    const transLower = (preferredTranslation || 'bsb').toLowerCase();
+    const safeTrans = ['bsb', 'web', 'kjv'].includes(transLower) ? transLower : 'bsb';
+    const filePath = path.join(process.cwd(), 'public', 'bibles', safeTrans, `${bookMeta.code}.json`);
+    if (!fs.existsSync(filePath)) return null;
+
+    const fileRaw = fs.readFileSync(filePath, 'utf-8');
+    const bookData = JSON.parse(fileRaw);
+    const chapterVerses: { verse: number; text: string }[] = bookData.chapters?.[String(chapter)] || [];
+    if (!chapterVerses.length) return null;
+
+    const matchedVerses = chapterVerses.filter(
+      (v) => v.verse >= startVerse && v.verse <= endVerse
+    );
+    if (!matchedVerses.length) return null;
+
+    const text = matchedVerses.map((v) => `${v.verse}. ${v.text}`).join(' ');
+    const ref = startVerse === endVerse
+      ? `${bookMeta.name} ${chapter}:${startVerse}`
+      : `${bookMeta.name} ${chapter}:${startVerse}-${endVerse}`;
+
+    return {
+      reference: ref,
+      text,
+      translation: safeTrans.toUpperCase(),
+    };
+  } catch (err) {
+    console.warn('Failed to resolve server scripture RAG:', err);
+    return null;
+  }
+}
+
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { userId } = await auth();
@@ -106,7 +165,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!userId) return new NextResponse('Unauthorized', { status: 401 });
 
   const chatId = parseInt(id);
-  const { content, image } = await req.json();
+  const { content, image, scriptureContext, translation } = await req.json();
 
   const chat = await prisma.chat.findUnique({
     where: { id: chatId, userId }
@@ -228,19 +287,43 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       parts: [{ text: msg.content.replace(/__GENERATED_IMAGE__[\s\S]*?__END_IMAGE__/g, '[generated image]') }],
     }));
 
+  // RAG: Resolve verified scripture ground truth
+  const resolvedGroundTruth: ScriptureContext | null =
+    scriptureContext && scriptureContext.text
+      ? scriptureContext
+      : resolveServerScripture(content, translation || 'BSB');
+
+  let effectiveSystemInstruction = SYSTEM_INSTRUCTION;
+  if (resolvedGroundTruth) {
+    effectiveSystemInstruction += `\n\n[VERIFIED SCRIPTURE GROUND TRUTH - RAG INJECTION]
+The user is studying or asking about the following exact passage in their active translation (${resolvedGroundTruth.translation}):
+Reference: ${resolvedGroundTruth.reference}
+Passage Text: "${resolvedGroundTruth.text}"
+
+MANDATORY ACCURACY INSTRUCTION:
+You MUST treat the verse text above as the 100% authoritative ground truth. When referencing, quoting, or explaining this passage, use this exact translation text without speculating or altering the translation's wording.`;
+  }
+
   // Build current message parts — support optional inline image
   type Part = { text: string } | { inlineData: { mimeType: string; data: string } };
   const messageParts: Part[] = [];
   if (image?.base64 && image?.mimeType) {
     messageParts.push({ inlineData: { mimeType: image.mimeType, data: image.base64 } });
   }
-  messageParts.push({ text: content || 'Please describe this image in the context of Bible study.' });
+
+  if (resolvedGroundTruth) {
+    messageParts.push({
+      text: `[Context: Verified scripture text for ${resolvedGroundTruth.reference} (${resolvedGroundTruth.translation}): "${resolvedGroundTruth.text}"]\n\n${content || 'Please provide an in-depth biblical study on this passage.'}`,
+    });
+  } else {
+    messageParts.push({ text: content || 'Please describe this image in the context of Bible study.' });
+  }
 
   const aiResponseText = await withModelFallback(CHAT_MODELS, async (model) => {
     const chatSession = ai.chats.create({
       model,
       history,
-      config: { systemInstruction: SYSTEM_INSTRUCTION },
+      config: { systemInstruction: effectiveSystemInstruction },
     });
     const result = await chatSession.sendMessage({ message: messageParts });
     return result.text ?? '';

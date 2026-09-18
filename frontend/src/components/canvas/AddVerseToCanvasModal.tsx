@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { BookOpen, X, Loader2, Check } from 'lucide-react';
 import { parseVerseReference } from '@/lib/bibleReferences';
+import { getPassage } from '@/lib/bibleProvider';
+import { AVAILABLE_TRANSLATIONS } from '@/types/bible';
 
 interface AddVerseToCanvasModalProps {
   isOpen: boolean;
@@ -11,15 +13,6 @@ interface AddVerseToCanvasModalProps {
   theme?: 'dark' | 'light';
 }
 
-const TRANSLATIONS = [
-  { id: 'kjv', label: 'KJV (King James Version)' },
-  { id: 'web', label: 'WEB (World English Bible)' },
-  { id: 'asv', label: 'ASV (American Standard)' },
-  { id: 'bbe', label: 'BBE (Bible in Basic English)' },
-  { id: 'darby', label: 'DARBY (Darby Bible)' },
-  { id: 'dra', label: 'DRA (Douay-Rheims)' },
-];
-
 export function AddVerseToCanvasModal({
   isOpen,
   onClose,
@@ -27,7 +20,12 @@ export function AddVerseToCanvasModal({
   theme = 'dark',
 }: AddVerseToCanvasModalProps) {
   const [query, setQuery] = useState('');
-  const [translation, setTranslation] = useState('kjv');
+  const [translation, setTranslation] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('theologica_bible_version') || 'bsb';
+    }
+    return 'bsb';
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<{
@@ -73,26 +71,17 @@ export function AddVerseToCanvasModal({
     setError(null);
     setIsLoading(true);
 
-    const controller = new AbortController();
-    const cleanBook = parsed.book.toLowerCase().replace(/\s+/g, '');
-    const cleanRef = `${cleanBook}+${parsed.chapter}:${parsed.verse}`;
-
+    let isCurrent = true;
     const timer = setTimeout(() => {
-      fetch(`https://bible-api.com/${cleanRef}?translation=${translation}`, {
-        signal: controller.signal,
-      })
-        .then((res) => {
-          if (!res.ok) throw new Error('Verse not found');
-          return res.json();
-        })
-        .then((data) => {
-          if (data.text || (data.verses && data.verses.length > 0)) {
-            const rawText = data.text ? data.text.trim() : data.verses.map((v: any) => v.text.trim()).join(' ');
-            const cleanText = rawText.replace(/\s+/g, ' ').trim();
+      getPassage(translation, parsed.book, parsed.chapter, parsed.verse)
+        .then(({ verse, chapter }) => {
+          if (!isCurrent) return;
+          const foundVerse = verse || chapter.verses.find((v) => v.verse === parsed.verse);
+          if (foundVerse && foundVerse.text) {
             const formattedRef = `${parsed.book} ${parsed.chapter}:${parsed.verse}`;
             setPreviewData({
-              reference: data.reference || formattedRef,
-              text: cleanText,
+              reference: formattedRef,
+              text: foundVerse.text,
               book: parsed.book,
               chapter: parsed.chapter,
               verse: parsed.verse,
@@ -104,19 +93,18 @@ export function AddVerseToCanvasModal({
           }
         })
         .catch((err) => {
-          if (err.name !== 'AbortError') {
-            setError('Could not fetch verse. Please check your reference.');
-            setPreviewData(null);
-          }
+          if (!isCurrent) return;
+          setError(err?.message || 'Could not fetch verse. Please check your reference.');
+          setPreviewData(null);
         })
         .finally(() => {
-          setIsLoading(false);
+          if (isCurrent) setIsLoading(false);
         });
-    }, 350);
+    }, 250);
 
     return () => {
+      isCurrent = false;
       clearTimeout(timer);
-      controller.abort();
     };
   }, [query, translation]);
 
@@ -208,9 +196,9 @@ export function AddVerseToCanvasModal({
                   : 'bg-zinc-50 border-zinc-300 text-zinc-800'
               }`}
             >
-              {TRANSLATIONS.map((t) => (
+              {AVAILABLE_TRANSLATIONS.map((t) => (
                 <option key={t.id} value={t.id} className={isDark ? 'bg-[#1e1e22]' : 'bg-white'}>
-                  {t.label}
+                  {t.abbreviation} - {t.name} {t.isLocal ? '(Instant)' : ''}
                 </option>
               ))}
             </select>

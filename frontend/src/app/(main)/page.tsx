@@ -19,6 +19,8 @@ import {
   createMarkdownComponents, 
   VerseClickHandler 
 } from '@/lib/bibleReferences';
+import { TranslationSelector } from '@/components/bible/TranslationSelector';
+import { getPassage } from '@/lib/bibleProvider';
 
 // --- All 66 Books ---
 const otStr = "Genesis:50,Exodus:40,Leviticus:27,Numbers:36,Deuteronomy:34,Joshua:24,Judges:21,Ruth:4,1 Samuel:31,2 Samuel:24,1 Kings:22,2 Kings:25,1 Chronicles:29,2 Chronicles:36,Ezra:10,Nehemiah:13,Esther:10,Job:42,Psalms:150,Proverbs:31,Ecclesiastes:12,Song of Solomon:8,Isaiah:66,Jeremiah:52,Lamentations:5,Ezekiel:48,Daniel:12,Hosea:14,Joel:3,Amos:9,Obadiah:1,Jonah:4,Micah:7,Nahum:3,Habakkuk:3,Zephaniah:3,Haggai:2,Zechariah:14,Malachi:4";
@@ -421,7 +423,13 @@ export default function App() {
   
   const [activeBook, setActiveBook] = useState(OT_BOOKS[0]);
   const [activeChapter, setActiveChapter] = useState(1);
-  const [translation, setTranslation] = useState("kjv");
+  const [translation, setTranslation] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('theologica_bible_version') || 'bsb';
+    }
+    return 'bsb';
+  });
+  const [isVersesLoading, setIsVersesLoading] = useState(false);
   const [bibleVerses, setBibleVerses] = useState<{verse: number, text: string}[]>([]);
   const [completedChapters, setCompletedChapters] = useState<string[]>([]);
   
@@ -965,7 +973,15 @@ export default function App() {
     setToolbarPosition(null);
     window.getSelection()?.removeAllRanges();
     
-    handleSendMessage(undefined, query);
+    const refStr = startVerse === endVerse 
+      ? `${activeBook.name} ${activeChapter}:${startVerse}` 
+      : `${activeBook.name} ${activeChapter}:${startVerse}-${endVerse}`;
+    const explicitScripture = {
+      reference: refStr,
+      text: cleanText,
+      translation: translation.toUpperCase(),
+    };
+    handleSendMessage(undefined, query, explicitScripture);
   };
 
   const addHighlightToChat = () => {
@@ -1242,22 +1258,27 @@ export default function App() {
     }
   };
 
-  // Fetch Verses on Chapter Change
+  // Fetch Verses on Chapter or Translation Change
   useEffect(() => {
     let isMounted = true;
-    fetch(`https://bible-api.com/${activeBook.name.toLowerCase().replace(/ /g, '')}+${activeChapter}?translation=${translation}`)
-      .then(r => r.json())
-      .then(data => {
+    setIsVersesLoading(true);
+
+    getPassage(translation, activeBook.name, activeChapter)
+      .then(({ chapter }) => {
         if (isMounted) {
-          if (data.verses && data.verses.length > 0) {
-            setBibleVerses(data.verses);
+          if (chapter.verses && chapter.verses.length > 0) {
+            setBibleVerses(chapter.verses);
           } else {
-            setBibleVerses([{verse: 1, text: data.text || "Chapter not found in this translation."}]);
+            setBibleVerses([{ verse: 1, text: "Chapter not found in this translation." }]);
           }
+          setIsVersesLoading(false);
         }
       })
-      .catch(() => {
-        if (isMounted) setBibleVerses([{verse: 1, text: "Error loading text from bible-api.com."}]);
+      .catch((err) => {
+        if (isMounted) {
+          setBibleVerses([{ verse: 1, text: err?.message || "Error loading scripture text." }]);
+          setIsVersesLoading(false);
+        }
       });
 
     // Fetch highlights for current chapter
@@ -1428,7 +1449,11 @@ export default function App() {
     }
   };
 
-  const handleSendMessage = async (e?: React.FormEvent | React.KeyboardEvent, overrideText?: string) => {
+  const handleSendMessage = async (
+    e?: React.FormEvent | React.KeyboardEvent,
+    overrideText?: string,
+    explicitScripture?: { reference: string; text: string; translation: string }
+  ) => {
     if (e) e.preventDefault();
     
     let textToSend = overrideText || chatInput;
@@ -1492,7 +1517,9 @@ export default function App() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
         content: currentInput,
-        image: currentImage ? { base64: currentImage.base64, mimeType: currentImage.mimeType } : undefined
+        image: currentImage ? { base64: currentImage.base64, mimeType: currentImage.mimeType } : undefined,
+        scriptureContext: explicitScripture,
+        translation: translation.toUpperCase()
       })
     });
 
@@ -1798,21 +1825,25 @@ export default function App() {
                   <button onClick={toggleSpeech} className="flex items-center justify-center p-2 rounded-lg text-fg-2 hover:text-fg hover:bg-surface transition-colors" title="Read chapter aloud">
                     {isSpeaking ? <VolumeX size={20} /> : <Volume2 size={20} />}
                   </button>
-                  <select value={translation} onChange={(e) => setTranslation(e.target.value)} className="bg-transparent text-sm font-medium text-fg-2 hover:text-fg focus:outline-none cursor-pointer transition-colors max-w-[60px] mr-2">
-                    <option value="kjv" className="bg-surface">KJV</option>
-                    <option value="asv" className="bg-surface">ASV</option>
-                    <option value="web" className="bg-surface">WEB</option>
-                    <option value="bbe" className="bg-surface">BBE</option>
-                    <option value="darby" className="bg-surface">DARBY</option>
-                    <option value="dra" className="bg-surface">DRA</option>
-                  </select>
+                  <TranslationSelector 
+                    currentTranslation={translation} 
+                    onSelectTranslation={setTranslation} 
+                  />
                 </div>
               </header>
 
               <div className="bible-reader-content flex-1 overflow-y-auto custom-scroll p-6" onMouseUp={handleSelection} onTouchEnd={handleSelection} onContextMenu={handleReaderContextMenu}>
                 <article className="max-w-3xl mx-auto">
                   <p className="font-serif text-[18px] leading-[1.8] text-fg whitespace-pre-wrap">
-                    {bibleVerses.length > 0 ? (
+                    {isVersesLoading ? (
+                      <span className="block space-y-3 py-4 animate-pulse">
+                        <span className="block h-4 bg-fg/10 rounded w-full"></span>
+                        <span className="block h-4 bg-fg/10 rounded w-11/12"></span>
+                        <span className="block h-4 bg-fg/10 rounded w-4/5"></span>
+                        <span className="block h-4 bg-fg/10 rounded w-full"></span>
+                        <span className="block h-4 bg-fg/10 rounded w-3/4"></span>
+                      </span>
+                    ) : bibleVerses.length > 0 ? (
                       bibleVerses.map((v, index) => (
                         <span key={index} data-verse={v.verse} className={`transition-colors duration-200 ${currentSpeakingVerseIndex === index ? 'text-accent' : ''}`}>
                           <sup 
@@ -2052,14 +2083,10 @@ export default function App() {
                     {isSpeaking ? <VolumeX size={20} /> : <Volume2 size={20} />}
                   </button>
                   <div className="hidden lg:block h-6 w-px bg-surface"></div>
-                  <select value={translation} onChange={(e) => setTranslation(e.target.value)} className="bg-transparent text-sm font-medium text-fg-2 hover:text-fg focus:outline-none cursor-pointer transition-colors max-w-[60px] lg:max-w-none mr-2">
-                    <option value="kjv" className="bg-surface">KJV</option>
-                    <option value="asv" className="bg-surface">ASV</option>
-                    <option value="web" className="bg-surface">WEB</option>
-                    <option value="bbe" className="bg-surface">BBE</option>
-                    <option value="darby" className="bg-surface">DARBY</option>
-                    <option value="dra" className="bg-surface">DRA</option>
-                  </select>
+                  <TranslationSelector 
+                    currentTranslation={translation} 
+                    onSelectTranslation={setTranslation} 
+                  />
                   <div className="hidden lg:flex items-center bg-surface rounded-lg p-0.5">
                     <button onClick={() => setShowLeftSidebar(!showLeftSidebar)} className={`p-1.5 rounded-md transition-colors ${showLeftSidebar ? 'text-fg hover:bg-border-soft' : 'text-muted hover:text-fg'}`} title="Toggle Navigation">
                       {showLeftSidebar ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
@@ -2076,7 +2103,15 @@ export default function App() {
               <div className="bible-reader-content flex-1 overflow-y-auto custom-scroll p-10 lg:p-16" onMouseUp={handleSelection} onTouchEnd={handleSelection} onContextMenu={handleReaderContextMenu}>
                 <article className="max-w-3xl mx-auto">
                   <p className="font-serif text-[18px] leading-[1.8] text-fg whitespace-pre-wrap">
-                    {bibleVerses.length > 0 ? (
+                    {isVersesLoading ? (
+                      <span className="block space-y-4 py-4 animate-pulse">
+                        <span className="block h-4 bg-fg/10 rounded w-full"></span>
+                        <span className="block h-4 bg-fg/10 rounded w-11/12"></span>
+                        <span className="block h-4 bg-fg/10 rounded w-4/5"></span>
+                        <span className="block h-4 bg-fg/10 rounded w-full"></span>
+                        <span className="block h-4 bg-fg/10 rounded w-3/4"></span>
+                      </span>
+                    ) : bibleVerses.length > 0 ? (
                       bibleVerses.map((v, index) => (
                         <span key={v.verse} data-verse={v.verse} className={`transition-colors duration-300 ${currentSpeakingVerseIndex === index ? 'text-accent' : ''}`}>
                           <sup 
