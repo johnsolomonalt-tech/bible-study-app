@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { ChevronRight, ChevronLeft, WifiOff, BookOpen } from 'lucide-react';
+import { getPassage } from '@/lib/bibleProvider';
+import { BibleVerse } from '@/types/bible';
 
 // --- All 66 Books ---
 const otStr = "Genesis:50,Exodus:40,Leviticus:27,Numbers:36,Deuteronomy:34,Joshua:24,Judges:21,Ruth:4,1 Samuel:31,2 Samuel:24,1 Kings:22,2 Kings:25,1 Chronicles:29,2 Chronicles:36,Ezra:10,Nehemiah:13,Esther:10,Job:42,Psalms:150,Proverbs:31,Ecclesiastes:12,Song of Solomon:8,Isaiah:66,Jeremiah:52,Lamentations:5,Ezekiel:48,Daniel:12,Hosea:14,Joel:3,Amos:9,Obadiah:1,Jonah:4,Micah:7,Nahum:3,Habakkuk:3,Zephaniah:3,Haggai:2,Zechariah:14,Malachi:4";
@@ -11,57 +13,53 @@ const OT_BOOKS = otStr.split(',').map(s => { const [n, c] = s.split(':'); return
 const NT_BOOKS = ntStr.split(',').map(s => { const [n, c] = s.split(':'); return { name: n, chapters: parseInt(c) }; });
 const ALL_BOOKS = [...OT_BOOKS, ...NT_BOOKS];
 
-type Verse = {
-  book_name: string;
-  chapter: number;
-  verse: number;
-  text: string;
-};
-
 export default function OfflinePage() {
   const [activeBook, setActiveBook] = useState('Genesis');
   const [activeChapter, setActiveChapter] = useState(1);
-  const [translation, setTranslation] = useState('kjv');
-  const [verses, setVerses] = useState<Verse[]>([]);
+  const [translation, setTranslation] = useState('bsb');
+  const [verses, setVerses] = useState<BibleVerse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   // Load saved state on mount
   useEffect(() => {
-    const savedBook = localStorage.getItem('lastBook');
-    const savedChapter = localStorage.getItem('lastChapter');
-    const savedTrans = localStorage.getItem('lastTranslation');
+    const savedBook = localStorage.getItem('lastBook') || localStorage.getItem('theologica_last_book');
+    const savedChapter = localStorage.getItem('lastChapter') || localStorage.getItem('theologica_last_chapter');
+    const savedTrans = localStorage.getItem('theologica_bible_version') || localStorage.getItem('lastTranslation');
     if (savedBook) setActiveBook(savedBook);
     if (savedChapter) setActiveChapter(parseInt(savedChapter, 10));
-    if (savedTrans) setTranslation(savedTrans);
+    if (savedTrans) setTranslation(savedTrans.toLowerCase());
   }, []);
 
-  // Fetch text
+  // Fetch text using unified engine
   useEffect(() => {
+    let isCancelled = false;
     async function fetchChapter() {
       setLoading(true);
       setError('');
       try {
-        const url = `https://bible-api.com/${activeBook}+${activeChapter}?translation=${translation}`;
-        const res = await fetch(url);
-        if (!res.ok) {
-          throw new Error('Chapter not available offline. Try reading a chapter you have previously loaded while online.');
+        const { chapter } = await getPassage(translation, activeBook, activeChapter);
+        if (!isCancelled) {
+          setVerses(chapter.verses || []);
+          localStorage.setItem('lastBook', activeBook);
+          localStorage.setItem('lastChapter', activeChapter.toString());
+          localStorage.setItem('lastTranslation', translation);
         }
-        const data = await res.json();
-        setVerses(data.verses || []);
-        
-        // Save to local storage for when we come back online
-        localStorage.setItem('lastBook', activeBook);
-        localStorage.setItem('lastChapter', activeChapter.toString());
-        localStorage.setItem('lastTranslation', translation);
       } catch (err: any) {
-        setVerses([]);
-        setError(err.message || 'Chapter not found in offline cache.');
+        if (!isCancelled) {
+          setVerses([]);
+          setError(err.message || 'Chapter not found in offline storage.');
+        }
       } finally {
-        setLoading(false);
+        if (!isCancelled) {
+          setLoading(false);
+        }
       }
     }
     fetchChapter();
+    return () => {
+      isCancelled = true;
+    };
   }, [activeBook, activeChapter, translation]);
 
   const currentBookData = ALL_BOOKS.find(b => b.name === activeBook);
@@ -131,14 +129,13 @@ export default function OfflinePage() {
             <select 
               value={translation} 
               onChange={(e) => setTranslation(e.target.value)}
-              className="bg-[#0a0a09] border border-[#2a2a29] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-amber-500"
+              className="bg-[#0a0a09] border border-[#2a2a29] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-amber-500 text-gray-200"
             >
-              <option value="kjv">KJV</option>
-              <option value="asv">ASV</option>
-              <option value="web">WEB</option>
-              <option value="bbe">BBE</option>
-              <option value="darby">DARBY</option>
-              <option value="dra">DRA</option>
+              <option value="bsb">BSB (Berean Standard)</option>
+              <option value="web">WEB (World English)</option>
+              <option value="kjv">KJV (King James)</option>
+              <option value="asv">ASV (American Standard)</option>
+              <option value="ylt">YLT (Young's Literal)</option>
             </select>
           </div>
         </div>

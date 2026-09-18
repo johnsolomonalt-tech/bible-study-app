@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Check, Zap, Globe, Lock } from 'lucide-react';
+import { ChevronDown, Check, Zap, Globe, Lock, ShieldCheck } from 'lucide-react';
 import { AVAILABLE_TRANSLATIONS, BibleTranslation } from '@/types/bible';
+import { LegalNoticeModal } from './LegalNoticeModal';
 
 interface TranslationSelectorProps {
   currentTranslation: string;
@@ -16,6 +17,7 @@ export function TranslationSelector({
   className = '',
 }: TranslationSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isLegalModalOpen, setIsLegalModalOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const activeTranslation =
@@ -220,8 +222,29 @@ export function TranslationSelector({
               </div>
             )}
           </div>
+
+          {/* Footer: Legal Disclosures */}
+          <div className="pt-2 mt-1 border-t border-border-soft/60 px-1 pb-0.5">
+            <button
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                setIsLegalModalOpen(true);
+              }}
+              className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-[11px] font-medium text-meta hover:text-fg hover:bg-fg/5 transition-colors cursor-pointer"
+            >
+              <ShieldCheck size={13} className="text-amber-500" />
+              <span>Scripture Attributions & Legal Notices</span>
+            </button>
+          </div>
         </div>
       )}
+
+      {/* Scripture & Copyright Compliance Modal */}
+      <LegalNoticeModal
+        isOpen={isLegalModalOpen}
+        onClose={() => setIsLegalModalOpen(false)}
+      />
     </div>
   );
 }

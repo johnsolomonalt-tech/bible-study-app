@@ -33,8 +33,8 @@ export interface BibleTranslation {
   license: 'public-domain' | 'open-license' | 'copyrighted';
 }
 
-export const AVAILABLE_TRANSLATIONS: BibleTranslation[] = [
-  // Local Open-License (0ms latency, 100% offline)
+export const OPEN_TRANSLATIONS: BibleTranslation[] = [
+  // Local Open-License (0ms latency, 100% offline, CC0/Public Domain)
   {
     id: 'bsb',
     name: 'Berean Standard Bible',
@@ -42,7 +42,7 @@ export const AVAILABLE_TRANSLATIONS: BibleTranslation[] = [
     isLocal: true,
     category: 'modern',
     year: '2023',
-    description: 'Accurate, readable modern translation into contemporary English.',
+    description: 'Accurate, readable modern translation dedicated to the Public Domain (CC0 1.0).',
     license: 'open-license',
   },
   {
@@ -66,7 +66,7 @@ export const AVAILABLE_TRANSLATIONS: BibleTranslation[] = [
     license: 'public-domain',
   },
 
-  // Open Extended via dynamic API fallback
+  // Open Extended via dynamic API fallback (Public Domain)
   {
     id: 'asv',
     name: 'American Standard Version',
@@ -87,8 +87,10 @@ export const AVAILABLE_TRANSLATIONS: BibleTranslation[] = [
     description: 'Strictly literal word-for-word rendering adhering to Hebrew & Greek idioms.',
     license: 'public-domain',
   },
+];
 
-  // Extended Copyrighted (via API.Bible if BIBLE_API_KEY is configured)
+export const COPYRIGHTED_TRANSLATIONS: BibleTranslation[] = [
+  // Extended Copyrighted (Requires explicit user API key via API.Bible)
   {
     id: 'esv',
     name: 'English Standard Version',
@@ -129,4 +131,12 @@ export const AVAILABLE_TRANSLATIONS: BibleTranslation[] = [
     description: 'Clear, dynamic thought-for-thought English translation.',
     license: 'copyrighted',
   },
+];
+
+// Available translations for the client: strictly open-license by default for 100% legal safety
+export const AVAILABLE_TRANSLATIONS: BibleTranslation[] = [
+  ...OPEN_TRANSLATIONS,
+  ...(typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_ENABLE_COPYRIGHTED_BIBLES === 'true'
+    ? COPYRIGHTED_TRANSLATIONS
+    : []),
 ];
