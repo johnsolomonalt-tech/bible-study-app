@@ -53,7 +53,16 @@ const createMarkdownComponents = (onVerseClick?: VerseClickHandler) => ({
   h1: ({ children }: any) => <h1 className="text-xl font-bold mb-4 mt-6 text-fg">{children}</h1>,
   h2: ({ children }: any) => <h2 className="text-[18px] font-bold mb-3 mt-5 text-fg">{children}</h2>,
   h3: ({ children }: any) => <h3 className="text-[16px] font-bold mb-2 mt-4 text-fg-hover">{children}</h3>,
-  a: ({ children, href }: any) => <a href={href} className="text-accent hover:underline" target="_blank" rel="noreferrer">{children}</a>,
+  a: ({ children, href }: any) => (
+    <a 
+      href={href} 
+      className="inline font-medium text-accent hover:text-accent/90 underline decoration-accent/35 hover:decoration-accent underline-offset-[3px] decoration-1 hover:bg-accent/10 rounded px-1 -mx-0.5 transition-all" 
+      target="_blank" 
+      rel="noreferrer"
+    >
+      {children}
+    </a>
+  ),
 });
 
 const markdownComponents = createMarkdownComponents();

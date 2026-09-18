@@ -1,5 +1,4 @@
 import React from 'react';
-import { BookOpen } from 'lucide-react';
 
 export interface ParsedVerseRef {
   book: string;
@@ -349,13 +348,10 @@ function renderVerseButton(
         e.stopPropagation();
         onVerseClick(bookName, chapter, verse);
       }}
-      className="inline-flex items-baseline gap-1 px-1.5 py-0.5 mx-0.5 rounded-md bg-accent/15 hover:bg-accent/25 text-accent font-semibold text-inherit border border-accent/25 hover:border-accent/40 transition-all cursor-pointer group/vlink align-baseline shadow-xs select-none"
+      className="inline font-medium text-accent hover:text-accent/90 underline decoration-accent/35 hover:decoration-accent underline-offset-[3px] decoration-1 hover:bg-accent/10 rounded px-1 -mx-0.5 transition-all cursor-pointer select-text"
       title={`Open ${bookName} ${chapter}:${verse} in Bible reader`}
     >
-      <BookOpen size={11} className="self-center opacity-70 group-hover/vlink:opacity-100 transition-opacity shrink-0" />
-      <span className="underline decoration-accent/40 group-hover/vlink:decoration-accent">
-        {rawMatch}
-      </span>
+      {rawMatch}
     </button>
   );
 }
