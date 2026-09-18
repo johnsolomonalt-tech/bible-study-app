@@ -3,7 +3,7 @@ const API_URL = '';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuth, UserButton, SignIn } from '@clerk/nextjs';
-import { Send, Plus, Layout, Edit, Sparkles, Target, Check, Copy, ChevronRight, ChevronLeft, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow } from 'lucide-react';
+import { Send, Plus, Layout, Edit, Sparkles, Target, Check, Copy, ChevronRight, ChevronLeft, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow, ShieldCheck } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import TextareaAutosize from 'react-textarea-autosize';
 import { getDevotionalForDay, DevotionalEntry } from '../../lib/devotionals';
@@ -21,6 +21,7 @@ import {
 } from '@/lib/bibleReferences';
 import { TranslationSelector } from '@/components/bible/TranslationSelector';
 import { getPassage } from '@/lib/bibleProvider';
+import { AVAILABLE_TRANSLATIONS } from '@/types/bible';
 
 // --- All 66 Books ---
 const otStr = "Genesis:50,Exodus:40,Leviticus:27,Numbers:36,Deuteronomy:34,Joshua:24,Judges:21,Ruth:4,1 Samuel:31,2 Samuel:24,1 Kings:22,2 Kings:25,1 Chronicles:29,2 Chronicles:36,Ezra:10,Nehemiah:13,Esther:10,Job:42,Psalms:150,Proverbs:31,Ecclesiastes:12,Song of Solomon:8,Isaiah:66,Jeremiah:52,Lamentations:5,Ezekiel:48,Daniel:12,Hosea:14,Joel:3,Amos:9,Obadiah:1,Jonah:4,Micah:7,Nahum:3,Habakkuk:3,Zephaniah:3,Haggai:2,Zechariah:14,Malachi:4";
@@ -431,6 +432,7 @@ export default function App() {
   });
   const [isVersesLoading, setIsVersesLoading] = useState(false);
   const [bibleVerses, setBibleVerses] = useState<{verse: number, text: string}[]>([]);
+  const [chapterCopyright, setChapterCopyright] = useState<string>('');
   const [completedChapters, setCompletedChapters] = useState<string[]>([]);
   
   // Verse navigation & interactive highlighting
@@ -1271,12 +1273,27 @@ export default function App() {
           } else {
             setBibleVerses([{ verse: 1, text: "Chapter not found in this translation." }]);
           }
+
+          // Extract official publisher copyright notice
+          if (chapter.copyright) {
+            setChapterCopyright(chapter.copyright);
+          } else {
+            const tr = AVAILABLE_TRANSLATIONS.find(t => t.id.toLowerCase() === translation.toLowerCase());
+            setChapterCopyright(tr?.copyrightNotice || '');
+          }
+
+          // API.Bible FUMS compliance beacon
+          if (chapter.fumsToken && typeof window !== 'undefined') {
+            fetch(`https://fums.api.bible/track?token=${encodeURIComponent(chapter.fumsToken)}`, { mode: 'no-cors' }).catch(() => {});
+          }
+
           setIsVersesLoading(false);
         }
       })
       .catch((err) => {
         if (isMounted) {
           setBibleVerses([{ verse: 1, text: err?.message || "Error loading scripture text." }]);
+          setChapterCopyright('');
           setIsVersesLoading(false);
         }
       });
@@ -1865,6 +1882,19 @@ export default function App() {
                       <span className="text-muted">Loading chapter...</span>
                     )}
                   </p>
+
+                  {/* Scripture Copyright Attribution Notice */}
+                  {chapterCopyright && (
+                    <footer className="mt-10 pt-4 pb-6 border-t border-border/40 text-meta space-y-1 select-none">
+                      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-fg-2 uppercase tracking-wider">
+                        <ShieldCheck size={12} className="text-accent" />
+                        <span>Scripture Attribution &bull; {translation.toUpperCase()}</span>
+                      </div>
+                      <p className="text-xs font-serif leading-relaxed text-meta/90">
+                        {chapterCopyright}
+                      </p>
+                    </footer>
+                  )}
                 </article>
               </div>
             </section>
@@ -2133,6 +2163,19 @@ export default function App() {
                       <span className="text-meta">Loading...</span>
                     )}
                   </p>
+
+                  {/* Scripture Copyright Attribution Notice */}
+                  {chapterCopyright && (
+                    <footer className="mt-10 pt-4 pb-6 border-t border-border/40 text-meta space-y-1 select-none">
+                      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-fg-2 uppercase tracking-wider">
+                        <ShieldCheck size={12} className="text-accent" />
+                        <span>Scripture Attribution &bull; {translation.toUpperCase()}</span>
+                      </div>
+                      <p className="text-xs font-serif leading-relaxed text-meta/90">
+                        {chapterCopyright}
+                      </p>
+                    </footer>
+                  )}
                 </article>
               </div>
                 </Panel>

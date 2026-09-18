@@ -2,7 +2,14 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import { findCanonicalBook } from '@/lib/bibleCanon';
-import { BibleChapter, BibleVerse } from '@/types/bible';
+import {
+  BibleChapter,
+  BibleVerse,
+  OPEN_TRANSLATIONS,
+  COPYRIGHTED_TRANSLATIONS,
+} from '@/types/bible';
+
+const ALL_TRANSLATION_META = [...OPEN_TRANSLATIONS, ...COPYRIGHTED_TRANSLATIONS];
 
 // Mapping of translation IDs to API.Bible Bible IDs (if user sets BIBLE_API_KEY)
 const API_BIBLE_MAP: Record<string, string> = {
@@ -75,12 +82,16 @@ export async function GET(
           const data = JSON.parse(raw);
           const verses: BibleVerse[] = data.chapters[String(chapterNum)] || [];
 
+          const transMeta = ALL_TRANSLATION_META.find((t) => t.id.toLowerCase() === versionKey);
+          const defaultCopyright = transMeta?.copyrightNotice || '';
+
           const responsePayload: BibleChapter = {
             book: bookMeta.code,
             bookName: bookMeta.name,
             chapter: chapterNum,
             translation: versionKey.toUpperCase(),
             verses,
+            copyright: defaultCopyright,
           };
 
           return NextResponse.json(responsePayload, {
@@ -118,12 +129,16 @@ export async function GET(
         text: cleanVerseText(v.text),
       }));
 
+      const transMeta = ALL_TRANSLATION_META.find((t) => t.id.toLowerCase() === versionKey);
+      const defaultCopyright = transMeta?.copyrightNotice || '';
+
       const responsePayload: BibleChapter = {
         book: bookMeta.code,
         bookName: bookMeta.name,
         chapter: chapterNum,
         translation: versionKey.toUpperCase(),
         verses,
+        copyright: defaultCopyright,
       };
 
       return NextResponse.json(responsePayload, {
@@ -196,10 +211,16 @@ export async function GET(
         }
       }
 
+      const transMeta = ALL_TRANSLATION_META.find((t) => t.id.toLowerCase() === versionKey);
+      const defaultCopyright = transMeta?.copyrightNotice || '';
+
       walkAst(contentList);
       if (currentVerse > 0 && currentText.trim()) {
         verses.push({ verse: currentVerse, text: cleanVerseText(currentText) });
       }
+
+      const officialCopyright = apiBibleData.data?.copyright || defaultCopyright;
+      const fumsToken = apiBibleData.meta?.fumsToken || undefined;
 
       const responsePayload: BibleChapter = {
         book: bookMeta.code,
@@ -207,6 +228,8 @@ export async function GET(
         chapter: chapterNum,
         translation: versionKey.toUpperCase(),
         verses: verses.length > 0 ? verses : [{ verse: 1, text: apiBibleData.data?.content || 'Text unavailable.' }],
+        copyright: officialCopyright,
+        fumsToken,
       };
 
       return NextResponse.json(responsePayload, {
