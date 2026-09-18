@@ -134,7 +134,7 @@ export function CustomCanvasEdge({
                 e.stopPropagation();
                 setIsEditing(true);
               }}
-              title={typeof label === 'string' ? `${label} (Double-click to edit)` : 'Connector link'}
+              title={typeof label === 'string' ? label : 'Connector link'}
               className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold tracking-wide border shadow-lg cursor-pointer transition-all select-none ${
                 selected || isHovered
                   ? isDark

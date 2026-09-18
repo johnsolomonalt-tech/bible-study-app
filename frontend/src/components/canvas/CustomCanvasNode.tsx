@@ -99,7 +99,7 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
 
   // Click outside to close menu
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setIsMenuOpen(false);
         setIsConnectSubmenuOpen(false);
@@ -107,8 +107,12 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
     };
     if (isMenuOpen) {
       document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
     }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
   }, [isMenuOpen]);
 
   const commitChanges = () => {
@@ -316,7 +320,7 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
                 type="button"
                 onClick={commitChanges}
                 className="p-1 bg-accent text-white rounded hover:bg-accent/80 transition-colors shadow-sm"
-                title="Save (Cmd+Enter)"
+                title="Save"
               >
                 <Check size={14} />
               </button>
@@ -521,7 +525,7 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
                   }
                 }}
                 onBlur={commitChanges}
-                placeholder={`Write markdown here... (${mod.text}+Enter to save)`}
+                placeholder="Write markdown here..."
                 className={`w-full min-h-[120px] resize-y font-mono text-xs p-2.5 rounded-lg border focus:outline-none focus:ring-1 focus:ring-accent transition-all ${
                   isDark 
                     ? 'bg-[#121214] border-zinc-700 text-zinc-200 placeholder-zinc-600' 
@@ -529,7 +533,7 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
                 }`}
               />
               <div className="flex items-center justify-between text-[11px] text-zinc-400">
-                <span>Tip: Press <kbd className="px-1 py-0.5 bg-zinc-700/30 rounded text-[10px] font-mono">{mod.symbol}+Enter</kbd> to save</span>
+                <span className="hidden sm:inline">Tip: Press <kbd className="px-1 py-0.5 bg-zinc-700/30 rounded text-[10px] font-mono">{mod.symbol}+Enter</kbd> to save</span>
                 <button
                   type="button"
                   onMouseDown={(e) => {
@@ -541,7 +545,7 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
                     e.preventDefault();
                     commitChanges();
                   }}
-                  className="px-2.5 py-1 bg-accent text-white rounded-md font-semibold text-xs hover:bg-accent/90 active:scale-95 transition-all shadow-xs cursor-pointer"
+                  className="px-2.5 py-1 bg-accent text-white rounded-md font-semibold text-xs hover:bg-accent/90 active:scale-95 transition-all shadow-xs cursor-pointer ml-auto sm:ml-0"
                 >
                   Done
                 </button>
@@ -564,7 +568,8 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
             ) : (
               <div className="flex flex-col items-center justify-center py-6 text-zinc-400 text-xs text-center select-none">
                 <Edit3 size={18} className="mb-1.5 opacity-40" />
-                <span>Double-click to write Markdown</span>
+                <span className="hidden sm:inline">Double-click to write Markdown</span>
+                <span className="sm:hidden">Tap edit to write Markdown</span>
               </div>
             )}
           </div>

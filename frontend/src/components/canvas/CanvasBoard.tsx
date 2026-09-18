@@ -1916,9 +1916,10 @@ function InnerCanvasBoard({
 
             {/* Helper Footer */}
             <div className={`pt-3 border-t text-[11px] flex items-center justify-center gap-4 ${isDark ? 'border-zinc-800 text-zinc-500' : 'border-zinc-100 text-zinc-400'}`}>
-              <span>Right-click for options</span>
-              <span>•</span>
-              <span>Press &quot;Boards&quot; to manage</span>
+              <span className="hidden sm:inline">Right-click for options</span>
+              <span className="hidden sm:inline">•</span>
+              <span className="hidden sm:inline">Press &quot;Boards&quot; to manage</span>
+              <span className="sm:hidden">Tap + Card to start creating</span>
             </div>
           </div>
         </div>
@@ -2103,7 +2104,7 @@ function InnerCanvasBoard({
               <Undo2 size={16} className="shrink-0" />
               <span>Undo</span>
             </div>
-            <span className="text-xs text-zinc-500 font-mono">{mod.symbol}Z</span>
+            <span className="text-xs text-zinc-500 font-mono hidden sm:inline">{mod.symbol}Z</span>
           </button>
 
           {/* Redo */}
@@ -2124,7 +2125,7 @@ function InnerCanvasBoard({
               <Redo2 size={16} className="shrink-0" />
               <span>Redo</span>
             </div>
-            <span className="text-xs text-zinc-500 font-mono">{mod.symbol}{mod.shift}Z</span>
+            <span className="text-xs text-zinc-500 font-mono hidden sm:inline">{mod.symbol}{mod.shift}Z</span>
           </button>
         </>
       )}
