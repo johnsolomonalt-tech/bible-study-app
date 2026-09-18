@@ -134,6 +134,10 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
     }
   };
 
+  const handleBaseClasses = `!w-3 !h-3 !bg-zinc-400 dark:!bg-zinc-500 !border-2 !border-[#161618] dark:!border-[#161618] !rounded-full transition-all duration-150 cursor-crosshair z-10 before:absolute before:-inset-2.5 before:content-[''] hover:!scale-125 hover:!bg-accent ${
+    selected ? '!opacity-90' : 'opacity-40 group-hover:opacity-100'
+  }`;
+
   return (
     <div
       onContextMenu={(e) => {
@@ -142,7 +146,7 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
         setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, selected: true } : n)));
         setIsMenuOpen(true);
       }}
-      className={`relative group rounded-xl transition-all duration-200 select-none w-[380px] max-w-full ${
+      className={`relative group rounded-xl transition-all duration-200 select-none w-[310px] sm:w-[380px] max-w-[calc(100vw-32px)] ${
         isMenuOpen ? '!z-50' : selected ? 'z-30' : 'z-0'
       } ${
         isDark 
@@ -155,15 +159,15 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
       }`}
       style={{
         width: width || (style as any)?.width || 380,
-        minWidth: 280,
-        minHeight: 180,
+        minWidth: 240,
+        minHeight: 160,
       }}
     >
       {/* Node Resizer */}
       <NodeResizer
         isVisible={selected}
-        minWidth={280}
-        minHeight={160}
+        minWidth={240}
+        minHeight={150}
         lineClassName="border-accent"
         handleClassName="!w-3 !h-3 !bg-accent !border-2 !border-white !rounded-full shadow-md"
       />
@@ -174,13 +178,13 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
         type="target"
         position={Position.Top}
         id="top-target"
-        className="!w-3 !h-3 !bg-zinc-400 dark:!bg-zinc-500 !border-2 !border-[#161618] dark:!border-[#161618] !rounded-full opacity-40 group-hover:opacity-100 hover:!scale-125 hover:!bg-accent transition-all duration-150 cursor-crosshair z-10"
+        className={handleBaseClasses}
       />
       <Handle
         type="source"
         position={Position.Top}
         id="top-source"
-        className="!w-3 !h-3 !bg-zinc-400 dark:!bg-zinc-500 !border-2 !border-[#161618] dark:!border-[#161618] !rounded-full opacity-40 group-hover:opacity-100 hover:!scale-125 hover:!bg-accent transition-all duration-150 cursor-crosshair z-10"
+        className={handleBaseClasses}
       />
 
       {/* Right Handles */}
@@ -188,13 +192,13 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
         type="source"
         position={Position.Right}
         id="right-source"
-        className="!w-3 !h-3 !bg-zinc-400 dark:!bg-zinc-500 !border-2 !border-[#161618] dark:!border-[#161618] !rounded-full opacity-40 group-hover:opacity-100 hover:!scale-125 hover:!bg-accent transition-all duration-150 cursor-crosshair z-10"
+        className={handleBaseClasses}
       />
       <Handle
         type="target"
         position={Position.Right}
         id="right-target"
-        className="!w-3 !h-3 !bg-zinc-400 dark:!bg-zinc-500 !border-2 !border-[#161618] dark:!border-[#161618] !rounded-full opacity-40 group-hover:opacity-100 hover:!scale-125 hover:!bg-accent transition-all duration-150 cursor-crosshair z-10"
+        className={handleBaseClasses}
       />
 
       {/* Bottom Handles */}
@@ -202,13 +206,13 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
         type="source"
         position={Position.Bottom}
         id="bottom-source"
-        className="!w-3 !h-3 !bg-zinc-400 dark:!bg-zinc-500 !border-2 !border-[#161618] dark:!border-[#161618] !rounded-full opacity-40 group-hover:opacity-100 hover:!scale-125 hover:!bg-accent transition-all duration-150 cursor-crosshair z-10"
+        className={handleBaseClasses}
       />
       <Handle
         type="target"
         position={Position.Bottom}
         id="bottom-target"
-        className="!w-3 !h-3 !bg-zinc-400 dark:!bg-zinc-500 !border-2 !border-[#161618] dark:!border-[#161618] !rounded-full opacity-40 group-hover:opacity-100 hover:!scale-125 hover:!bg-accent transition-all duration-150 cursor-crosshair z-10"
+        className={handleBaseClasses}
       />
 
       {/* Left Handles */}
@@ -216,13 +220,13 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
         type="target"
         position={Position.Left}
         id="left-target"
-        className="!w-3 !h-3 !bg-zinc-400 dark:!bg-zinc-500 !border-2 !border-[#161618] dark:!border-[#161618] !rounded-full opacity-40 group-hover:opacity-100 hover:!scale-125 hover:!bg-accent transition-all duration-150 cursor-crosshair z-10"
+        className={handleBaseClasses}
       />
       <Handle
         type="source"
         position={Position.Left}
         id="left-source"
-        className="!w-3 !h-3 !bg-zinc-400 dark:!bg-zinc-500 !border-2 !border-[#161618] dark:!border-[#161618] !rounded-full opacity-40 group-hover:opacity-100 hover:!scale-125 hover:!bg-accent transition-all duration-150 cursor-crosshair z-10"
+        className={handleBaseClasses}
       />
 
       {/* Card Header */}
@@ -318,16 +322,29 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
               </button>
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className={`p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/30 transition-colors cursor-pointer ${
-                isMenuOpen ? 'bg-zinc-700/30 text-zinc-200' : ''
-              }`}
-              title="Card options"
-            >
-              <MoreVertical size={16} />
-            </button>
+            <div className="flex items-center gap-0.5">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsEditing(true);
+                }}
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/30 transition-colors cursor-pointer"
+                title="Edit card markdown"
+              >
+                <Edit3 size={15} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className={`p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/30 transition-colors cursor-pointer ${
+                  isMenuOpen ? 'bg-zinc-700/30 text-zinc-200' : ''
+                }`}
+                title="Card options"
+              >
+                <MoreVertical size={16} />
+              </button>
+            </div>
           )}
 
           {/* Quick Action Dropdown */}
@@ -519,7 +536,12 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
                     e.preventDefault(); // Prevent blur before commit
                     commitChanges();
                   }}
-                  className="px-2 py-0.5 bg-accent text-white rounded font-medium hover:bg-accent/80 transition-colors"
+                  onClick={commitChanges}
+                  onTouchEnd={(e) => {
+                    e.preventDefault();
+                    commitChanges();
+                  }}
+                  className="px-2.5 py-1 bg-accent text-white rounded-md font-semibold text-xs hover:bg-accent/90 active:scale-95 transition-all shadow-xs cursor-pointer"
                 >
                   Done
                 </button>

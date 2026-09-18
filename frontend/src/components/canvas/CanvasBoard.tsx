@@ -204,6 +204,18 @@ function InnerCanvasBoard({
   const isDark = theme === 'dark';
   const mod = useModifierKey();
   const [isAddVerseModalOpen, setIsAddVerseModalOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobileQuery = window.matchMedia('(max-width: 768px)').matches;
+      const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      setIsMobile(mobileQuery || hasTouch);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Viewport restoration & activation when switching to the canvas tab
   useEffect(() => {
@@ -215,12 +227,12 @@ function InnerCanvasBoard({
       if (currentViewportRef.current && currentViewportRef.current.zoom >= 0.25) {
         setViewport(currentViewportRef.current, { duration: 250 });
       } else {
-        fitView({ padding: 0.25, duration: 400, minZoom: 0.35, maxZoom: 1.1 });
+        fitView({ padding: isMobile ? 0.15 : 0.25, duration: 400, minZoom: 0.25, maxZoom: 1.1 });
       }
     }, 120);
 
     return () => clearTimeout(timer);
-  }, [isActiveTab, fitView, setViewport]);
+  }, [isActiveTab, fitView, setViewport, isMobile]);
 
   // Pane Context Menu state
   const [paneContextMenu, setPaneContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -666,11 +678,11 @@ function InnerCanvasBoard({
         onVerseClick: onNavigateToVerse,
       },
       style: {
-        width: raw.style?.width || 380,
+        width: raw.style?.width || (isMobile ? 310 : 380),
         ...raw.style,
       },
     };
-  }, [handleDeleteNode, handleDuplicateNode, handleUpdateNode, handleConnectTo, onNavigateToVerse, theme]);
+  }, [handleDeleteNode, handleDuplicateNode, handleUpdateNode, handleConnectTo, onNavigateToVerse, theme, isMobile]);
 
   // Format edge helper
   const prepareEdge = useCallback((raw: SerializableEdge): Edge => {
@@ -1363,12 +1375,13 @@ function InnerCanvasBoard({
       general: 'New Note',
     };
 
+    const cardWidth = isMobile ? 310 : 380;
     const newNode: Node<CanvasNodeData> = {
       id: newId,
       type: 'customCard',
       position: { x: posX, y: posY },
       selected: true,
-      style: { width: 380 },
+      style: { width: cardWidth },
       data: {
         title: titles[category],
         content: '',
@@ -1389,7 +1402,7 @@ function InnerCanvasBoard({
       pushSnapshot(next, edgesRef.current);
       return next;
     });
-  }, [handleCreateBoard, theme, onNavigateToVerse, handleUpdateNode, handleDuplicateNode, handleDeleteNode, pushSnapshot, setNodes]);
+  }, [handleCreateBoard, theme, onNavigateToVerse, handleUpdateNode, handleDuplicateNode, handleDeleteNode, pushSnapshot, setNodes, isMobile]);
 
   // Add scripture verse directly to canvas from lookup modal
   const handleAddVerse = useCallback((verseData: { title: string; content: string; reference: string }) => {
@@ -1399,6 +1412,7 @@ function InnerCanvasBoard({
 
     const timestamp = Date.now();
     const newId = `card-verse-${timestamp}`;
+    const cardWidth = isMobile ? 310 : 380;
 
     let posX = 200;
     let posY = 200;
@@ -1409,7 +1423,7 @@ function InnerCanvasBoard({
         x: rect.left + rect.width / 2,
         y: rect.top + rect.height / 2,
       });
-      posX = Math.round(centerPos.x - 190);
+      posX = Math.round(centerPos.x - cardWidth / 2);
       posY = Math.round(centerPos.y - 120);
     } else if (nodesRef.current.length > 0) {
       const last = nodesRef.current[nodesRef.current.length - 1];
@@ -1422,7 +1436,7 @@ function InnerCanvasBoard({
       type: 'customCard',
       position: { x: posX, y: posY },
       selected: true,
-      style: { width: 380 },
+      style: { width: cardWidth },
       data: {
         title: verseData.title,
         content: verseData.content,
@@ -1443,7 +1457,7 @@ function InnerCanvasBoard({
       pushSnapshot(next, edgesRef.current);
       return next;
     });
-  }, [handleCreateBoard, screenToFlowPosition, theme, onNavigateToVerse, handleUpdateNode, handleDuplicateNode, handleDeleteNode, pushSnapshot, setNodes]);
+  }, [handleCreateBoard, theme, onNavigateToVerse, handleUpdateNode, handleDuplicateNode, handleDeleteNode, pushSnapshot, setNodes, screenToFlowPosition, isMobile]);
 
   // Connecting edges
   const onConnect = useCallback((connection: Connection) => {
@@ -1784,21 +1798,24 @@ function InnerCanvasBoard({
         }}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-        minZoom={0.25}
+        minZoom={0.2}
         maxZoom={2.0}
-        defaultViewport={{ x: 80, y: 60, zoom: 0.85 }}
+        defaultViewport={{ x: isMobile ? 20 : 80, y: isMobile ? 40 : 60, zoom: isMobile ? 0.7 : 0.85 }}
         selectionMode={SelectionMode.Partial}
         panOnScroll={false}
-        selectionOnDrag={true}
-        panOnDrag={[1, 2]}
+        selectionOnDrag={!isMobile}
+        panOnDrag={isMobile ? true : [1, 2]}
         zoomOnPinch={true}
         zoomOnScroll={true}
+        preventScrolling={true}
+        autoPanOnNodeDrag={true}
+        autoPanOnConnect={true}
         proOptions={{ hideAttribution: true }}
         defaultEdgeOptions={{
           type: 'customEdge',
           animated: true,
         }}
-        className="w-full h-full"
+        className="w-full h-full touch-none"
       >
         {/* Dot Grid */}
         <Background
@@ -1808,8 +1825,8 @@ function InnerCanvasBoard({
           color={isDark ? '#323236' : '#D4D4D8'}
         />
 
-        {/* MiniMap */}
-        {boards.length > 0 && nodes.length > 0 && (
+        {/* MiniMap - hidden on mobile to maximize touch canvas workspace */}
+        {!isMobile && boards.length > 0 && nodes.length > 0 && (
           <MiniMap
             position="bottom-right"
             nodeStrokeWidth={3}
@@ -1837,7 +1854,7 @@ function InnerCanvasBoard({
           <Controls
             position="bottom-left"
             showInteractive={false}
-            className={`!rounded-xl !border shadow-xl !overflow-hidden ${
+            className={`!rounded-xl !border shadow-xl !overflow-hidden mb-2 sm:mb-0 ${
               isDark 
                 ? '!bg-[#1e1e22] !border-zinc-700/70 !text-zinc-200 [&>button]:!border-zinc-700 [&>button]:!bg-[#1e1e22] [&>button]:!fill-zinc-300 hover:[&>button]:!bg-zinc-800' 
                 : '!bg-white !border-zinc-200 !text-zinc-700 [&>button]:!border-zinc-200 [&>button]:!bg-white [&>button]:!fill-zinc-600 hover:[&>button]:!bg-zinc-50'

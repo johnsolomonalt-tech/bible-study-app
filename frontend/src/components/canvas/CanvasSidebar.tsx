@@ -86,13 +86,20 @@ export function CanvasSidebar({
   if (!isOpen) return null;
 
   return (
-    <aside 
-      className={`absolute left-0 top-0 bottom-0 w-72 sm:w-80 z-30 flex flex-col border-r shadow-2xl backdrop-blur-xl transition-all duration-200 animate-in slide-in-from-left-4 ${
-        isDark 
-          ? 'bg-[#18181b]/95 border-zinc-800 text-zinc-100' 
-          : 'bg-white/95 border-zinc-200 text-zinc-800'
-      }`}
-    >
+    <>
+      {/* Mobile backdrop overlay to tap-dismiss */}
+      <div 
+        onClick={onToggle}
+        className="fixed inset-0 bg-black/50 z-20 sm:hidden animate-in fade-in duration-200"
+        aria-hidden="true"
+      />
+      <aside 
+        className={`absolute left-0 top-0 bottom-0 w-72 sm:w-80 z-30 flex flex-col border-r shadow-2xl backdrop-blur-xl transition-all duration-200 animate-in slide-in-from-left-4 ${
+          isDark 
+            ? 'bg-[#18181b]/95 border-zinc-800 text-zinc-100' 
+            : 'bg-white/95 border-zinc-200 text-zinc-800'
+        }`}
+      >
       {/* Sidebar Header */}
       <div className={`flex items-center justify-between px-4 py-3.5 border-b shrink-0 ${
         isDark ? 'border-zinc-800' : 'border-zinc-200'
@@ -297,5 +304,6 @@ export function CanvasSidebar({
         <span className="font-mono text-[10px]">{boards.length} Total</span>
       </div>
     </aside>
+  </>
   );
 }

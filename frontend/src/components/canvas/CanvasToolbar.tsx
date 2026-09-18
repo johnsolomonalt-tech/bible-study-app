@@ -16,7 +16,8 @@ import {
   ChevronDown,
   PanelLeft,
   Layers,
-  LayoutGrid
+  LayoutGrid,
+  MoreHorizontal
 } from 'lucide-react';
 import { NodeCategory, CATEGORY_METADATA } from '@/types/canvas';
 import { useModifierKey } from '@/lib/os';
@@ -77,9 +78,11 @@ export function CanvasToolbar({
 }: CanvasToolbarProps) {
   const mod = useModifierKey();
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState(boardTitle);
   const addMenuRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
   const isDark = theme === 'dark';
 
   useEffect(() => {
@@ -91,12 +94,15 @@ export function CanvasToolbar({
       if (addMenuRef.current && !addMenuRef.current.contains(e.target as Node)) {
         setIsAddMenuOpen(false);
       }
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node)) {
+        setIsMobileMenuOpen(false);
+      }
     };
-    if (isAddMenuOpen) {
+    if (isAddMenuOpen || isMobileMenuOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isAddMenuOpen]);
+  }, [isAddMenuOpen, isMobileMenuOpen]);
 
   const handleTitleSubmit = () => {
     setIsEditingTitle(false);
@@ -219,7 +225,7 @@ export function CanvasToolbar({
 
       {/* Right: Actions Toolbar */}
       <div 
-        className={`pointer-events-auto flex items-center gap-1.5 p-1.5 rounded-xl shadow-xl border backdrop-blur-md transition-all ${
+        className={`pointer-events-auto flex items-center gap-1 sm:gap-1.5 p-1 sm:p-1.5 rounded-xl shadow-xl border backdrop-blur-md transition-all ${
           isDark 
             ? 'bg-[#1e1e22]/90 border-zinc-700/70 text-zinc-200' 
             : 'bg-white/95 border-zinc-200/90 text-zinc-700'
@@ -230,12 +236,12 @@ export function CanvasToolbar({
           <button
             type="button"
             onClick={() => setIsAddMenuOpen(!isAddMenuOpen)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-white text-xs sm:text-sm font-semibold hover:bg-accent/90 active:scale-95 transition-all shadow-sm cursor-pointer"
+            className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-accent text-white text-xs sm:text-sm font-semibold hover:bg-accent/90 active:scale-95 transition-all shadow-sm cursor-pointer"
             title="Add card to canvas"
           >
             <Plus size={15} />
             <span className="hidden sm:inline">Add Card</span>
-            <ChevronDown size={14} className={`transition-transform duration-200 ${isAddMenuOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown size={13} className={`transition-transform duration-200 ${isAddMenuOpen ? 'rotate-180' : ''}`} />
           </button>
 
           {isAddMenuOpen && (
@@ -285,12 +291,12 @@ export function CanvasToolbar({
           )}
         </div>
 
-        {/* Quick Add Verse Button */}
+        {/* Quick Add Verse Button - desktop only */}
         {onOpenAddVerse && (
           <button
             type="button"
             onClick={onOpenAddVerse}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs sm:text-sm font-semibold transition-all shadow-xs cursor-pointer ${
+            className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs sm:text-sm font-semibold transition-all shadow-xs cursor-pointer ${
               isDark
                 ? 'bg-amber-500/15 border-amber-500/35 text-amber-400 hover:bg-amber-500/25 active:scale-95'
                 : 'bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100 active:scale-95'
@@ -298,7 +304,7 @@ export function CanvasToolbar({
             title="Search and add a Bible verse directly to Canvas"
           >
             <BookOpen size={14} className="shrink-0" />
-            <span className="hidden sm:inline">Add Verse</span>
+            <span className="hidden md:inline">Add Verse</span>
           </button>
         )}
 
@@ -306,21 +312,22 @@ export function CanvasToolbar({
         <button
           type="button"
           onClick={onOpenAi}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-accent to-amber-600 hover:from-accent/90 hover:to-amber-500 text-white text-xs font-semibold shadow-md active:scale-95 transition-all cursor-pointer"
+          className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-gradient-to-r from-accent to-amber-600 hover:from-accent/90 hover:to-amber-500 text-white text-xs font-semibold shadow-md active:scale-95 transition-all cursor-pointer"
           title="Ask Theologica AI to architect or expand your canvas"
         >
-          <Sparkles size={14} className="animate-pulse text-amber-200" />
+          <Sparkles size={14} className="animate-pulse text-amber-200 shrink-0" />
           <span className="hidden md:inline">Theologica AI</span>
         </button>
 
-        <div className="h-4 w-[1px] bg-zinc-700/40 mx-0.5" />
+        {/* Desktop-only Action Buttons */}
+        <div className="hidden sm:block h-4 w-[1px] bg-zinc-700/40 mx-0.5" />
 
-        {/* Undo Button */}
+        {/* Undo Button - desktop */}
         <button
           type="button"
           onClick={onUndo}
           disabled={!hasActiveBoard || !canUndo}
-          className={`p-1.5 rounded-lg transition-colors ${
+          className={`hidden sm:block p-1.5 rounded-lg transition-colors ${
             hasActiveBoard && canUndo 
               ? 'hover:bg-zinc-700/30 text-zinc-200 cursor-pointer active:scale-90 hover:text-white' 
               : 'opacity-30 cursor-not-allowed text-zinc-500'
@@ -330,12 +337,12 @@ export function CanvasToolbar({
           <Undo2 size={16} />
         </button>
 
-        {/* Redo Button */}
+        {/* Redo Button - desktop */}
         <button
           type="button"
           onClick={onRedo}
           disabled={!hasActiveBoard || !canRedo}
-          className={`p-1.5 rounded-lg transition-colors ${
+          className={`hidden sm:block p-1.5 rounded-lg transition-colors ${
             hasActiveBoard && canRedo 
               ? 'hover:bg-zinc-700/30 text-zinc-200 cursor-pointer active:scale-90 hover:text-white' 
               : 'opacity-30 cursor-not-allowed text-zinc-500'
@@ -345,15 +352,15 @@ export function CanvasToolbar({
           <Redo2 size={16} />
         </button>
 
-        <div className="h-4 w-[1px] bg-zinc-700/40 mx-0.5" />
+        <div className="hidden sm:block h-4 w-[1px] bg-zinc-700/40 mx-0.5" />
 
-        {/* Auto Arrange */}
+        {/* Auto Arrange - desktop */}
         {onAutoArrange && (
           <button
             type="button"
             onClick={onAutoArrange}
             disabled={!hasActiveBoard || nodeCount === 0}
-            className={`p-1.5 rounded-lg transition-colors ${
+            className={`hidden sm:block p-1.5 rounded-lg transition-colors ${
               hasActiveBoard && nodeCount > 0
                 ? 'hover:bg-zinc-700/30 text-zinc-300 hover:text-white cursor-pointer active:scale-90'
                 : 'opacity-30 cursor-not-allowed text-zinc-500'
@@ -364,12 +371,12 @@ export function CanvasToolbar({
           </button>
         )}
 
-        {/* Fit View */}
+        {/* Fit View - desktop */}
         <button
           type="button"
           onClick={onFitView}
           disabled={!hasActiveBoard || nodeCount === 0}
-          className={`p-1.5 rounded-lg transition-colors ${
+          className={`hidden sm:block p-1.5 rounded-lg transition-colors ${
             hasActiveBoard && nodeCount > 0
               ? 'hover:bg-zinc-700/30 text-zinc-300 hover:text-white cursor-pointer active:scale-90'
               : 'opacity-30 cursor-not-allowed text-zinc-500'
@@ -379,12 +386,12 @@ export function CanvasToolbar({
           <Maximize2 size={16} />
         </button>
 
-        {/* Clear Board */}
+        {/* Clear Board - desktop */}
         <button
           type="button"
           onClick={onClear}
           disabled={!hasActiveBoard || nodeCount === 0}
-          className={`p-1.5 rounded-lg transition-colors ${
+          className={`hidden sm:block p-1.5 rounded-lg transition-colors ${
             hasActiveBoard && nodeCount > 0
               ? 'hover:bg-rose-500/20 text-zinc-400 hover:text-rose-400 cursor-pointer active:scale-90'
               : 'opacity-30 cursor-not-allowed text-zinc-500'
@@ -393,6 +400,146 @@ export function CanvasToolbar({
         >
           <Trash2 size={16} />
         </button>
+
+        {/* Mobile More Actions Menu */}
+        <div className="relative sm:hidden" ref={mobileMenuRef}>
+          <button
+            type="button"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+              isMobileMenuOpen 
+                ? 'bg-accent text-white' 
+                : isDark 
+                  ? 'hover:bg-zinc-800 text-zinc-300' 
+                  : 'hover:bg-zinc-100 text-zinc-700'
+            }`}
+            title="More canvas actions"
+          >
+            <MoreHorizontal size={18} />
+          </button>
+
+          {isMobileMenuOpen && (
+            <div 
+              className={`absolute right-0 top-full mt-2 w-56 rounded-2xl shadow-2xl border p-2 z-50 animate-in fade-in-50 zoom-in-95 ${
+                isDark 
+                  ? 'bg-[#222226] border-zinc-700 text-zinc-200' 
+                  : 'bg-white border-zinc-200 text-zinc-800 shadow-xl'
+              }`}
+            >
+              {onOpenAddVerse && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    onOpenAddVerse();
+                  }}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
+                    isDark ? 'hover:bg-zinc-800 text-amber-400' : 'hover:bg-zinc-100 text-amber-700'
+                  }`}
+                >
+                  <BookOpen size={15} />
+                  <span>Add Bible Verse</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  onFitView();
+                }}
+                disabled={!hasActiveBoard || nodeCount === 0}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                  hasActiveBoard && nodeCount > 0 
+                    ? isDark ? 'hover:bg-zinc-800 text-zinc-200 cursor-pointer' : 'hover:bg-zinc-100 text-zinc-700 cursor-pointer'
+                    : 'opacity-30 cursor-not-allowed'
+                }`}
+              >
+                <Maximize2 size={15} />
+                <span>Fit All Cards</span>
+              </button>
+
+              {onAutoArrange && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    onAutoArrange();
+                  }}
+                  disabled={!hasActiveBoard || nodeCount === 0}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                    hasActiveBoard && nodeCount > 0 
+                      ? isDark ? 'hover:bg-zinc-800 text-zinc-200 cursor-pointer' : 'hover:bg-zinc-100 text-zinc-700 cursor-pointer'
+                      : 'opacity-30 cursor-not-allowed'
+                  }`}
+                >
+                  <LayoutGrid size={15} />
+                  <span>Auto Arrange Layout</span>
+                </button>
+              )}
+
+              <div className={`border-t my-1 ${isDark ? 'border-zinc-700/60' : 'border-zinc-200'}`} />
+
+              <div className="flex items-center gap-1 px-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onUndo();
+                  }}
+                  disabled={!hasActiveBoard || !canUndo}
+                  className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    hasActiveBoard && canUndo 
+                      ? isDark ? 'hover:bg-zinc-800 text-zinc-200 cursor-pointer' : 'hover:bg-zinc-100 text-zinc-700 cursor-pointer'
+                      : 'opacity-30 cursor-not-allowed'
+                  }`}
+                >
+                  <Undo2 size={14} />
+                  <span>Undo</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    onRedo();
+                  }}
+                  disabled={!hasActiveBoard || !canRedo}
+                  className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    hasActiveBoard && canRedo 
+                      ? isDark ? 'hover:bg-zinc-800 text-zinc-200 cursor-pointer' : 'hover:bg-zinc-100 text-zinc-700 cursor-pointer'
+                      : 'opacity-30 cursor-not-allowed'
+                  }`}
+                >
+                  <Redo2 size={14} />
+                  <span>Redo</span>
+                </button>
+              </div>
+
+              <div className={`border-t my-1 ${isDark ? 'border-zinc-700/60' : 'border-zinc-200'}`} />
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  onClear();
+                }}
+                disabled={!hasActiveBoard || nodeCount === 0}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                  hasActiveBoard && nodeCount > 0 
+                    ? 'text-rose-400 hover:bg-rose-500/10 cursor-pointer' 
+                    : 'opacity-30 cursor-not-allowed text-zinc-500'
+                }`}
+              >
+                <Trash2 size={15} />
+                <span>Clear Canvas</span>
+              </button>
+
+              <div className="px-3 pt-2 pb-1 border-t border-zinc-700/40 text-[10px] text-zinc-500 flex items-center justify-between">
+                <span>{nodeCount} {nodeCount === 1 ? 'card' : 'cards'}</span>
+                <span className="capitalize">{saveStatus}</span>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
