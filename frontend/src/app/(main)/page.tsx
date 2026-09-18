@@ -13,7 +13,12 @@ import { NodeCategory } from '@/types/canvas';
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from 'react-resizable-panels';
 import type { PanelImperativeHandle } from 'react-resizable-panels';
 import { motion, AnimatePresence } from 'framer-motion';
-import { linkifyBibleReferences, parseVerseReference, VerseClickHandler } from '@/lib/bibleReferences';
+import { 
+  linkifyBibleReferences, 
+  parseVerseReference, 
+  createMarkdownComponents, 
+  VerseClickHandler 
+} from '@/lib/bibleReferences';
 
 // --- All 66 Books ---
 const otStr = "Genesis:50,Exodus:40,Leviticus:27,Numbers:36,Deuteronomy:34,Joshua:24,Judges:21,Ruth:4,1 Samuel:31,2 Samuel:24,1 Kings:22,2 Kings:25,1 Chronicles:29,2 Chronicles:36,Ezra:10,Nehemiah:13,Esther:10,Job:42,Psalms:150,Proverbs:31,Ecclesiastes:12,Song of Solomon:8,Isaiah:66,Jeremiah:52,Lamentations:5,Ezekiel:48,Daniel:12,Hosea:14,Joel:3,Amos:9,Obadiah:1,Jonah:4,Micah:7,Nahum:3,Habakkuk:3,Zephaniah:3,Haggai:2,Zechariah:14,Malachi:4";
@@ -21,49 +26,6 @@ const ntStr = "Matthew:28,Mark:16,Luke:24,John:21,Acts:28,Romans:16,1 Corinthian
 
 const OT_BOOKS = otStr.split(',').map(s => { const [n, c] = s.split(':'); return { name: n, chapters: parseInt(c) }; });
 const NT_BOOKS = ntStr.split(',').map(s => { const [n, c] = s.split(':'); return { name: n, chapters: parseInt(c) }; });
-
-const createMarkdownComponents = (onVerseClick?: VerseClickHandler) => ({
-  p: ({ children }: any) => (
-    <p className="mb-4 last:mb-0 leading-[1.7] text-[15px]">
-      {onVerseClick ? linkifyBibleReferences(children, onVerseClick) : children}
-    </p>
-  ),
-  blockquote: ({ children }: any) => (
-    <blockquote className="border-l-[3px] border-[#c96442] bg-accent/10 py-3 px-5 my-5 italic rounded-r-xl shadow-sm text-fg-hover text-[15px]">
-      {onVerseClick ? linkifyBibleReferences(children, onVerseClick) : children}
-    </blockquote>
-  ),
-  strong: ({ children }: any) => (
-    <strong className="font-semibold text-fg">
-      {onVerseClick ? linkifyBibleReferences(children, onVerseClick) : children}
-    </strong>
-  ),
-  em: ({ children }: any) => (
-    <em className="italic text-fg-hover">
-      {onVerseClick ? linkifyBibleReferences(children, onVerseClick) : children}
-    </em>
-  ),
-  li: ({ children }: any) => (
-    <li className="leading-[1.7] text-[15px]">
-      {onVerseClick ? linkifyBibleReferences(children, onVerseClick) : children}
-    </li>
-  ),
-  ul: ({ children }: any) => <ul className="list-disc pl-6 mb-4 space-y-2">{children}</ul>,
-  ol: ({ children }: any) => <ol className="list-decimal pl-6 mb-4 space-y-2">{children}</ol>,
-  h1: ({ children }: any) => <h1 className="text-xl font-bold mb-4 mt-6 text-fg">{children}</h1>,
-  h2: ({ children }: any) => <h2 className="text-[18px] font-bold mb-3 mt-5 text-fg">{children}</h2>,
-  h3: ({ children }: any) => <h3 className="text-[16px] font-bold mb-2 mt-4 text-fg-hover">{children}</h3>,
-  a: ({ children, href }: any) => (
-    <a 
-      href={href} 
-      className="inline font-medium text-accent hover:text-accent/90 underline decoration-accent/35 hover:decoration-accent underline-offset-[3px] decoration-1 hover:bg-accent/10 rounded px-1 -mx-0.5 transition-all" 
-      target="_blank" 
-      rel="noreferrer"
-    >
-      {children}
-    </a>
-  ),
-});
 
 const markdownComponents = createMarkdownComponents();
 
@@ -2469,30 +2431,56 @@ export default function App() {
                       className="w-full"
                     >
                       <header className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6">
-                        <div className="space-y-1.5">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-md bg-accent/15 text-accent border border-accent/30 tracking-widest uppercase">
-                              {devotionalTime === 'morning' ? 'Morning Devotion' : 'Evening Devotion'}
-                            </span>
-                            <span className="text-muted text-xs font-medium">
-                              Day {displayDay} of {totalDays}
-                            </span>
-                          </div>
-                          <h2 
-                            onClick={() => {
-                              const ref = devotionalTime === 'morning' ? devotionalEntry.morningVerse : devotionalEntry.eveningVerse;
-                              const parsed = parseVerseReference(ref);
-                              if (parsed) {
-                                navigateToVerse(parsed.book, parsed.chapter, parsed.verse);
-                              }
-                            }}
-                            className="text-accent font-display text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight cursor-pointer hover:underline flex items-center gap-2 group/devo"
-                            title="Open in Bible reader"
-                          >
-                            <span>{devotionalTime === 'morning' ? devotionalEntry.morningVerse : devotionalEntry.eveningVerse}</span>
-                            <BookOpen size={20} className="opacity-0 group-hover/devo:opacity-75 transition-opacity shrink-0" />
-                          </h2>
-                        </div>
+                        {(() => {
+                          const currentVerse = devotionalTime === 'morning' ? devotionalEntry.morningVerse : devotionalEntry.eveningVerse;
+                          const parsedVerse = parseVerseReference(currentVerse);
+                          const splitMatch = currentVerse.match(/^(".*?")\s*[-—–]\s*(.+)$/);
+                          const quote = splitMatch ? splitMatch[1] : currentVerse;
+                          const citation = splitMatch ? splitMatch[2] : (parsedVerse ? parsedVerse.raw : '');
+
+                          return (
+                            <div className="space-y-2.5 max-w-3xl">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-md bg-accent/15 text-accent border border-accent/30 tracking-widest uppercase">
+                                  {devotionalTime === 'morning' ? 'Morning Devotion' : 'Evening Devotion'}
+                                </span>
+                                <span className="text-muted text-xs font-medium">
+                                  Day {displayDay} of {totalDays}
+                                </span>
+                              </div>
+                              <h2 
+                                onClick={() => {
+                                  if (parsedVerse) {
+                                    navigateToVerse(parsedVerse.book, parsedVerse.chapter, parsedVerse.verse);
+                                  }
+                                }}
+                                className={`font-display text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-fg transition-colors ${
+                                  parsedVerse ? 'cursor-pointer hover:text-accent' : ''
+                                }`}
+                                title={parsedVerse ? `Open ${parsedVerse.book} ${parsedVerse.chapter}:${parsedVerse.verse} in Bible reader` : undefined}
+                              >
+                                {quote}
+                              </h2>
+                              {citation && (
+                                <div className="pt-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (parsedVerse) {
+                                        navigateToVerse(parsedVerse.book, parsedVerse.chapter, parsedVerse.verse);
+                                      }
+                                    }}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-accent/10 hover:bg-accent/20 text-accent text-sm sm:text-base font-semibold border border-accent/25 hover:border-accent/40 transition-all cursor-pointer group/devo-verse"
+                                    title={parsedVerse ? `Open ${parsedVerse.book} ${parsedVerse.chapter}:${parsedVerse.verse} in Bible reader` : undefined}
+                                  >
+                                    <span>{citation}</span>
+                                    <BookOpen size={15} className="opacity-70 group-hover/devo-verse:opacity-100 transition-opacity" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
 
                         {/* Action controls */}
                         <div className="flex items-center gap-2 shrink-0">
@@ -2533,7 +2521,10 @@ export default function App() {
                       <div className="w-full h-px bg-border/60 mb-8" />
 
                       <div className="text-[18px] lg:text-[20px] leading-[2.0] text-fg font-serif mb-10 whitespace-pre-wrap selection:bg-accent/20">
-                        {devotionalTime === 'morning' ? devotionalEntry.morningText : devotionalEntry.eveningText}
+                        {linkifyBibleReferences(
+                          devotionalTime === 'morning' ? devotionalEntry.morningText : devotionalEntry.eveningText,
+                          navigateToVerse
+                        )}
                       </div>
 
                       <footer className="text-muted text-sm font-medium italic border-t border-border/60 pt-5 flex items-center justify-between">

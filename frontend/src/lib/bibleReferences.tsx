@@ -326,6 +326,47 @@ export function parseVerseReference(text: string): ParsedVerseRef | null {
     }
   }
 
+  // 3. Fallback: Search for any Bible verse citation embedded in text (e.g. quote headers like `"Quote" - Joshua 5:12` or `Devotional: Joshua 5:12`)
+  const verseSearchRegex = new RegExp(`\\b(${BOOK_REGEX_PART})\\.?\\s*(\\d+):\\s*(\\d+)(?:\\s*[\\-\\u2013\\u2014]\\s*(\\d+))?\\b`, 'gi');
+  const verseMatches = Array.from(trimmed.matchAll(verseSearchRegex));
+  if (verseMatches.length > 0) {
+    const last = verseMatches[verseMatches.length - 1];
+    const rawBook = last[1].toLowerCase().replace(/\s+/g, ' ').trim();
+    const canonical = CANONICAL_BOOKS[rawBook];
+    if (canonical) {
+      const chapter = parseInt(last[2], 10);
+      const verse = parseInt(last[3], 10);
+      if (!isNaN(chapter) && !isNaN(verse) && chapter >= 1 && verse >= 1) {
+        return {
+          book: canonical.name,
+          chapter,
+          verse,
+          raw: last[0],
+        };
+      }
+    }
+  }
+
+  // 4. Fallback: Search for standalone chapter citation embedded in text
+  const chapterSearchRegex = new RegExp(`\\b(${SAFE_CHAPTER_BOOKS_PART})\\.?\\s+(\\d+)(?!:\\s*\\d+)\\b`, 'gi');
+  const chapterMatches = Array.from(trimmed.matchAll(chapterSearchRegex));
+  if (chapterMatches.length > 0) {
+    const last = chapterMatches[chapterMatches.length - 1];
+    const rawBook = last[1].toLowerCase().replace(/\s+/g, ' ').trim();
+    const canonical = CANONICAL_BOOKS[rawBook];
+    if (canonical) {
+      const chapter = parseInt(last[2], 10);
+      if (!isNaN(chapter) && chapter >= 1 && chapter <= canonical.chapters) {
+        return {
+          book: canonical.name,
+          chapter,
+          verse: 1,
+          raw: last[0],
+        };
+      }
+    }
+  }
+
   return null;
 }
 
