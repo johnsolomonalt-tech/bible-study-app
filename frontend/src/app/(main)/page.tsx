@@ -3,7 +3,7 @@ const API_URL = '';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuth, UserButton, SignIn } from '@clerk/nextjs';
-import { Send, Plus, Layout, Edit, Sparkles, Target, Check, ChevronRight, ChevronLeft, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow } from 'lucide-react';
+import { Send, Plus, Layout, Edit, Sparkles, Target, Check, Copy, ChevronRight, ChevronLeft, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import TextareaAutosize from 'react-textarea-autosize';
 import { getDevotionalForDay, DevotionalEntry } from '../../lib/devotionals';
@@ -59,21 +59,21 @@ const createMarkdownComponents = (onVerseClick?: VerseClickHandler) => ({
 const markdownComponents = createMarkdownComponents();
 
 const userMarkdownComponents = {
-  p: ({ children }: any) => <p className="mb-4 last:mb-0 leading-[1.7] text-[15px]">{children}</p>,
+  p: ({ children }: any) => <p className="mb-2 last:mb-0 leading-relaxed text-[14px] text-fg">{children}</p>,
   blockquote: ({ children }: any) => (
-    <blockquote className="border-l-[3px] border-white/40 bg-white/10 py-3 px-5 my-3 italic rounded-r-xl shadow-sm text-white/90 text-[15px]">
+    <blockquote className="border-l-[3px] border-accent/60 bg-accent/10 py-2 px-3 my-2 italic rounded-r-lg shadow-sm text-fg-hover text-[13px]">
       {children}
     </blockquote>
   ),
-  strong: ({ children }: any) => <strong className="font-semibold text-white">{children}</strong>,
-  em: ({ children }: any) => <em className="italic text-white/90">{children}</em>,
-  ul: ({ children }: any) => <ul className="list-disc pl-6 mb-4 space-y-2">{children}</ul>,
-  ol: ({ children }: any) => <ol className="list-decimal pl-6 mb-4 space-y-2">{children}</ol>,
-  li: ({ children }: any) => <li className="leading-[1.7] text-[15px]">{children}</li>,
-  h1: ({ children }: any) => <h1 className="text-xl font-bold mb-4 mt-6 text-white">{children}</h1>,
-  h2: ({ children }: any) => <h2 className="text-[18px] font-bold mb-3 mt-5 text-white">{children}</h2>,
-  h3: ({ children }: any) => <h3 className="text-[16px] font-bold mb-2 mt-4 text-white/90">{children}</h3>,
-  a: ({ children, href }: any) => <a href={href} className="text-white hover:underline" target="_blank" rel="noreferrer">{children}</a>,
+  strong: ({ children }: any) => <strong className="font-semibold text-fg">{children}</strong>,
+  em: ({ children }: any) => <em className="italic text-fg-hover">{children}</em>,
+  ul: ({ children }: any) => <ul className="list-disc pl-5 mb-2 space-y-1 text-fg">{children}</ul>,
+  ol: ({ children }: any) => <ol className="list-decimal pl-5 mb-2 space-y-1 text-fg">{children}</ol>,
+  li: ({ children }: any) => <li className="leading-relaxed text-[14px] text-fg">{children}</li>,
+  h1: ({ children }: any) => <h1 className="text-lg font-bold mb-2 mt-3 text-fg">{children}</h1>,
+  h2: ({ children }: any) => <h2 className="text-base font-bold mb-2 mt-2 text-fg">{children}</h2>,
+  h3: ({ children }: any) => <h3 className="text-[14px] font-bold mb-1 mt-2 text-fg-hover">{children}</h3>,
+  a: ({ children, href }: any) => <a href={href} className="text-accent hover:underline" target="_blank" rel="noreferrer">{children}</a>,
 };
 
 // Typewriter configuration
@@ -174,29 +174,170 @@ const TypewriterMessage = ({ content, onVerseClick }: { content: string; onVerse
   );
 };
 
+const AiMessageActions = ({
+  content,
+  chatTitle,
+  onSendToCanvas
+}: {
+  content: string;
+  chatTitle?: string;
+  onSendToCanvas?: (content: string, title?: string) => void;
+}) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      const { textContent } = parseAiMessage(content);
+      await navigator.clipboard.writeText(textContent || content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy message:', err);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-1.5 mt-2.5 pt-1.5 select-none text-muted">
+      <button
+        type="button"
+        onClick={handleCopy}
+        className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted hover:text-fg px-2 py-1 rounded-md hover:bg-surface transition-all cursor-pointer"
+        title="Copy response"
+      >
+        {copied ? (
+          <>
+            <Check size={12} className="text-emerald-500" />
+            <span className="text-emerald-500 font-medium">Copied</span>
+          </>
+        ) : (
+          <>
+            <Copy size={12} />
+            <span>Copy</span>
+          </>
+        )}
+      </button>
+
+      {onSendToCanvas && (
+        <button
+          type="button"
+          onClick={() => onSendToCanvas(content, chatTitle)}
+          className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted hover:text-accent px-2 py-1 rounded-md hover:bg-surface transition-all cursor-pointer"
+          title="Send this insight to Canvas"
+        >
+          <Workflow size={12} />
+          <span>Canvas</span>
+        </button>
+      )}
+    </div>
+  );
+};
+
 const AiThinkingIndicator = ({ status, isFullView }: { status: string; isFullView?: boolean }) => {
   return (
-    <div className={`flex flex-col items-start ${isFullView ? 'max-w-3xl w-full mx-auto' : ''}`}>
-      <span className={`text-[11px] text-muted font-semibold tracking-wide uppercase ml-1 ${isFullView ? 'mb-2' : 'mb-1.5'}`}>
-        Study AI
-      </span>
-      <div
-        className={`${
-          isFullView
-            ? 'px-5 py-3.5 text-[14px] rounded-[20px]'
-            : 'px-4 py-3 max-w-[90%] text-[13.5px] rounded-2xl'
-        } leading-relaxed bg-surface text-fg rounded-bl-sm ring-1 ring-border-soft shadow-sm flex flex-col gap-2 transition-all duration-200`}
-      >
-        <div className="flex gap-1.5 items-center py-0.5">
-          <div className="w-1.5 h-1.5 rounded-full bg-[#87867f] animate-bounce" style={{ animationDelay: '0ms' }} />
-          <div className="w-1.5 h-1.5 rounded-full bg-[#87867f] animate-bounce" style={{ animationDelay: '150ms' }} />
-          <div className="w-1.5 h-1.5 rounded-full bg-[#87867f] animate-bounce" style={{ animationDelay: '300ms' }} />
+    <div className={`flex flex-col items-start w-full ${isFullView ? 'max-w-3xl mx-auto' : ''} py-2`}>
+      <div className="flex items-center gap-2 mb-2 select-none">
+        <div className="w-5 h-5 rounded-full bg-accent/10 border border-accent/30 flex items-center justify-center text-accent">
+          <Sparkles size={11} />
         </div>
-        <div className="text-[12px] text-muted flex items-center gap-2 font-medium tracking-tight select-none">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-accent animate-pulse shrink-0" />
-          <span className="animate-fade-in transition-all duration-200">{status}</span>
+        <span className="text-[11px] font-semibold tracking-wider uppercase text-muted">Study AI</span>
+      </div>
+      <div className="flex items-center gap-2.5 text-[13px] text-muted font-medium py-1 select-none">
+        <div className="flex gap-1 items-center">
+          <span className="w-1.5 h-1.5 rounded-full bg-accent/70 animate-bounce" style={{ animationDelay: '0ms' }} />
+          <span className="w-1.5 h-1.5 rounded-full bg-accent/70 animate-bounce" style={{ animationDelay: '150ms' }} />
+          <span className="w-1.5 h-1.5 rounded-full bg-accent/70 animate-bounce" style={{ animationDelay: '300ms' }} />
+        </div>
+        <span className="text-fg-2 transition-all duration-200">{status}</span>
+      </div>
+    </div>
+  );
+};
+
+const AiChatMessageView = ({
+  message,
+  index,
+  totalMessages,
+  onVerseClick,
+  onSendToCanvas,
+  chatTitle,
+  isFullView,
+}: {
+  message: { role: string; content: string; imagePreview?: string };
+  index: number;
+  totalMessages: number;
+  onVerseClick?: VerseClickHandler;
+  onSendToCanvas?: (content: string, title?: string) => void;
+  chatTitle?: string;
+  isFullView?: boolean;
+}) => {
+  const isUser = message.role === 'user';
+  const isLast = index === totalMessages - 1;
+  const mdComponents = useMemo(() => createMarkdownComponents(onVerseClick), [onVerseClick]);
+
+  if (isUser) {
+    return (
+      <div className={`flex flex-col items-end w-full ${isFullView ? 'max-w-3xl mx-auto' : ''}`}>
+        <div className={`${
+          isFullView 
+            ? 'px-5 py-3 max-w-[85%] sm:max-w-[75%] text-[15px]' 
+            : 'px-4 py-2.5 max-w-[90%] sm:max-w-[85%] text-[14px]'
+        } leading-relaxed bg-surface border border-border-soft/60 text-fg rounded-2xl shadow-sm break-words`}>
+          {message.imagePreview && (
+            <img 
+              src={message.imagePreview} 
+              alt="attached" 
+              className={`${isFullView ? 'max-h-52 mb-3' : 'max-h-40 mb-2'} rounded-xl object-contain`} 
+            />
+          )}
+          <ReactMarkdown components={userMarkdownComponents}>{message.content}</ReactMarkdown>
         </div>
       </div>
+    );
+  }
+
+  // Study AI message
+  const { imageBase64, textContent } = parseAiMessage(message.content);
+
+  return (
+    <div className={`flex flex-col items-start w-full ${isFullView ? 'max-w-3xl mx-auto' : ''} py-2`}>
+      <div className="flex items-center gap-2 mb-2 select-none">
+        <div className="w-5 h-5 rounded-full bg-accent/10 border border-accent/30 flex items-center justify-center text-accent">
+          <Sparkles size={11} />
+        </div>
+        <span className="text-[11px] font-semibold tracking-wider uppercase text-muted">Study AI</span>
+      </div>
+
+      <div className={`w-full ${isFullView ? 'text-[15px] leading-[1.75]' : 'text-[14px] leading-relaxed'} text-fg overflow-x-auto break-words markdown-body`}>
+        {isLast ? (
+          <TypewriterMessage content={message.content} onVerseClick={onVerseClick} />
+        ) : (
+          <>
+            {imageBase64 && (
+              <div className={isFullView ? 'mb-3' : 'mb-2'}>
+                <img 
+                  src={`data:image/png;base64,${imageBase64}`} 
+                  alt="AI generated" 
+                  className={`rounded-xl max-w-full object-contain ${isFullView ? 'max-h-96' : 'max-h-64'} shadow-lg`} 
+                />
+                <a 
+                  href={`data:image/png;base64,${imageBase64}`} 
+                  download="theologica-image.png" 
+                  className={`inline-flex items-center gap-1 mt-1.5 ${isFullView ? 'text-[11px]' : 'text-[10px]'} text-muted hover:text-fg-hover transition-colors`}
+                >
+                  ↓ Download image
+                </a>
+              </div>
+            )}
+            {textContent ? <ReactMarkdown components={mdComponents}>{textContent}</ReactMarkdown> : null}
+          </>
+        )}
+      </div>
+
+      <AiMessageActions
+        content={message.content}
+        chatTitle={chatTitle}
+        onSendToCanvas={onSendToCanvas}
+      />
     </div>
   );
 };
@@ -1743,16 +1884,15 @@ export default function App() {
                     </div>
                   ) : (
                     activeChat.messages.map((m, i) => (
-                      <div key={i} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
-                        {m.role === 'model' && <span className="text-[11px] text-muted mb-1.5 ml-1 font-semibold tracking-wide uppercase">Study AI</span>}
-                        <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-[14px] leading-relaxed ${m.role === 'user' ? 'bg-accent text-white' : 'bg-surface text-fg-hover'}`}>
-                          {m.role === 'model' && i === activeChat.messages.length - 1 ? (
-                            <TypewriterMessage content={m.content} onVerseClick={navigateToVerse} />
-                          ) : (
-                            <ReactMarkdown components={m.role === 'user' ? userMarkdownComponents : aiMarkdownComponents}>{m.content}</ReactMarkdown>
-                          )}
-                        </div>
-                      </div>
+                      <AiChatMessageView
+                        key={i}
+                        message={m}
+                        index={i}
+                        totalMessages={activeChat.messages.length}
+                        onVerseClick={navigateToVerse}
+                        onSendToCanvas={sendChatMessageToCanvas}
+                        chatTitle={activeChat?.title}
+                      />
                     ))
                   )}
                   {isAiTyping && (
@@ -1792,7 +1932,7 @@ export default function App() {
                                 <button 
                                   type="button" 
                                   onClick={() => setChatQuotes(prev => prev.filter(item => item.id !== q.id))} 
-                                  className="shrink-0 p-1 text-muted hover:text-error hover:bg-surface rounded-full transition-colors"
+                                  className="shrink-0 p-1 text-muted hover:text-error hover:bg-surface rounded-full transition-colors cursor-pointer"
                                   title="Remove reference"
                                 >
                                   <X size={12} />
@@ -1811,35 +1951,33 @@ export default function App() {
                         </button>
                       </div>
                     )}
-                    <div className="relative flex items-end bg-surface rounded-xl border border-border focus-within:border-border-soft transition-colors p-1">
+                    <div className="relative flex items-end bg-surface border border-border-soft/80 rounded-2xl shadow-sm focus-within:border-accent/60 focus-within:ring-2 focus-within:ring-accent/20 transition-all p-1.5">
                       <button 
                         type="button" 
                         onClick={() => imageFileRef.current?.click()} 
                         disabled={cooldown > 0 || !isOnline} 
-                        className="flex-shrink-0 p-2 text-muted hover:text-fg-hover disabled:opacity-40 transition-colors"
+                        className="flex-shrink-0 p-2 text-muted hover:text-fg disabled:opacity-40 transition-colors mr-1"
                         title="Attach image"
                       >
                         <Paperclip size={16} />
                       </button>
-                      <textarea 
-                        className="w-full bg-transparent p-2 min-h-[44px] max-h-[120px] text-[14px] text-fg placeholder-meta focus:outline-none resize-none custom-scroll" 
+                      <TextareaAutosize 
+                        minRows={1}
+                        maxRows={5}
+                        className="flex-1 bg-transparent text-fg pl-1 pr-10 py-2 text-[14px] placeholder:text-meta focus:outline-none resize-none" 
                         placeholder={!isOnline ? "Study AI is unavailable offline" : cooldown > 0 ? `Study AI is resting... (${cooldown}s)` : "Ask anything..."} 
-                        rows={1}
                         value={chatInput}
                         onChange={(e) => setChatInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            handleSendMessage(e as any);
-                          }
-                        }}
+                        onKeyDown={handleChatKeyDown}
+                        disabled={cooldown > 0 || !isOnline}
                       />
                       <button 
                         type="submit" 
                         disabled={isAiTyping || (!chatInput.trim() && !chatImage && chatQuotes.length === 0) || cooldown > 0 || !isOnline}
-                        className="p-2 text-accent hover:text-fg-hover disabled:opacity-30 disabled:hover:text-accent transition-colors shrink-0"
+                        className="absolute right-2 bottom-2 p-2 bg-accent hover:bg-[#b5583b] text-white rounded-xl disabled:opacity-30 disabled:hover:bg-accent transition-all shadow-sm shrink-0 cursor-pointer"
+                        title="Send message"
                       >
-                        <Send size={18} />
+                        <Send size={15} />
                       </button>
                     </div>
                   </div>
@@ -2035,47 +2173,15 @@ export default function App() {
                   </div>
                 ) : (
                   activeChat.messages.map((m, i) => (
-                    <div key={i} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
-                      {m.role === 'model' && <span className="text-[11px] text-muted mb-1.5 ml-1 font-semibold tracking-wide uppercase">Study AI</span>}
-                      <div className={`px-4 py-3 max-w-[95%] sm:max-w-[90%] text-[14px] leading-relaxed overflow-x-auto break-words ${
-                        m.role === 'user' 
-                        ? 'bg-accent text-white rounded-2xl rounded-br-sm shadow-sm' 
-                        : 'bg-surface text-fg rounded-2xl rounded-bl-sm ring-1 ring-border-soft shadow-sm markdown-body'
-                      }`}>
-                        {(m as any).imagePreview && (
-                          <img src={(m as any).imagePreview} alt="attached" className="max-h-40 rounded-xl mb-2 object-contain" />
-                        )}
-                        {m.role === 'model' && i === activeChat.messages.length - 1 ? (
-                            <TypewriterMessage content={m.content} onVerseClick={navigateToVerse} />
-                          ) : (() => {
-                            const { imageBase64, textContent } = parseAiMessage(m.content);
-                            return (
-                              <>
-                                {imageBase64 && (
-                                  <div className="mb-2">
-                                    <img src={`data:image/png;base64,${imageBase64}`} alt="AI generated" className="rounded-xl max-w-full object-contain max-h-64 shadow-lg" />
-                                    <a href={`data:image/png;base64,${imageBase64}`} download="theologica-image.png" className="inline-flex items-center gap-1 mt-1 text-[10px] text-muted hover:text-fg-hover transition-colors">↓ Download</a>
-                                  </div>
-                                )}
-                                {textContent ? <ReactMarkdown components={m.role === 'user' ? userMarkdownComponents : aiMarkdownComponents}>{textContent}</ReactMarkdown> : null}
-                              </>
-                            );
-                          })()}
-                        {m.role === 'model' && (
-                          <div className="flex items-center justify-end gap-1 mt-2 pt-1.5 border-t border-border/40">
-                            <button
-                              type="button"
-                              onClick={() => sendChatMessageToCanvas(m.content, activeChat?.title)}
-                              className="flex items-center gap-1 text-[10px] font-medium text-muted hover:text-accent transition-colors px-1.5 py-0.5 rounded hover:bg-surface-hover cursor-pointer"
-                              title="Send to Canvas"
-                            >
-                              <Workflow size={11} />
-                              <span>Canvas</span>
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                    <AiChatMessageView
+                      key={i}
+                      message={m}
+                      index={i}
+                      totalMessages={activeChat.messages.length}
+                      onVerseClick={navigateToVerse}
+                      onSendToCanvas={sendChatMessageToCanvas}
+                      chatTitle={activeChat?.title}
+                    />
                   ))
                 )}
                 {isAiTyping && (
@@ -2146,27 +2252,34 @@ export default function App() {
                         </button>
                       </div>
                     )}
-                    <div className="relative flex items-end">
-                      <button type="button" onClick={() => imageFileRef.current?.click()} disabled={cooldown > 0 || !isOnline} className="flex-shrink-0 p-2 text-muted hover:text-fg-hover disabled:opacity-40 transition-colors mr-1">
+                    <div className="relative flex items-end bg-surface border border-border-soft/80 rounded-2xl shadow-sm focus-within:border-accent/60 focus-within:ring-2 focus-within:ring-accent/20 transition-all p-1.5">
+                      <button 
+                        type="button" 
+                        onClick={() => imageFileRef.current?.click()} 
+                        disabled={cooldown > 0 || !isOnline} 
+                        className="flex-shrink-0 p-2 text-muted hover:text-fg disabled:opacity-40 transition-colors mr-1"
+                        title="Attach image"
+                      >
                         <Paperclip size={16} />
                       </button>
-                    <TextareaAutosize 
-                      minRows={1}
-                      maxRows={6}
-                      value={chatInput} 
-                      onChange={e => setChatInput(e.target.value)}
-                      onKeyDown={handleChatKeyDown}
-                      disabled={cooldown > 0 || !isOnline}
-                      placeholder={!isOnline ? "Study AI is unavailable offline" : cooldown > 0 ? `Study AI is resting... (${cooldown}s)` : "Message Study AI..."}
-                      className="flex-1 bg-surface text-fg rounded-[24px] pl-5 pr-12 py-3 text-[14px] focus:outline-none focus:ring-[3px] focus:ring-[rgba(56,152,236,0.3)] disabled:opacity-50 transition-all placeholder:text-meta resize-none overflow-hidden"
-                    />
-                    <button 
-                      type="submit" 
-                      disabled={isAiTyping || (!chatInput.trim() && !chatImage && chatQuotes.length === 0) || cooldown > 0 || !isOnline} 
-                      className="absolute right-1.5 bottom-1.5 p-2 bg-accent hover:bg-[#b5583b] text-white rounded-full disabled:opacity-50 disabled:hover:bg-accent transition-colors"
-                    >
-                      <Send size={16} />
-                    </button>
+                      <TextareaAutosize 
+                        minRows={1}
+                        maxRows={6}
+                        value={chatInput} 
+                        onChange={e => setChatInput(e.target.value)}
+                        onKeyDown={handleChatKeyDown}
+                        disabled={cooldown > 0 || !isOnline}
+                        placeholder={!isOnline ? "Study AI is unavailable offline" : cooldown > 0 ? `Study AI is resting... (${cooldown}s)` : "Message Study AI..."}
+                        className="flex-1 bg-transparent text-fg pl-1 pr-10 py-2 text-[14px] focus:outline-none disabled:opacity-50 transition-all placeholder:text-meta resize-none"
+                      />
+                      <button 
+                        type="submit" 
+                        disabled={isAiTyping || (!chatInput.trim() && !chatImage && chatQuotes.length === 0) || cooldown > 0 || !isOnline} 
+                        className="absolute right-2 bottom-2 p-2 bg-accent hover:bg-[#b5583b] text-white rounded-xl disabled:opacity-40 disabled:hover:bg-accent transition-all shadow-sm cursor-pointer"
+                        title="Send message"
+                      >
+                        <Send size={15} />
+                      </button>
                     </div>
                   </div>
                 </form>
@@ -2486,47 +2599,16 @@ export default function App() {
                       </div>
                     ) : (
                       activeChat.messages.map((m, i) => (
-                        <div key={i} className={`flex flex-col max-w-3xl w-full mx-auto ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
-                          {m.role === 'model' && <span className="text-[11px] text-muted mb-2 ml-1 font-semibold tracking-wide uppercase">Study AI</span>}
-                          <div className={`px-5 py-4 text-[15px] leading-[1.7] ${
-                            m.role === 'user' 
-                            ? 'bg-accent text-white rounded-[20px] rounded-br-sm shadow-sm' 
-                            : 'bg-surface text-fg rounded-[20px] rounded-bl-sm ring-1 ring-border-soft shadow-sm markdown-body'
-                          }`}>
-                            {(m as any).imagePreview && (
-                              <img src={(m as any).imagePreview} alt="attached" className="max-h-52 rounded-xl mb-3 object-contain" />
-                            )}
-                            {m.role === 'model' && i === activeChat.messages.length - 1 ? (
-                            <TypewriterMessage content={m.content} onVerseClick={navigateToVerse} />
-                          ) : (() => {
-                            const { imageBase64, textContent } = parseAiMessage(m.content);
-                            return (
-                              <>
-                                {imageBase64 && (
-                                  <div className="mb-3">
-                                    <img src={`data:image/png;base64,${imageBase64}`} alt="AI generated" className="rounded-xl max-w-full object-contain max-h-96 shadow-lg" />
-                                    <a href={`data:image/png;base64,${imageBase64}`} download="theologica-image.png" className="inline-flex items-center gap-1.5 mt-2 text-[11px] text-muted hover:text-fg-hover transition-colors">↓ Download image</a>
-                                  </div>
-                                )}
-                                {textContent ? <ReactMarkdown components={m.role === 'user' ? userMarkdownComponents : aiMarkdownComponents}>{textContent}</ReactMarkdown> : null}
-                              </>
-                            );
-                          })()}
-                          {m.role === 'model' && (
-                            <div className="flex items-center justify-end gap-1 mt-2.5 pt-2 border-t border-border/40">
-                              <button
-                                type="button"
-                                onClick={() => sendChatMessageToCanvas(m.content, activeChat?.title)}
-                                className="flex items-center gap-1.5 text-[11px] font-medium text-muted hover:text-accent transition-colors px-2 py-1 rounded-md hover:bg-surface-hover cursor-pointer"
-                                title="Send this theological insight to Canvas as a card"
-                              >
-                                <Workflow size={12} />
-                                <span>Send to Canvas</span>
-                              </button>
-                            </div>
-                          )}
-                          </div>
-                        </div>
+                        <AiChatMessageView
+                          key={i}
+                          message={m}
+                          index={i}
+                          totalMessages={activeChat.messages.length}
+                          onVerseClick={navigateToVerse}
+                          onSendToCanvas={sendChatMessageToCanvas}
+                          chatTitle={activeChat?.title}
+                          isFullView
+                        />
                       ))
                     )}
                     {isAiTyping && (
@@ -2585,27 +2667,34 @@ export default function App() {
                           </button>
                         </div>
                       )}
-                      <div className="relative flex items-end">
-                        <button type="button" onClick={() => imageFileRef.current?.click()} disabled={cooldown > 0} className="flex-shrink-0 p-2.5 text-muted hover:text-fg-hover disabled:opacity-40 transition-colors mr-1">
+                      <div className="relative flex items-end bg-surface border border-border-soft/80 rounded-2xl shadow-md focus-within:border-accent/60 focus-within:ring-2 focus-within:ring-accent/20 transition-all p-2">
+                        <button 
+                          type="button" 
+                          onClick={() => imageFileRef.current?.click()} 
+                          disabled={cooldown > 0} 
+                          className="flex-shrink-0 p-2.5 text-muted hover:text-fg disabled:opacity-40 transition-colors mr-1"
+                          title="Attach image"
+                        >
                           <Paperclip size={18} />
                         </button>
-                      <TextareaAutosize 
-                        minRows={1}
-                        maxRows={6}
-                        value={chatInput} 
-                        onChange={e => setChatInput(e.target.value)}
-                        onKeyDown={handleChatKeyDown}
-                        disabled={cooldown > 0}
-                        placeholder={cooldown > 0 ? `Study AI is resting... (${cooldown}s remaining)` : "Message Study AI..."}
-                        className="flex-1 bg-surface text-fg rounded-[26px] pl-6 pr-14 py-4 text-[15px] focus:outline-none focus:ring-[3px] focus:ring-[rgba(56,152,236,0.3)] disabled:opacity-50 transition-all placeholder:text-meta resize-none overflow-hidden"
-                      />
-                      <button 
-                        type="submit" 
-                        disabled={isAiTyping || (!chatInput.trim() && !chatImage && chatQuotes.length === 0) || cooldown > 0} 
-                        className="absolute right-2 bottom-2 p-2.5 bg-accent hover:bg-[#b5583b] text-white rounded-full disabled:opacity-50 disabled:hover:bg-accent transition-colors"
-                      >
-                        <Send size={16} />
-                      </button>
+                        <TextareaAutosize 
+                          minRows={1}
+                          maxRows={6}
+                          value={chatInput} 
+                          onChange={e => setChatInput(e.target.value)}
+                          onKeyDown={handleChatKeyDown}
+                          disabled={cooldown > 0}
+                          placeholder={cooldown > 0 ? `Study AI is resting... (${cooldown}s remaining)` : "Message Study AI..."}
+                          className="flex-1 bg-transparent text-fg pl-1 pr-14 py-2 text-[15px] focus:outline-none disabled:opacity-50 transition-all placeholder:text-meta resize-none"
+                        />
+                        <button 
+                          type="submit" 
+                          disabled={isAiTyping || (!chatInput.trim() && !chatImage && chatQuotes.length === 0) || cooldown > 0} 
+                          className="absolute right-2.5 bottom-2.5 p-2.5 bg-accent hover:bg-[#b5583b] text-white rounded-xl disabled:opacity-40 disabled:hover:bg-accent transition-all shadow-sm cursor-pointer"
+                          title="Send message"
+                        >
+                          <Send size={16} />
+                        </button>
                       </div>
                     </div>
                   </form>
