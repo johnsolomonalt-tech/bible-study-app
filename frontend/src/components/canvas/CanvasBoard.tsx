@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useAuth } from '@clerk/nextjs';
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -27,7 +28,6 @@ import { CustomCanvasEdge } from './CustomCanvasEdge';
 import { CanvasToolbar } from './CanvasToolbar';
 import { CanvasSidebar } from './CanvasSidebar';
 import { TheologicaAiCanvasModal } from './TheologicaAiCanvasModal';
-import { AddVerseToCanvasModal } from './AddVerseToCanvasModal';
 import {
   NodeCategory,
   CanvasNodeData,
@@ -203,8 +203,29 @@ function InnerCanvasBoard({
   const currentViewportRef = useRef<{ x: number; y: number; zoom: number } | null>(null);
   const isDark = theme === 'dark';
   const mod = useModifierKey();
-  const [isAddVerseModalOpen, setIsAddVerseModalOpen] = useState(false);
+  const { getToken, userId, isSignedIn } = useAuth();
   const [isMobile, setIsMobile] = useState(false);
+
+  const fetchWithAuth = useCallback(
+    async (url: string, init?: RequestInit) => {
+      try {
+        const token = await getToken();
+        const headers: Record<string, string> = {
+          ...((init?.headers as Record<string, string>) || {}),
+        };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        return fetch(url, {
+          ...init,
+          headers,
+        });
+      } catch {
+        return fetch(url, init);
+      }
+    },
+    [getToken]
+  );
 
   useEffect(() => {
     const checkMobile = () => {
@@ -765,7 +786,7 @@ function InnerCanvasBoard({
       });
 
       // 3. Background sync to API (safe offline fallback)
-      fetch('/api/canvas', {
+      fetchWithAuth('/api/canvas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -785,7 +806,7 @@ function InnerCanvasBoard({
       console.error('Error saving board immediately:', err);
       setSaveStatus('unsaved');
     }
-  }, [toSerializableNodes, toSerializableEdges, getViewport]);
+  }, [toSerializableNodes, toSerializableEdges, getViewport, fetchWithAuth]);
 
   // Manual save trigger (e.g. Cmd+S or save button)
   const handleManualSave = useCallback(() => {
@@ -822,6 +843,7 @@ function InnerCanvasBoard({
     let loadedEdges: SerializableEdge[] = [];
     let loadedTitle = 'Untitled Canvas';
     let foundLocalData = false;
+    let localUpdatedAt: string | null = null;
     let savedViewport: { x: number; y: number; zoom: number } | null = null;
 
     // Check boards list for metadata title
@@ -833,10 +855,13 @@ function InnerCanvasBoard({
         if (matched?.title) {
           loadedTitle = matched.title;
         }
+        if (matched?.updatedAt) {
+          localUpdatedAt = matched.updatedAt;
+        }
       }
     } catch {}
 
-    // 1. Try local storage
+    // 1. Try local storage for instant 0ms render
     try {
       const local = localStorage.getItem(`${STORAGE_KEY_BOARD_PREFIX}${boardId}`);
       if (local) {
@@ -845,6 +870,7 @@ function InnerCanvasBoard({
         loadedNodes = parsed.nodes || [];
         loadedEdges = parsed.edges || [];
         if (parsed.title) loadedTitle = parsed.title;
+        if (parsed.updatedAt) localUpdatedAt = parsed.updatedAt;
         if (parsed.viewport && typeof parsed.viewport.zoom === 'number' && parsed.viewport.zoom >= 0.2) {
           savedViewport = parsed.viewport;
           currentViewportRef.current = savedViewport;
@@ -854,7 +880,7 @@ function InnerCanvasBoard({
       console.warn('LocalStorage canvas parse error:', e);
     }
 
-    // Set state & refs
+    // Set state & refs immediately
     const pNodes = loadedNodes.map(prepareNode);
     const pEdges = loadedEdges.map(prepareEdge);
 
@@ -876,42 +902,52 @@ function InnerCanvasBoard({
     isBoardLoadingRef.current = false;
     setSaveStatus('saved');
 
-    // 2. Fetch remote update in background if local didn't exist
-    if (!foundLocalData && boardId) {
+    // 2. Fetch remote update in background from PostgreSQL database
+    if (boardId) {
       try {
-        const res = await fetch(`/api/canvas?id=${boardId}`);
+        const res = await fetchWithAuth(`/api/canvas?id=${boardId}`);
         if (res.ok) {
           const remote = await res.json();
-          if (remote && remote.id === boardId) {
-            const rNodes = (remote.nodes || []).map(prepareNode);
-            const rEdges = (remote.edges || []).map(prepareEdge);
-            const rTitle = remote.title || loadedTitle;
-            if (remote.viewport && typeof remote.viewport.zoom === 'number' && remote.viewport.zoom >= 0.2) {
-              savedViewport = remote.viewport;
-              currentViewportRef.current = savedViewport;
+          if (remote && remote.id === boardId && activeBoardIdRef.current === boardId) {
+            const remoteTime = remote.updatedAt ? new Date(remote.updatedAt).getTime() : 0;
+            const localTime = localUpdatedAt ? new Date(localUpdatedAt).getTime() : 0;
+            const isRemoteNewer = !foundLocalData || (remoteTime > localTime);
+
+            if (isRemoteNewer && !isDirtyRef.current) {
+              const rNodes = (remote.nodes || []).map(prepareNode);
+              const rEdges = (remote.edges || []).map(prepareEdge);
+              const rTitle = remote.title || loadedTitle;
+              let rViewport = savedViewport;
+              if (remote.viewport && typeof remote.viewport.zoom === 'number' && remote.viewport.zoom >= 0.2) {
+                rViewport = remote.viewport;
+                currentViewportRef.current = rViewport;
+              }
+              setNodes(rNodes);
+              setEdges(rEdges);
+              setBoardTitle(rTitle);
+              nodesRef.current = rNodes;
+              edgesRef.current = rEdges;
+              boardTitleRef.current = rTitle;
+              historyRef.current = [{
+                nodes: toSerializableNodes(rNodes),
+                edges: toSerializableEdges(rEdges),
+              }];
+              historyIndexRef.current = 0;
+              updateHistoryState();
+              try {
+                localStorage.setItem(`${STORAGE_KEY_BOARD_PREFIX}${boardId}`, JSON.stringify({
+                  id: boardId,
+                  title: rTitle,
+                  nodes: remote.nodes || [],
+                  edges: remote.edges || [],
+                  viewport: rViewport || undefined,
+                  updatedAt: remote.updatedAt || new Date().toISOString(),
+                }));
+              } catch {}
+              if (rViewport && typeof rViewport.zoom === 'number' && rViewport.zoom >= 0.25) {
+                setViewport(rViewport, { duration: 300 });
+              }
             }
-            setNodes(rNodes);
-            setEdges(rEdges);
-            setBoardTitle(rTitle);
-            nodesRef.current = rNodes;
-            edgesRef.current = rEdges;
-            boardTitleRef.current = rTitle;
-            historyRef.current = [{
-              nodes: toSerializableNodes(rNodes),
-              edges: toSerializableEdges(rEdges),
-            }];
-            historyIndexRef.current = 0;
-            updateHistoryState();
-            try {
-              localStorage.setItem(`${STORAGE_KEY_BOARD_PREFIX}${boardId}`, JSON.stringify({
-                id: boardId,
-                title: rTitle,
-                nodes: remote.nodes || [],
-                edges: remote.edges || [],
-                viewport: savedViewport || undefined,
-                updatedAt: remote.updatedAt || new Date().toISOString(),
-              }));
-            } catch {}
           }
         }
       } catch {
@@ -926,7 +962,7 @@ function InnerCanvasBoard({
         fitView({ padding: 0.25, duration: 500, minZoom: 0.35, maxZoom: 1.1 });
       }
     }, 120);
-  }, [fitView, setViewport, prepareEdge, prepareNode, toSerializableEdges, toSerializableNodes, updateHistoryState, setNodes, setEdges]);
+  }, [fetchWithAuth, fitView, setViewport, prepareEdge, prepareNode, toSerializableEdges, toSerializableNodes, updateHistoryState, setNodes, setEdges]);
 
   // Load boards list and initial board on mount with smart-merge
   useEffect(() => {
@@ -993,7 +1029,7 @@ function InnerCanvasBoard({
     }
 
     // 3. Fetch boards list from API and SMART-MERGE (never delete user's local boards!)
-    fetch('/api/canvas?list=true')
+    fetchWithAuth('/api/canvas?list=true')
       .then((res) => res.json())
       .then((remoteList) => {
         if (Array.isArray(remoteList)) {
@@ -1017,12 +1053,65 @@ function InnerCanvasBoard({
             try {
               localStorage.setItem(STORAGE_KEY_BOARDS_LIST, JSON.stringify(merged));
             } catch {}
+
+            // If active board wasn't set or was empty, auto-select first available board
+            if (!activeBoardIdRef.current && merged.length > 0) {
+              const firstId = merged[0].id;
+              activeBoardIdRef.current = firstId;
+              setActiveBoardId(firstId);
+              try {
+                localStorage.setItem(STORAGE_KEY_ACTIVE_BOARD, firstId);
+              } catch {}
+              loadBoardData(firstId);
+            }
+
             return merged;
           });
         }
       })
       .catch(() => {});
-  }, [loadBoardData, updateHistoryState, setNodes, setEdges]); // Run once on mount
+  }, [loadBoardData, updateHistoryState, setNodes, setEdges, fetchWithAuth]); // Run on mount
+
+  // 4. Re-sync boards whenever user signs in or auth state updates
+  useEffect(() => {
+    if (!isSignedIn) return;
+    fetchWithAuth('/api/canvas?list=true')
+      .then((res) => res.json())
+      .then((remoteList) => {
+        if (Array.isArray(remoteList)) {
+          const cleanedRemote = remoteList.filter((b: CanvasBoardMetadata) => !(b.id === 'default' && b.title === 'Romans 8 Study'));
+          setBoards((prev) => {
+            const map = new Map<string, CanvasBoardMetadata>();
+            cleanedRemote.forEach((b: CanvasBoardMetadata) => {
+              if (b?.id) map.set(b.id, b);
+            });
+            prev.forEach((b: CanvasBoardMetadata) => {
+              if (!b?.id) return;
+              const existing = map.get(b.id);
+              if (!existing || (b.updatedAt && (!existing.updatedAt || new Date(b.updatedAt) >= new Date(existing.updatedAt)))) {
+                map.set(b.id, b);
+              }
+            });
+            const merged = Array.from(map.values());
+            try {
+              localStorage.setItem(STORAGE_KEY_BOARDS_LIST, JSON.stringify(merged));
+            } catch {}
+
+            if (!activeBoardIdRef.current && merged.length > 0) {
+              const firstId = merged[0].id;
+              activeBoardIdRef.current = firstId;
+              setActiveBoardId(firstId);
+              try {
+                localStorage.setItem(STORAGE_KEY_ACTIVE_BOARD, firstId);
+              } catch {}
+              loadBoardData(firstId);
+            }
+            return merged;
+          });
+        }
+      })
+      .catch(() => {});
+  }, [userId, isSignedIn, fetchWithAuth, loadBoardData]);
 
   // Sync theme changes to nodes
   useEffect(() => {
@@ -1182,7 +1271,7 @@ function InnerCanvasBoard({
     setSaveStatus('saved');
 
     // 6. Sync new board to API
-    fetch('/api/canvas', {
+    fetchWithAuth('/api/canvas', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1194,7 +1283,7 @@ function InnerCanvasBoard({
     }).catch(() => {});
 
     return newId;
-  }, [saveBoardImmediate, updateHistoryState, setNodes, setEdges]);
+  }, [saveBoardImmediate, updateHistoryState, setNodes, setEdges, fetchWithAuth]);
 
   const handleRenameBoard = useCallback((id: string, newTitle: string) => {
     const trimmed = newTitle.trim() || 'Untitled Canvas';
@@ -1224,7 +1313,7 @@ function InnerCanvasBoard({
           localStorage.setItem(`${STORAGE_KEY_BOARD_PREFIX}${id}`, JSON.stringify(parsed));
 
           // Sync to API with inactive board's own nodes (never active board's nodes!)
-          fetch('/api/canvas', {
+          fetchWithAuth('/api/canvas', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1239,7 +1328,7 @@ function InnerCanvasBoard({
         console.warn('Failed to rename inactive board in storage:', e);
       }
     }
-  }, [saveBoardImmediate]);
+  }, [saveBoardImmediate, fetchWithAuth]);
 
   const handleDeleteBoard = useCallback((id: string) => {
     let nextBoardsList: CanvasBoardMetadata[] = [];
@@ -1254,7 +1343,7 @@ function InnerCanvasBoard({
     });
 
     // Delete from API
-    fetch(`/api/canvas?id=${id}`, { method: 'DELETE' }).catch(() => {});
+    fetchWithAuth(`/api/canvas?id=${id}`, { method: 'DELETE' }).catch(() => {});
 
     // If active was deleted
     if (id === activeBoardIdRef.current) {
@@ -1403,61 +1492,6 @@ function InnerCanvasBoard({
       return next;
     });
   }, [handleCreateBoard, theme, onNavigateToVerse, handleUpdateNode, handleDuplicateNode, handleDeleteNode, pushSnapshot, setNodes, isMobile]);
-
-  // Add scripture verse directly to canvas from lookup modal
-  const handleAddVerse = useCallback((verseData: { title: string; content: string; reference: string }) => {
-    if (!activeBoardIdRef.current) {
-      handleCreateBoard(verseData.title);
-    }
-
-    const timestamp = Date.now();
-    const newId = `card-verse-${timestamp}`;
-    const cardWidth = isMobile ? 310 : 380;
-
-    let posX = 200;
-    let posY = 200;
-
-    if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const centerPos = screenToFlowPosition({
-        x: rect.left + rect.width / 2,
-        y: rect.top + rect.height / 2,
-      });
-      posX = Math.round(centerPos.x - cardWidth / 2);
-      posY = Math.round(centerPos.y - 120);
-    } else if (nodesRef.current.length > 0) {
-      const last = nodesRef.current[nodesRef.current.length - 1];
-      posX = last.position.x + 60;
-      posY = last.position.y + 60;
-    }
-
-    const newNode: Node<CanvasNodeData> = {
-      id: newId,
-      type: 'customCard',
-      position: { x: posX, y: posY },
-      selected: true,
-      style: { width: cardWidth },
-      data: {
-        title: verseData.title,
-        content: verseData.content,
-        category: 'scripture',
-        theme,
-        onVerseClick: onNavigateToVerse,
-        onUpdate: handleUpdateNode,
-        onDuplicate: handleDuplicateNode,
-        onDelete: handleDeleteNode,
-      },
-    };
-
-    setNodes((nds) => {
-      const next: Node<CanvasNodeData>[] = [
-        ...nds.map((n) => ({ ...n, selected: false })),
-        newNode,
-      ];
-      pushSnapshot(next, edgesRef.current);
-      return next;
-    });
-  }, [handleCreateBoard, theme, onNavigateToVerse, handleUpdateNode, handleDuplicateNode, handleDeleteNode, pushSnapshot, setNodes, screenToFlowPosition, isMobile]);
 
   // Connecting edges
   const onConnect = useCallback((connection: Connection) => {
@@ -1750,7 +1784,6 @@ function InnerCanvasBoard({
         boardTitle={boardTitle}
         onTitleChange={(t) => handleRenameBoard(activeBoardId, t)}
         onAddNode={handleAddNode}
-        onOpenAddVerse={() => setIsAddVerseModalOpen(true)}
         onOpenAi={() => setIsAiModalOpen(true)}
         onUndo={handleUndo}
         onRedo={handleRedo}
@@ -1974,21 +2007,6 @@ function InnerCanvasBoard({
             </div>
           ) : (
             <>
-              {/* Add Scripture Verse */}
-              <button
-                type="button"
-                onClick={() => {
-                  setPaneContextMenu(null);
-                  setIsAddVerseModalOpen(true);
-                }}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-                  isDark ? 'hover:bg-zinc-800 text-amber-300' : 'hover:bg-amber-50 text-amber-700'
-                }`}
-              >
-                <BookOpen size={16} className="text-amber-400 shrink-0" />
-                <span>Add Bible Verse...</span>
-              </button>
-
               {/* Add Card Submenu */}
               <div>
                 <button
@@ -2014,12 +2032,8 @@ function InnerCanvasBoard({
                           key={cat}
                           type="button"
                           onClick={() => {
-                            if (cat === 'scripture') {
-                              setIsAddVerseModalOpen(true);
-                            } else {
-                              const flowPos = screenToFlowPosition({ x: paneContextMenu.x, y: paneContextMenu.y });
-                              handleAddNode(cat, flowPos);
-                            }
+                            const flowPos = screenToFlowPosition({ x: paneContextMenu.x, y: paneContextMenu.y });
+                            handleAddNode(cat, flowPos);
                             setPaneContextMenu(null);
                           }}
                           className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors cursor-pointer text-left ${
@@ -2158,14 +2172,6 @@ function InnerCanvasBoard({
         currentGraph={currentGraphPayload}
         selectedNode={selectedNode}
         onApplyGraphUpdate={handleApplyAiGraph}
-        theme={theme}
-      />
-
-      {/* Add Scripture Verse Modal */}
-      <AddVerseToCanvasModal
-        isOpen={isAddVerseModalOpen}
-        onClose={() => setIsAddVerseModalOpen(false)}
-        onAddVerse={handleAddVerse}
         theme={theme}
       />
     </div>

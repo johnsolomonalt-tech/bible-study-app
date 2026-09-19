@@ -196,10 +196,17 @@ export function TheologicaAiCanvasModal({
         onApplyGraphUpdate(data.nodes, data.edges || [], data.explanation, data.boardTitle, activeMode);
       }
 
-      if (data.synthesis) {
+      // Suppress full-screen summary popup on mobile devices and on non-synthesize modes
+      const isMobileDevice = typeof window !== 'undefined' && (
+        window.innerWidth < 768 || 
+        window.matchMedia('(max-width: 768px)').matches || 
+        'ontouchstart' in window
+      );
+
+      if (data.synthesis && activeMode === 'synthesize' && !isMobileDevice) {
         setSynthesisResult(data.synthesis);
       } else {
-        // Auto-close on success if purely node graph generation
+        // Auto-close immediately on success so the user can directly see and interact with their canvas
         onClose();
       }
     } catch (err: any) {

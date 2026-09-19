@@ -55,3 +55,18 @@ model Highlight {
   color     String
   createdAt DateTime @default(now())
 }
+
+model Canvas {
+  id        String   @id @default(cuid())
+  boardId   String
+  userId    String   @default("legacy")
+  title     String   @default("Untitled Canvas")
+  nodes     Json     @default("[]")
+  edges     Json     @default("[]")
+  viewport  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, boardId])
+  @@index([userId])
+}
