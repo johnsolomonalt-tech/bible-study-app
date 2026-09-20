@@ -9,12 +9,14 @@ interface TranslationSelectorProps {
   currentTranslation: string;
   onSelectTranslation: (versionId: string) => void;
   className?: string;
+  theme?: 'dark' | 'light';
 }
 
 export function TranslationSelector({
   currentTranslation,
   onSelectTranslation,
   className = '',
+  theme,
 }: TranslationSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLegalModalOpen, setIsLegalModalOpen] = useState(false);
@@ -233,8 +235,8 @@ export function TranslationSelector({
               }}
               className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-[11px] font-medium text-meta hover:text-fg hover:bg-fg/5 transition-colors cursor-pointer"
             >
-              <ShieldCheck size={13} className="text-amber-500" />
-              <span>Scripture Attributions & Legal Notices</span>
+              <ShieldCheck size={13} className="text-accent" />
+              <span>Scripture Attributions</span>
             </button>
           </div>
         </div>
@@ -244,6 +246,7 @@ export function TranslationSelector({
       <LegalNoticeModal
         isOpen={isLegalModalOpen}
         onClose={() => setIsLegalModalOpen(false)}
+        theme={theme}
       />
     </div>
   );

@@ -1844,7 +1844,8 @@ export default function App() {
                   </button>
                   <TranslationSelector 
                     currentTranslation={translation} 
-                    onSelectTranslation={setTranslation} 
+                    onSelectTranslation={setTranslation}
+                    theme={theme as 'dark' | 'light'}
                   />
                 </div>
               </header>
@@ -1883,15 +1884,11 @@ export default function App() {
                     )}
                   </p>
 
-                  {/* Scripture Copyright Attribution Notice */}
+                  {/* Scripture Attribution Footnote */}
                   {chapterCopyright && (
-                    <footer className="mt-10 pt-4 pb-6 border-t border-border/40 text-meta space-y-1 select-none">
-                      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-fg-2 uppercase tracking-wider">
-                        <ShieldCheck size={12} className="text-accent" />
-                        <span>Scripture Attribution &bull; {translation.toUpperCase()}</span>
-                      </div>
-                      <p className="text-xs font-serif leading-relaxed text-meta/90">
-                        {chapterCopyright}
+                    <footer className="mt-8 pt-3 pb-4 border-t border-border-soft/50 text-fg-2 select-none">
+                      <p className="text-[11px] font-sans leading-relaxed text-fg-2/90">
+                        <span className="font-semibold text-fg">{translation.toUpperCase()}:</span> {chapterCopyright}
                       </p>
                     </footer>
                   )}
@@ -2115,7 +2112,8 @@ export default function App() {
                   <div className="hidden lg:block h-6 w-px bg-surface"></div>
                   <TranslationSelector 
                     currentTranslation={translation} 
-                    onSelectTranslation={setTranslation} 
+                    onSelectTranslation={setTranslation}
+                    theme={theme as 'dark' | 'light'}
                   />
                   <div className="hidden lg:flex items-center bg-surface rounded-lg p-0.5">
                     <button onClick={() => setShowLeftSidebar(!showLeftSidebar)} className={`p-1.5 rounded-md transition-colors ${showLeftSidebar ? 'text-fg hover:bg-border-soft' : 'text-muted hover:text-fg'}`} title="Toggle Navigation">
@@ -2164,15 +2162,11 @@ export default function App() {
                     )}
                   </p>
 
-                  {/* Scripture Copyright Attribution Notice */}
+                  {/* Scripture Attribution Footnote */}
                   {chapterCopyright && (
-                    <footer className="mt-10 pt-4 pb-6 border-t border-border/40 text-meta space-y-1 select-none">
-                      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-fg-2 uppercase tracking-wider">
-                        <ShieldCheck size={12} className="text-accent" />
-                        <span>Scripture Attribution &bull; {translation.toUpperCase()}</span>
-                      </div>
-                      <p className="text-xs font-serif leading-relaxed text-meta/90">
-                        {chapterCopyright}
+                    <footer className="mt-8 pt-3 pb-4 border-t border-border-soft/50 text-fg-2 select-none">
+                      <p className="text-[11px] font-sans leading-relaxed text-fg-2/90">
+                        <span className="font-semibold text-fg">{translation.toUpperCase()}:</span> {chapterCopyright}
                       </p>
                     </footer>
                   )}

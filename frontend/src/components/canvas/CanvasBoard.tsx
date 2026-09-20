@@ -217,11 +217,15 @@ function InnerCanvasBoard({
           headers['Authorization'] = `Bearer ${token}`;
         }
         return fetch(url, {
+          credentials: 'include',
           ...init,
           headers,
         });
       } catch {
-        return fetch(url, init);
+        return fetch(url, {
+          credentials: 'include',
+          ...init,
+        });
       }
     },
     [getToken]
@@ -301,18 +305,20 @@ function InnerCanvasBoard({
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [aiToast, setAiToast] = useState<{ message: string; count: number } | null>(null);
 
-  // Keep references to latest nodes, edges, activeBoardId, boardTitle, and state flags
+  // Keep references to latest nodes, edges, activeBoardId, boardTitle, boards, and state flags
   const nodesRef = useRef<Node<CanvasNodeData>[]>([]);
   const edgesRef = useRef<Edge[]>([]);
   const activeBoardIdRef = useRef<string>('');
   const boardTitleRef = useRef<string>('');
   const isBoardLoadingRef = useRef<boolean>(false);
   const isDirtyRef = useRef<boolean>(false);
+  const boardsRef = useRef<CanvasBoardMetadata[]>([]);
 
   nodesRef.current = nodes;
   edgesRef.current = edges;
   activeBoardIdRef.current = activeBoardId;
   boardTitleRef.current = boardTitle;
+  boardsRef.current = boards;
 
   // Undo / Redo history engine
   const historyRef = useRef<HistorySnapshot[]>([]);
@@ -395,6 +401,10 @@ function InnerCanvasBoard({
     historyRef.current = trimmed;
     historyIndexRef.current = trimmed.length - 1;
     updateHistoryState();
+
+    if (!isBoardLoadingRef.current) {
+      isDirtyRef.current = true;
+    }
   }, [toSerializableNodes, toSerializableEdges, updateHistoryState]);
 
   // Node action callbacks (memoized with stable references)
@@ -899,9 +909,6 @@ function InnerCanvasBoard({
     historyIndexRef.current = 0;
     updateHistoryState();
 
-    isBoardLoadingRef.current = false;
-    setSaveStatus('saved');
-
     // 2. Fetch remote update in background from PostgreSQL database
     if (boardId) {
       try {
@@ -911,7 +918,9 @@ function InnerCanvasBoard({
           if (remote && remote.id === boardId && activeBoardIdRef.current === boardId) {
             const remoteTime = remote.updatedAt ? new Date(remote.updatedAt).getTime() : 0;
             const localTime = localUpdatedAt ? new Date(localUpdatedAt).getTime() : 0;
-            const isRemoteNewer = !foundLocalData || (remoteTime > localTime);
+            const hasRemoteCards = Array.isArray(remote.nodes) && remote.nodes.length > 0;
+            const hasLocalCards = pNodes.length > 0;
+            const isRemoteNewer = !foundLocalData || (remoteTime >= localTime) || (!hasLocalCards && hasRemoteCards);
 
             if (isRemoteNewer && !isDirtyRef.current) {
               const rNodes = (remote.nodes || []).map(prepareNode);
@@ -952,7 +961,15 @@ function InnerCanvasBoard({
         }
       } catch {
         // Offline fallback
+      } finally {
+        isBoardLoadingRef.current = false;
+        isDirtyRef.current = false;
+        setSaveStatus('saved');
       }
+    } else {
+      isBoardLoadingRef.current = false;
+      isDirtyRef.current = false;
+      setSaveStatus('saved');
     }
 
     setTimeout(() => {
@@ -964,16 +981,60 @@ function InnerCanvasBoard({
     }, 120);
   }, [fetchWithAuth, fitView, setViewport, prepareEdge, prepareNode, toSerializableEdges, toSerializableNodes, updateHistoryState, setNodes, setEdges]);
 
-  // Load boards list and initial board on mount with smart-merge
+  // Core remote boards synchronization engine
+  const syncBoardsWithRemote = useCallback((remoteList: unknown) => {
+    if (!Array.isArray(remoteList)) return;
+    const cleanedRemote = remoteList.filter(
+      (b: CanvasBoardMetadata) => b?.id && !(b.id === 'default' && b.title === 'Romans 8 Study')
+    );
+
+    const map = new Map<string, CanvasBoardMetadata>();
+    cleanedRemote.forEach((b) => map.set(b.id, b));
+
+    // Local items take precedence if updated more recently or newly created
+    boardsRef.current.forEach((b) => {
+      if (!b?.id) return;
+      const existing = map.get(b.id);
+      if (!existing || (b.updatedAt && (!existing.updatedAt || new Date(b.updatedAt) >= new Date(existing.updatedAt)))) {
+        map.set(b.id, b);
+      }
+    });
+
+    const mergedList = Array.from(map.values());
+    boardsRef.current = mergedList;
+    setBoards(mergedList);
+    try {
+      localStorage.setItem(STORAGE_KEY_BOARDS_LIST, JSON.stringify(mergedList));
+    } catch {}
+
+    const currentActive = activeBoardIdRef.current;
+    const hasActiveInList = currentActive && mergedList.some((b) => b.id === currentActive);
+
+    // If no active board, or active board not in list, or current canvas is empty:
+    // pick the first cloud board
+    if ((!currentActive || !hasActiveInList || nodesRef.current.length === 0) && mergedList.length > 0) {
+      const targetId = mergedList[0].id;
+      activeBoardIdRef.current = targetId;
+      setActiveBoardId(targetId);
+      try {
+        localStorage.setItem(STORAGE_KEY_ACTIVE_BOARD, targetId);
+      } catch {}
+      loadBoardData(targetId);
+    } else if (currentActive && !isDirtyRef.current) {
+      // Re-load to check if remote has newer edits from another device
+      loadBoardData(currentActive);
+    }
+  }, [loadBoardData]);
+
+  // 1. Load boards list and initial board on mount
   useEffect(() => {
-    // 1. Read initial boards index from localStorage
+    // Read initial boards index from localStorage
     let initialBoards: CanvasBoardMetadata[] = [];
     try {
       const localList = localStorage.getItem(STORAGE_KEY_BOARDS_LIST);
       if (localList) {
         const parsed = JSON.parse(localList);
         if (Array.isArray(parsed)) {
-          // If the list only has the old canned demo 'default' with 'Romans 8 Study', purge it!
           initialBoards = parsed.filter((b) => !(b.id === 'default' && b.title === 'Romans 8 Study'));
           if (initialBoards.length !== parsed.length) {
             localStorage.setItem(STORAGE_KEY_BOARDS_LIST, JSON.stringify(initialBoards));
@@ -981,12 +1042,11 @@ function InnerCanvasBoard({
           }
         }
       }
-    } catch {
-      // Ignore
-    }
+    } catch {}
     setBoards(initialBoards);
+    boardsRef.current = initialBoards;
 
-    // 2. Read initial active board ID from localStorage
+    // Read initial active board ID from localStorage
     let savedActiveId = localStorage.getItem(STORAGE_KEY_ACTIVE_BOARD) || '';
     if (savedActiveId === 'default' && !initialBoards.some((b) => b.id === 'default')) {
       savedActiveId = initialBoards.length > 0 ? initialBoards[0].id : '';
@@ -1028,90 +1088,48 @@ function InnerCanvasBoard({
       } catch {}
     }
 
-    // 3. Fetch boards list from API and SMART-MERGE (never delete user's local boards!)
+    // Fetch boards list from cloud API and merge
     fetchWithAuth('/api/canvas?list=true')
       .then((res) => res.json())
-      .then((remoteList) => {
-        if (Array.isArray(remoteList)) {
-          // Filter out any canned Romans 8 Study from remoteList too
-          const cleanedRemote = remoteList.filter((b: CanvasBoardMetadata) => !(b.id === 'default' && b.title === 'Romans 8 Study'));
-          setBoards((prev) => {
-            const map = new Map<string, CanvasBoardMetadata>();
-            // Remote items
-            cleanedRemote.forEach((b: CanvasBoardMetadata) => {
-              if (b?.id) map.set(b.id, b);
-            });
-            // Local items take precedence if updated more recently or newly created
-            prev.forEach((b: CanvasBoardMetadata) => {
-              if (!b?.id) return;
-              const existing = map.get(b.id);
-              if (!existing || (b.updatedAt && (!existing.updatedAt || new Date(b.updatedAt) >= new Date(existing.updatedAt)))) {
-                map.set(b.id, b);
-              }
-            });
-            const merged = Array.from(map.values());
-            try {
-              localStorage.setItem(STORAGE_KEY_BOARDS_LIST, JSON.stringify(merged));
-            } catch {}
-
-            // If active board wasn't set or was empty, auto-select first available board
-            if (!activeBoardIdRef.current && merged.length > 0) {
-              const firstId = merged[0].id;
-              activeBoardIdRef.current = firstId;
-              setActiveBoardId(firstId);
-              try {
-                localStorage.setItem(STORAGE_KEY_ACTIVE_BOARD, firstId);
-              } catch {}
-              loadBoardData(firstId);
-            }
-
-            return merged;
-          });
-        }
-      })
+      .then(syncBoardsWithRemote)
       .catch(() => {});
-  }, [loadBoardData, updateHistoryState, setNodes, setEdges, fetchWithAuth]); // Run on mount
+  }, [loadBoardData, updateHistoryState, setNodes, setEdges, fetchWithAuth, syncBoardsWithRemote]);
 
-  // 4. Re-sync boards whenever user signs in or auth state updates
+  // 2. Cloud sync when switching to or opening the canvas tab
+  useEffect(() => {
+    if (!isActiveTab) return;
+    fetchWithAuth('/api/canvas?list=true')
+      .then((res) => res.json())
+      .then(syncBoardsWithRemote)
+      .catch(() => {});
+  }, [isActiveTab, fetchWithAuth, syncBoardsWithRemote]);
+
+  // 3. Re-sync boards whenever user signs in or auth state updates
   useEffect(() => {
     if (!isSignedIn) return;
     fetchWithAuth('/api/canvas?list=true')
       .then((res) => res.json())
-      .then((remoteList) => {
-        if (Array.isArray(remoteList)) {
-          const cleanedRemote = remoteList.filter((b: CanvasBoardMetadata) => !(b.id === 'default' && b.title === 'Romans 8 Study'));
-          setBoards((prev) => {
-            const map = new Map<string, CanvasBoardMetadata>();
-            cleanedRemote.forEach((b: CanvasBoardMetadata) => {
-              if (b?.id) map.set(b.id, b);
-            });
-            prev.forEach((b: CanvasBoardMetadata) => {
-              if (!b?.id) return;
-              const existing = map.get(b.id);
-              if (!existing || (b.updatedAt && (!existing.updatedAt || new Date(b.updatedAt) >= new Date(existing.updatedAt)))) {
-                map.set(b.id, b);
-              }
-            });
-            const merged = Array.from(map.values());
-            try {
-              localStorage.setItem(STORAGE_KEY_BOARDS_LIST, JSON.stringify(merged));
-            } catch {}
-
-            if (!activeBoardIdRef.current && merged.length > 0) {
-              const firstId = merged[0].id;
-              activeBoardIdRef.current = firstId;
-              setActiveBoardId(firstId);
-              try {
-                localStorage.setItem(STORAGE_KEY_ACTIVE_BOARD, firstId);
-              } catch {}
-              loadBoardData(firstId);
-            }
-            return merged;
-          });
-        }
-      })
+      .then(syncBoardsWithRemote)
       .catch(() => {});
-  }, [userId, isSignedIn, fetchWithAuth, loadBoardData]);
+  }, [userId, isSignedIn, fetchWithAuth, syncBoardsWithRemote]);
+
+  // 4. Auto sync when device/tab becomes visible or regains window focus
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && isActiveTab) {
+        fetchWithAuth('/api/canvas?list=true')
+          .then((res) => res.json())
+          .then(syncBoardsWithRemote)
+          .catch(() => {});
+      }
+    };
+    window.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleVisibility);
+    return () => {
+      window.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleVisibility);
+    };
+  }, [isActiveTab, fetchWithAuth, syncBoardsWithRemote]);
 
   // Sync theme changes to nodes
   useEffect(() => {
@@ -1131,8 +1149,8 @@ function InnerCanvasBoard({
 
   // Synchronous auto-save debounce for current board
   useEffect(() => {
-    // Never auto-save while loading a board or if no active board exists
-    if (isBoardLoadingRef.current || !activeBoardId) return;
+    // Only auto-save if board is not currently loading, an active board exists, and user explicitly edited the board
+    if (isBoardLoadingRef.current || !activeBoardId || !isDirtyRef.current) return;
 
     // Keep refs in sync
     nodesRef.current = nodes;
@@ -1140,14 +1158,12 @@ function InnerCanvasBoard({
     boardTitleRef.current = boardTitle;
     activeBoardIdRef.current = activeBoardId;
 
-    // Mark as dirty
-    isDirtyRef.current = true;
     setSaveStatus('saving');
 
     const timer = setTimeout(() => {
-      if (isBoardLoadingRef.current || !activeBoardId) return;
+      if (isBoardLoadingRef.current || !activeBoardId || !isDirtyRef.current) return;
       saveBoardImmediate(activeBoardId, boardTitle, nodes, edges);
-    }, 600);
+    }, 800);
 
     return () => clearTimeout(timer);
   }, [nodes, edges, boardTitle, activeBoardId, saveBoardImmediate]);
@@ -1560,6 +1576,7 @@ function InnerCanvasBoard({
     const restoredNodes = snapshot.nodes.map(prepareNode);
     const restoredEdges = snapshot.edges.map(prepareEdge);
 
+    isDirtyRef.current = true;
     setNodes(restoredNodes);
     setEdges(restoredEdges);
     updateHistoryState();
@@ -1578,6 +1595,7 @@ function InnerCanvasBoard({
     const restoredNodes = snapshot.nodes.map(prepareNode);
     const restoredEdges = snapshot.edges.map(prepareEdge);
 
+    isDirtyRef.current = true;
     setNodes(restoredNodes);
     setEdges(restoredEdges);
     updateHistoryState();
@@ -1688,22 +1706,24 @@ function InnerCanvasBoard({
     setEdges(arrangedEdges);
     pushSnapshot(arrangedNodes, arrangedEdges);
 
-    const toastMessage = explanation || (cleanTitle 
-      ? `Theologica AI generated "${cleanTitle}" with ${newNodes.length} cards.`
-      : `Theologica AI added ${newNodes.length} cards to your canvas.`);
+    if (!isMobile) {
+      const toastMessage = explanation || (cleanTitle 
+        ? `Theologica AI generated "${cleanTitle}" with ${newNodes.length} cards.`
+        : `Theologica AI added ${newNodes.length} cards to your canvas.`);
 
-    setAiToast({
-      message: toastMessage,
-      count: newNodes.length,
-    });
-    setTimeout(() => setAiToast(null), 6000);
+      setAiToast({
+        message: toastMessage,
+        count: newNodes.length,
+      });
+      setTimeout(() => setAiToast(null), 6000);
+    }
 
     setTimeout(() => {
       if (containerRef.current && containerRef.current.clientWidth > 100) {
         fitView({ padding: 0.28, duration: 800, minZoom: 0.35, maxZoom: 1.1 });
       }
     }, 150);
-  }, [arrangeGraph, fitView, handleCreateBoard, handleRenameBoard, prepareEdge, prepareNode, pushSnapshot, setEdges, setNodes]);
+  }, [arrangeGraph, fitView, handleCreateBoard, handleRenameBoard, prepareEdge, prepareNode, pushSnapshot, setEdges, setNodes, isMobile]);
 
   // Target selected node for AI expansion
   const selectedNode = useMemo(() => {
@@ -2146,9 +2166,9 @@ function InnerCanvasBoard({
     </div>
   )}
 
-      {/* Floating Theologica AI Success Toast */}
-      {aiToast && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-[#1e1e22]/95 border border-accent/60 shadow-2xl text-xs text-white backdrop-blur-md animate-in fade-in slide-in-from-bottom-3">
+      {/* Floating Theologica AI Success Toast (Desktop only) */}
+      {aiToast && !isMobile && (
+        <div className="hidden sm:flex absolute bottom-6 left-1/2 -translate-x-1/2 z-40 items-center gap-3 px-4 py-2.5 rounded-2xl bg-[#1e1e22]/95 border border-accent/60 shadow-2xl text-xs text-white backdrop-blur-md animate-in fade-in slide-in-from-bottom-3">
           <Sparkles size={15} className="text-accent animate-pulse shrink-0" />
           <span className="font-medium">{aiToast.message}</span>
           <button
