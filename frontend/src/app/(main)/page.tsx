@@ -1682,37 +1682,44 @@ export default function App() {
       <header className="relative h-14 border-b border-border flex items-center justify-between px-6 bg-bg z-10 shrink-0">
         
         {/* Left: Logo */}
-        <div className="flex-1 flex items-center">
-          <div className="font-display text-[22px] tracking-tight text-accent flex items-center gap-3">
+        <div className="flex-1 flex items-center min-w-0">
+          <div className="font-display text-[20px] tracking-tight text-accent flex items-center gap-2.5 select-none">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={theme === 'light' ? '/logo-light.png' : '/logo-dark.png'} alt="Theologica Logo" className="w-10 h-10 object-contain drop-shadow-md rounded-lg" />
-            <span className="inline">Theologica</span>
+            <img src={theme === 'light' ? '/logo-light.png' : '/logo-dark.png'} alt="Theologica Logo" className="w-8 h-8 object-contain drop-shadow-sm rounded-lg shrink-0" />
+            <span className="inline font-semibold">Theologica</span>
           </div>
         </div>
 
         {/* Center: Tabs (Desktop) */}
-        <div className="hidden lg:flex absolute left-1/2 -translate-x-1/2 gap-1.5 p-1.5 bg-surface rounded-xl ring-shadow">
+        <nav 
+          aria-label="Navigation Tabs"
+          className="hidden lg:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 items-center gap-1 p-1 bg-surface border border-border-soft/60 rounded-xl shadow-xs select-none"
+        >
           {['study', 'canvas', 'devotional', 'notes', 'chats', 'tracker'].map(tab => (
             <button 
               key={tab} 
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${activeTab === tab ? 'bg-border-soft text-white shadow-sm' : 'text-muted hover:text-fg'}`}
+              className={`px-2.5 xl:px-3 py-1 rounded-lg text-xs xl:text-[13px] font-medium transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                activeTab === tab 
+                  ? 'bg-bg text-fg shadow-xs border border-border-soft/60 font-semibold' 
+                  : 'text-fg-2 hover:text-fg hover:bg-surface-hover/60 border border-transparent'
+              }`}
             >
-              {tab === 'study' && <Layout size={16} />}
-              {tab === 'canvas' && <Workflow size={16} />}
-              {tab === 'devotional' && <BookOpen size={16} />}
-              {tab === 'notes' && <Edit size={16} />}
-              {tab === 'chats' && <Sparkles size={16} />}
-              {tab === 'tracker' && <Target size={16} />}
+              {tab === 'study' && <Layout size={14} className={activeTab === tab ? 'text-accent' : ''} />}
+              {tab === 'canvas' && <Workflow size={14} className={activeTab === tab ? 'text-accent' : ''} />}
+              {tab === 'devotional' && <BookOpen size={14} className={activeTab === tab ? 'text-accent' : ''} />}
+              {tab === 'notes' && <Edit size={14} className={activeTab === tab ? 'text-accent' : ''} />}
+              {tab === 'chats' && <Sparkles size={14} className={activeTab === tab ? 'text-accent' : ''} />}
+              {tab === 'tracker' && <Target size={14} className={activeTab === tab ? 'text-accent' : ''} />}
               <span className="capitalize">{tab === 'chats' ? 'AI Chats' : tab}</span>
             </button>
           ))}
-        </div>
+        </nav>
         
         {/* Right: Settings & Clerk UserButton */}
-        <div className="flex-1 flex justify-end items-center gap-4">
-          <button onClick={() => setIsSettingsOpen(true)} className="text-muted hover:text-fg transition-colors" title="Settings">
-            <Settings size={20} />
+        <div className="flex-1 flex justify-end items-center gap-3.5">
+          <button onClick={() => setIsSettingsOpen(true)} className="text-muted hover:text-fg transition-colors p-1.5 rounded-lg hover:bg-surface" title="Settings">
+            <Settings size={18} />
           </button>
           <UserButton />
         </div>
