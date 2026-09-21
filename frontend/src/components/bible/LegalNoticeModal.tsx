@@ -140,10 +140,10 @@ export function LegalNoticeModal({ isOpen, onClose, theme }: LegalNoticeModalPro
           <button
             onClick={onClose}
             type="button"
-            className="px-4 py-1.5 rounded-lg text-white font-semibold text-xs transition-all cursor-pointer shadow-xs active:scale-95"
+            className="px-5 py-1.5 rounded-lg text-white font-semibold text-xs transition-all cursor-pointer shadow-xs active:scale-95"
             style={{ backgroundColor: '#c96442' }}
           >
-            Close
+            OK
           </button>
         </div>
       </div>
