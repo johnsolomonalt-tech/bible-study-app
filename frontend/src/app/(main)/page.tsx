@@ -944,32 +944,11 @@ export default function App() {
     return cleaned.trim();
   };
 
-  // Click on a verse number to reference that verse directly
-  const handleVerseNumberClick = (verseNum: number, verseText: string, e: React.MouseEvent | React.TouchEvent) => {
+  // Clicking a verse number dismisses any active toolbar without opening selection toolbar
+  const handleVerseNumberClick = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    
-    // Clear any native browser selection
     window.getSelection()?.removeAllRanges();
-
-    setSelectedText(verseText);
-    setSelectionVerse(verseNum);
-    setEndVerseNumber(verseNum);
-    setSelectionRange(null);
-    
-    const existingHighlight = highlights.find(h => h.book === activeBook.name && h.chapter === activeChapter && h.verse === verseNum);
-
-    const toolbarHalfWidth = 165;
-    const x = Math.max(toolbarHalfWidth + 12, Math.min(window.innerWidth - toolbarHalfWidth - 12, rect.left + rect.width / 2));
-    const isNearTop = rect.top < 110;
-    const y = isNearTop ? rect.bottom + 8 : rect.top - 6;
-
-    setToolbarPosition({
-      x,
-      y,
-      highlightId: existingHighlight?.id,
-      isBelow: isNearTop
-    });
+    setToolbarPosition(null);
   };
 
   // Highlighting & Drag Selection Logic
@@ -979,7 +958,8 @@ export default function App() {
       return;
     }
     const rawText = selection.toString().trim();
-    if (!rawText) return;
+    // Do not trigger toolbar on empty text or isolated verse numbers
+    if (!rawText || /^\d+$/.test(rawText)) return;
 
     const range = selection.getRangeAt(0);
     const rect = range.getBoundingClientRect();
@@ -2079,37 +2059,41 @@ export default function App() {
 
               <div className="bible-reader-content flex-1 overflow-y-auto custom-scroll p-6" onMouseUp={handleSelection} onTouchEnd={handleSelection} onContextMenu={handleReaderContextMenu}>
                 <article className="max-w-3xl mx-auto">
-                  <p className="font-serif text-[18px] leading-[1.8] text-fg whitespace-pre-wrap">
-                    {isVersesLoading ? (
-                      <span className="block space-y-3 py-4 animate-pulse">
-                        <span className="block h-4 bg-fg/10 rounded w-full"></span>
-                        <span className="block h-4 bg-fg/10 rounded w-11/12"></span>
-                        <span className="block h-4 bg-fg/10 rounded w-4/5"></span>
-                        <span className="block h-4 bg-fg/10 rounded w-full"></span>
-                        <span className="block h-4 bg-fg/10 rounded w-3/4"></span>
-                      </span>
-                    ) : bibleVerses.length > 0 ? (
-                      bibleVerses.map((v, index) => (
-                        <span key={index} data-verse={v.verse} className={`transition-colors duration-200 ${currentSpeakingVerseIndex === index ? 'text-accent' : ''}`}>
+                  {isVersesLoading ? (
+                    <div className="space-y-4 py-4 animate-pulse">
+                      <div className="h-4 bg-fg/10 rounded w-full"></div>
+                      <div className="h-4 bg-fg/10 rounded w-11/12"></div>
+                      <div className="h-4 bg-fg/10 rounded w-4/5"></div>
+                      <div className="h-4 bg-fg/10 rounded w-full"></div>
+                      <div className="h-4 bg-fg/10 rounded w-3/4"></div>
+                    </div>
+                  ) : bibleVerses.length > 0 ? (
+                    <div className="font-serif text-[18px] leading-[1.85] text-fg space-y-3.5">
+                      {bibleVerses.map((v, index) => (
+                        <p 
+                          key={v.verse} 
+                          data-verse={v.verse} 
+                          className={`group relative rounded-lg py-1 px-2 -mx-2 transition-colors duration-200 ${
+                            currentSpeakingVerseIndex === index ? 'text-accent bg-accent/5' : ''
+                          }`}
+                        >
                           <sup 
-                            onClick={(e) => handleVerseNumberClick(v.verse, v.text, e)}
-                            onTouchEnd={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleVerseNumberClick(v.verse, v.text, e);
-                            }}
-                            className="verse-number-btn select-none text-muted hover:text-accent font-semibold text-[11px] mr-1.5 cursor-pointer transition-colors px-1 py-0.5 rounded hover:bg-surface"
-                            title={`Reference ${activeBook.name} ${activeChapter}:${v.verse}`}
+                            onClick={handleVerseNumberClick}
+                            onTouchEnd={handleVerseNumberClick}
+                            className="verse-number select-none text-[11px] font-sans font-semibold text-muted/80 mr-2 cursor-default align-baseline relative -top-0.5 inline-block"
+                            title={`Verse ${v.verse}`}
                           >
                             {v.verse}
                           </sup>
-                          {renderVerseContent(v.verse, v.text)}{' '}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-muted">Loading chapter...</span>
-                    )}
-                  </p>
+                          <span className="verse-text">
+                            {renderVerseContent(v.verse, v.text)}
+                          </span>
+                        </p>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-muted">Loading chapter...</span>
+                  )}
 
                   {/* Scripture Attribution Footnote */}
                   {chapterCopyright && (
@@ -2357,37 +2341,43 @@ export default function App() {
               </header>
               <div className="bible-reader-content flex-1 overflow-y-auto custom-scroll p-10 lg:p-16" onMouseUp={handleSelection} onTouchEnd={handleSelection} onContextMenu={handleReaderContextMenu}>
                 <article className="max-w-3xl mx-auto">
-                  <p className="font-serif text-[18px] leading-[1.8] text-fg whitespace-pre-wrap">
-                    {isVersesLoading ? (
-                      <span className="block space-y-4 py-4 animate-pulse">
-                        <span className="block h-4 bg-fg/10 rounded w-full"></span>
-                        <span className="block h-4 bg-fg/10 rounded w-11/12"></span>
-                        <span className="block h-4 bg-fg/10 rounded w-4/5"></span>
-                        <span className="block h-4 bg-fg/10 rounded w-full"></span>
-                        <span className="block h-4 bg-fg/10 rounded w-3/4"></span>
-                      </span>
-                    ) : bibleVerses.length > 0 ? (
-                      bibleVerses.map((v, index) => (
-                        <span key={v.verse} data-verse={v.verse} className={`transition-colors duration-300 ${currentSpeakingVerseIndex === index ? 'text-accent' : ''}`}>
+                  {isVersesLoading ? (
+                    <div className="space-y-4 py-4 animate-pulse">
+                      <div className="h-4 bg-fg/10 rounded w-full"></div>
+                      <div className="h-4 bg-fg/10 rounded w-11/12"></div>
+                      <div className="h-4 bg-fg/10 rounded w-4/5"></div>
+                      <div className="h-4 bg-fg/10 rounded w-full"></div>
+                      <div className="h-4 bg-fg/10 rounded w-3/4"></div>
+                    </div>
+                  ) : bibleVerses.length > 0 ? (
+                    <div className="font-serif text-[18px] leading-[1.85] text-fg space-y-3.5">
+                      {bibleVerses.map((v, index) => (
+                        <p 
+                          key={v.verse} 
+                          data-verse={v.verse} 
+                          className={`group relative rounded-lg py-1 px-2 -mx-2 transition-colors duration-300 ${
+                            currentSpeakingVerseIndex === index ? 'text-accent bg-accent/5' : ''
+                          }`}
+                        >
                           <sup 
-                            onClick={(e) => handleVerseNumberClick(v.verse, v.text, e)}
-                            onTouchEnd={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleVerseNumberClick(v.verse, v.text, e);
-                            }}
-                            className={`verse-number-btn select-none text-[10px] font-sans font-semibold mr-1.5 cursor-pointer px-1 py-0.5 rounded hover:bg-surface hover:text-accent transition-colors ${currentSpeakingVerseIndex === index ? 'text-accent' : 'text-muted'}`}
-                            title={`Reference ${activeBook.name} ${activeChapter}:${v.verse}`}
+                            onClick={handleVerseNumberClick}
+                            onTouchEnd={handleVerseNumberClick}
+                            className={`verse-number select-none text-[11px] font-sans font-semibold mr-2 cursor-default align-baseline relative -top-0.5 inline-block ${
+                              currentSpeakingVerseIndex === index ? 'text-accent' : 'text-muted/80'
+                            }`}
+                            title={`Verse ${v.verse}`}
                           >
                             {v.verse}
                           </sup>
-                          {renderVerseContent(v.verse, v.text)}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-meta">Loading...</span>
-                    )}
-                  </p>
+                          <span className="verse-text">
+                            {renderVerseContent(v.verse, v.text)}
+                          </span>
+                        </p>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-meta">Loading...</span>
+                  )}
 
                   {/* Scripture Attribution Footnote */}
                   {chapterCopyright && (
