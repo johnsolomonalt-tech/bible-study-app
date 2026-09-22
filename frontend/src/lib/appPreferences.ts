@@ -22,6 +22,7 @@ export const PREF_KEYS = {
   TRACKER_EXPANDED_BOOKS: 'theologica_tracker_books',
   ACTIVE_NOTE_ID: 'theologica_active_note_id',
   ACTIVE_CHAT_ID: 'theologica_active_chat_id',
+  COOKIE_CONSENT: 'theologica_cookie_consent',
 } as const;
 
 export const VALID_TABS = ['study', 'canvas', 'devotional', 'notes', 'chats', 'tracker'] as const;

@@ -8,6 +8,7 @@ import ReactMarkdown from 'react-markdown';
 import TextareaAutosize from 'react-textarea-autosize';
 import { getDevotionalForDay, DevotionalEntry } from '../../lib/devotionals';
 import PWAInstallPrompt from '../PWAInstallPrompt';
+import { CookieConsentPrompt } from '@/components/bible/CookieConsentPrompt';
 import { CanvasBoard } from '@/components/canvas/CanvasBoard';
 import { NodeCategory } from '@/types/canvas';
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from 'react-resizable-panels';
@@ -3302,6 +3303,7 @@ export default function App() {
         </div>
 
         <PWAInstallPrompt />
+        <CookieConsentPrompt theme={theme as 'dark' | 'light'} />
       </div>
     </>
   );
