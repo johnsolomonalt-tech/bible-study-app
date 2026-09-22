@@ -5,6 +5,7 @@ import { BookOpen, X, Loader2, Check } from 'lucide-react';
 import { parseVerseReference } from '@/lib/bibleReferences';
 import { getPassage } from '@/lib/bibleProvider';
 import { AVAILABLE_TRANSLATIONS } from '@/types/bible';
+import { getPreference, PREF_KEYS } from '@/lib/appPreferences';
 
 interface AddVerseToCanvasModalProps {
   isOpen: boolean;
@@ -21,10 +22,7 @@ export function AddVerseToCanvasModal({
 }: AddVerseToCanvasModalProps) {
   const [query, setQuery] = useState('');
   const [translation, setTranslation] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('theologica_bible_version') || 'bsb';
-    }
-    return 'bsb';
+    return getPreference(PREF_KEYS.BIBLE_VERSION, 'bsb');
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

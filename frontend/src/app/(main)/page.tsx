@@ -22,6 +22,17 @@ import {
 import { TranslationSelector } from '@/components/bible/TranslationSelector';
 import { getPassage } from '@/lib/bibleProvider';
 import { AVAILABLE_TRANSLATIONS } from '@/types/bible';
+import { 
+  getPreference, 
+  setPreference, 
+  flushPreferences, 
+  removePreference, 
+  PREF_KEYS, 
+  VALID_TABS, 
+  VALID_MOBILE_VIEWS,
+  ValidTab,
+  ValidMobileView
+} from '@/lib/appPreferences';
 
 // --- All 66 Books ---
 const otStr = "Genesis:50,Exodus:40,Leviticus:27,Numbers:36,Deuteronomy:34,Joshua:24,Judges:21,Ruth:4,1 Samuel:31,2 Samuel:24,1 Kings:22,2 Kings:25,1 Chronicles:29,2 Chronicles:36,Ezra:10,Nehemiah:13,Esther:10,Job:42,Psalms:150,Proverbs:31,Ecclesiastes:12,Song of Solomon:8,Isaiah:66,Jeremiah:52,Lamentations:5,Ezekiel:48,Daniel:12,Hosea:14,Joel:3,Amos:9,Obadiah:1,Jonah:4,Micah:7,Nahum:3,Habakkuk:3,Zephaniah:3,Haggai:2,Zechariah:14,Malachi:4";
@@ -29,6 +40,7 @@ const ntStr = "Matthew:28,Mark:16,Luke:24,John:21,Acts:28,Romans:16,1 Corinthian
 
 const OT_BOOKS = otStr.split(',').map(s => { const [n, c] = s.split(':'); return { name: n, chapters: parseInt(c) }; });
 const NT_BOOKS = ntStr.split(',').map(s => { const [n, c] = s.split(':'); return { name: n, chapters: parseInt(c) }; });
+const ALL_BOOKS = [...OT_BOOKS, ...NT_BOOKS];
 
 const markdownComponents = createMarkdownComponents();
 
@@ -364,20 +376,10 @@ export default function App() {
     category?: NodeCategory;
   } | null>(null);
 
-  // Initialize active tab from URL query params (e.g. /?tab=canvas or via /canvas rewrite)
+  // Synchronize activeTab to URL query params & cookies/storage for reliable refresh & bookmarking
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const tabParam = params.get('tab');
-      if (tabParam && ['study', 'canvas', 'devotional', 'notes', 'chats', 'tracker'].includes(tabParam)) {
-        setActiveTab(tabParam);
-      }
-    }
-  }, []);
-
-  // Synchronize activeTab to URL query params for reliable refresh & bookmarking
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
+      setPreference(PREF_KEYS.ACTIVE_TAB, activeTab);
       const url = new URL(window.location.href);
       if (activeTab === 'study') {
         url.searchParams.delete('tab');
@@ -577,13 +579,214 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [theme, setTheme] = useState('dark');
   const [trackerFormat, setTrackerFormat] = useState<'percent' | 'fraction'>('percent');
+  const preferencesRestoredRef = useRef(false);
 
+  // Restore all saved session preferences & temporary UI states on mount
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-    setTheme(savedTheme);
-    const savedTracker = (localStorage.getItem('trackerFormat') as 'percent' | 'fraction') || 'percent';
-    setTrackerFormat(savedTracker);
+    if (preferencesRestoredRef.current || typeof window === 'undefined') return;
+    preferencesRestoredRef.current = true;
+
+    // 1. Active Tab
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab');
+    if (tabParam && VALID_TABS.includes(tabParam as ValidTab)) {
+      setActiveTab(tabParam);
+    } else {
+      const savedTab = getPreference(PREF_KEYS.ACTIVE_TAB);
+      if (savedTab && VALID_TABS.includes(savedTab as ValidTab)) {
+        setActiveTab(savedTab);
+      }
+    }
+
+    // 2. Translation
+    const savedTranslation = getPreference(PREF_KEYS.BIBLE_VERSION);
+    if (savedTranslation && AVAILABLE_TRANSLATIONS.some(t => t.id.toLowerCase() === savedTranslation.toLowerCase())) {
+      setTranslation(savedTranslation.toLowerCase());
+    }
+
+    // 3. Book & Chapter
+    const savedBookName = getPreference(PREF_KEYS.LAST_BOOK);
+    let targetBook = OT_BOOKS[0];
+    if (savedBookName) {
+      const found = ALL_BOOKS.find(b => b.name.toLowerCase() === savedBookName.toLowerCase());
+      if (found) {
+        targetBook = found;
+        setActiveBook(found);
+      }
+    }
+
+    const savedChapterStr = getPreference(PREF_KEYS.LAST_CHAPTER);
+    if (savedChapterStr) {
+      const parsed = parseInt(savedChapterStr, 10);
+      if (!isNaN(parsed) && parsed >= 1) {
+        const clamped = Math.min(Math.max(1, parsed), targetBook.chapters);
+        setActiveChapter(clamped);
+      }
+    }
+
+    // 4. Layout Sidebars
+    const leftPref = getPreference(PREF_KEYS.SHOW_LEFT_SIDEBAR);
+    if (leftPref !== '') setShowLeftSidebar(leftPref === 'true');
+    const rightPref = getPreference(PREF_KEYS.SHOW_RIGHT_SIDEBAR);
+    if (rightPref !== '') setShowRightSidebar(rightPref === 'true');
+    const bottomPref = getPreference(PREF_KEYS.SHOW_BOTTOM_NOTES);
+    if (bottomPref !== '') setShowBottomNotes(bottomPref === 'true');
+
+    // 5. Mobile Study View
+    const mobileViewPref = getPreference(PREF_KEYS.MOBILE_STUDY_VIEW);
+    if (mobileViewPref && VALID_MOBILE_VIEWS.includes(mobileViewPref as ValidMobileView)) {
+      setMobileStudyView(mobileViewPref as ValidMobileView);
+    }
+
+    // 6. Devotional Time
+    const devoTimePref = getPreference(PREF_KEYS.DEVOTIONAL_TIME);
+    if (devoTimePref === 'morning' || devoTimePref === 'evening') {
+      setDevotionalTime(devoTimePref);
+    }
+
+    // 7. Theme & Tracker
+    const savedTheme = getPreference(PREF_KEYS.THEME) || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    if (savedTheme === 'light' || savedTheme === 'dark') setTheme(savedTheme);
+
+    const savedTracker = getPreference(PREF_KEYS.TRACKER_FORMAT) as 'percent' | 'fraction';
+    if (savedTracker === 'percent' || savedTracker === 'fraction') setTrackerFormat(savedTracker);
+
+    const savedTestaments = getPreference(PREF_KEYS.TRACKER_EXPANDED_TESTAMENTS);
+    if (savedTestaments) {
+      try {
+        const parsed = JSON.parse(savedTestaments);
+        if (Array.isArray(parsed)) setExpandedTestaments(parsed);
+      } catch {}
+    }
+
+    const savedExpBooks = getPreference(PREF_KEYS.TRACKER_EXPANDED_BOOKS);
+    if (savedExpBooks) {
+      try {
+        const parsed = JSON.parse(savedExpBooks);
+        if (Array.isArray(parsed)) setExpandedBooks(parsed);
+      } catch {}
+    }
   }, []);
+
+  // Persist translation version
+  useEffect(() => {
+    if (typeof window !== 'undefined' && translation) {
+      setPreference(PREF_KEYS.BIBLE_VERSION, translation);
+    }
+  }, [translation]);
+
+  // Persist active book & chapter
+  useEffect(() => {
+    if (typeof window !== 'undefined' && activeBook?.name && activeChapter) {
+      setPreference(PREF_KEYS.LAST_BOOK, activeBook.name);
+      setPreference(PREF_KEYS.LAST_CHAPTER, activeChapter.toString());
+    }
+  }, [activeBook.name, activeChapter]);
+
+  // Persist layout sidebars
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setPreference(PREF_KEYS.SHOW_LEFT_SIDEBAR, String(showLeftSidebar));
+      setPreference(PREF_KEYS.SHOW_RIGHT_SIDEBAR, String(showRightSidebar));
+      setPreference(PREF_KEYS.SHOW_BOTTOM_NOTES, String(showBottomNotes));
+    }
+  }, [showLeftSidebar, showRightSidebar, showBottomNotes]);
+
+  // Persist mobile study view
+  useEffect(() => {
+    if (typeof window !== 'undefined' && mobileStudyView) {
+      setPreference(PREF_KEYS.MOBILE_STUDY_VIEW, mobileStudyView);
+    }
+  }, [mobileStudyView]);
+
+  // Persist devotional time
+  useEffect(() => {
+    if (typeof window !== 'undefined' && devotionalTime) {
+      setPreference(PREF_KEYS.DEVOTIONAL_TIME, devotionalTime);
+    }
+  }, [devotionalTime]);
+
+  // Persist tracker tree expansion
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setPreference(PREF_KEYS.TRACKER_EXPANDED_TESTAMENTS, JSON.stringify(expandedTestaments));
+      setPreference(PREF_KEYS.TRACKER_EXPANDED_BOOKS, JSON.stringify(expandedBooks));
+    }
+  }, [expandedTestaments, expandedBooks]);
+
+  // Persist active note ID
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (activeNoteId !== null) {
+        setPreference(PREF_KEYS.ACTIVE_NOTE_ID, String(activeNoteId));
+      } else {
+        removePreference(PREF_KEYS.ACTIVE_NOTE_ID);
+      }
+    }
+  }, [activeNoteId]);
+
+  // Persist active chat ID
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (activeChatId !== null) {
+        setPreference(PREF_KEYS.ACTIVE_CHAT_ID, String(activeChatId));
+      } else {
+        removePreference(PREF_KEYS.ACTIVE_CHAT_ID);
+      }
+    }
+  }, [activeChatId]);
+
+  // Synchronous flush on tab close / background
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleBeforeUnload = () => {
+      flushPreferences({
+        [PREF_KEYS.ACTIVE_TAB]: activeTab,
+        [PREF_KEYS.BIBLE_VERSION]: translation,
+        [PREF_KEYS.LAST_BOOK]: activeBook.name,
+        [PREF_KEYS.LAST_CHAPTER]: activeChapter.toString(),
+        [PREF_KEYS.SHOW_LEFT_SIDEBAR]: String(showLeftSidebar),
+        [PREF_KEYS.SHOW_RIGHT_SIDEBAR]: String(showRightSidebar),
+        [PREF_KEYS.SHOW_BOTTOM_NOTES]: String(showBottomNotes),
+        [PREF_KEYS.MOBILE_STUDY_VIEW]: mobileStudyView,
+        [PREF_KEYS.DEVOTIONAL_TIME]: devotionalTime,
+        [PREF_KEYS.THEME]: theme,
+        [PREF_KEYS.TRACKER_FORMAT]: trackerFormat,
+        ...(activeNoteId !== null ? { [PREF_KEYS.ACTIVE_NOTE_ID]: String(activeNoteId) } : {}),
+        ...(activeChatId !== null ? { [PREF_KEYS.ACTIVE_CHAT_ID]: String(activeChatId) } : {}),
+      });
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handleBeforeUnload);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        handleBeforeUnload();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('pagehide', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [
+    activeTab,
+    translation,
+    activeBook.name,
+    activeChapter,
+    showLeftSidebar,
+    showRightSidebar,
+    showBottomNotes,
+    mobileStudyView,
+    devotionalTime,
+    theme,
+    trackerFormat,
+    activeNoteId,
+    activeChatId,
+  ]);
 
   // Dynamic favicon and theme sync effect across browser tab and mobile
   useEffect(() => {
@@ -620,7 +823,7 @@ export default function App() {
   const toggleTheme = () => {
     const newTheme = theme === 'dark' ? 'light' : 'dark';
     setTheme(newTheme);
-    localStorage.setItem('theme', newTheme);
+    setPreference(PREF_KEYS.THEME, newTheme);
     if (newTheme === 'light') document.documentElement.setAttribute('data-theme', 'light');
     else document.documentElement.removeAttribute('data-theme');
   };
@@ -628,7 +831,7 @@ export default function App() {
   const toggleTrackerFormat = () => {
     const newFormat = trackerFormat === 'percent' ? 'fraction' : 'percent';
     setTrackerFormat(newFormat);
-    localStorage.setItem('trackerFormat', newFormat);
+    setPreference(PREF_KEYS.TRACKER_FORMAT, newFormat);
   };
   const [chatInput, setChatInput] = useState('');
   const [chatQuotes, setChatQuotes] = useState<{id: string, text: string, reference: string}[]>([]);
@@ -679,12 +882,28 @@ export default function App() {
   useEffect(() => {
     fetchWithAuth(`${API_URL}/api/notes`).then(r => r.json()).then(data => {
       setNotes(data);
-      if (data.length > 0) setActiveNoteId(data[0].id);
+      if (Array.isArray(data) && data.length > 0) {
+        const savedNoteIdStr = getPreference(PREF_KEYS.ACTIVE_NOTE_ID);
+        const savedNoteId = savedNoteIdStr ? parseInt(savedNoteIdStr, 10) : null;
+        if (savedNoteId && data.some((n: { id: number }) => n.id === savedNoteId)) {
+          setActiveNoteId(savedNoteId);
+        } else {
+          setActiveNoteId(data[0].id);
+        }
+      }
     });
     fetchWithAuth(`${API_URL}/api/chats`).then(r => r.json()).then(data => {
       setChats(data);
-      data.forEach((c: { title: string }) => seenTitles.add(c.title));
-      setActiveChatId(null); // Fresh session on reload
+      if (Array.isArray(data)) {
+        data.forEach((c: { title: string }) => seenTitles.add(c.title));
+        const savedChatIdStr = getPreference(PREF_KEYS.ACTIVE_CHAT_ID);
+        const savedChatId = savedChatIdStr ? parseInt(savedChatIdStr, 10) : null;
+        if (savedChatId && data.some((c: { id: number }) => c.id === savedChatId)) {
+          setActiveChatId(savedChatId);
+        } else {
+          setActiveChatId(null);
+        }
+      }
     });
     fetchWithAuth(`${API_URL}/api/tracker`).then(r => r.json()).then(data => {
       setCompletedChapters(data.map((item: {chapterId: string}) => item.chapterId));

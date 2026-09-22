@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Check, Zap, Globe, Lock, ShieldCheck } from 'lucide-react';
 import { AVAILABLE_TRANSLATIONS, BibleTranslation } from '@/types/bible';
 import { LegalNoticeModal } from './LegalNoticeModal';
+import { setPreference, PREF_KEYS } from '@/lib/appPreferences';
 
 interface TranslationSelectorProps {
   currentTranslation: string;
@@ -46,9 +47,7 @@ export function TranslationSelector({
   const handleSelect = (t: BibleTranslation) => {
     onSelectTranslation(t.id);
     setIsOpen(false);
-    try {
-      localStorage.setItem('theologica_bible_version', t.id);
-    } catch {}
+    setPreference(PREF_KEYS.BIBLE_VERSION, t.id);
   };
 
   const localTranslations = AVAILABLE_TRANSLATIONS.filter((t) => t.isLocal);

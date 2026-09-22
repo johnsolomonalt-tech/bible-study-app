@@ -53,7 +53,8 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               try {
-                let theme = localStorage.getItem('theme');
+                let themeMatch = document.cookie.match(/(^|;)\s*theme=([^;]+)/);
+                let theme = themeMatch ? decodeURIComponent(themeMatch[2]) : localStorage.getItem('theme');
                 if (!theme) {
                   theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
                 }
