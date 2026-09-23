@@ -1,9 +1,8 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Check, Zap, Globe, Lock, ShieldCheck } from 'lucide-react';
+import { ChevronDown, Check, Globe, Lock } from 'lucide-react';
 import { AVAILABLE_TRANSLATIONS, BibleTranslation } from '@/types/bible';
-import { LegalNoticeModal } from './LegalNoticeModal';
 import { setPreference, PREF_KEYS } from '@/lib/appPreferences';
 
 interface TranslationSelectorProps {
@@ -17,10 +16,8 @@ export function TranslationSelector({
   currentTranslation,
   onSelectTranslation,
   className = '',
-  theme,
 }: TranslationSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [isLegalModalOpen, setIsLegalModalOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const activeTranslation =
@@ -67,17 +64,6 @@ export function TranslationSelector({
         <span className="text-accent font-mono tracking-wide">
           {activeTranslation.abbreviation}
         </span>
-        {activeTranslation.isLocal ? (
-          <span className="flex items-center gap-0.5 text-[10px] text-emerald-500 font-medium hidden sm:inline-flex">
-            <Zap size={10} />
-            <span>Instant</span>
-          </span>
-        ) : (
-          <span className="text-[10px] text-zinc-400 font-medium hidden sm:inline-flex">
-            <Globe size={10} />
-            <span>Cloud</span>
-          </span>
-        )}
         <ChevronDown
           size={13}
           className={`text-meta transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
@@ -91,16 +77,13 @@ export function TranslationSelector({
             <span className="text-[11px] font-bold uppercase tracking-wider text-meta">
               Bible Translations
             </span>
-            <span className="text-[10px] text-emerald-500 font-medium flex items-center gap-1">
-              <Zap size={10} /> 0ms Offline Ready
-            </span>
           </div>
 
           <div className="max-h-80 overflow-y-auto custom-scroll space-y-3 p-1">
-            {/* Group 1: Local Open Translations */}
+            {/* Group 1: Standard Translations */}
             <div>
-              <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-accent/80 flex items-center gap-1.5">
-                <span>⚡ Local & Offline (Recommended)</span>
+              <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-meta flex items-center gap-1.5">
+                <span>Translations</span>
               </div>
               <div className="space-y-0.5">
                 {localTranslations.map((t) => {
@@ -141,7 +124,7 @@ export function TranslationSelector({
               <div className="pt-2 border-t border-border-soft/40">
                 <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-meta flex items-center gap-1.5">
                   <Globe size={11} />
-                  <span>Open Online Translations</span>
+                  <span>Additional Translations</span>
                 </div>
                 <div className="space-y-0.5">
                   {openTranslations.map((t) => {
@@ -223,30 +206,8 @@ export function TranslationSelector({
               </div>
             )}
           </div>
-
-          {/* Footer: Legal Disclosures */}
-          <div className="pt-2 mt-1 border-t border-border-soft/60 px-1 pb-0.5">
-            <button
-              type="button"
-              onClick={() => {
-                setIsOpen(false);
-                setIsLegalModalOpen(true);
-              }}
-              className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-[11px] font-medium text-meta hover:text-fg hover:bg-fg/5 transition-colors cursor-pointer"
-            >
-              <ShieldCheck size={13} className="text-accent" />
-              <span>Scripture Attributions</span>
-            </button>
-          </div>
         </div>
       )}
-
-      {/* Scripture & Copyright Compliance Modal */}
-      <LegalNoticeModal
-        isOpen={isLegalModalOpen}
-        onClose={() => setIsLegalModalOpen(false)}
-        theme={theme}
-      />
     </div>
   );
 }

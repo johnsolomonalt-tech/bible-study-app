@@ -196,7 +196,7 @@ export function AddVerseToCanvasModal({
             >
               {AVAILABLE_TRANSLATIONS.map((t) => (
                 <option key={t.id} value={t.id} className={isDark ? 'bg-[#1e1e22]' : 'bg-white'}>
-                  {t.abbreviation} - {t.name} {t.isLocal ? '(Instant)' : ''}
+                  {t.abbreviation} - {t.name}
                 </option>
               ))}
             </select>

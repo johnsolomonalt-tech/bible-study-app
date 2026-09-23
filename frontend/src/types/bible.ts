@@ -37,7 +37,7 @@ export interface BibleTranslation {
 }
 
 export const OPEN_TRANSLATIONS: BibleTranslation[] = [
-  // Local Open-License (0ms latency, 100% offline, CC0/Public Domain)
+  // Local Open-License
   {
     id: 'bsb',
     name: 'Berean Standard Bible',
@@ -45,7 +45,7 @@ export const OPEN_TRANSLATIONS: BibleTranslation[] = [
     isLocal: true,
     category: 'modern',
     year: '2023',
-    description: 'Accurate, readable modern translation dedicated to the Public Domain (CC0 1.0).',
+    description: 'Accurate, readable modern translation.',
     license: 'open-license',
     copyrightNotice: 'The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and is dedicated to the public domain (CC0 1.0).',
   },
@@ -56,7 +56,7 @@ export const OPEN_TRANSLATIONS: BibleTranslation[] = [
     isLocal: true,
     category: 'modern',
     year: '2000',
-    description: 'Modern public-domain English translation based on the ASV and Byzantine Majority Text.',
+    description: 'Modern English translation based on the ASV and Byzantine Majority Text.',
     license: 'public-domain',
     copyrightNotice: 'The World English Bible (WEB) is 100% in the Public Domain worldwide.',
   },
@@ -67,7 +67,7 @@ export const OPEN_TRANSLATIONS: BibleTranslation[] = [
     isLocal: true,
     category: 'traditional',
     year: '1611',
-    description: 'Historic, majestic authorized English translation in the public domain.',
+    description: 'Historic, majestic authorized English translation.',
     license: 'public-domain',
     copyrightNotice: 'The King James Authorized Version (1611 / 1769) is in the Public Domain worldwide.',
   },

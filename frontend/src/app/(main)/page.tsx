@@ -2094,15 +2094,6 @@ export default function App() {
                   ) : (
                     <span className="text-muted">Loading chapter...</span>
                   )}
-
-                  {/* Scripture Attribution Footnote */}
-                  {chapterCopyright && (
-                    <footer className="mt-8 pt-3 pb-4 border-t border-border-soft/50 text-fg-2 select-none">
-                      <p className="text-[11px] font-sans leading-relaxed text-fg-2/90">
-                        <span className="font-semibold text-fg">{translation.toUpperCase()}:</span> {chapterCopyright}
-                      </p>
-                    </footer>
-                  )}
                 </article>
               </div>
             </section>
@@ -2377,15 +2368,6 @@ export default function App() {
                     </div>
                   ) : (
                     <span className="text-meta">Loading...</span>
-                  )}
-
-                  {/* Scripture Attribution Footnote */}
-                  {chapterCopyright && (
-                    <footer className="mt-8 pt-3 pb-4 border-t border-border-soft/50 text-fg-2 select-none">
-                      <p className="text-[11px] font-sans leading-relaxed text-fg-2/90">
-                        <span className="font-semibold text-fg">{translation.toUpperCase()}:</span> {chapterCopyright}
-                      </p>
-                    </footer>
                   )}
                 </article>
               </div>
