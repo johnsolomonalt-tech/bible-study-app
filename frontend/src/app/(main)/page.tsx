@@ -14,7 +14,9 @@ import { NodeCategory } from '@/types/canvas';
 import { LectioDivinaModal } from '@/components/bible/LectioDivinaModal';
 import { ScriptureBacklinksDrawer } from '@/components/bible/ScriptureBacklinksDrawer';
 import { InterlinearHoverCard } from '@/components/bible/InterlinearHoverCard';
-import { findInterlinearWord, InterlinearWord } from '@/lib/interlinearData';
+import { InterlinearModeRibbon } from '@/components/bible/InterlinearModeRibbon';
+import { VerseInterlinearModal } from '@/components/bible/VerseInterlinearModal';
+import { findInterlinearWord, getOrGenerateInterlinearWord, InterlinearWord } from '@/lib/interlinearData';
 import { getScriptureBacklinks, BacklinksResult } from '@/lib/backlinks';
 import { TheologicalLensSelector, TheologicalLensType } from '@/components/chat/TheologicalLensSelector';
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from 'react-resizable-panels';
@@ -451,6 +453,10 @@ export default function App() {
   const [theologicalLens, setTheologicalLens] = useState<TheologicalLensType>('canonical');
   const [isLectioModalOpen, setIsLectioModalOpen] = useState(false);
   const [isInterlinearMode, setIsInterlinearMode] = useState(false);
+  const [interlinearShowStrongs, setInterlinearShowStrongs] = useState(false);
+  const [interlinearShowTranslit, setInterlinearShowTranslit] = useState(false);
+  const [isVerseInterlinearOpen, setIsVerseInterlinearOpen] = useState(false);
+  const [verseInterlinearTarget, setVerseInterlinearTarget] = useState(1);
   const [activeInterlinearWord, setActiveInterlinearWord] = useState<{
     word: InterlinearWord;
     position: { x: number; y: number } | null;
@@ -465,6 +471,56 @@ export default function App() {
     reference: '',
     backlinks: null,
   });
+
+  // Load and persist interlinear preferences
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const savedMode = localStorage.getItem('theologica_interlinear_mode') === 'true';
+        if (savedMode) setIsInterlinearMode(true);
+        const savedStrongs = localStorage.getItem('theologica_interlinear_strongs') === 'true';
+        if (savedStrongs) setInterlinearShowStrongs(true);
+        const savedTranslit = localStorage.getItem('theologica_interlinear_translit') === 'true';
+        if (savedTranslit) setInterlinearShowTranslit(true);
+      } catch {}
+    }
+  }, []);
+
+  const handleToggleInterlinearMode = useCallback((newVal?: boolean) => {
+    setIsInterlinearMode((prev) => {
+      const val = typeof newVal === 'boolean' ? newVal : !prev;
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('theologica_interlinear_mode', String(val));
+        } catch {}
+      }
+      return val;
+    });
+  }, []);
+
+  const handleToggleStrongs = useCallback(() => {
+    setInterlinearShowStrongs((prev) => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('theologica_interlinear_strongs', String(next));
+        } catch {}
+      }
+      return next;
+    });
+  }, []);
+
+  const handleToggleTranslit = useCallback(() => {
+    setInterlinearShowTranslit((prev) => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('theologica_interlinear_translit', String(next));
+        } catch {}
+      }
+      return next;
+    });
+  }, []);
 
   // Verse navigation & interactive highlighting
   const pendingVerseRef = useRef<{ book: string; chapter: number; verse: number } | null>(null);
@@ -1355,6 +1411,25 @@ export default function App() {
     setBacklinksDrawerState((prev) => ({ ...prev, isOpen: false }));
   };
 
+  const handleSelectionWordStudy = () => {
+    const rawText = selectedText || selectionRange?.toString().trim() || '';
+    if (!rawText) return;
+    const firstWord = rawText.split(/\s+/)[0].replace(/[^a-zA-Z]/g, '');
+    if (!firstWord) return;
+    const wordObj = getOrGenerateInterlinearWord(
+      firstWord,
+      isOldTestament,
+      `${activeBook.name} ${activeChapter}:${selectionVerse || 1}`
+    );
+    setActiveInterlinearWord({
+      word: wordObj,
+      position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
+      verseRef: `${activeBook.name} ${activeChapter}:${selectionVerse || 1}`,
+    });
+    setToolbarPosition(null);
+    window.getSelection()?.removeAllRanges();
+  };
+
   const renderTextWithInterlinear = (rawStr: string, verseNum: number) => {
     if (!isInterlinearMode) {
       return rawStr;
@@ -1366,7 +1441,29 @@ export default function App() {
       }
       const match = findInterlinearWord(token, isOldTestament);
       if (!match) {
-        return <span key={tIdx}>{token}</span>;
+        // Universal fallback: every word in the verse is clickable for original language study
+        return (
+          <span
+            key={tIdx}
+            onClick={(e) => {
+              e.stopPropagation();
+              const genWord = getOrGenerateInterlinearWord(
+                token,
+                isOldTestament,
+                `${activeBook.name} ${activeChapter}:${verseNum}`
+              );
+              setActiveInterlinearWord({
+                word: genWord,
+                position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
+                verseRef: `${activeBook.name} ${activeChapter}:${verseNum}`,
+              });
+            }}
+            className="cursor-pointer hover:bg-accent/15 hover:text-accent rounded px-0.5 transition-colors"
+            title={`Click to study "${token}" in original ${isOldTestament ? 'Hebrew' : 'Greek'}`}
+          >
+            {token}
+          </span>
+        );
       }
 
       return (
@@ -1374,20 +1471,43 @@ export default function App() {
           key={tIdx}
           onClick={(e) => {
             e.stopPropagation();
-            const rect = e.currentTarget.getBoundingClientRect();
             setActiveInterlinearWord({
               word: match,
-              position: { x: rect.left + rect.width / 2, y: rect.bottom + 6 },
+              position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
               verseRef: `${activeBook.name} ${activeChapter}:${verseNum}`,
             });
           }}
-          className="inline-flex flex-col items-center cursor-pointer group/word mx-0.5 px-1 py-0.5 rounded hover:bg-accent/15 border-b border-dotted border-accent/60 transition-colors"
+          className={`inline-flex flex-col items-center cursor-pointer group/word mx-0.5 px-1.5 py-0.5 rounded-lg border transition-all select-none align-baseline ${
+            isOldTestament
+              ? 'bg-amber-500/10 hover:bg-amber-500/25 border-amber-500/30 text-fg'
+              : 'bg-cyan-500/10 hover:bg-cyan-500/25 border-cyan-500/30 text-fg'
+          }`}
           title={`Original language: ${match.lemma} (${match.strongs}) - Click to inspect word study`}
         >
-          <span className="text-[10px] font-sans font-medium text-accent leading-none -mb-0.5 select-none opacity-80 group-hover/word:opacity-100">
-            {match.lemma}
-          </span>
-          <span className="font-serif leading-tight">
+          <div className="flex items-center gap-0.5 leading-none mb-0.5">
+            <span
+              className={`text-[11px] font-serif font-bold ${
+                isOldTestament
+                  ? 'text-amber-600 dark:text-amber-400'
+                  : 'text-cyan-600 dark:text-cyan-300'
+              }`}
+            >
+              {match.lemma}
+            </span>
+            {interlinearShowStrongs && (
+              <span className="text-[9px] font-mono px-1 rounded bg-accent/20 text-accent font-semibold ml-0.5">
+                {match.strongs}
+              </span>
+            )}
+          </div>
+
+          {interlinearShowTranslit && (
+            <span className="text-[9px] italic text-muted leading-none mb-0.5">
+              /{match.transliteration}/
+            </span>
+          )}
+
+          <span className="font-serif leading-tight font-medium">
             {token}
           </span>
         </span>
@@ -2214,7 +2334,7 @@ export default function App() {
                   <div className="font-display text-[18px] ml-1">{activeBook.name} {activeChapter}</div>
                 </div>
                 <div className="flex items-center gap-1 sm:gap-2">
-                  <button onClick={() => setIsInterlinearMode(!isInterlinearMode)} className={`p-2 rounded-lg transition-colors ${isInterlinearMode ? 'bg-accent text-white' : 'text-fg-2 hover:text-fg hover:bg-surface'}`} title={isInterlinearMode ? "Disable Interlinear" : "Enable Interlinear"}>
+                  <button onClick={() => handleToggleInterlinearMode()} className={`p-2 rounded-lg transition-colors ${isInterlinearMode ? 'bg-accent text-white' : 'text-fg-2 hover:text-fg hover:bg-surface'}`} title={isInterlinearMode ? "Disable Interlinear" : "Enable Interlinear"}>
                     <Languages size={18} />
                   </button>
                   <button onClick={() => setIsLectioModalOpen(true)} className="p-2 rounded-lg text-fg-2 hover:text-accent hover:bg-surface transition-colors" title="Lectio Divina Contemplative Mode">
@@ -2262,6 +2382,23 @@ export default function App() {
 
               <div className="bible-reader-content flex-1 overflow-y-auto custom-scroll p-6" onMouseUp={handleSelection} onTouchEnd={handleSelection} onContextMenu={handleReaderContextMenu}>
                 <article className="max-w-3xl mx-auto">
+                  {isInterlinearMode && (
+                    <InterlinearModeRibbon
+                      isOldTestament={isOldTestament}
+                      bookName={activeBook.name}
+                      chapter={activeChapter}
+                      showStrongs={interlinearShowStrongs}
+                      onToggleShowStrongs={handleToggleStrongs}
+                      showTranslit={interlinearShowTranslit}
+                      onToggleShowTranslit={handleToggleTranslit}
+                      onOpenVerseBreakdown={() => {
+                        setVerseInterlinearTarget(1);
+                        setIsVerseInterlinearOpen(true);
+                      }}
+                      onDisableInterlinear={() => handleToggleInterlinearMode(false)}
+                      theme={theme as 'dark' | 'light'}
+                    />
+                  )}
                   {isVersesLoading ? (
                     <div className="space-y-4 py-4 animate-pulse">
                       <div className="h-4 bg-fg/10 rounded w-full"></div>
@@ -2288,6 +2425,25 @@ export default function App() {
                           >
                             {v.verse}
                           </sup>
+                          {isInterlinearMode && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setVerseInterlinearTarget(v.verse);
+                                setIsVerseInterlinearOpen(true);
+                              }}
+                              className={`inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded font-sans font-medium transition-colors select-none cursor-pointer align-baseline relative -top-0.5 mr-1.5 ${
+                                isOldTestament
+                                  ? 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-600 dark:text-amber-400'
+                                  : 'bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-600 dark:text-cyan-400'
+                              }`}
+                              title={`Open word-by-word Interlinear study for verse ${v.verse}`}
+                            >
+                              <Languages size={10} />
+                              <span>Interlinear</span>
+                            </button>
+                          )}
                           {chapterBacklinksMap.has(v.verse) && (
                             <button
                               type="button"
@@ -2558,7 +2714,7 @@ export default function App() {
                     <span>Lectio</span>
                   </button>
                   <button
-                    onClick={() => setIsInterlinearMode(!isInterlinearMode)}
+                    onClick={() => handleToggleInterlinearMode()}
                     className={`hidden lg:flex items-center gap-1.5 text-[13px] font-medium px-3 py-2 rounded-lg border ring-shadow transition-all cursor-pointer ${
                       isInterlinearMode
                         ? 'border-accent bg-accent text-white shadow-accent/20'
@@ -2623,6 +2779,23 @@ export default function App() {
               </header>
               <div className="bible-reader-content flex-1 overflow-y-auto custom-scroll p-10 lg:p-16" onMouseUp={handleSelection} onTouchEnd={handleSelection} onContextMenu={handleReaderContextMenu}>
                 <article className="max-w-3xl mx-auto">
+                  {isInterlinearMode && (
+                    <InterlinearModeRibbon
+                      isOldTestament={isOldTestament}
+                      bookName={activeBook.name}
+                      chapter={activeChapter}
+                      showStrongs={interlinearShowStrongs}
+                      onToggleShowStrongs={handleToggleStrongs}
+                      showTranslit={interlinearShowTranslit}
+                      onToggleShowTranslit={handleToggleTranslit}
+                      onOpenVerseBreakdown={() => {
+                        setVerseInterlinearTarget(1);
+                        setIsVerseInterlinearOpen(true);
+                      }}
+                      onDisableInterlinear={() => handleToggleInterlinearMode(false)}
+                      theme={theme as 'dark' | 'light'}
+                    />
+                  )}
                   {isVersesLoading ? (
                     <div className="space-y-4 py-4 animate-pulse">
                       <div className="h-4 bg-fg/10 rounded w-full"></div>
@@ -2651,6 +2824,25 @@ export default function App() {
                           >
                             {v.verse}
                           </sup>
+                          {isInterlinearMode && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setVerseInterlinearTarget(v.verse);
+                                setIsVerseInterlinearOpen(true);
+                              }}
+                              className={`inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded font-sans font-medium transition-colors select-none cursor-pointer align-baseline relative -top-0.5 mr-1.5 ${
+                                isOldTestament
+                                  ? 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-600 dark:text-amber-400'
+                                  : 'bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-600 dark:text-cyan-400'
+                              }`}
+                              title={`Open word-by-word Interlinear study for verse ${v.verse}`}
+                            >
+                              <Languages size={10} />
+                              <span>Interlinear</span>
+                            </button>
+                          )}
                           {chapterBacklinksMap.has(v.verse) && (
                             <button
                               type="button"
@@ -2919,6 +3111,16 @@ export default function App() {
             >
               <Workflow size={15} />
               <span>Canvas</span>
+            </button>
+            <button 
+              type="button"
+              onMouseDown={(e) => e.preventDefault()} 
+              onClick={handleSelectionWordStudy} 
+              className="flex items-center justify-center h-8 sm:h-9 px-3 rounded-xl bg-surface border border-border-soft text-fg hover:bg-border-soft active:scale-95 transition-all text-xs sm:text-sm font-semibold shadow-sm gap-1.5 cursor-pointer shrink-0" 
+              title="Inspect Hebrew/Greek Word Study"
+            >
+              <Languages size={15} className="text-accent" />
+              <span>Word Study</span>
             </button>
             {toolbarPosition.highlightId && (
               <>
@@ -3621,6 +3823,27 @@ export default function App() {
           onOpenNote={handleOpenBacklinkNote}
           onOpenCanvasBoard={handleOpenBacklinkCanvasBoard}
           theme={theme as 'dark' | 'light'}
+        />
+
+        {/* Full Verse Interlinear Breakdown Modal */}
+        <VerseInterlinearModal
+          isOpen={isVerseInterlinearOpen}
+          onClose={() => setIsVerseInterlinearOpen(false)}
+          bookName={activeBook.name}
+          chapter={activeChapter}
+          initialVerse={verseInterlinearTarget}
+          totalVerses={bibleVerses.length}
+          verses={bibleVerses}
+          isOldTestament={isOldTestament}
+          theme={theme as 'dark' | 'light'}
+          onSendToCanvas={handleSendWordStudyToCanvas}
+          onSelectWord={(w) => {
+            setActiveInterlinearWord({
+              word: w,
+              position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
+              verseRef: `${activeBook.name} ${activeChapter}:${verseInterlinearTarget}`,
+            });
+          }}
         />
 
         {/* Reverse Interlinear Original Language Word Card */}
