@@ -428,7 +428,7 @@ export default function App() {
   
   const [activeBook, setActiveBook] = useState(OT_BOOKS[0]);
   const [activeChapter, setActiveChapter] = useState(1);
-  const [expandedBook, setExpandedBook] = useState<string | null>(OT_BOOKS[0].name);
+  const [expandedBook, setExpandedBook] = useState<string | null>(null);
   const [translation, setTranslation] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('theologica_bible_version') || 'bsb';
