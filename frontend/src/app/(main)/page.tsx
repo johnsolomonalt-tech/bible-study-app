@@ -428,6 +428,7 @@ export default function App() {
   
   const [activeBook, setActiveBook] = useState(OT_BOOKS[0]);
   const [activeChapter, setActiveChapter] = useState(1);
+  const [expandedBook, setExpandedBook] = useState<string | null>(OT_BOOKS[0].name);
   const [translation, setTranslation] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('theologica_bible_version') || 'bsb';
@@ -682,6 +683,9 @@ export default function App() {
     if (typeof window !== 'undefined' && activeBook?.name && activeChapter) {
       setPreference(PREF_KEYS.LAST_BOOK, activeBook.name);
       setPreference(PREF_KEYS.LAST_CHAPTER, activeChapter.toString());
+    }
+    if (activeBook?.name) {
+      setExpandedBook(activeBook.name);
     }
   }, [activeBook.name, activeChapter]);
 
@@ -1990,10 +1994,21 @@ export default function App() {
               <div className="flex-1 overflow-y-auto custom-scroll p-3">
                 <div className="text-[11px] font-bold tracking-widest text-muted uppercase mb-3 ml-2 mt-2">Old Testament</div>
                 {OT_BOOKS.map(b => (
-                  <details key={b.name} className="group mb-1">
-                    <summary className="w-full text-left px-3 py-2.5 rounded-lg text-[14px] font-medium text-fg-2 hover:bg-surface hover:text-fg cursor-pointer list-none flex justify-between items-center transition-colors">
+                  <details
+                    key={b.name}
+                    name="mobile-bible-books"
+                    open={expandedBook === b.name}
+                    className="group mb-1"
+                  >
+                    <summary
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setExpandedBook(prev => prev === b.name ? null : b.name);
+                      }}
+                      className="w-full text-left px-3 py-2.5 rounded-lg text-[14px] font-medium text-fg-2 hover:bg-surface hover:text-fg cursor-pointer list-none flex justify-between items-center transition-colors"
+                    >
                       {b.name} 
-                      <ChevronRight size={16} className="group-open:rotate-90 transition-transform opacity-50" />
+                      <ChevronRight size={16} className={`transition-transform opacity-50 ${expandedBook === b.name ? 'rotate-90' : ''}`} />
                     </summary>
                     <div className="grid grid-cols-5 gap-1.5 px-3 py-2 pb-3">
                       {Array.from({ length: b.chapters }).map((_, i) => {
@@ -2001,7 +2016,7 @@ export default function App() {
                         return (
                           <button 
                             key={i} 
-                            onClick={() => { setActiveBook(b); setActiveChapter(i + 1); setMobileStudyView('reader'); }}
+                            onClick={() => { setActiveBook(b); setActiveChapter(i + 1); setExpandedBook(b.name); setMobileStudyView('reader'); }}
                             className={`text-xs min-h-[44px] py-2 rounded-md transition-colors ${isActive ? 'bg-accent text-white shadow-sm' : 'text-muted hover:bg-border-soft hover:text-fg'}`}
                           >
                             {i + 1}
@@ -2013,10 +2028,21 @@ export default function App() {
                 ))}
                 <div className="text-[11px] font-bold tracking-widest text-muted uppercase mb-3 ml-2 mt-6">New Testament</div>
                 {NT_BOOKS.map(b => (
-                  <details key={b.name} className="group mb-1">
-                    <summary className="w-full text-left px-3 py-2.5 rounded-lg text-[14px] font-medium text-fg-2 hover:bg-surface hover:text-fg cursor-pointer list-none flex justify-between items-center transition-colors">
+                  <details
+                    key={b.name}
+                    name="mobile-bible-books"
+                    open={expandedBook === b.name}
+                    className="group mb-1"
+                  >
+                    <summary
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setExpandedBook(prev => prev === b.name ? null : b.name);
+                      }}
+                      className="w-full text-left px-3 py-2.5 rounded-lg text-[14px] font-medium text-fg-2 hover:bg-surface hover:text-fg cursor-pointer list-none flex justify-between items-center transition-colors"
+                    >
                       {b.name} 
-                      <ChevronRight size={16} className="group-open:rotate-90 transition-transform opacity-50" />
+                      <ChevronRight size={16} className={`transition-transform opacity-50 ${expandedBook === b.name ? 'rotate-90' : ''}`} />
                     </summary>
                     <div className="grid grid-cols-5 gap-1.5 px-3 py-2 pb-3">
                       {Array.from({ length: b.chapters }).map((_, i) => {
@@ -2024,7 +2050,7 @@ export default function App() {
                         return (
                           <button 
                             key={i} 
-                            onClick={() => { setActiveBook(b); setActiveChapter(i + 1); setMobileStudyView('reader'); }}
+                            onClick={() => { setActiveBook(b); setActiveChapter(i + 1); setExpandedBook(b.name); setMobileStudyView('reader'); }}
                             className={`text-xs min-h-[44px] py-2 rounded-md transition-colors ${isActive ? 'bg-accent text-white shadow-sm' : 'text-muted hover:bg-border-soft hover:text-fg'}`}
                           >
                             {i + 1}
@@ -2246,10 +2272,21 @@ export default function App() {
               <div className="flex-1 overflow-y-auto custom-scroll p-3">
                 <div className="text-[11px] font-bold tracking-widest text-muted uppercase mb-3 ml-2 mt-2">Old Testament</div>
                 {OT_BOOKS.map(b => (
-                  <details key={b.name} className="group mb-1">
-                    <summary className="w-full text-left px-3 py-2.5 rounded-lg text-[14px] font-medium text-fg-2 hover:bg-surface hover:text-fg cursor-pointer list-none flex justify-between items-center transition-colors">
+                  <details
+                    key={b.name}
+                    name="desktop-bible-books"
+                    open={expandedBook === b.name}
+                    className="group mb-1"
+                  >
+                    <summary
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setExpandedBook(prev => prev === b.name ? null : b.name);
+                      }}
+                      className="w-full text-left px-3 py-2.5 rounded-lg text-[14px] font-medium text-fg-2 hover:bg-surface hover:text-fg cursor-pointer list-none flex justify-between items-center transition-colors"
+                    >
                       {b.name} 
-                      <ChevronRight size={16} className="group-open:rotate-90 transition-transform opacity-50" />
+                      <ChevronRight size={16} className={`transition-transform opacity-50 ${expandedBook === b.name ? 'rotate-90' : ''}`} />
                     </summary>
                     <div className="grid grid-cols-5 gap-1.5 px-3 py-2 pb-3">
                       {Array.from({ length: b.chapters }).map((_, i) => {
@@ -2257,7 +2294,7 @@ export default function App() {
                         return (
                           <button 
                             key={i} 
-                            onClick={() => { setActiveBook(b); setActiveChapter(i + 1); setMobileStudyView('reader'); }}
+                            onClick={() => { setActiveBook(b); setActiveChapter(i + 1); setExpandedBook(b.name); setMobileStudyView('reader'); }}
                             className={`text-xs min-h-[44px] lg:min-h-0 py-2 lg:py-1.5 rounded-md transition-colors ${isActive ? 'bg-accent text-white shadow-sm' : 'text-muted hover:bg-border-soft hover:text-fg'}`}
                           >
                             {i + 1}
@@ -2269,10 +2306,21 @@ export default function App() {
                 ))}
                 <div className="text-[11px] font-bold tracking-widest text-muted uppercase mb-3 ml-2 mt-6">New Testament</div>
                 {NT_BOOKS.map(b => (
-                  <details key={b.name} className="group mb-1">
-                    <summary className="w-full text-left px-3 py-2.5 rounded-lg text-[14px] font-medium text-fg-2 hover:bg-surface hover:text-fg cursor-pointer list-none flex justify-between items-center transition-colors">
+                  <details
+                    key={b.name}
+                    name="desktop-bible-books"
+                    open={expandedBook === b.name}
+                    className="group mb-1"
+                  >
+                    <summary
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setExpandedBook(prev => prev === b.name ? null : b.name);
+                      }}
+                      className="w-full text-left px-3 py-2.5 rounded-lg text-[14px] font-medium text-fg-2 hover:bg-surface hover:text-fg cursor-pointer list-none flex justify-between items-center transition-colors"
+                    >
                       {b.name} 
-                      <ChevronRight size={16} className="group-open:rotate-90 transition-transform opacity-50" />
+                      <ChevronRight size={16} className={`transition-transform opacity-50 ${expandedBook === b.name ? 'rotate-90' : ''}`} />
                     </summary>
                     <div className="grid grid-cols-5 gap-1.5 px-3 py-2 pb-3">
                       {Array.from({ length: b.chapters }).map((_, i) => {
@@ -2280,7 +2328,7 @@ export default function App() {
                         return (
                           <button 
                             key={i} 
-                            onClick={() => { setActiveBook(b); setActiveChapter(i + 1); setMobileStudyView('reader'); }}
+                            onClick={() => { setActiveBook(b); setActiveChapter(i + 1); setExpandedBook(b.name); setMobileStudyView('reader'); }}
                             className={`text-xs min-h-[44px] lg:min-h-0 py-2 lg:py-1.5 rounded-md transition-colors ${isActive ? 'bg-accent text-white shadow-sm' : 'text-muted hover:bg-border-soft hover:text-fg'}`}
                           >
                             {i + 1}
