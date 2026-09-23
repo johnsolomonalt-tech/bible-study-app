@@ -3,7 +3,7 @@ const API_URL = '';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuth, UserButton, SignIn } from '@clerk/nextjs';
-import { Send, Plus, Layout, Edit, Sparkles, Target, Check, Copy, ChevronRight, ChevronLeft, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow, ShieldCheck } from 'lucide-react';
+import { Send, Plus, Layout, Edit, Sparkles, Target, Check, Copy, ChevronRight, ChevronLeft, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow, ShieldCheck, Heart, Layers, Languages } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import TextareaAutosize from 'react-textarea-autosize';
 import { getDevotionalForDay, DevotionalEntry } from '../../lib/devotionals';
@@ -11,6 +11,12 @@ import PWAInstallPrompt from '../PWAInstallPrompt';
 import { CookieConsentPrompt } from '@/components/bible/CookieConsentPrompt';
 import { CanvasBoard } from '@/components/canvas/CanvasBoard';
 import { NodeCategory } from '@/types/canvas';
+import { LectioDivinaModal } from '@/components/bible/LectioDivinaModal';
+import { ScriptureBacklinksDrawer } from '@/components/bible/ScriptureBacklinksDrawer';
+import { InterlinearHoverCard } from '@/components/bible/InterlinearHoverCard';
+import { findInterlinearWord, InterlinearWord } from '@/lib/interlinearData';
+import { getScriptureBacklinks, BacklinksResult } from '@/lib/backlinks';
+import { TheologicalLensSelector, TheologicalLensType } from '@/components/chat/TheologicalLensSelector';
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from 'react-resizable-panels';
 import type { PanelImperativeHandle } from 'react-resizable-panels';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -372,6 +378,7 @@ export default function App() {
     });
   }, [getToken]);
   const [activeTab, setActiveTab] = useState('study'); // study, notes, chats, tracker, devotional, canvas
+  const [canvasFocusTrigger, setCanvasFocusTrigger] = useState(0);
   const [canvasIncomingNode, setCanvasIncomingNode] = useState<{
     title: string;
     content: string;
@@ -440,6 +447,25 @@ export default function App() {
   const [chapterCopyright, setChapterCopyright] = useState<string>('');
   const [completedChapters, setCompletedChapters] = useState<string[]>([]);
   
+  // Theological Lens & Feature States
+  const [theologicalLens, setTheologicalLens] = useState<TheologicalLensType>('canonical');
+  const [isLectioModalOpen, setIsLectioModalOpen] = useState(false);
+  const [isInterlinearMode, setIsInterlinearMode] = useState(false);
+  const [activeInterlinearWord, setActiveInterlinearWord] = useState<{
+    word: InterlinearWord;
+    position: { x: number; y: number } | null;
+    verseRef: string;
+  } | null>(null);
+  const [backlinksDrawerState, setBacklinksDrawerState] = useState<{
+    isOpen: boolean;
+    reference: string;
+    backlinks: BacklinksResult | null;
+  }>({
+    isOpen: false,
+    reference: '',
+    backlinks: null,
+  });
+
   // Verse navigation & interactive highlighting
   const pendingVerseRef = useRef<{ book: string; chapter: number; verse: number } | null>(null);
 
@@ -574,6 +600,36 @@ export default function App() {
   const [activeNoteId, setActiveNoteId] = useState<number | null>(null);
   const tempNoteIdRef = useRef<number | null>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const isOldTestament = useMemo(() => {
+    return OT_BOOKS.some((b) => b.name.toLowerCase() === activeBook.name.toLowerCase());
+  }, [activeBook.name]);
+
+  const chapterBacklinksMap = useMemo(() => {
+    const map = new Map<number, BacklinksResult>();
+    for (const v of bibleVerses) {
+      const res = getScriptureBacklinks({
+        book: activeBook.name,
+        chapter: activeChapter,
+        verse: v.verse,
+        notes,
+        highlights,
+      });
+      if (res.totalCount > 0) {
+        map.set(v.verse, res);
+      }
+    }
+    return map;
+  }, [activeBook.name, activeChapter, bibleVerses, notes, highlights]);
+
+  const totalChapterBacklinks = useMemo(() => {
+    return getScriptureBacklinks({
+      book: activeBook.name,
+      chapter: activeChapter,
+      notes,
+      highlights,
+    });
+  }, [activeBook.name, activeChapter, notes, highlights]);
 
   // Chats State
   const [chats, setChats] = useState<{id: number, title: string, messages: {role: string, content: string}[]}[]>([]);
@@ -1259,15 +1315,94 @@ export default function App() {
     setActiveTab('canvas');
   };
 
+  const handleSendWordStudyToCanvas = (nodePayload: {
+    title: string;
+    content: string;
+    category: NodeCategory;
+  }) => {
+    setCanvasIncomingNode(nodePayload);
+    setActiveTab('canvas');
+    setActiveInterlinearWord(null);
+  };
+
+  const handleSaveLectioToNotes = async (title: string, content: string) => {
+    try {
+      const res = await fetchWithAuth(`${API_URL}/api/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, content }),
+      });
+      if (res.ok) {
+        const newNote = await res.json();
+        setNotes((prev) => [newNote, ...prev]);
+      }
+    } catch (err) {
+      console.error('Failed to save lectio note', err);
+    }
+  };
+
+  const handleOpenBacklinkNote = (noteId: number) => {
+    setActiveTab('notes');
+    setActiveNoteId(noteId);
+    setBacklinksDrawerState((prev) => ({ ...prev, isOpen: false }));
+  };
+
+  const handleOpenBacklinkCanvasBoard = (boardId: string) => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('theologica_active_canvas_board_id', boardId);
+    }
+    setActiveTab('canvas');
+    setBacklinksDrawerState((prev) => ({ ...prev, isOpen: false }));
+  };
+
+  const renderTextWithInterlinear = (rawStr: string, verseNum: number) => {
+    if (!isInterlinearMode) {
+      return rawStr;
+    }
+    const tokens = rawStr.split(/(\s+|[.,;:!?"'()\[\]]+)/);
+    return tokens.map((token, tIdx) => {
+      if (/^[\s.,;:!?"'()\[\]]+$/.test(token) || !token.trim()) {
+        return <span key={tIdx}>{token}</span>;
+      }
+      const match = findInterlinearWord(token, isOldTestament);
+      if (!match) {
+        return <span key={tIdx}>{token}</span>;
+      }
+
+      return (
+        <span
+          key={tIdx}
+          onClick={(e) => {
+            e.stopPropagation();
+            const rect = e.currentTarget.getBoundingClientRect();
+            setActiveInterlinearWord({
+              word: match,
+              position: { x: rect.left + rect.width / 2, y: rect.bottom + 6 },
+              verseRef: `${activeBook.name} ${activeChapter}:${verseNum}`,
+            });
+          }}
+          className="inline-flex flex-col items-center cursor-pointer group/word mx-0.5 px-1 py-0.5 rounded hover:bg-accent/15 border-b border-dotted border-accent/60 transition-colors"
+          title={`Original language: ${match.lemma} (${match.strongs}) - Click to inspect word study`}
+        >
+          <span className="text-[10px] font-sans font-medium text-accent leading-none -mb-0.5 select-none opacity-80 group-hover/word:opacity-100">
+            {match.lemma}
+          </span>
+          <span className="font-serif leading-tight">
+            {token}
+          </span>
+        </span>
+      );
+    });
+  };
 
   const renderVerseContent = (verse: number, text: string) => {
     const { mainText, footnote } = parseVerseFootnote(text);
     const verseHighlights = highlights.filter(h => h.verse === verse);
     if (verseHighlights.length === 0) {
-      if (!footnote) return <>{mainText}</>;
+      if (!footnote) return <>{renderTextWithInterlinear(mainText, verse)}</>;
       return (
         <>
-          {mainText}
+          {renderTextWithInterlinear(mainText, verse)}
           <span className="text-gray-500 text-sm italic ml-2 select-none" data-footnote="true">
             {footnote}
           </span>
@@ -1345,10 +1480,10 @@ export default function App() {
               className={`cursor-pointer rounded-sm px-0.5 ${seg.highlight.color === 'yellow' ? 'bg-yellow-500/40 text-inherit' : seg.highlight.color === 'green' ? 'bg-green-500/40 text-inherit' : seg.highlight.color === 'blue' ? 'bg-blue-500/40 text-inherit' : seg.highlight.color === 'pink' ? 'bg-pink-500/40 text-inherit' : 'bg-purple-500/40 text-inherit'}`}
               title="Click to remove highlight"
             >
-              {seg.text}
+              {renderTextWithInterlinear(seg.text, verse)}
             </mark>
           ) : (
-            <span key={i}>{seg.text}</span>
+            <span key={i}>{renderTextWithInterlinear(seg.text, verse)}</span>
           )
         )}
         {footnote && (
@@ -1752,7 +1887,8 @@ export default function App() {
         content: currentInput,
         image: currentImage ? { base64: currentImage.base64, mimeType: currentImage.mimeType } : undefined,
         scriptureContext: explicitScripture,
-        translation: translation.toUpperCase()
+        translation: translation.toUpperCase(),
+        theologicalLens,
       })
     });
 
@@ -1914,7 +2050,12 @@ export default function App() {
           {['study', 'canvas', 'devotional', 'notes', 'chats', 'tracker'].map(tab => (
             <button 
               key={tab} 
-              onClick={() => setActiveTab(tab)}
+              onClick={() => {
+                setActiveTab(tab);
+                if (tab === 'canvas') {
+                  setCanvasFocusTrigger(prev => prev + 1);
+                }
+              }}
               className={`px-2.5 xl:px-3 py-1 rounded-lg text-xs xl:text-[13px] font-medium transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                 activeTab === tab 
                   ? 'bg-bg text-fg shadow-xs border border-border-soft/60 font-semibold' 
@@ -2072,9 +2213,33 @@ export default function App() {
                   </button>
                   <div className="font-display text-[18px] ml-1">{activeBook.name} {activeChapter}</div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 sm:gap-2">
+                  <button onClick={() => setIsInterlinearMode(!isInterlinearMode)} className={`p-2 rounded-lg transition-colors ${isInterlinearMode ? 'bg-accent text-white' : 'text-fg-2 hover:text-fg hover:bg-surface'}`} title={isInterlinearMode ? "Disable Interlinear" : "Enable Interlinear"}>
+                    <Languages size={18} />
+                  </button>
+                  <button onClick={() => setIsLectioModalOpen(true)} className="p-2 rounded-lg text-fg-2 hover:text-accent hover:bg-surface transition-colors" title="Lectio Divina Contemplative Mode">
+                    <Heart size={18} />
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setBacklinksDrawerState({
+                        isOpen: true,
+                        reference: `${activeBook.name} ${activeChapter}`,
+                        backlinks: totalChapterBacklinks,
+                      });
+                    }} 
+                    className={`p-2 rounded-lg relative transition-colors ${totalChapterBacklinks.totalCount > 0 ? 'text-accent hover:bg-surface' : 'text-fg-2 hover:text-fg hover:bg-surface'}`} 
+                    title="Chapter Backlinks"
+                  >
+                    <Layers size={18} />
+                    {totalChapterBacklinks.totalCount > 0 && (
+                      <span className="absolute top-1 right-1 min-w-[14px] h-3.5 px-0.5 bg-accent text-white text-[9px] font-bold rounded-full flex items-center justify-center shadow-sm">
+                        {totalChapterBacklinks.totalCount}
+                      </span>
+                    )}
+                  </button>
                   <button onClick={() => setMobileStudyView('ai')} className="p-2 text-fg-2 hover:text-fg relative" title="Study AI">
-                    <Sparkles size={20} />
+                    <Sparkles size={18} />
                     {chatQuotes.length > 0 && (
                       <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 bg-accent text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm">
                         {chatQuotes.length}
@@ -2082,10 +2247,10 @@ export default function App() {
                     )}
                   </button>
                   <button onClick={toggleCompleted} className="flex items-center justify-center p-2 rounded-lg bg-surface text-fg">
-                    <Check size={20} className={isCompleted ? "text-accent" : "text-meta"} /> 
+                    <Check size={18} className={isCompleted ? "text-accent" : "text-meta"} /> 
                   </button>
                   <button onClick={toggleSpeech} className="flex items-center justify-center p-2 rounded-lg text-fg-2 hover:text-fg hover:bg-surface transition-colors" title="Read chapter aloud">
-                    {isSpeaking ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                    {isSpeaking ? <VolumeX size={18} /> : <Volume2 size={18} />}
                   </button>
                   <TranslationSelector 
                     currentTranslation={translation} 
@@ -2118,11 +2283,30 @@ export default function App() {
                           <sup 
                             onClick={handleVerseNumberClick}
                             onTouchEnd={handleVerseNumberClick}
-                            className="verse-number select-none text-[11px] font-sans font-semibold text-muted/80 mr-2 cursor-default align-baseline relative -top-0.5 inline-block"
+                            className="verse-number select-none text-[11px] font-sans font-semibold text-muted/80 mr-1.5 cursor-default align-baseline relative -top-0.5 inline-block"
                             title={`Verse ${v.verse}`}
                           >
                             {v.verse}
                           </sup>
+                          {chapterBacklinksMap.has(v.verse) && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const bInfo = chapterBacklinksMap.get(v.verse)!;
+                                setBacklinksDrawerState({
+                                  isOpen: true,
+                                  reference: `${activeBook.name} ${activeChapter}:${v.verse}`,
+                                  backlinks: bInfo,
+                                });
+                              }}
+                              className="inline-flex items-center gap-0.5 text-[10px] px-1 py-0.2 rounded bg-accent/15 hover:bg-accent/25 text-accent font-sans font-medium transition-colors select-none cursor-pointer align-baseline relative -top-0.5 mr-1.5"
+                              title={`${chapterBacklinksMap.get(v.verse)!.totalCount} backlinks on verse ${v.verse}`}
+                            >
+                              <Layers size={10} />
+                              <span>{chapterBacklinksMap.get(v.verse)!.totalCount}</span>
+                            </button>
+                          )}
                           <span className="verse-text">
                             {renderVerseContent(v.verse, v.text)}
                           </span>
@@ -2138,11 +2322,15 @@ export default function App() {
 
             {/* Mobile Right Sidebar: Study AI */}
             <aside className={`w-full border-l border-border bg-bg flex-col ${mobileStudyView === 'ai' ? 'flex' : 'hidden'}`}>
-              <header className="h-[60px] border-b border-border flex items-center px-4 gap-2 text-[15px] font-medium text-fg shrink-0">
-                <button onClick={() => setMobileStudyView('reader')} className="p-2 mr-1 text-fg-2 hover:text-fg">
-                  <ChevronLeft size={20} />
-                </button>
-                <Sparkles size={16} className="text-accent" /> Study AI
+              <header className="h-[60px] border-b border-border flex items-center justify-between px-4 text-[15px] font-medium text-fg shrink-0">
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setMobileStudyView('reader')} className="p-2 mr-1 text-fg-2 hover:text-fg">
+                    <ChevronLeft size={20} />
+                  </button>
+                  <Sparkles size={16} className="text-accent" />
+                  <span>Study AI</span>
+                </div>
+                <TheologicalLensSelector currentLens={theologicalLens} onSelectLens={setTheologicalLens} compact />
               </header>
               <div className="flex-1 flex flex-col h-[calc(100%-60px)]">
                 <div className="flex-1 overflow-y-auto custom-scroll p-4 space-y-4">
@@ -2357,9 +2545,52 @@ export default function App() {
                   </button>
                   <div className="font-display text-[18px] lg:text-[22px] ml-1">{activeBook.name} {activeChapter}</div>
                 </div>
-                <div className="flex items-center gap-2 lg:gap-4">
+                <div className="flex items-center gap-2 lg:gap-3">
                   <button onClick={() => setMobileStudyView('ai')} className="lg:hidden p-2 text-fg-2 hover:text-fg">
                     <Sparkles size={20} />
+                  </button>
+                  <button
+                    onClick={() => setIsLectioModalOpen(true)}
+                    className="hidden lg:flex items-center gap-1.5 text-[13px] font-medium px-3 py-2 rounded-lg bg-surface text-fg hover:bg-border-soft hover:text-accent border border-border ring-shadow transition-all cursor-pointer"
+                    title="Lectio Divina Guided Prayer & Contemplation Mode"
+                  >
+                    <Heart size={15} className="text-accent" />
+                    <span>Lectio</span>
+                  </button>
+                  <button
+                    onClick={() => setIsInterlinearMode(!isInterlinearMode)}
+                    className={`hidden lg:flex items-center gap-1.5 text-[13px] font-medium px-3 py-2 rounded-lg border ring-shadow transition-all cursor-pointer ${
+                      isInterlinearMode
+                        ? 'border-accent bg-accent text-white shadow-accent/20'
+                        : 'border-border bg-surface text-fg hover:bg-border-soft'
+                    }`}
+                    title={isInterlinearMode ? "Disable Reverse Interlinear" : "Enable Reverse Interlinear (Original Hebrew/Greek Word Study)"}
+                  >
+                    <Languages size={15} />
+                    <span>Interlinear</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setBacklinksDrawerState({
+                        isOpen: true,
+                        reference: `${activeBook.name} ${activeChapter}`,
+                        backlinks: totalChapterBacklinks,
+                      });
+                    }}
+                    className={`hidden lg:flex items-center gap-1.5 text-[13px] font-medium px-3 py-2 rounded-lg border ring-shadow transition-all cursor-pointer ${
+                      totalChapterBacklinks.totalCount > 0
+                        ? 'border-accent/40 bg-accent/10 text-accent hover:bg-accent/15'
+                        : 'border-border bg-surface text-muted hover:text-fg'
+                    }`}
+                    title="Scripture Backlinks (Notes, Canvas Boards & Highlights)"
+                  >
+                    <Layers size={15} />
+                    <span>Backlinks</span>
+                    {totalChapterBacklinks.totalCount > 0 && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-accent text-white ml-0.5">
+                        {totalChapterBacklinks.totalCount}
+                      </span>
+                    )}
                   </button>
                   <button onClick={toggleCompleted} className="hidden lg:flex items-center gap-2 text-[13px] font-medium px-3.5 py-2 rounded-lg bg-surface text-fg hover:bg-border-soft ring-shadow ring-shadow-hover transition-all">
                     <Check size={16} className={isCompleted ? "text-accent" : "text-meta"} /> 
@@ -2413,13 +2644,32 @@ export default function App() {
                           <sup 
                             onClick={handleVerseNumberClick}
                             onTouchEnd={handleVerseNumberClick}
-                            className={`verse-number select-none text-[11px] font-sans font-semibold mr-2 cursor-default align-baseline relative -top-0.5 inline-block ${
+                            className={`verse-number select-none text-[11px] font-sans font-semibold mr-1.5 cursor-default align-baseline relative -top-0.5 inline-block ${
                               currentSpeakingVerseIndex === index ? 'text-accent' : 'text-muted/80'
                             }`}
                             title={`Verse ${v.verse}`}
                           >
                             {v.verse}
                           </sup>
+                          {chapterBacklinksMap.has(v.verse) && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const bInfo = chapterBacklinksMap.get(v.verse)!;
+                                setBacklinksDrawerState({
+                                  isOpen: true,
+                                  reference: `${activeBook.name} ${activeChapter}:${v.verse}`,
+                                  backlinks: bInfo,
+                                });
+                              }}
+                              className="inline-flex items-center gap-0.5 text-[10px] px-1 py-0.2 rounded bg-accent/15 hover:bg-accent/25 text-accent font-sans font-medium transition-colors select-none cursor-pointer align-baseline relative -top-0.5 mr-1.5"
+                              title={`${chapterBacklinksMap.get(v.verse)!.totalCount} backlinks on verse ${v.verse}`}
+                            >
+                              <Layers size={10} />
+                              <span>{chapterBacklinksMap.get(v.verse)!.totalCount}</span>
+                            </button>
+                          )}
                           <span className="verse-text">
                             {renderVerseContent(v.verse, v.text)}
                           </span>
@@ -2461,11 +2711,15 @@ export default function App() {
             {/* Right Sidebar: Study AI */}
             {showRightSidebar && (
               <Panel panelRef={rightPanelRef} defaultSize="25" minSize="20" className={`w-full lg:w-auto border-l border-border bg-bg flex-col ${mobileStudyView === 'ai' ? 'flex' : 'hidden lg:flex'}`}>
-              <header className="h-[60px] border-b border-border flex items-center px-4 lg:px-6 gap-2 text-[15px] font-medium text-fg shrink-0">
-                <button onClick={() => setMobileStudyView('reader')} className="lg:hidden p-2 mr-1 text-fg-2 hover:text-fg">
-                  <ChevronLeft size={20} />
-                </button>
-                <Sparkles size={16} className="hidden lg:block" /> Study AI
+              <header className="h-[60px] border-b border-border flex items-center justify-between px-4 lg:px-6 text-[15px] font-medium text-fg shrink-0">
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setMobileStudyView('reader')} className="lg:hidden p-2 mr-1 text-fg-2 hover:text-fg">
+                    <ChevronLeft size={20} />
+                  </button>
+                  <Sparkles size={16} className="hidden lg:block text-accent" />
+                  <span>Study AI</span>
+                </div>
+                <TheologicalLensSelector currentLens={theologicalLens} onSelectLens={setTheologicalLens} compact />
               </header>
               <div className="flex-1 overflow-y-auto custom-scroll p-5 space-y-6">
                 {activeChat.messages.length === 0 ? (
@@ -2916,11 +3170,14 @@ export default function App() {
             <section className={`flex-1 flex-col bg-bg ${activeChatId ? 'flex' : 'hidden lg:flex'}`}>
               {activeChatId ? (
                 <>
-                  <header className="h-[60px] border-b border-border flex items-center px-4 lg:px-8 shrink-0">
-                    <button onClick={() => setActiveChatId(null)} className="lg:hidden p-2 mr-2 text-fg-2 hover:text-fg">
-                      <ChevronLeft size={20} />
-                    </button>
-                    <h2 className="text-[18px] font-medium">{activeChat.title}</h2>
+                  <header className="h-[60px] border-b border-border flex items-center justify-between px-4 lg:px-8 shrink-0">
+                    <div className="flex items-center">
+                      <button onClick={() => setActiveChatId(null)} className="lg:hidden p-2 mr-2 text-fg-2 hover:text-fg">
+                        <ChevronLeft size={20} />
+                      </button>
+                      <h2 className="text-[18px] font-medium">{activeChat.title}</h2>
+                    </div>
+                    <TheologicalLensSelector currentLens={theologicalLens} onSelectLens={setTheologicalLens} />
                   </header>
                   <div className="flex-1 overflow-y-auto custom-scroll p-8 lg:p-12 space-y-8 flex flex-col">
                     {activeChat.messages.length === 0 ? (
@@ -3308,6 +3565,7 @@ export default function App() {
             incomingNode={canvasIncomingNode}
             onIncomingNodeHandled={() => setCanvasIncomingNode(null)}
             isActiveTab={activeTab === 'canvas'}
+            focusTrigger={canvasFocusTrigger}
             onNavigateToVerse={navigateToVerse}
           />
         </div>
@@ -3320,7 +3578,12 @@ export default function App() {
           {['study', 'canvas', 'devotional', 'notes', 'chats', 'tracker'].map(tab => (
             <button 
               key={tab} 
-              onClick={() => setActiveTab(tab)}
+              onClick={() => {
+                setActiveTab(tab);
+                if (tab === 'canvas') {
+                  setCanvasFocusTrigger(prev => prev + 1);
+                }
+              }}
               className={`flex flex-col items-center justify-center w-full h-full min-h-[44px] transition-colors ${activeTab === tab ? 'text-accent' : 'text-muted hover:text-fg'}`}
             >
               {tab === 'study' && <Layout size={20} className="mb-1" />}
@@ -3336,6 +3599,46 @@ export default function App() {
 
         <PWAInstallPrompt />
         <CookieConsentPrompt theme={theme as 'dark' | 'light'} />
+
+        {/* Lectio Divina Guided Prayer Modal */}
+        <LectioDivinaModal
+          isOpen={isLectioModalOpen}
+          onClose={() => setIsLectioModalOpen(false)}
+          passageReference={`${activeBook.name} ${activeChapter}`}
+          passageText={bibleVerses.map(v => `${v.verse} ${v.text}`).join('\n')}
+          theme={theme as 'dark' | 'light'}
+          onSaveToNotes={handleSaveLectioToNotes}
+        />
+
+        {/* Scripture Backlinks Drawer (Scripture Second Brain) */}
+        <ScriptureBacklinksDrawer
+          isOpen={backlinksDrawerState.isOpen}
+          onClose={() => setBacklinksDrawerState(prev => ({ ...prev, isOpen: false }))}
+          reference={backlinksDrawerState.reference}
+          notes={backlinksDrawerState.backlinks?.notes || []}
+          canvasItems={backlinksDrawerState.backlinks?.canvasItems || []}
+          highlights={backlinksDrawerState.backlinks?.highlights || []}
+          onOpenNote={handleOpenBacklinkNote}
+          onOpenCanvasBoard={handleOpenBacklinkCanvasBoard}
+          theme={theme as 'dark' | 'light'}
+        />
+
+        {/* Reverse Interlinear Original Language Word Card */}
+        {activeInterlinearWord && (
+          <div 
+            className="fixed inset-0 z-50 pointer-events-auto flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+            onClick={() => setActiveInterlinearWord(null)}
+          >
+            <div onClick={(e) => e.stopPropagation()}>
+              <InterlinearHoverCard
+                word={activeInterlinearWord.word}
+                onClose={() => setActiveInterlinearWord(null)}
+                onSendToCanvas={handleSendWordStudyToCanvas}
+                theme={theme as 'dark' | 'light'}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

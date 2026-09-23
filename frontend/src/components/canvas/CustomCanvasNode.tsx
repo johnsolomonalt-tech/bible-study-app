@@ -19,7 +19,9 @@ import {
   FileText,
   Link2,
   ChevronRight,
-  ExternalLink
+  ExternalLink,
+  GitBranch,
+  Languages
 } from 'lucide-react';
 import { CanvasNodeData, NodeCategory, CATEGORY_METADATA } from '@/types/canvas';
 import { useModifierKey } from '@/lib/os';
@@ -31,6 +33,7 @@ const CATEGORY_ICONS: Record<NodeCategory, React.ElementType> = {
   historical_context: HelpCircle,
   illustration: Lightbulb,
   application: Sparkles,
+  word_study: Languages,
   general: FileText,
 };
 
@@ -327,6 +330,27 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
             </div>
           ) : (
             <div className="flex items-center gap-0.5">
+              {(data.category === 'scripture' || parsedTitleRef) && data.onSpawnCrossReferences && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const ref = parsedTitleRef 
+                      ? `${parsedTitleRef.book} ${parsedTitleRef.chapter}:${parsedTitleRef.verse}` 
+                      : data.title;
+                    data.onSpawnCrossReferences?.(id, ref);
+                  }}
+                  className={`px-1.5 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1 transition-all cursor-pointer border ${
+                    isDark 
+                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20 hover:border-amber-400' 
+                      : 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100 hover:border-amber-300'
+                  }`}
+                  title="Spawn cross-reference scripture nodes"
+                >
+                  <GitBranch size={12} className="text-amber-500 shrink-0" />
+                  <span className="hidden sm:inline">Cross-Refs</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={(e) => {
@@ -397,6 +421,32 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
               </div>
 
               <div className={`border-t my-1.5 ${isDark ? 'border-zinc-700/60' : 'border-zinc-100'}`} />
+
+              {/* Spawn Cross-References */}
+              {(data.category === 'scripture' || parsedTitleRef) && data.onSpawnCrossReferences && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    const ref = parsedTitleRef 
+                      ? `${parsedTitleRef.book} ${parsedTitleRef.chapter}:${parsedTitleRef.verse}` 
+                      : data.title;
+                    data.onSpawnCrossReferences?.(id, ref);
+                  }}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer mb-1 ${
+                    isDark ? 'hover:bg-amber-500/20 text-amber-300' : 'hover:bg-amber-50 text-amber-800'
+                  }`}
+                  title="Spawn and link cross-reference verses from Treasury of Scripture Knowledge"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <GitBranch size={16} className="text-amber-500 shrink-0" />
+                    <span className="font-semibold">Spawn Cross-Refs</span>
+                  </div>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 uppercase tracking-wider">
+                    TSK
+                  </span>
+                </button>
+              )}
 
               {/* Add Connection */}
               <div>

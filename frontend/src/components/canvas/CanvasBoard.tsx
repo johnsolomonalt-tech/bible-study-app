@@ -28,6 +28,11 @@ import { CustomCanvasEdge } from './CustomCanvasEdge';
 import { CanvasToolbar } from './CanvasToolbar';
 import { CanvasSidebar } from './CanvasSidebar';
 import { TheologicaAiCanvasModal } from './TheologicaAiCanvasModal';
+import { ExportStudyGuideModal } from './ExportStudyGuideModal';
+import { ShareCanvasModal } from './ShareCanvasModal';
+import { getVerseCrossReferences } from '@/lib/crossReferences';
+import { parseVerseReference } from '@/lib/bibleReferences';
+import { getPassage } from '@/lib/bibleProvider';
 import {
   NodeCategory,
   CanvasNodeData,
@@ -65,6 +70,7 @@ interface CanvasBoardProps {
   onIncomingNodeHandled?: () => void;
   isActiveTab?: boolean;
   onNavigateToVerse?: (book: string, chapter: number, verse: number) => void;
+  focusTrigger?: number;
 }
 
 interface HistorySnapshot {
@@ -197,6 +203,7 @@ function InnerCanvasBoard({
   onIncomingNodeHandled,
   isActiveTab = true,
   onNavigateToVerse,
+  focusTrigger = 0,
 }: CanvasBoardProps) {
   const { fitView, setViewport, getViewport, screenToFlowPosition } = useReactFlow();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -242,23 +249,6 @@ function InnerCanvasBoard({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Viewport restoration & activation when switching to the canvas tab
-  useEffect(() => {
-    if (!isActiveTab) return;
-
-    const timer = setTimeout(() => {
-      if (!containerRef.current || containerRef.current.clientWidth <= 100) return;
-
-      if (currentViewportRef.current && currentViewportRef.current.zoom >= 0.25) {
-        setViewport(currentViewportRef.current, { duration: 250 });
-      } else {
-        fitView({ padding: isMobile ? 0.15 : 0.25, duration: 400, minZoom: 0.25, maxZoom: 1.1 });
-      }
-    }, 120);
-
-    return () => clearTimeout(timer);
-  }, [isActiveTab, fitView, setViewport, isMobile]);
-
   // Pane Context Menu state
   const [paneContextMenu, setPaneContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [paneAddSubmenuOpen, setPaneAddSubmenuOpen] = useState(false);
@@ -303,6 +293,8 @@ function InnerCanvasBoard({
 
   // Theologica AI Modal state
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const [isExportGuideOpen, setIsExportGuideOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [aiToast, setAiToast] = useState<{ message: string; count: number } | null>(null);
 
   // Keep references to latest nodes, edges, activeBoardId, boardTitle, boards, and state flags
@@ -319,6 +311,48 @@ function InnerCanvasBoard({
   activeBoardIdRef.current = activeBoardId;
   boardTitleRef.current = boardTitle;
   boardsRef.current = boards;
+
+  // Auto-spawn camera directly where note cards are located on the canvas board
+  const spawnToCards = useCallback((duration = 450) => {
+    const currentNodes = nodesRef.current.length > 0 ? nodesRef.current : nodes;
+
+    if (!currentNodes || currentNodes.length === 0) {
+      setViewport({ x: 0, y: 0, zoom: 1 }, { duration: 250 });
+      return;
+    }
+
+    // Pass 1: Immediate fitView to all note cards
+    fitView({
+      padding: isMobile ? 0.18 : 0.25,
+      duration,
+      minZoom: 0.35,
+      maxZoom: 1.05,
+    });
+
+    // Pass 2: Delayed fitView ensures exact bounding box once layout / transition finishes
+    const retryTimer = setTimeout(() => {
+      fitView({
+        padding: isMobile ? 0.18 : 0.25,
+        duration: Math.max(200, duration - 150),
+        minZoom: 0.35,
+        maxZoom: 1.05,
+      });
+    }, 100);
+
+    return () => clearTimeout(retryTimer);
+  }, [fitView, isMobile, nodes, setViewport]);
+
+  // Viewport auto-spawn whenever switching to or clicking the Canvas tab
+  useEffect(() => {
+    if (!isActiveTab) return;
+
+    const timer = setTimeout(() => {
+      if (!containerRef.current || containerRef.current.clientWidth <= 100) return;
+      spawnToCards(400);
+    }, 80);
+
+    return () => clearTimeout(timer);
+  }, [isActiveTab, focusTrigger, spawnToCards]);
 
   // Undo / Redo history engine
   const historyRef = useRef<HistorySnapshot[]>([]);
@@ -509,6 +543,100 @@ function InnerCanvasBoard({
       return next;
     });
   }, [isDark, theme, pushSnapshot, setEdges]);
+
+  // Spawn Treasury of Scripture Knowledge cross-reference nodes
+  const handleSpawnCrossReferences = useCallback(async (nodeId: string, reference: string) => {
+    const parentNode = nodesRef.current.find((n) => n.id === nodeId);
+    if (!parentNode) return;
+
+    const parsed = parseVerseReference(reference) || parseVerseReference(parentNode.data.title);
+    if (!parsed) return;
+
+    const crossRefs = getVerseCrossReferences(parsed.book, parsed.chapter, parsed.verse);
+    if (!crossRefs || crossRefs.length === 0) return;
+
+    const selectedRefs = crossRefs.slice(0, 3);
+    const newNodesToAdd: Node<CanvasNodeData>[] = [];
+    const newEdgesToAdd: Edge[] = [];
+
+    const baseWidth = isMobile ? 310 : 380;
+    const startX = parentNode.position.x + baseWidth + 80;
+    const verticalGap = 280;
+    const startY = parentNode.position.y - ((selectedRefs.length - 1) * verticalGap) / 2;
+
+    for (let i = 0; i < selectedRefs.length; i++) {
+      const cr = selectedRefs[i];
+      let verseText = '';
+      try {
+        const passage = await getPassage('bsb', cr.targetBook, cr.targetChapter, cr.targetVerse);
+        if (passage?.verse?.text) {
+          verseText = `> "${passage.verse.text}"\n\n*${cr.description}*`;
+        } else if (passage?.chapter?.verses) {
+          const matching = passage.chapter.verses.find((v) => v.verse === cr.targetVerse);
+          verseText = matching ? `> "${matching.text}"\n\n*${cr.description}*` : `*${cr.description}*`;
+        }
+      } catch {
+        verseText = `*${cr.description}*`;
+      }
+
+      const childId = `node-crossref-${Date.now()}-${i}-${Math.random().toString(36).substring(2, 6)}`;
+      const childNode: Node<CanvasNodeData> = {
+        id: childId,
+        type: 'customCard',
+        position: {
+          x: Math.round(startX),
+          y: Math.round(startY + i * verticalGap),
+        },
+        data: {
+          title: cr.reference,
+          content: verseText,
+          category: 'scripture',
+          theme,
+          onUpdate: handleUpdateNode,
+          onDuplicate: handleDuplicateNode,
+          onDelete: handleDeleteNode,
+          onConnectTo: handleConnectTo,
+          onSpawnCrossReferences: handleSpawnCrossReferences,
+          onVerseClick: onNavigateToVerse,
+        },
+        style: { width: baseWidth },
+      };
+
+      const edgeId = `edge-crossref-${Date.now()}-${i}`;
+      const newEdge: Edge = {
+        id: edgeId,
+        source: nodeId,
+        target: childId,
+        sourceHandle: 'right-source',
+        targetHandle: 'left-target',
+        type: 'customEdge',
+        label: cr.relationship,
+        animated: true,
+        data: { theme },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: isDark ? '#f59e0b' : '#d97706',
+          width: 16,
+          height: 16,
+        },
+      };
+
+      newNodesToAdd.push(childNode);
+      newEdgesToAdd.push(newEdge);
+    }
+
+    setNodes((prev) => {
+      const updated = [...prev, ...newNodesToAdd];
+      pushSnapshot(updated, [...edgesRef.current, ...newEdgesToAdd]);
+      return updated;
+    });
+
+    setEdges((prev) => [...prev, ...newEdgesToAdd]);
+
+    setTimeout(() => {
+      fitView({ padding: 0.2, duration: 600 });
+    }, 150);
+  }, [fitView, handleDeleteNode, handleDuplicateNode, handleUpdateNode, handleConnectTo, isDark, isMobile, onNavigateToVerse, pushSnapshot, setEdges, setNodes, theme]);
 
   // Core Auto Arrange Algorithm: computes collision-free topological columns & optimal connection handles
   const arrangeGraph = useCallback((
@@ -706,6 +834,7 @@ function InnerCanvasBoard({
         onDuplicate: handleDuplicateNode,
         onDelete: handleDeleteNode,
         onConnectTo: handleConnectTo,
+        onSpawnCrossReferences: handleSpawnCrossReferences,
         onVerseClick: onNavigateToVerse,
       },
       style: {
@@ -713,7 +842,7 @@ function InnerCanvasBoard({
         ...raw.style,
       },
     };
-  }, [handleDeleteNode, handleDuplicateNode, handleUpdateNode, handleConnectTo, onNavigateToVerse, theme, isMobile]);
+  }, [handleDeleteNode, handleDuplicateNode, handleUpdateNode, handleConnectTo, handleSpawnCrossReferences, onNavigateToVerse, theme, isMobile]);
 
   // Format edge helper
   const prepareEdge = useCallback((raw: SerializableEdge): Edge => {
@@ -973,13 +1102,16 @@ function InnerCanvasBoard({
     }
 
     setTimeout(() => {
-      if (savedViewport && typeof savedViewport.zoom === 'number' && savedViewport.zoom >= 0.25) {
+      const currentNodes = nodesRef.current.length > 0 ? nodesRef.current : nodes;
+      if (currentNodes.length > 0) {
+        fitView({ padding: isMobile ? 0.18 : 0.25, duration: 450, minZoom: 0.35, maxZoom: 1.05 });
+      } else if (savedViewport && typeof savedViewport.zoom === 'number' && savedViewport.zoom >= 0.25) {
         setViewport(savedViewport, { duration: 300 });
       } else if (containerRef.current && containerRef.current.clientWidth > 100) {
-        fitView({ padding: 0.25, duration: 500, minZoom: 0.35, maxZoom: 1.1 });
+        fitView({ padding: 0.25, duration: 450, minZoom: 0.35, maxZoom: 1.05 });
       }
     }, 120);
-  }, [fetchWithAuth, fitView, setViewport, prepareEdge, prepareNode, toSerializableEdges, toSerializableNodes, updateHistoryState, setNodes, setEdges]);
+  }, [fetchWithAuth, fitView, isMobile, setViewport, prepareEdge, prepareNode, toSerializableEdges, toSerializableNodes, updateHistoryState, setNodes, setEdges]);
 
   // Core remote boards synchronization engine
   const syncBoardsWithRemote = useCallback((remoteList: unknown) => {
@@ -1477,6 +1609,7 @@ function InnerCanvasBoard({
       historical_context: 'Historical Setting',
       illustration: 'Typology / Analogy',
       application: 'Personal Application',
+      word_study: 'Original Language Word Study',
       general: 'New Note',
     };
 
@@ -1666,7 +1799,7 @@ function InnerCanvasBoard({
     newEdges: SerializableEdge[],
     explanation: string,
     suggestedBoardTitle?: string,
-    mode?: 'generate' | 'expand' | 'synthesize'
+    mode?: 'generate' | 'expand' | 'synthesize' | 'discourse'
   ) => {
     const cleanTitle = (typeof suggestedBoardTitle === 'string' && suggestedBoardTitle.trim())
       ? suggestedBoardTitle.trim()
@@ -1772,11 +1905,12 @@ function InnerCanvasBoard({
         onDuplicate: handleDuplicateNode,
         onDelete: handleDeleteNode,
         onConnectTo: handleConnectTo,
+        onSpawnCrossReferences: handleSpawnCrossReferences,
         onVerseClick: onNavigateToVerse,
         otherNodes: summary.filter((s) => s.id !== n.id),
       },
     }));
-  }, [nodes, theme, handleUpdateNode, handleDuplicateNode, handleDeleteNode, handleConnectTo, onNavigateToVerse]);
+  }, [nodes, theme, handleUpdateNode, handleDuplicateNode, handleDeleteNode, handleConnectTo, handleSpawnCrossReferences, onNavigateToVerse]);
 
   return (
     <div 
@@ -1805,6 +1939,8 @@ function InnerCanvasBoard({
         onTitleChange={(t) => handleRenameBoard(activeBoardId, t)}
         onAddNode={handleAddNode}
         onOpenAi={() => setIsAiModalOpen(true)}
+        onExportStudyGuide={() => setIsExportGuideOpen(true)}
+        onShareBoard={() => setIsShareModalOpen(true)}
         onUndo={handleUndo}
         onRedo={handleRedo}
         canUndo={canUndo}
@@ -2192,6 +2328,38 @@ function InnerCanvasBoard({
         currentGraph={currentGraphPayload}
         selectedNode={selectedNode}
         onApplyGraphUpdate={handleApplyAiGraph}
+        theme={theme}
+      />
+
+      {/* Export Study Guide & Sermon Outline Modal */}
+      <ExportStudyGuideModal
+        isOpen={isExportGuideOpen}
+        onClose={() => setIsExportGuideOpen(false)}
+        boardTitle={boardTitle}
+        nodes={nodes.map((n) => ({
+          id: n.id,
+          type: 'customCard',
+          position: n.position,
+          data: n.data,
+          style: n.style,
+        }))}
+        edges={edges.map((e) => ({
+          id: e.id,
+          source: e.source,
+          target: e.target,
+          label: typeof e.label === 'string' ? e.label : undefined,
+          animated: Boolean(e.animated),
+        }))}
+        theme={theme}
+      />
+
+      {/* Share Board Modal */}
+      <ShareCanvasModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        boardId={activeBoardId}
+        boardTitle={boardTitle}
+        nodeCount={nodes.length}
         theme={theme}
       />
     </div>

@@ -4,6 +4,7 @@ export type NodeCategory =
   | 'historical_context' 
   | 'illustration' 
   | 'application' 
+  | 'word_study'
   | 'general';
 
 export interface CanvasNodeData extends Record<string, unknown> {
@@ -17,6 +18,7 @@ export interface CanvasNodeData extends Record<string, unknown> {
   onDuplicate?: (id: string) => void;
   onDelete?: (id: string) => void;
   onConnectTo?: (sourceId: string, targetId: string) => void;
+  onSpawnCrossReferences?: (nodeId: string, reference: string) => void;
   otherNodes?: Array<{ id: string; title: string; category: NodeCategory }>;
   theme?: 'dark' | 'light';
   onVerseClick?: (book: string, chapter: number, verse: number) => void;
@@ -116,6 +118,16 @@ export const CATEGORY_METADATA: Record<
     bgLight: 'bg-rose-50',
     textDark: 'text-rose-400',
     textLight: 'text-rose-700',
+  },
+  word_study: {
+    label: 'Word Study',
+    accent: '#3B82F6',
+    borderDark: 'border-blue-500/40',
+    borderLight: 'border-blue-400',
+    bgDark: 'bg-blue-500/10',
+    bgLight: 'bg-blue-50',
+    textDark: 'text-blue-400',
+    textLight: 'text-blue-700',
   },
   general: {
     label: 'General',

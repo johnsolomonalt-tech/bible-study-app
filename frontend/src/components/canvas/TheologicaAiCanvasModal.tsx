@@ -18,7 +18,8 @@ import {
   FileText,
   Lightbulb,
   HelpCircle,
-  Clock
+  Clock,
+  Workflow
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -41,7 +42,7 @@ interface TheologicaAiCanvasModalProps {
   theme: 'dark' | 'light';
 }
 
-type Mode = 'generate' | 'expand' | 'synthesize';
+type Mode = 'generate' | 'expand' | 'synthesize' | 'discourse';
 
 const PRESET_TOPICS = [
   { label: "Romans 8:28-30 (Golden Chain)", query: "Map Romans 8:28-30 (The Golden Chain of Redemption) with scripture, doctrinal implications, and applications" },
@@ -49,6 +50,14 @@ const PRESET_TOPICS = [
   { label: "1 Corinthians Context", query: "Historical, cultural, and spiritual background of ancient Corinth and Paul's pastoral counsel" },
   { label: "Beatitudes Overview", query: "Mind-map of the Beatitudes in Matthew 5 with kingdom virtues and modern Christian applications" },
   { label: "Messianic Prophecies", query: "Old Testament Messianic prophecies and their direct fulfillment in Jesus Christ" },
+];
+
+const DISCOURSE_TOPICS = [
+  { label: "Romans 8:28-39 (Sovereignty to Glory)", query: "Discourse analysis of Romans 8:28-39 diagramming Paul's logical chain from foreknowledge to eternal security" },
+  { label: "Ephesians 2:1-10 (Grace & Calling)", query: "Argument flowchart of Ephesians 2:1-10 diagramming condition of sin, divine intervention ('But God'), and grace unto good works" },
+  { label: "Galatians 3:1-14 (Faith vs Law)", query: "Discourse tree of Paul's argument in Galatians 3 contrasting works of the law with the promise to Abraham" },
+  { label: "Philippians 2:5-11 (The Christ Hymn)", query: "Logic diagram of Philippians 2:5-11 from kenosis (humiliation) to exaltation and universal confession" },
+  { label: "Hebrews 12:1-3 (Cloud of Witnesses)", query: "Flowchart of Hebrews 12:1-3 showing motivation from OT saints to looking unto Jesus as pioneer of faith" },
 ];
 
 const EXPANSION_PROMPTS = [
@@ -69,6 +78,7 @@ export function TheologicaAiCanvasModal({
 }: TheologicaAiCanvasModalProps) {
   const mod = useModifierKey();
   const [activeMode, setActiveMode] = useState<Mode>(selectedNode ? 'expand' : 'generate');
+  const [selectedLens, setSelectedLens] = useState<'canonical' | 'patristic' | 'reformation' | 'scholarly' | 'contemplative'>('canonical');
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
@@ -114,9 +124,6 @@ export function TheologicaAiCanvasModal({
     let timerFinish: NodeJS.Timeout;
 
     if (isLoading) {
-      setLoadingStep(0);
-      setIsFinishingUp(false);
-
       // Milestone 1 at 5s
       timer1 = setTimeout(() => {
         setLoadingStep(1);
@@ -167,6 +174,8 @@ export function TheologicaAiCanvasModal({
     abortControllerRef.current = controller;
 
     setIsLoading(true);
+    setLoadingStep(0);
+    setIsFinishingUp(false);
     setError(null);
     setSynthesisResult(null);
 
@@ -180,6 +189,7 @@ export function TheologicaAiCanvasModal({
           currentGraph,
           selectedNodeId: activeMode === 'expand' && selectedNode ? selectedNode.id : undefined,
           mode: activeMode,
+          theologicalLens: selectedLens,
         }),
       });
 
@@ -307,6 +317,19 @@ export function TheologicaAiCanvasModal({
             >
               <Network size={14} />
               <span>Generate Mind-Map</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveMode('discourse')}
+              className={`flex items-center gap-1.5 pb-2.5 px-2 border-b-2 transition-all ${
+                activeMode === 'discourse'
+                  ? 'border-accent text-accent'
+                  : 'border-transparent text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              <Workflow size={14} />
+              <span>Logic Flowchart</span>
             </button>
 
             {selectedNode && (
@@ -445,13 +468,49 @@ export function TheologicaAiCanvasModal({
                 </div>
               )}
 
+              {/* Theological Perspective Lens Bar */}
+              <div className="flex items-center justify-between py-2 px-3 rounded-xl bg-zinc-100 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/60 text-xs">
+                <span className="font-semibold text-zinc-500 dark:text-zinc-400">Tradition Lens:</span>
+                <div className="flex items-center gap-1">
+                  {[
+                    { id: 'canonical', label: 'Canonical', icon: '🕊️' },
+                    { id: 'patristic', label: 'Patristic', icon: '🏛️' },
+                    { id: 'reformation', label: 'Reformed', icon: '📜' },
+                    { id: 'scholarly', label: 'Scholarly', icon: '🔍' },
+                    { id: 'contemplative', label: 'Devotional', icon: '🌿' },
+                  ].map((l) => (
+                    <button
+                      key={l.id}
+                      type="button"
+                      onClick={() => setSelectedLens(l.id as any)}
+                      className={`px-2 py-0.5 rounded-lg text-[11px] font-medium transition-all cursor-pointer ${
+                        selectedLens === l.id
+                          ? 'bg-accent text-white font-semibold shadow-xs'
+                          : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/30'
+                      }`}
+                    >
+                      <span>{l.icon} {l.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Suggestions Chips */}
               <div>
                 <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-2">
-                  {activeMode === 'expand' ? 'Suggested expansions for card' : 'Suggested study mind-maps'}
+                  {activeMode === 'expand' 
+                    ? 'Suggested expansions for card' 
+                    : activeMode === 'discourse'
+                    ? 'Suggested discourse argument flowcharts'
+                    : 'Suggested study mind-maps'}
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  {(activeMode === 'expand' ? EXPANSION_PROMPTS : PRESET_TOPICS).map((item, idx) => (
+                  {(activeMode === 'expand' 
+                    ? EXPANSION_PROMPTS 
+                    : activeMode === 'discourse'
+                    ? DISCOURSE_TOPICS
+                    : PRESET_TOPICS
+                  ).map((item, idx) => (
                     <button
                       key={idx}
                       type="button"
@@ -491,6 +550,8 @@ export function TheologicaAiCanvasModal({
                   placeholder={
                     activeMode === 'expand' && selectedNode
                       ? `Instruct Theologica AI what to expand from "${selectedNode.data.title}"...`
+                      : activeMode === 'discourse'
+                      ? "e.g. Diagram the logical argument and exegetical flow of Romans 8:28-39..."
                       : activeMode === 'synthesize'
                       ? "e.g. Synthesize the key doctrines and applications from this canvas into a study outline..."
                       : "e.g. Map John 15:1-8 (The Vine and Branches) with theology, historical context, and discipleship applications..."

@@ -171,8 +171,30 @@ export async function GET(req: Request) {
           });
         }
       } catch (dbErr) {
-        console.warn(`Canvas: PostgreSQL board query failed for ${boardId}, falling back:`, dbErr);
+        console.warn('Canvas: PostgreSQL query failed, falling back to memory/public:', dbErr);
       }
+    }
+
+    // Public/Shared read fallback: check if board exists in Prisma by boardId
+    try {
+      const publicRecord = await prisma.canvas.findFirst({
+        where: { boardId },
+      });
+      if (publicRecord) {
+        const payload: CanvasStatePayload = {
+          nodes: (publicRecord.nodes as any) || [],
+          edges: (publicRecord.edges as any) || [],
+          viewport: (publicRecord.viewport as any) || undefined,
+        };
+        return NextResponse.json({
+          id: publicRecord.boardId,
+          title: publicRecord.title,
+          updatedAt: publicRecord.updatedAt.toISOString(),
+          ...payload,
+        });
+      }
+    } catch (pubErr) {
+      console.warn('Canvas: public board query fallback failed:', pubErr);
     }
 
     // Check memory cache

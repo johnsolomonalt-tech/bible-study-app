@@ -17,7 +17,9 @@ import {
   PanelLeft,
   Layers,
   LayoutGrid,
-  MoreHorizontal
+  MoreHorizontal,
+  Share2,
+  Languages
 } from 'lucide-react';
 import { NodeCategory, CATEGORY_METADATA } from '@/types/canvas';
 import { useModifierKey } from '@/lib/os';
@@ -27,6 +29,8 @@ interface CanvasToolbarProps {
   onTitleChange: (newTitle: string) => void;
   onAddNode: (category: NodeCategory) => void;
   onOpenAi: () => void;
+  onExportStudyGuide?: () => void;
+  onShareBoard?: () => void;
   onUndo: () => void;
   onRedo: () => void;
   canUndo: boolean;
@@ -50,6 +54,7 @@ const CATEGORY_ICONS: Record<NodeCategory, React.ElementType> = {
   historical_context: HelpCircle,
   illustration: Lightbulb,
   application: Sparkles,
+  word_study: Languages,
   general: FileText,
 };
 
@@ -58,6 +63,8 @@ export function CanvasToolbar({
   onTitleChange,
   onAddNode,
   onOpenAi,
+  onExportStudyGuide,
+  onShareBoard,
   onUndo,
   onRedo,
   canUndo,
@@ -297,6 +304,46 @@ export function CanvasToolbar({
           <span className="hidden md:inline">Theologica AI</span>
         </button>
 
+        {/* Export Study Guide / Sermon Outline */}
+        {onExportStudyGuide && (
+          <button
+            type="button"
+            onClick={onExportStudyGuide}
+            disabled={!hasActiveBoard || nodeCount === 0}
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
+              hasActiveBoard && nodeCount > 0
+                ? isDark
+                  ? 'bg-zinc-800/90 border-zinc-700/80 text-zinc-200 hover:bg-zinc-700/80 cursor-pointer shadow-xs active:scale-95'
+                  : 'bg-zinc-100 border-zinc-200 text-zinc-800 hover:bg-zinc-200/80 cursor-pointer shadow-xs active:scale-95'
+                : 'opacity-40 cursor-not-allowed border-transparent text-zinc-500'
+            }`}
+            title="Export visual canvas as a Sermon Outline or Small Group Guide"
+          >
+            <FileText size={14} className="text-emerald-500 shrink-0" />
+            <span className="hidden lg:inline">Study Guide</span>
+          </button>
+        )}
+
+        {/* Share Board Button */}
+        {onShareBoard && (
+          <button
+            type="button"
+            onClick={onShareBoard}
+            disabled={!hasActiveBoard}
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
+              hasActiveBoard
+                ? isDark
+                  ? 'bg-zinc-800/90 border-zinc-700/80 text-zinc-200 hover:bg-zinc-700/80 cursor-pointer shadow-xs active:scale-95'
+                  : 'bg-zinc-100 border-zinc-200 text-zinc-800 hover:bg-zinc-200/80 cursor-pointer shadow-xs active:scale-95'
+                : 'opacity-40 cursor-not-allowed border-transparent text-zinc-500'
+            }`}
+            title="Share read-only board link or embed code"
+          >
+            <Share2 size={14} className="text-cyan-400 shrink-0" />
+            <span className="hidden xl:inline">Share</span>
+          </button>
+        )}
+
         {/* Desktop-only Action Buttons */}
         <div className="hidden sm:block h-4 w-[1px] bg-zinc-700/40 mx-0.5" />
 
@@ -404,6 +451,44 @@ export function CanvasToolbar({
                   : 'bg-white border-zinc-200 text-zinc-800 shadow-xl'
               }`}
             >
+
+              {onExportStudyGuide && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    onExportStudyGuide();
+                  }}
+                  disabled={!hasActiveBoard || nodeCount === 0}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                    hasActiveBoard && nodeCount > 0 
+                      ? isDark ? 'hover:bg-zinc-800 text-zinc-200 cursor-pointer' : 'hover:bg-zinc-100 text-zinc-700 cursor-pointer'
+                      : 'opacity-30 cursor-not-allowed'
+                  }`}
+                >
+                  <FileText size={15} className="text-emerald-500" />
+                  <span>Export Study Guide</span>
+                </button>
+              )}
+
+              {onShareBoard && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    onShareBoard();
+                  }}
+                  disabled={!hasActiveBoard}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                    hasActiveBoard 
+                      ? isDark ? 'hover:bg-zinc-800 text-zinc-200 cursor-pointer' : 'hover:bg-zinc-100 text-zinc-700 cursor-pointer'
+                      : 'opacity-30 cursor-not-allowed'
+                  }`}
+                >
+                  <Share2 size={15} className="text-cyan-400" />
+                  <span>Share Board</span>
+                </button>
+              )}
 
               <button
                 type="button"

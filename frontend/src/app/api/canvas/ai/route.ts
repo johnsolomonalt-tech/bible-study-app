@@ -58,7 +58,8 @@ interface RequestBody {
     edges: SerializableEdge[];
   };
   selectedNodeId?: string;
-  mode?: 'generate' | 'expand' | 'synthesize';
+  mode?: 'generate' | 'expand' | 'synthesize' | 'discourse';
+  theologicalLens?: string;
 }
 
 interface RawGeneratedNode {
@@ -112,7 +113,7 @@ export async function POST(req: Request) {
     }
 
     const body: RequestBody = await req.json();
-    const { prompt, currentGraph, selectedNodeId, mode = 'generate' } = body;
+    const { prompt, currentGraph, selectedNodeId, mode = 'generate', theologicalLens = 'canonical' } = body;
 
     if (!prompt || !prompt.trim()) {
       return NextResponse.json({ error: 'Prompt is required.' }, { status: 400 });
@@ -165,6 +166,23 @@ ID: "${selectedNode.id}"
 Title: "${selectedNode.data.title}"
 Category: "${selectedNode.data.category}"
 Content: "${selectedNode.data.content}"
+` : ''}
+
+${mode === 'discourse' ? `
+DISCOURSE ANALYSIS & ARGUMENT FLOWCHART MODE:
+The user is requesting an exegetical flow-of-thought argument map for this passage.
+Generate 4-6 connected nodes arranged in logical progression:
+1. Context & Occasion (historical_context) - The problem or historical setting.
+2. Foundational Premise (theological_point or scripture) - The starting theological assertion.
+3. Grammatical / Exegetical Link (theological_point) - Focus on conjunctions ('therefore', 'for', 'so that', 'in order that') and original language connectives.
+4. Core Theological Truth (theological_point) - The central divine revelation or gospel truth.
+5. Practical Mandate / Imperative (application) - Concrete Christian obedience flowing from this indicative truth.
+Connect these sequentially with descriptive edge labels (e.g. "Occasion for", "Builds Premise", "Exegetical Pivot", "Yields Command").
+` : ''}
+
+${theologicalLens && theologicalLens !== 'canonical' ? `
+THEOLOGICAL LENS APPLIED (${theologicalLens.toUpperCase()}):
+Draw specifically upon the hermeneutics, historical citations, and theological emphasis of the ${theologicalLens} tradition.
 ` : ''}
 
 USER INSTRUCTION:

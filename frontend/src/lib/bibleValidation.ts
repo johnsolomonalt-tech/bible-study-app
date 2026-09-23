@@ -64,7 +64,7 @@ const VERSE_CITATION_REGEX = /\b(\d{1,3}:\d{1,3}(-\d{1,3})?|ch(apter)?\.?\s*\d+|
 
 export function validateBiblePrompt(
   prompt: string,
-  mode: 'generate' | 'expand' | 'synthesize' = 'generate'
+  mode: 'generate' | 'expand' | 'synthesize' | 'discourse' = 'generate'
 ): ValidationResult {
   const trimmed = prompt.trim();
 
@@ -86,9 +86,9 @@ export function validateBiblePrompt(
     }
   }
 
-  // 3. For 'expand' and 'synthesize' modes:
-  // The user is operating on existing biblical cards on their canvas.
-  if (mode === 'expand' || mode === 'synthesize') {
+  // 3. For 'expand', 'synthesize', and 'discourse' modes:
+  // The user is operating on existing biblical cards or mapping discourse flow.
+  if (mode === 'expand' || mode === 'synthesize' || mode === 'discourse') {
     // Block blatantly off-topic requests (e.g. asking to write python code or sports scores)
     for (const unPattern of UNRELATED_PATTERNS) {
       if (unPattern.test(trimmed) && !BIBLICAL_TOPICS_REGEX.test(trimmed)) {
