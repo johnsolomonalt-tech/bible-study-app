@@ -23,6 +23,7 @@ import {
 import { TranslationSelector } from '@/components/bible/TranslationSelector';
 import { getPassage } from '@/lib/bibleProvider';
 import { AVAILABLE_TRANSLATIONS } from '@/types/bible';
+import { parseVerseFootnote, getCleanScriptureText } from '@/lib/verseParser';
 import { 
   getPreference, 
   setPreference, 
@@ -1256,16 +1257,22 @@ export default function App() {
 
 
   const renderVerseContent = (verse: number, text: string) => {
+    const { mainText, footnote } = parseVerseFootnote(text);
     const verseHighlights = highlights.filter(h => h.verse === verse);
-    if (verseHighlights.length === 0) return <>{text}</>;
+    if (verseHighlights.length === 0) {
+      if (!footnote) return <>{mainText}</>;
+      return (
+        <>
+          {mainText}
+          <span className="text-gray-500 text-sm italic ml-2 select-none" data-footnote="true">
+            {footnote}
+          </span>
+        </>
+      );
+    }
 
-    // Simple implementation: sort highlights by length descending to replace biggest first
-    // In a robust implementation, we would split the string using offsets.
-    // For now, let's use a regex replacement to wrap text in marked spans.
-    // Since React needs elements, we can do this by splitting the string safely.
-    
     // For perfect non-overlapping rendering:
-    let segments: { text: string, highlight?: typeof highlights[0] }[] = [{ text }];
+    let segments: { text: string, highlight?: typeof highlights[0] }[] = [{ text: mainText }];
     
     verseHighlights.forEach(h => {
       let newSegments: typeof segments = [];
@@ -1339,6 +1346,11 @@ export default function App() {
           ) : (
             <span key={i}>{seg.text}</span>
           )
+        )}
+        {footnote && (
+          <span className="text-gray-500 text-sm italic ml-2 select-none" data-footnote="true">
+            {footnote}
+          </span>
         )}
       </>
     );
@@ -1545,7 +1557,7 @@ export default function App() {
     }
     
     setCurrentSpeakingVerseIndex(index);
-    const textToSpeak = bibleVerses[index].text;
+    const textToSpeak = getCleanScriptureText(bibleVerses[index].text);
     
     const utterance = new SpeechSynthesisUtterance(textToSpeak);
     utterance.rate = 0.9; // Slightly slower for reverence

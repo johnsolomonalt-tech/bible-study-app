@@ -6,6 +6,7 @@ import { parseVerseReference } from '@/lib/bibleReferences';
 import { getPassage } from '@/lib/bibleProvider';
 import { AVAILABLE_TRANSLATIONS } from '@/types/bible';
 import { getPreference, PREF_KEYS } from '@/lib/appPreferences';
+import { parseVerseFootnote } from '@/lib/verseParser';
 
 interface AddVerseToCanvasModalProps {
   isOpen: boolean;
@@ -110,7 +111,11 @@ export function AddVerseToCanvasModal({
     if (e) e.preventDefault();
     if (!previewData) return;
 
-    const markdownContent = `> "${previewData.text}"\n\n*${previewData.reference}* (${translation.toUpperCase()})`;
+    const parsed = parseVerseFootnote(previewData.text);
+    const verseBody = parsed.footnote 
+      ? `${parsed.mainText} *(${parsed.footnote})*`
+      : parsed.mainText;
+    const markdownContent = `> "${verseBody}"\n\n*${previewData.reference}* (${translation.toUpperCase()})`;
 
     onAddVerse({
       title: previewData.reference,
@@ -231,7 +236,12 @@ export function AddVerseToCanvasModal({
                     </span>
                   </div>
                   <blockquote className="text-[14px] italic leading-relaxed text-fg border-l-2 border-amber-500/60 pl-3 my-1">
-                    "{previewData.text}"
+                    "{parseVerseFootnote(previewData.text).mainText}"
+                    {parseVerseFootnote(previewData.text).footnote && (
+                      <span className="text-gray-500 text-xs italic block mt-1 not-italic">
+                        ({parseVerseFootnote(previewData.text).footnote})
+                      </span>
+                    )}
                   </blockquote>
                   <div className="text-[11px] text-muted flex items-center gap-1">
                     <span>*Will appear as a clickable verse link on Canvas*</span>

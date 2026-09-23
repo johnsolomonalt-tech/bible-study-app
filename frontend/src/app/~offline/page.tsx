@@ -5,6 +5,7 @@ import { ChevronRight, ChevronLeft, WifiOff, BookOpen } from 'lucide-react';
 import { getPassage } from '@/lib/bibleProvider';
 import { BibleVerse } from '@/types/bible';
 import { getPreference, setPreference, PREF_KEYS } from '@/lib/appPreferences';
+import { parseVerseFootnote } from '@/lib/verseParser';
 
 // --- All 66 Books ---
 const otStr = "Genesis:50,Exodus:40,Leviticus:27,Numbers:36,Deuteronomy:34,Joshua:24,Judges:21,Ruth:4,1 Samuel:31,2 Samuel:24,1 Kings:22,2 Kings:25,1 Chronicles:29,2 Chronicles:36,Ezra:10,Nehemiah:13,Esther:10,Job:42,Psalms:150,Proverbs:31,Ecclesiastes:12,Song of Solomon:8,Isaiah:66,Jeremiah:52,Lamentations:5,Ezekiel:48,Daniel:12,Hosea:14,Joel:3,Amos:9,Obadiah:1,Jonah:4,Micah:7,Nahum:3,Habakkuk:3,Zephaniah:3,Haggai:2,Zechariah:14,Malachi:4";
@@ -156,12 +157,22 @@ export default function OfflinePage() {
             </div>
           ) : (
             <div className="space-y-4 font-merriweather text-lg leading-relaxed text-gray-300">
-              {verses.map(verse => (
-                <div key={verse.verse} className="flex gap-4">
-                  <span className="text-amber-600/50 text-sm mt-1.5 min-w-[1.5rem] font-sans font-medium">{verse.verse}</span>
-                  <p>{verse.text}</p>
-                </div>
-              ))}
+              {verses.map(verse => {
+                const { mainText, footnote } = parseVerseFootnote(verse.text);
+                return (
+                  <div key={verse.verse} className="flex gap-4">
+                    <span className="text-amber-600/50 text-sm mt-1.5 min-w-[1.5rem] font-sans font-medium">{verse.verse}</span>
+                    <p>
+                      {mainText}
+                      {footnote && (
+                        <span className="text-gray-500 text-sm italic ml-2">
+                          {footnote}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
