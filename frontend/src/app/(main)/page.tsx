@@ -2826,11 +2826,11 @@ export default function App() {
               <PanelGroup orientation="vertical" id="theologica-layout-vertical-v2">
                 <Panel defaultSize="75" minSize="30" className="flex flex-col relative">
                   <header className="h-[60px] border-b border-border flex items-center justify-between px-4 lg:px-6 bg-bg shrink-0">
-                <div className="flex items-center gap-1 lg:gap-2">
+                <div className="flex items-center gap-1 lg:gap-2 min-w-0">
                   <button onClick={() => setMobileStudyView('chapters')} className="lg:hidden p-2 text-fg-2 hover:text-fg">
                     <Layout size={20} />
                   </button>
-                  <div className="font-display text-[18px] lg:text-[22px] ml-1">{activeBook.name} {activeChapter}</div>
+                  <div className="font-display text-[18px] lg:text-[22px] ml-1 truncate">{activeBook.name} {activeChapter}</div>
                 </div>
                 <div className="flex items-center gap-2 lg:gap-3">
                   <button onClick={() => setMobileStudyView('ai')} className="lg:hidden p-2 text-fg-2 hover:text-fg">
@@ -2909,7 +2909,7 @@ export default function App() {
                 </div>
               </header>
               <div className="bible-reader-content flex-1 overflow-y-auto custom-scroll p-10 lg:p-16" onMouseUp={handleSelection} onTouchEnd={handleSelection} onContextMenu={handleReaderContextMenu}>
-                <article className="max-w-3xl mx-auto">
+                <article className="max-w-3xl mx-auto w-full break-words">
                   {isInterlinearMode && (
                     <InterlinearModeRibbon
                       isOldTestament={isOldTestament}
