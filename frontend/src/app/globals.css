@@ -159,5 +159,35 @@ body {
 
 .verse-nav-highlight {
   animation: versePulse 2.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-  display: inline-block;
 }
+
+/* Universal automatic line-wrapping: text automatically breaks onto next line without clipping */
+.verse-text,
+.verse-number,
+p[data-verse],
+.bible-reader-content,
+.bible-reader-content article,
+.bible-reader-content p,
+.markdown-body,
+.break-anywhere,
+article,
+blockquote {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  hyphens: manual;
+}
+
+/* Prevent horizontal viewport spill */
+html, body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+

@@ -67,7 +67,7 @@ export function TranslationSelector({
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 rounded-2xl shadow-2xl border border-border-soft bg-surface p-2 z-50 animate-in fade-in-50 zoom-in-95 backdrop-blur-xl">
+        <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 max-w-[calc(100vw-20px)] rounded-2xl shadow-2xl border border-border-soft bg-surface p-2 z-50 animate-in fade-in-50 zoom-in-95 backdrop-blur-xl">
           {/* Header */}
           <div className="px-3 py-2 border-b border-border-soft/60 mb-1.5 flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-meta">

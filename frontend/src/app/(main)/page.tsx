@@ -3,7 +3,7 @@ const API_URL = '';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuth, UserButton, SignIn } from '@clerk/nextjs';
-import { Send, Plus, Layout, Edit, Sparkles, Target, Check, Copy, ChevronRight, ChevronLeft, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow, ShieldCheck, Heart, Layers, Languages } from 'lucide-react';
+import { Send, Plus, Layout, Edit, Sparkles, Target, Check, Copy, ChevronRight, ChevronLeft, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow, ShieldCheck, Heart, Layers, Languages, MoreVertical } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import TextareaAutosize from 'react-textarea-autosize';
 import { getDevotionalForDay, DevotionalEntry } from '../../lib/devotionals';
@@ -471,6 +471,7 @@ export default function App() {
     reference: '',
     backlinks: null,
   });
+  const [isMobileMoreMenuOpen, setIsMobileMoreMenuOpen] = useState(false);
 
   // Load and persist interlinear preferences
   useEffect(() => {
@@ -1123,10 +1124,13 @@ export default function App() {
         }
       }
 
+      const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
       const toolbarHalfWidth = 195;
-      const x = Math.max(toolbarHalfWidth + 12, Math.min(window.innerWidth - toolbarHalfWidth - 12, rect.left + rect.width / 2));
-      const isNearTop = rect.top < 110;
-      const y = isNearTop ? rect.bottom + 8 : rect.top - 6;
+      const x = isMobile 
+        ? window.innerWidth / 2 
+        : Math.max(toolbarHalfWidth + 12, Math.min(window.innerWidth - toolbarHalfWidth - 12, rect.left + rect.width / 2));
+      const isNearTop = rect.top < 130;
+      const y = isNearTop ? rect.bottom + 8 : Math.max(70, rect.top - 6);
 
       setToolbarPosition({
         x,
@@ -1142,6 +1146,9 @@ export default function App() {
     const handleDocumentClick = (e: MouseEvent | TouchEvent) => {
       const target = e.target as HTMLElement | null;
       if (!target) return;
+      if (!target.closest('.mobile-more-menu-container')) {
+        setIsMobileMoreMenuOpen(false);
+      }
       if (target.closest('.floating-verse-toolbar') || target.closest('.verse-number-btn')) return;
       
       // Do not dismiss if user is actively selecting text
@@ -1458,7 +1465,7 @@ export default function App() {
                 verseRef: `${activeBook.name} ${activeChapter}:${verseNum}`,
               });
             }}
-            className="cursor-pointer hover:bg-accent/15 hover:text-accent rounded px-0.5 transition-colors"
+            className="cursor-pointer hover:bg-accent/15 hover:text-accent rounded px-0.5 transition-colors inline-block max-w-full break-words"
             title={`Click to study "${token}" in original ${isOldTestament ? 'Hebrew' : 'Greek'}`}
           >
             {token}
@@ -1477,16 +1484,16 @@ export default function App() {
               verseRef: `${activeBook.name} ${activeChapter}:${verseNum}`,
             });
           }}
-          className={`inline-flex flex-col items-center cursor-pointer group/word mx-0.5 px-1.5 py-0.5 rounded-lg border transition-all select-none align-baseline ${
+          className={`inline-flex flex-col items-center cursor-pointer group/word mx-0.5 px-1.5 py-0.5 rounded-lg border transition-all select-none align-baseline max-w-full break-inside-avoid ${
             isOldTestament
               ? 'bg-amber-500/10 hover:bg-amber-500/25 border-amber-500/30 text-fg'
               : 'bg-cyan-500/10 hover:bg-cyan-500/25 border-cyan-500/30 text-fg'
           }`}
           title={`Original language: ${match.lemma} (${match.strongs}) - Click to inspect word study`}
         >
-          <div className="flex items-center gap-0.5 leading-none mb-0.5">
+          <div className="flex items-center gap-0.5 leading-none mb-0.5 max-w-full flex-wrap justify-center">
             <span
-              className={`text-[11px] font-serif font-bold ${
+              className={`text-[11px] font-serif font-bold truncate max-w-full ${
                 isOldTestament
                   ? 'text-amber-600 dark:text-amber-400'
                   : 'text-cyan-600 dark:text-cyan-300'
@@ -1495,19 +1502,19 @@ export default function App() {
               {match.lemma}
             </span>
             {interlinearShowStrongs && (
-              <span className="text-[9px] font-mono px-1 rounded bg-accent/20 text-accent font-semibold ml-0.5">
+              <span className="text-[9px] font-mono px-1 rounded bg-accent/20 text-accent font-semibold ml-0.5 shrink-0">
                 {match.strongs}
               </span>
             )}
           </div>
 
           {interlinearShowTranslit && (
-            <span className="text-[9px] italic text-muted leading-none mb-0.5">
+            <span className="text-[9px] italic text-muted leading-none mb-0.5 truncate max-w-full">
               /{match.transliteration}/
             </span>
           )}
 
-          <span className="font-serif leading-tight font-medium">
+          <span className="font-serif leading-tight font-medium break-words">
             {token}
           </span>
         </span>
@@ -1523,7 +1530,7 @@ export default function App() {
       return (
         <>
           {renderTextWithInterlinear(mainText, verse)}
-          <span className="text-gray-500 text-sm italic ml-2 select-none" data-footnote="true">
+          <span className="text-gray-500 text-sm italic ml-2 select-none break-words inline" data-footnote="true">
             {footnote}
           </span>
         </>
@@ -1591,10 +1598,13 @@ export default function App() {
                 }
                 setSelectionVerse(verseNumber);
                 
+                const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
+                const isNearTop = rect.top < 130;
                 setToolbarPosition({
-                  x: rect.left + rect.width / 2,
-                  y: rect.top - 4,
-                  highlightId: seg.highlight!.id
+                  x: isMobile ? window.innerWidth / 2 : Math.max(200, Math.min(window.innerWidth - 200, rect.left + rect.width / 2)),
+                  y: isNearTop ? rect.bottom + 8 : Math.max(70, rect.top - 6),
+                  highlightId: seg.highlight!.id,
+                  isBelow: isNearTop
                 });
               }}
               className={`cursor-pointer rounded-sm px-0.5 ${seg.highlight.color === 'yellow' ? 'bg-yellow-500/40 text-inherit' : seg.highlight.color === 'green' ? 'bg-green-500/40 text-inherit' : seg.highlight.color === 'blue' ? 'bg-blue-500/40 text-inherit' : seg.highlight.color === 'pink' ? 'bg-pink-500/40 text-inherit' : 'bg-purple-500/40 text-inherit'}`}
@@ -1607,7 +1617,7 @@ export default function App() {
           )
         )}
         {footnote && (
-          <span className="text-gray-500 text-sm italic ml-2 select-none" data-footnote="true">
+          <span className="text-gray-500 text-sm italic ml-2 select-none break-words inline" data-footnote="true">
             {footnote}
           </span>
         )}
@@ -2326,39 +2336,34 @@ export default function App() {
 
             {/* Mobile Center: Bible Reader */}
             <section className={`flex-1 flex-col h-full bg-bg ${mobileStudyView === 'reader' ? 'flex' : 'hidden'}`}>
-              <header className="h-[60px] border-b border-border flex items-center justify-between px-4 bg-bg shrink-0">
-                <div className="flex items-center gap-1">
-                  <button onClick={() => setMobileStudyView('chapters')} className="p-2 text-fg-2 hover:text-fg">
+              <header className="h-[60px] border-b border-border flex items-center justify-between px-3 sm:px-4 bg-bg shrink-0 relative">
+                <div className="flex items-center gap-1 min-w-0 shrink">
+                  <button onClick={() => setMobileStudyView('chapters')} className="p-2 text-fg-2 hover:text-fg shrink-0 cursor-pointer" title="Choose Book & Chapter">
                     <Layout size={20} />
                   </button>
-                  <div className="font-display text-[18px] ml-1">{activeBook.name} {activeChapter}</div>
+                  <div className="font-display text-[16px] sm:text-[18px] ml-1 truncate font-medium">
+                    {activeBook.name} {activeChapter}
+                  </div>
                 </div>
-                <div className="flex items-center gap-1 sm:gap-2">
-                  <button onClick={() => handleToggleInterlinearMode()} className={`p-2 rounded-lg transition-colors ${isInterlinearMode ? 'bg-accent text-white' : 'text-fg-2 hover:text-fg hover:bg-surface'}`} title={isInterlinearMode ? "Disable Interlinear" : "Enable Interlinear"}>
+
+                <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+                  {/* Interlinear Mode Toggle Button */}
+                  <button 
+                    onClick={() => handleToggleInterlinearMode()} 
+                    className={`p-2 rounded-lg transition-colors cursor-pointer ${
+                      isInterlinearMode ? 'bg-accent text-white' : 'text-fg-2 hover:text-fg hover:bg-surface'
+                    }`} 
+                    title={isInterlinearMode ? "Disable Interlinear" : "Enable Interlinear"}
+                  >
                     <Languages size={18} />
                   </button>
-                  <button onClick={() => setIsLectioModalOpen(true)} className="p-2 rounded-lg text-fg-2 hover:text-accent hover:bg-surface transition-colors" title="Lectio Divina Contemplative Mode">
-                    <Heart size={18} />
-                  </button>
+
+                  {/* Study AI Button */}
                   <button 
-                    onClick={() => {
-                      setBacklinksDrawerState({
-                        isOpen: true,
-                        reference: `${activeBook.name} ${activeChapter}`,
-                        backlinks: totalChapterBacklinks,
-                      });
-                    }} 
-                    className={`p-2 rounded-lg relative transition-colors ${totalChapterBacklinks.totalCount > 0 ? 'text-accent hover:bg-surface' : 'text-fg-2 hover:text-fg hover:bg-surface'}`} 
-                    title="Chapter Backlinks"
+                    onClick={() => setMobileStudyView('ai')} 
+                    className="p-2 text-fg-2 hover:text-fg relative rounded-lg hover:bg-surface transition-colors cursor-pointer" 
+                    title="Study AI"
                   >
-                    <Layers size={18} />
-                    {totalChapterBacklinks.totalCount > 0 && (
-                      <span className="absolute top-1 right-1 min-w-[14px] h-3.5 px-0.5 bg-accent text-white text-[9px] font-bold rounded-full flex items-center justify-center shadow-sm">
-                        {totalChapterBacklinks.totalCount}
-                      </span>
-                    )}
-                  </button>
-                  <button onClick={() => setMobileStudyView('ai')} className="p-2 text-fg-2 hover:text-fg relative" title="Study AI">
                     <Sparkles size={18} />
                     {chatQuotes.length > 0 && (
                       <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 bg-accent text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm">
@@ -2366,22 +2371,148 @@ export default function App() {
                       </span>
                     )}
                   </button>
-                  <button onClick={toggleCompleted} className="flex items-center justify-center p-2 rounded-lg bg-surface text-fg">
-                    <Check size={18} className={isCompleted ? "text-accent" : "text-meta"} /> 
-                  </button>
-                  <button onClick={toggleSpeech} className="flex items-center justify-center p-2 rounded-lg text-fg-2 hover:text-fg hover:bg-surface transition-colors" title="Read chapter aloud">
-                    {isSpeaking ? <VolumeX size={18} /> : <Volume2 size={18} />}
-                  </button>
+
+                  {/* Quick Speech / Pause button if currently speaking */}
+                  {isSpeaking && (
+                    <button 
+                      onClick={toggleSpeech} 
+                      className="p-2 rounded-lg bg-accent/15 text-accent animate-pulse cursor-pointer" 
+                      title="Stop reading chapter"
+                    >
+                      <VolumeX size={18} />
+                    </button>
+                  )}
+
+                  {/* Inline on sm screens (tablets & wider), hidden on compact phones */}
+                  <div className="hidden sm:flex items-center gap-1">
+                    <button 
+                      onClick={() => setIsLectioModalOpen(true)} 
+                      className="p-2 rounded-lg text-fg-2 hover:text-accent hover:bg-surface transition-colors cursor-pointer" 
+                      title="Lectio Divina Contemplative Mode"
+                    >
+                      <Heart size={18} />
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setBacklinksDrawerState({
+                          isOpen: true,
+                          reference: `${activeBook.name} ${activeChapter}`,
+                          backlinks: totalChapterBacklinks,
+                        });
+                      }} 
+                      className={`p-2 rounded-lg relative transition-colors cursor-pointer ${
+                        totalChapterBacklinks.totalCount > 0 ? 'text-accent hover:bg-surface' : 'text-fg-2 hover:text-fg hover:bg-surface'
+                      }`} 
+                      title="Chapter Backlinks"
+                    >
+                      <Layers size={18} />
+                      {totalChapterBacklinks.totalCount > 0 && (
+                        <span className="absolute top-1 right-1 min-w-[14px] h-3.5 px-0.5 bg-accent text-white text-[9px] font-bold rounded-full flex items-center justify-center shadow-sm">
+                          {totalChapterBacklinks.totalCount}
+                        </span>
+                      )}
+                    </button>
+                    <button 
+                      onClick={toggleCompleted} 
+                      className="flex items-center justify-center p-2 rounded-lg bg-surface text-fg cursor-pointer hover:bg-surface-hover"
+                      title={isCompleted ? "Marked as completed" : "Mark as completed"}
+                    >
+                      <Check size={18} className={isCompleted ? "text-accent" : "text-meta"} /> 
+                    </button>
+                    {!isSpeaking && (
+                      <button 
+                        onClick={toggleSpeech} 
+                        className="flex items-center justify-center p-2 rounded-lg text-fg-2 hover:text-fg hover:bg-surface transition-colors cursor-pointer" 
+                        title="Read chapter aloud"
+                      >
+                        <Volume2 size={18} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Translation Selector */}
                   <TranslationSelector 
                     currentTranslation={translation} 
                     onSelectTranslation={setTranslation}
                     theme={theme as 'dark' | 'light'}
                   />
+
+                  {/* More Menu Toggle (Mobile Only) */}
+                  <div className="relative sm:hidden mobile-more-menu-container">
+                    <button
+                      type="button"
+                      onClick={() => setIsMobileMoreMenuOpen(!isMobileMoreMenuOpen)}
+                      className={`p-2 rounded-lg text-fg-2 hover:text-fg hover:bg-surface transition-colors cursor-pointer ${
+                        isMobileMoreMenuOpen ? 'bg-surface text-fg' : ''
+                      }`}
+                      title="More actions"
+                    >
+                      <MoreVertical size={18} />
+                    </button>
+
+                    {isMobileMoreMenuOpen && (
+                      <div 
+                        className="absolute right-0 top-full mt-2 w-56 rounded-2xl bg-surface border border-border-soft shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 backdrop-blur-xl"
+                        onClick={() => setIsMobileMoreMenuOpen(false)}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBacklinksDrawerState({
+                              isOpen: true,
+                              reference: `${activeBook.name} ${activeChapter}`,
+                              backlinks: totalChapterBacklinks,
+                            });
+                          }}
+                          className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-fg/5 text-fg text-xs font-medium cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <Layers size={16} className="text-accent" />
+                            <span>Scripture Backlinks</span>
+                          </div>
+                          {totalChapterBacklinks.totalCount > 0 && (
+                            <span className="min-w-[16px] h-4 px-1 bg-accent text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                              {totalChapterBacklinks.totalCount}
+                            </span>
+                          )}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setIsLectioModalOpen(true)}
+                          className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-fg/5 text-fg text-xs font-medium cursor-pointer"
+                        >
+                          <Heart size={16} className="text-rose-400" />
+                          <span>Lectio Divina</span>
+                        </button>
+
+                        {!isSpeaking && (
+                          <button
+                            type="button"
+                            onClick={toggleSpeech}
+                            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-fg/5 text-fg text-xs font-medium cursor-pointer"
+                          >
+                            <Volume2 size={16} className="text-fg-2" />
+                            <span>Read Chapter Aloud</span>
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={toggleCompleted}
+                          className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-fg/5 text-fg text-xs font-medium cursor-pointer border-t border-border-soft/60 mt-1 pt-2"
+                        >
+                          <Check size={16} className={isCompleted ? "text-accent" : "text-meta"} />
+                          <span>{isCompleted ? 'Marked Completed' : 'Mark Completed'}</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </header>
 
-              <div className="bible-reader-content flex-1 overflow-y-auto custom-scroll p-6" onMouseUp={handleSelection} onTouchEnd={handleSelection} onContextMenu={handleReaderContextMenu}>
-                <article className="max-w-3xl mx-auto">
+              <div className="bible-reader-content flex-1 overflow-y-auto custom-scroll p-4 sm:p-6 lg:p-10" onMouseUp={handleSelection} onTouchEnd={handleSelection} onContextMenu={handleReaderContextMenu}>
+                <article className="max-w-3xl mx-auto w-full break-words">
                   {isInterlinearMode && (
                     <InterlinearModeRibbon
                       isOldTestament={isOldTestament}
@@ -2408,19 +2539,19 @@ export default function App() {
                       <div className="h-4 bg-fg/10 rounded w-3/4"></div>
                     </div>
                   ) : bibleVerses.length > 0 ? (
-                    <div className="font-serif text-[18px] leading-[1.85] text-fg space-y-3.5">
+                    <div className="font-serif text-[17px] sm:text-[18px] leading-[1.85] text-fg space-y-3.5 w-full break-words">
                       {bibleVerses.map((v, index) => (
                         <p 
                           key={v.verse} 
                           data-verse={v.verse} 
-                          className={`group relative rounded-lg py-1 px-2 -mx-2 transition-colors duration-200 ${
+                          className={`group relative rounded-lg py-1 px-1.5 sm:px-2 -mx-1 sm:-mx-2 transition-colors duration-200 break-words ${
                             currentSpeakingVerseIndex === index ? 'text-accent bg-accent/5' : ''
                           }`}
                         >
                           <sup 
                             onClick={handleVerseNumberClick}
                             onTouchEnd={handleVerseNumberClick}
-                            className="verse-number select-none text-[11px] font-sans font-semibold text-muted/80 mr-1.5 cursor-default align-baseline relative -top-0.5 inline-block"
+                            className="verse-number select-none text-[11px] font-sans font-semibold text-muted/80 mr-1.5 cursor-default align-baseline relative -top-0.5 inline-block shrink-0"
                             title={`Verse ${v.verse}`}
                           >
                             {v.verse}
@@ -2433,7 +2564,7 @@ export default function App() {
                                 setVerseInterlinearTarget(v.verse);
                                 setIsVerseInterlinearOpen(true);
                               }}
-                              className={`inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded font-sans font-medium transition-colors select-none cursor-pointer align-baseline relative -top-0.5 mr-1.5 ${
+                              className={`inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded font-sans font-medium transition-colors select-none cursor-pointer align-baseline relative -top-0.5 mr-1.5 shrink-0 ${
                                 isOldTestament
                                   ? 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-600 dark:text-amber-400'
                                   : 'bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-600 dark:text-cyan-400'
@@ -2456,14 +2587,14 @@ export default function App() {
                                   backlinks: bInfo,
                                 });
                               }}
-                              className="inline-flex items-center gap-0.5 text-[10px] px-1 py-0.2 rounded bg-accent/15 hover:bg-accent/25 text-accent font-sans font-medium transition-colors select-none cursor-pointer align-baseline relative -top-0.5 mr-1.5"
+                              className="inline-flex items-center gap-0.5 text-[10px] px-1 py-0.2 rounded bg-accent/15 hover:bg-accent/25 text-accent font-sans font-medium transition-colors select-none cursor-pointer align-baseline relative -top-0.5 mr-1.5 shrink-0"
                               title={`${chapterBacklinksMap.get(v.verse)!.totalCount} backlinks on verse ${v.verse}`}
                             >
                               <Layers size={10} />
                               <span>{chapterBacklinksMap.get(v.verse)!.totalCount}</span>
                             </button>
                           )}
-                          <span className="verse-text">
+                          <span className="verse-text break-words">
                             {renderVerseContent(v.verse, v.text)}
                           </span>
                         </p>
@@ -2805,19 +2936,19 @@ export default function App() {
                       <div className="h-4 bg-fg/10 rounded w-3/4"></div>
                     </div>
                   ) : bibleVerses.length > 0 ? (
-                    <div className="font-serif text-[18px] leading-[1.85] text-fg space-y-3.5">
+                    <div className="font-serif text-[18px] leading-[1.85] text-fg space-y-3.5 w-full break-words">
                       {bibleVerses.map((v, index) => (
                         <p 
                           key={v.verse} 
                           data-verse={v.verse} 
-                          className={`group relative rounded-lg py-1 px-2 -mx-2 transition-colors duration-300 ${
+                          className={`group relative rounded-lg py-1 px-2 -mx-2 transition-colors duration-300 break-words ${
                             currentSpeakingVerseIndex === index ? 'text-accent bg-accent/5' : ''
                           }`}
                         >
                           <sup 
                             onClick={handleVerseNumberClick}
                             onTouchEnd={handleVerseNumberClick}
-                            className={`verse-number select-none text-[11px] font-sans font-semibold mr-1.5 cursor-default align-baseline relative -top-0.5 inline-block ${
+                            className={`verse-number select-none text-[11px] font-sans font-semibold mr-1.5 cursor-default align-baseline relative -top-0.5 inline-block shrink-0 ${
                               currentSpeakingVerseIndex === index ? 'text-accent' : 'text-muted/80'
                             }`}
                             title={`Verse ${v.verse}`}
@@ -2832,7 +2963,7 @@ export default function App() {
                                 setVerseInterlinearTarget(v.verse);
                                 setIsVerseInterlinearOpen(true);
                               }}
-                              className={`inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded font-sans font-medium transition-colors select-none cursor-pointer align-baseline relative -top-0.5 mr-1.5 ${
+                              className={`inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded font-sans font-medium transition-colors select-none cursor-pointer align-baseline relative -top-0.5 mr-1.5 shrink-0 ${
                                 isOldTestament
                                   ? 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-600 dark:text-amber-400'
                                   : 'bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-600 dark:text-cyan-400'
@@ -2855,14 +2986,14 @@ export default function App() {
                                   backlinks: bInfo,
                                 });
                               }}
-                              className="inline-flex items-center gap-0.5 text-[10px] px-1 py-0.2 rounded bg-accent/15 hover:bg-accent/25 text-accent font-sans font-medium transition-colors select-none cursor-pointer align-baseline relative -top-0.5 mr-1.5"
+                              className="inline-flex items-center gap-0.5 text-[10px] px-1 py-0.2 rounded bg-accent/15 hover:bg-accent/25 text-accent font-sans font-medium transition-colors select-none cursor-pointer align-baseline relative -top-0.5 mr-1.5 shrink-0"
                               title={`${chapterBacklinksMap.get(v.verse)!.totalCount} backlinks on verse ${v.verse}`}
                             >
                               <Layers size={10} />
                               <span>{chapterBacklinksMap.get(v.verse)!.totalCount}</span>
                             </button>
                           )}
-                          <span className="verse-text">
+                          <span className="verse-text break-words">
                             {renderVerseContent(v.verse, v.text)}
                           </span>
                         </p>
@@ -3042,10 +3173,14 @@ export default function App() {
         {toolbarPosition && (
           <div 
             onMouseDown={(e) => e.preventDefault()}
-            className={`floating-verse-toolbar fixed z-50 flex items-center gap-2 bg-surface border border-border-soft p-2 rounded-2xl shadow-2xl backdrop-blur-md transform -translate-x-1/2 max-w-[95vw] ${
+            className={`floating-verse-toolbar fixed z-50 flex items-center gap-1.5 sm:gap-2 bg-surface/95 border border-border-soft p-2 rounded-2xl shadow-2xl backdrop-blur-md max-w-[calc(100vw-24px)] overflow-x-auto no-scrollbar custom-scroll ${
               toolbarPosition.isBelow ? 'translate-y-2' : '-translate-y-full'
             }`}
-            style={{ left: toolbarPosition.x, top: toolbarPosition.y }}
+            style={{ 
+              left: Math.max(12, Math.min(typeof window !== 'undefined' ? window.innerWidth - 12 : 360, toolbarPosition.x)), 
+              top: toolbarPosition.y,
+              transform: 'translateX(-50%)'
+            }}
           >
             <button 
               type="button" 
@@ -3141,7 +3276,7 @@ export default function App() {
 
         {/* DEVOTIONAL TAB */}
         {activeTab === 'devotional' && (
-          <div className="flex-1 flex flex-col items-center overflow-y-auto custom-scroll p-4 sm:p-6 lg:p-10 bg-bg">
+          <div className="flex-1 flex flex-col items-center overflow-y-auto custom-scroll p-4 sm:p-6 lg:p-10 pb-24 lg:pb-10 bg-bg">
             <div className="w-full max-w-4xl xl:max-w-5xl space-y-6">
               {/* Day navigation & Time toggle header */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0 pb-2 border-b border-border/50">
@@ -3207,7 +3342,7 @@ export default function App() {
 
               {/* Devotional Article Card with smooth non-overflowing transition */}
               {devotionalEntry && (
-                <article className="border border-border/80 rounded-2xl p-6 sm:p-10 lg:p-14 shadow-lg bg-surface/25 backdrop-blur-sm ring-shadow w-full">
+                <article className="border border-border/80 rounded-2xl p-4 sm:p-8 lg:p-14 shadow-lg bg-surface/25 backdrop-blur-sm ring-shadow w-full break-words">
                   <AnimatePresence mode="wait">
                     <motion.div
                       key={`${displayDay}-${devotionalTime}`}
@@ -3241,7 +3376,7 @@ export default function App() {
                                     navigateToVerse(parsedVerse.book, parsedVerse.chapter, parsedVerse.verse);
                                   }
                                 }}
-                                className={`font-display text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-fg transition-colors ${
+                                className={`font-display text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-fg transition-colors break-words ${
                                   parsedVerse ? 'cursor-pointer hover:text-accent' : ''
                                 }`}
                                 title={parsedVerse ? `Open ${parsedVerse.book} ${parsedVerse.chapter}:${parsedVerse.verse} in Bible reader` : undefined}
@@ -3307,14 +3442,14 @@ export default function App() {
 
                       <div className="w-full h-px bg-border/60 mb-8" />
 
-                      <div className="text-[18px] lg:text-[20px] leading-[2.0] text-fg font-serif mb-10 whitespace-pre-wrap selection:bg-accent/20">
+                      <div className="text-[17px] sm:text-[18px] lg:text-[20px] leading-[2.0] text-fg font-serif mb-10 whitespace-pre-wrap break-words selection:bg-accent/20">
                         {linkifyBibleReferences(
                           devotionalTime === 'morning' ? devotionalEntry.morningText : devotionalEntry.eveningText,
                           navigateToVerse
                         )}
                       </div>
 
-                      <footer className="text-muted text-sm font-medium italic border-t border-border/60 pt-5 flex items-center justify-between">
+                      <footer className="text-muted text-sm font-medium italic border-t border-border/60 pt-5 flex flex-wrap gap-2 items-center justify-between">
                         <span>{devotionalEntry.citation}</span>
                         <span className="text-xs text-muted/80">Spurgeon’s Morning and Evening</span>
                       </footer>
@@ -3332,9 +3467,9 @@ export default function App() {
             <aside className={`w-full lg:w-[280px] border-r border-border bg-bg flex-col shrink-0 ${activeChatId ? 'hidden lg:flex' : 'flex'}`}>
               <header className="h-[60px] border-b border-border flex items-center justify-between px-5 shrink-0">
                 <span className="text-[15px] font-medium text-fg">Conversations</span>
-                <button onClick={handleNewChat} className="p-2 text-fg-2 hover:text-fg hover:bg-surface rounded-lg transition-colors"><Plus size={16} /></button>
+                <button onClick={handleNewChat} className="p-2 text-fg-2 hover:text-fg hover:bg-surface rounded-lg transition-colors cursor-pointer"><Plus size={16} /></button>
               </header>
-              <div className="flex-1 overflow-y-auto custom-scroll p-3 space-y-1">
+              <div className="flex-1 overflow-y-auto custom-scroll p-3 pb-24 lg:pb-3 space-y-1">
                 {chats.map(c => (
                   <div 
                     key={c.id} 
@@ -3347,8 +3482,8 @@ export default function App() {
                         onClick={(e) => {
                           e.stopPropagation();
                           handleRenameChat(c.id, c.title);
-                        }}
-                        className="p-2 lg:p-1 min-w-[44px] min-h-[44px] lg:min-w-0 lg:min-h-0 text-meta hover:text-fg-hover transition-colors"
+                        }} 
+                        className="p-2 lg:p-1 min-w-[44px] min-h-[44px] lg:min-w-0 lg:min-h-0 text-meta hover:text-fg-hover transition-colors cursor-pointer"
                         title="Rename Conversation"
                       >
                         <Edit size={14} />
@@ -3357,8 +3492,8 @@ export default function App() {
                         onClick={(e) => {
                           e.stopPropagation();
                           handleDeleteChat(c.id);
-                        }}
-                        className="p-2 lg:p-1 min-w-[44px] min-h-[44px] lg:min-w-0 lg:min-h-0 text-meta hover:text-accent transition-colors"
+                        }} 
+                        className="p-2 lg:p-1 min-w-[44px] min-h-[44px] lg:min-w-0 lg:min-h-0 text-meta hover:text-accent transition-colors cursor-pointer"
                         title="Delete Conversation"
                       >
                         <Trash2 size={14} />
@@ -3372,16 +3507,16 @@ export default function App() {
             <section className={`flex-1 flex-col bg-bg ${activeChatId ? 'flex' : 'hidden lg:flex'}`}>
               {activeChatId ? (
                 <>
-                  <header className="h-[60px] border-b border-border flex items-center justify-between px-4 lg:px-8 shrink-0">
-                    <div className="flex items-center">
-                      <button onClick={() => setActiveChatId(null)} className="lg:hidden p-2 mr-2 text-fg-2 hover:text-fg">
+                  <header className="h-[60px] border-b border-border flex items-center justify-between px-3 sm:px-4 lg:px-8 shrink-0">
+                    <div className="flex items-center min-w-0 mr-2">
+                      <button onClick={() => setActiveChatId(null)} className="lg:hidden p-2 mr-1 text-fg-2 hover:text-fg shrink-0 cursor-pointer">
                         <ChevronLeft size={20} />
                       </button>
-                      <h2 className="text-[18px] font-medium">{activeChat.title}</h2>
+                      <h2 className="text-[15px] sm:text-[18px] font-medium truncate max-w-[140px] xs:max-w-[220px] sm:max-w-md">{activeChat.title}</h2>
                     </div>
-                    <TheologicalLensSelector currentLens={theologicalLens} onSelectLens={setTheologicalLens} />
+                    <TheologicalLensSelector currentLens={theologicalLens} onSelectLens={setTheologicalLens} compact />
                   </header>
-                  <div className="flex-1 overflow-y-auto custom-scroll p-8 lg:p-12 space-y-8 flex flex-col">
+                  <div className="flex-1 overflow-y-auto custom-scroll p-4 sm:p-8 lg:p-12 space-y-6 sm:space-y-8 flex flex-col">
                     {activeChat.messages.length === 0 ? (
                       <div className="flex-1 flex flex-col items-center justify-center text-meta">
                         <Sparkles size={24} />
@@ -3406,7 +3541,7 @@ export default function App() {
                     )}
                     <div ref={messagesEndRef} />
                   </div>
-                  <form onSubmit={handleSendMessage} className="p-6 border-t border-border w-full shrink-0">
+                  <form onSubmit={handleSendMessage} className="p-3 sm:p-6 border-t border-border w-full shrink-0">
                     <div className="flex flex-col max-w-4xl mx-auto w-full">
                       {chatQuotes.length > 0 && (
                         <div className="mb-3 max-w-3xl">
@@ -3514,20 +3649,20 @@ export default function App() {
 
 
           return (
-            <div className="flex-1 overflow-y-auto custom-scroll p-10 lg:p-16 bg-bg">
+            <div className="flex-1 overflow-y-auto custom-scroll p-4 sm:p-10 lg:p-16 pb-24 lg:pb-16 bg-bg">
               <div className="max-w-5xl mx-auto">
-                <header className="mb-12">
-                  <h1 className="text-[40px] font-display text-fg mb-3">Reading Tracker</h1>
-                  <p className="text-[16px] text-muted">Track your progress through all 66 books.</p>
+                <header className="mb-6 sm:mb-12">
+                  <h1 className="text-2xl sm:text-[40px] font-display text-fg mb-2 sm:mb-3">Reading Tracker</h1>
+                  <p className="text-sm sm:text-[16px] text-muted">Track your progress through all 66 books.</p>
                 </header>
 
-                <div className="bg-surface p-8 rounded-[20px] ring-shadow mb-16">
+                <div className="bg-surface p-4 sm:p-8 rounded-[20px] ring-shadow mb-8 sm:mb-16">
                   <div className="flex justify-between items-end mb-4">
                     <div>
                       <div className="text-[12px] font-bold tracking-widest text-muted uppercase mb-2">Overall Progress</div>
-                      <div className="text-[32px] font-semibold text-fg leading-none">{progressPercent}%</div>
+                      <div className="text-[28px] sm:text-[32px] font-semibold text-fg leading-none">{progressPercent}%</div>
                     </div>
-                    <div className="text-[15px] font-medium text-fg-2">{completedCount} / {totalChapters} Chapters</div>
+                    <div className="text-xs sm:text-[15px] font-medium text-fg-2">{completedCount} / {totalChapters} Chapters</div>
                   </div>
                   <div className="h-3.5 w-full bg-bg rounded-full overflow-hidden inset-shadow">
                     <div className="h-full bg-accent transition-all duration-700 ease-out" style={{ width: `${progressPercent}%` }} />
@@ -3538,9 +3673,9 @@ export default function App() {
                 <div className="mb-6">
                   <button 
                     onClick={() => toggleTestament('OT')}
-                    className="w-full flex items-center justify-between text-left bg-surface p-5 rounded-[20px] ring-shadow hover:bg-surface-warm transition-colors"
+                    className="w-full flex items-center justify-between text-left bg-surface p-3.5 sm:p-5 rounded-[20px] ring-shadow hover:bg-surface-warm transition-colors cursor-pointer"
                   >
-                    <div className="text-[16px] font-bold tracking-widest text-fg uppercase">Old Testament</div>
+                    <div className="text-sm sm:text-[16px] font-bold tracking-widest text-fg uppercase">Old Testament</div>
                     
                       <div className="flex-1 mx-3 sm:mx-6 min-w-[50px]">
                         <div className="h-1.5 w-full bg-bg rounded-full overflow-hidden">
@@ -3559,7 +3694,7 @@ export default function App() {
                           <div key={book.name} className="bg-[#1c1c1b] rounded-[16px] overflow-hidden ring-1 ring-border">
                             <button 
                               onClick={() => toggleBook(book.name)}
-                              className="w-full flex items-center justify-between p-4 hover:bg-surface transition-colors"
+                              className="w-full flex items-center justify-between p-4 hover:bg-surface transition-colors cursor-pointer"
                             >
                               <h3 className="font-medium text-[15px] text-fg">{book.name}</h3>
                               
@@ -3581,7 +3716,7 @@ export default function App() {
                                       <button
                                         key={i}
                                         onClick={() => toggleAnyChapter(id)}
-                                        className={`w-11 h-11 lg:w-9 lg:h-9 rounded-xl text-xs font-semibold flex items-center justify-center transition-all ${
+                                        className={`w-11 h-11 lg:w-9 lg:h-9 rounded-xl text-xs font-semibold flex items-center justify-center transition-all cursor-pointer ${
                                           isChecked 
                                             ? 'bg-accent text-white shadow-sm' 
                                             : 'bg-surface text-muted hover:text-fg hover:bg-border-soft'
@@ -3605,9 +3740,9 @@ export default function App() {
                 <div className="mb-16">
                   <button 
                     onClick={() => toggleTestament('NT')}
-                    className="w-full flex items-center justify-between text-left bg-surface p-5 rounded-[20px] ring-shadow hover:bg-surface-warm transition-colors"
+                    className="w-full flex items-center justify-between text-left bg-surface p-3.5 sm:p-5 rounded-[20px] ring-shadow hover:bg-surface-warm transition-colors cursor-pointer"
                   >
-                    <div className="text-[16px] font-bold tracking-widest text-fg uppercase">New Testament</div>
+                    <div className="text-sm sm:text-[16px] font-bold tracking-widest text-fg uppercase">New Testament</div>
                     
                       <div className="flex-1 mx-3 sm:mx-6 min-w-[50px]">
                         <div className="h-1.5 w-full bg-bg rounded-full overflow-hidden">
@@ -3626,7 +3761,7 @@ export default function App() {
                           <div key={book.name} className="bg-[#1c1c1b] rounded-[16px] overflow-hidden ring-1 ring-border">
                             <button 
                               onClick={() => toggleBook(book.name)}
-                              className="w-full flex items-center justify-between p-4 hover:bg-surface transition-colors"
+                              className="w-full flex items-center justify-between p-4 hover:bg-surface transition-colors cursor-pointer"
                             >
                               <h3 className="font-medium text-[15px] text-fg">{book.name}</h3>
                               
@@ -3648,7 +3783,7 @@ export default function App() {
                                       <button
                                         key={i}
                                         onClick={() => toggleAnyChapter(id)}
-                                        className={`w-11 h-11 lg:w-9 lg:h-9 rounded-xl text-xs font-semibold flex items-center justify-center transition-all ${
+                                        className={`w-11 h-11 lg:w-9 lg:h-9 rounded-xl text-xs font-semibold flex items-center justify-center transition-all cursor-pointer ${
                                           isChecked 
                                             ? 'bg-accent text-white shadow-sm' 
                                             : 'bg-surface text-muted hover:text-fg hover:bg-border-soft'
@@ -3689,12 +3824,12 @@ export default function App() {
                     setNotes([newNote, ...notes]);
                     setActiveNoteId(newNote.id);
                   }}
-                  className="p-2 text-fg-2 hover:text-fg hover:bg-surface rounded-lg transition-colors"
+                  className="p-2 text-fg-2 hover:text-fg hover:bg-surface rounded-lg transition-colors cursor-pointer"
                 >
                   <Plus size={16} />
                 </button>
               </header>
-              <div className="flex-1 overflow-y-auto custom-scroll p-3">
+              <div className="flex-1 overflow-y-auto custom-scroll p-3 pb-24 lg:pb-3">
                 {notes.map(n => (
                   <div 
                     key={n.id} 
@@ -3707,8 +3842,8 @@ export default function App() {
                         onClick={(e) => {
                           e.stopPropagation();
                           handleRenameNoteSidebar(n.id, n.title, n.content);
-                        }}
-                        className="p-2 lg:p-1 min-w-[44px] min-h-[44px] lg:min-w-0 lg:min-h-0 text-meta hover:text-fg-hover transition-colors"
+                        }} 
+                        className="p-2 lg:p-1 min-w-[44px] min-h-[44px] lg:min-w-0 lg:min-h-0 text-meta hover:text-fg-hover transition-colors cursor-pointer"
                         title="Rename Note"
                       >
                         <Edit size={14} />
@@ -3717,8 +3852,8 @@ export default function App() {
                         onClick={(e) => {
                           e.stopPropagation();
                           handleDeleteNote(n.id);
-                        }}
-                        className="p-2 lg:p-1 min-w-[44px] min-h-[44px] lg:min-w-0 lg:min-h-0 text-meta hover:text-accent transition-colors"
+                        }} 
+                        className="p-2 lg:p-1 min-w-[44px] min-h-[44px] lg:min-w-0 lg:min-h-0 text-meta hover:text-accent transition-colors cursor-pointer"
                         title="Delete Note"
                       >
                         <Trash2 size={14} />
@@ -3732,7 +3867,7 @@ export default function App() {
               {activeNoteId ? (
                 <>
                   <header className="h-[60px] border-b border-border flex items-center px-4 lg:px-8 shrink-0">
-                    <button onClick={() => setActiveNoteId(null)} className="lg:hidden p-2 mr-2 text-fg-2 hover:text-fg">
+                    <button onClick={() => setActiveNoteId(null)} className="lg:hidden p-2 mr-2 text-fg-2 hover:text-fg cursor-pointer">
                       <ChevronLeft size={20} />
                     </button>
                     <input 
@@ -3744,7 +3879,7 @@ export default function App() {
                     />
                   </header>
                   <textarea 
-                    className="flex-1 bg-transparent p-8 lg:p-16 focus:outline-none resize-none text-[16px] leading-[1.8] text-fg custom-scroll" 
+                    className="flex-1 bg-transparent p-4 sm:p-8 lg:p-16 pb-24 lg:pb-16 focus:outline-none resize-none text-[16px] leading-[1.8] text-fg custom-scroll" 
                     value={activeNote.content} 
                     onChange={(e) => updateNote(activeNote.id, activeNote.title, e.target.value)}
                     placeholder="Start typing your note here..."
@@ -3794,7 +3929,7 @@ export default function App() {
               {tab === 'notes' && <Edit size={20} className="mb-1" />}
               {tab === 'chats' && <Sparkles size={20} className="mb-1" />}
               {tab === 'tracker' && <Target size={20} className="mb-1" />}
-              <span className="text-[10px] font-medium capitalize">{tab === 'chats' ? 'AI Chats' : tab}</span>
+              <span className="text-[10px] font-medium capitalize truncate max-w-full px-0.5">{tab === 'chats' ? 'AI Chats' : tab}</span>
             </button>
           ))}
         </div>

@@ -153,7 +153,7 @@ export function LectioDivinaModal({
         </div>
 
         {/* 4-Stage Progress Stepper */}
-        <div className="px-6 py-3 border-b border-zinc-200 dark:border-zinc-800/80 bg-zinc-100/50 dark:bg-zinc-900/40 flex items-center justify-between">
+        <div className="px-3 sm:px-6 py-2.5 sm:py-3 border-b border-zinc-200 dark:border-zinc-800/80 bg-zinc-100/50 dark:bg-zinc-900/40 flex items-center justify-around sm:justify-between flex-wrap gap-1">
           {STAGES.map((st, i) => {
             const isActive = currentStage === st.id;
             const isCompleted = currentStageIndex > i;
@@ -162,7 +162,7 @@ export function LectioDivinaModal({
                 key={st.id}
                 type="button"
                 onClick={() => setCurrentStage(st.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer ${
+                className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer ${
                   isActive
                     ? 'bg-amber-500 text-white font-bold shadow-xs'
                     : isCompleted
@@ -178,7 +178,7 @@ export function LectioDivinaModal({
         </div>
 
         {/* Stage Content */}
-        <div className="p-6 sm:p-8 overflow-y-auto space-y-6 flex-1 custom-scroll">
+        <div className="p-4 sm:p-8 overflow-y-auto space-y-6 flex-1 custom-scroll">
           {/* STAGE 1: LECTIO */}
           {currentStage === 'lectio' && (
             <div className="space-y-5 animate-in fade-in duration-200">
@@ -192,7 +192,7 @@ export function LectioDivinaModal({
                 </p>
               </div>
 
-              <div className={`p-6 rounded-2xl border leading-relaxed font-serif text-base sm:text-lg italic shadow-inner ${
+              <div className={`p-4 sm:p-6 rounded-2xl border leading-relaxed font-serif text-base sm:text-lg italic shadow-inner max-h-64 overflow-y-auto custom-scroll break-words ${
                 isDark 
                   ? 'bg-zinc-900/80 border-zinc-800 text-zinc-200' 
                   : 'bg-white border-amber-100 text-zinc-800'
@@ -241,11 +241,11 @@ export function LectioDivinaModal({
                 />
               </div>
 
-              <div className="flex justify-between items-center pt-3">
+              <div className="flex flex-wrap gap-2 justify-between items-center pt-3">
                 <button
                   type="button"
                   onClick={() => setCurrentStage('lectio')}
-                  className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200"
+                  className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 cursor-pointer"
                 >
                   <ChevronLeft size={15} />
                   <span>Back to Scripture</span>
@@ -254,7 +254,7 @@ export function LectioDivinaModal({
                 <button
                   type="button"
                   onClick={() => setCurrentStage('oratio')}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 text-white font-semibold text-xs hover:bg-amber-600 transition-all cursor-pointer shadow-md"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 text-white font-semibold text-xs hover:bg-amber-600 transition-all cursor-pointer shadow-md ml-auto"
                 >
                   <span>Proceed to Oratio (Pray)</span>
                   <ChevronRight size={15} />
@@ -291,11 +291,11 @@ export function LectioDivinaModal({
                 />
               </div>
 
-              <div className="flex justify-between items-center pt-3">
+              <div className="flex flex-wrap gap-2 justify-between items-center pt-3">
                 <button
                   type="button"
                   onClick={() => setCurrentStage('meditatio')}
-                  className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200"
+                  className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 cursor-pointer"
                 >
                   <ChevronLeft size={15} />
                   <span>Back to Meditatio</span>
@@ -308,7 +308,7 @@ export function LectioDivinaModal({
                     setTimeRemaining(timerDuration);
                     setIsTimerRunning(true);
                   }}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 text-white font-semibold text-xs hover:bg-amber-600 transition-all cursor-pointer shadow-md"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 text-white font-semibold text-xs hover:bg-amber-600 transition-all cursor-pointer shadow-md ml-auto"
                 >
                   <span>Proceed to Contemplatio (Rest)</span>
                   <ChevronRight size={15} />
@@ -385,26 +385,27 @@ export function LectioDivinaModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="px-6 py-4 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-900/30">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-zinc-200 dark:border-zinc-800 flex flex-wrap gap-2 items-center justify-between bg-zinc-50/50 dark:bg-zinc-900/30">
           <div className="text-xs text-zinc-400 flex items-center gap-1.5">
-            <Feather size={14} className="text-amber-500" />
-            <span>&ldquo;Be still and know that I am God.&rdquo; — Psalm 46:10</span>
+            <Feather size={14} className="text-amber-500 shrink-0" />
+            <span className="hidden sm:inline">&ldquo;Be still and know that I am God.&rdquo; — Psalm 46:10</span>
+            <span className="sm:hidden text-[11px]">Psalm 46:10</span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 ml-auto">
             {onSaveToNotes && (
               <button
                 type="button"
                 onClick={handleSaveToNotes}
                 disabled={isSaving}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer shadow-sm ${
+                className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer shadow-sm ${
                   isSaved
                     ? 'bg-emerald-600 text-white'
                     : 'bg-amber-500 text-white hover:bg-amber-600 active:scale-95'
                 }`}
               >
                 {isSaved ? <Check size={14} /> : <Save size={14} />}
-                <span>{isSaved ? 'Saved to Notes!' : 'Save Reflection to Notes'}</span>
+                <span>{isSaved ? 'Saved!' : 'Save to Notes'}</span>
               </button>
             )}
           </div>

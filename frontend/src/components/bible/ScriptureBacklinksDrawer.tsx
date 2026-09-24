@@ -82,7 +82,7 @@ export function ScriptureBacklinksDrawer({
                 {totalLinks} References
               </span>
             </div>
-            <h2 className="text-lg font-bold font-serif leading-snug mt-0.5">
+            <h2 className="text-lg font-bold font-serif leading-snug mt-0.5 break-words">
               {reference}
             </h2>
           </div>
@@ -222,12 +222,12 @@ export function ScriptureBacklinksDrawer({
                           isDark ? 'bg-zinc-900/40 border-zinc-800' : 'bg-zinc-50 border-zinc-200'
                         }`}
                       >
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-start gap-2 mb-1">
                           <span 
-                            className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs" 
+                            className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs mt-1" 
                             style={{ backgroundColor: hl.color || '#F59E0B' }} 
                           />
-                          <span className="text-xs font-medium text-zinc-300 italic">
+                          <span className="text-xs font-medium text-zinc-300 italic break-words flex-1 min-w-0">
                             &ldquo;{hl.text}&rdquo;
                           </span>
                         </div>

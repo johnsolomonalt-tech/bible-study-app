@@ -139,11 +139,11 @@ export function VerseInterlinearModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-md animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6 bg-black/60 backdrop-blur-md animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className={`w-full max-w-4xl max-h-[90vh] rounded-3xl border shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 ${
+        className={`w-full max-w-4xl max-h-[92vh] rounded-2xl sm:rounded-3xl border shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 ${
           isDark
             ? 'bg-[#18181e] border-zinc-700/80 text-zinc-100 shadow-[0_25px_60px_rgba(0,0,0,0.8)]'
             : 'bg-white border-zinc-200 text-zinc-900 shadow-[0_25px_60px_rgba(0,0,0,0.15)]'
@@ -151,39 +151,39 @@ export function VerseInterlinearModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <header className="p-4 sm:p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3 shrink-0">
-          <div className="flex items-center gap-3">
+        <header className="p-3 sm:p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-2 sm:gap-3 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <div
-              className={`p-2.5 rounded-2xl ${
+              className={`p-2 rounded-xl sm:p-2.5 sm:rounded-2xl shrink-0 ${
                 isOldTestament
                   ? 'bg-amber-500/15 text-amber-500 border border-amber-500/30'
                   : 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30'
               }`}
             >
-              <Languages size={22} />
+              <Languages size={20} />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base sm:text-lg font-bold font-serif">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <h2 className="text-sm sm:text-lg font-bold font-serif truncate">
                   {bookName} {chapter}:{currentVerseObj.verse}
                 </h2>
                 <span
-                  className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                  className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider px-1.5 sm:px-2 py-0.5 rounded-full border shrink-0 ${
                     isOldTestament
                       ? 'bg-amber-500/15 text-amber-500 border-amber-500/30'
                       : 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30'
                   }`}
                 >
-                  {isOldTestament ? 'Biblical Hebrew' : 'Koine Greek'}
+                  {isOldTestament ? 'Hebrew' : 'Greek'}
                 </span>
               </div>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              <p className="text-[11px] sm:text-xs text-zinc-500 dark:text-zinc-400 truncate hidden xs:block">
                 Word-by-word morphological and Strong's concordance breakdown
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Verse Paging */}
             <div className="flex items-center bg-zinc-100 dark:bg-zinc-800/80 rounded-xl p-0.5 border border-zinc-200 dark:border-zinc-700">
               <button
@@ -195,7 +195,7 @@ export function VerseInterlinearModal({
               >
                 <ChevronLeft size={16} />
               </button>
-              <span className="text-xs font-semibold px-2 font-mono">
+              <span className="text-xs font-semibold px-1.5 font-mono">
                 v.{selectedVerseNum}
               </span>
               <button
@@ -215,7 +215,7 @@ export function VerseInterlinearModal({
             <button
               type="button"
               onClick={onClose}
-              className="p-2 rounded-xl text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors cursor-pointer"
+              className="p-1.5 sm:p-2 rounded-xl text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors cursor-pointer"
               title="Close modal"
             >
               <X size={18} />
@@ -224,15 +224,15 @@ export function VerseInterlinearModal({
         </header>
 
         {/* Full Verse Quote Box */}
-        <div className="p-4 sm:p-5 bg-zinc-50 dark:bg-zinc-900/50 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
-          <p className="font-serif text-base sm:text-lg leading-relaxed text-zinc-800 dark:text-zinc-200 italic">
+        <div className="p-3 sm:p-5 bg-zinc-50 dark:bg-zinc-900/50 border-b border-zinc-200 dark:border-zinc-800 shrink-0 max-h-40 overflow-y-auto custom-scroll">
+          <p className="font-serif text-sm sm:text-base leading-relaxed text-zinc-800 dark:text-zinc-200 italic break-words">
             "{currentVerseObj.text}"
           </p>
         </div>
 
         {/* Word-by-Word Grid Container */}
-        <div className="flex-1 overflow-y-auto custom-scroll p-4 sm:p-6 space-y-3">
-          <div className="flex items-center justify-between mb-2">
+        <div className="flex-1 overflow-y-auto custom-scroll p-3 sm:p-6 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
             <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">
               Analyzed Words ({wordTokens.length})
             </span>
@@ -242,7 +242,7 @@ export function VerseInterlinearModal({
                 type="button"
                 onClick={handleExportFullVerseToCanvas}
                 disabled={hasExportedAll}
-                className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border transition-all cursor-pointer shadow-sm ${
+                className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 sm:px-3 py-1.5 rounded-xl border transition-all cursor-pointer shadow-sm ${
                   hasExportedAll
                     ? 'bg-emerald-600 text-white border-emerald-600'
                     : 'bg-accent text-white border-accent hover:bg-accent/90'
@@ -256,7 +256,7 @@ export function VerseInterlinearModal({
                 ) : (
                   <>
                     <Plus size={14} />
-                    <span>Send Full Verse Breakdown to Canvas</span>
+                    <span><span className="hidden sm:inline">Send Full Verse Breakdown</span><span className="sm:hidden">Send</span> to Canvas</span>
                   </>
                 )}
               </button>

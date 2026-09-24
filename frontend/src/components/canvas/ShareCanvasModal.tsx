@@ -159,17 +159,17 @@ export function ShareCanvasModal({
         </div>
 
         {/* Footer Info */}
-        <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-xs text-zinc-500">
+        <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between flex-wrap gap-2 text-xs text-zinc-500">
           <div className="flex items-center gap-1.5">
-            <Globe size={13} className="text-emerald-500" />
-            <span>Anyone with the link can explore this board.</span>
+            <Globe size={13} className="text-emerald-500 shrink-0" />
+            <span className="break-words">Anyone with the link can explore this board.</span>
           </div>
 
           <a
             href={shareUrl}
             target="_blank"
             rel="noreferrer"
-            className="flex items-center gap-1 text-accent hover:underline font-semibold"
+            className="flex items-center gap-1 text-accent hover:underline font-semibold shrink-0"
           >
             <span>Open Preview</span>
             <ExternalLink size={12} />

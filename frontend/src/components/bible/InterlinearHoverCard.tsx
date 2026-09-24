@@ -66,7 +66,7 @@ export function InterlinearHoverCard({
 
   return (
     <div
-      className={`z-50 w-80 sm:w-96 rounded-2xl shadow-2xl border p-4 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150 ${
+      className={`z-50 w-full max-w-[calc(100vw-32px)] sm:w-96 rounded-2xl shadow-2xl border p-4 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150 break-words ${
         isDark
           ? 'bg-[#1e1e24]/95 border-zinc-700/80 text-zinc-100 shadow-[0_16px_40px_rgba(0,0,0,0.6)]'
           : 'bg-white/98 border-zinc-200 text-zinc-900 shadow-[0_16px_40px_rgba(0,0,0,0.12)]'
@@ -125,7 +125,7 @@ export function InterlinearHoverCard({
         <div className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
           Theological & Lexical Meaning
         </div>
-        <p className="text-xs leading-relaxed text-zinc-700 dark:text-zinc-300">
+        <p className="text-xs leading-relaxed text-zinc-700 dark:text-zinc-300 break-words">
           {word.definition}
         </p>
       </div>

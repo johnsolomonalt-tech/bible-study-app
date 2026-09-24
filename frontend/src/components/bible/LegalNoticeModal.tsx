@@ -92,12 +92,12 @@ export function LegalNoticeModal({ isOpen, onClose, theme }: LegalNoticeModalPro
                   borderColor: isDark ? '#2e2e32' : '#e4e4e7',
                 }}
               >
-                <div className="flex items-center justify-between font-semibold mb-1">
+                <div className="flex items-center justify-between flex-wrap gap-1.5 font-semibold mb-1">
                   <span style={{ color: isDark ? '#ffffff' : '#141413' }}>
                     {t.name} ({t.abbreviation})
                   </span>
                   <span 
-                    className="text-[10px] px-2 py-0.5 rounded-full font-mono font-medium border"
+                    className="text-[10px] px-2 py-0.5 rounded-full font-mono font-medium border shrink-0"
                     style={{
                       backgroundColor: isDark ? 'rgba(34, 197, 94, 0.15)' : '#ecfdf5',
                       borderColor: isDark ? 'rgba(34, 197, 94, 0.3)' : '#a7f3d0',

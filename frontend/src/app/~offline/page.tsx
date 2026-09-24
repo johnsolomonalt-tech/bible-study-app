@@ -97,7 +97,7 @@ export default function OfflinePage() {
             <span className="font-semibold text-gray-100">Theologica Offline</span>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <select
               value={activeBook}
               onChange={(e) => {
@@ -144,7 +144,7 @@ export default function OfflinePage() {
 
         {/* Content */}
         <div className="flex-1 bg-[#1a1a19]/50 rounded-3xl border border-[#2a2a29] p-6 sm:p-10">
-          <h1 className="text-3xl font-merriweather text-amber-500 mb-8 text-center font-bold">
+          <h1 className="text-3xl font-merriweather text-amber-500 mb-8 text-center font-bold break-words">
             {activeBook} {activeChapter}
           </h1>
 
@@ -160,9 +160,9 @@ export default function OfflinePage() {
               {verses.map(verse => {
                 const { mainText, footnote } = parseVerseFootnote(verse.text);
                 return (
-                  <div key={verse.verse} className="flex gap-4">
-                    <span className="text-amber-600/50 text-sm mt-1.5 min-w-[1.5rem] font-sans font-medium">{verse.verse}</span>
-                    <p>
+                  <div key={verse.verse} className="flex gap-3 sm:gap-4 items-baseline">
+                    <span className="text-amber-600/50 text-sm mt-1.5 min-w-[1.5rem] font-sans font-medium shrink-0">{verse.verse}</span>
+                    <p className="break-words flex-1 min-w-0">
                       {mainText}
                       {footnote && (
                         <span className="text-gray-500 text-sm italic ml-2">

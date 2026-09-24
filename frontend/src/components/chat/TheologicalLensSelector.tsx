@@ -127,7 +127,7 @@ export function TheologicalLensSelector({
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute right-0 mt-1.5 w-72 origin-top-right rounded-xl bg-surface border border-border shadow-xl z-50 overflow-hidden divide-y divide-border/60 animate-in fade-in-0 zoom-in-95 duration-100">
+        <div className="absolute right-0 mt-1.5 w-72 max-w-[calc(100vw-24px)] origin-top-right rounded-xl bg-surface border border-border shadow-xl z-50 overflow-hidden divide-y divide-border/60 animate-in fade-in-0 zoom-in-95 duration-100">
           <div className="px-3.5 py-2.5 bg-bg/60">
             <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted uppercase tracking-wider">
               <Sparkles size={11} className="text-accent" />

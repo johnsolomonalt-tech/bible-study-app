@@ -180,7 +180,7 @@ export function ExportStudyGuideModal({
         {/* Configuration Bar */}
         <div className="px-5 py-3 border-b border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/40 flex flex-wrap items-center justify-between gap-3">
           {/* Format Selector Pills */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center flex-wrap gap-1.5">
             {FORMAT_OPTIONS.map((fmt) => {
               const Icon = fmt.icon;
               const isSelected = selectedFormat === fmt.id;
@@ -265,7 +265,7 @@ export function ExportStudyGuideModal({
               placeholder="Edit markdown guide directly..."
             />
           ) : (
-            <div className={`prose max-w-none ${isDark ? 'prose-invert' : ''}`}>
+            <div className={`prose max-w-none break-words ${isDark ? 'prose-invert' : ''}`}>
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {generatedMarkdown || '# No content generated yet.\nClick **Regenerate** above.'}
               </ReactMarkdown>
@@ -274,7 +274,7 @@ export function ExportStudyGuideModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30">
+        <div className="flex items-center justify-between flex-wrap gap-2 px-5 py-3.5 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30">
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -286,11 +286,11 @@ export function ExportStudyGuideModal({
               }`}
             >
               {isEditing ? <Eye size={14} /> : <Edit3 size={14} />}
-              <span>{isEditing ? 'Preview Markdown' : 'Edit Text'}</span>
+              <span>{isEditing ? 'Preview' : 'Edit Text'}</span>
             </button>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center flex-wrap gap-2">
             <button
               type="button"
               onClick={handlePrint}
@@ -324,7 +324,7 @@ export function ExportStudyGuideModal({
               }`}
             >
               {copied ? <Check size={14} /> : <Copy size={14} />}
-              <span>{copied ? 'Copied to Clipboard!' : 'Copy Markdown'}</span>
+              <span>{copied ? 'Copied!' : 'Copy'}</span>
             </button>
           </div>
         </div>

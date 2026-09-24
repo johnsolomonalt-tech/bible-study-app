@@ -303,13 +303,13 @@ export function TheologicaAiCanvasModal({
 
         {/* Mode Navigation Tabs */}
         {!isLoading && (
-          <div className={`flex border-b px-6 pt-2 gap-2 text-xs font-semibold shrink-0 ${
+          <div className={`flex border-b px-4 sm:px-6 pt-2 gap-2 text-xs font-semibold shrink-0 overflow-x-auto no-scrollbar ${
             isDark ? 'border-zinc-800 bg-[#161618]' : 'border-zinc-100 bg-zinc-50/50'
           }`}>
             <button
               type="button"
               onClick={() => setActiveMode('generate')}
-              className={`flex items-center gap-1.5 pb-2.5 px-2 border-b-2 transition-all ${
+              className={`flex items-center gap-1.5 pb-2.5 px-2 border-b-2 transition-all whitespace-nowrap shrink-0 ${
                 activeMode === 'generate'
                   ? 'border-accent text-accent'
                   : 'border-transparent text-zinc-400 hover:text-zinc-200'
@@ -322,7 +322,7 @@ export function TheologicaAiCanvasModal({
             <button
               type="button"
               onClick={() => setActiveMode('discourse')}
-              className={`flex items-center gap-1.5 pb-2.5 px-2 border-b-2 transition-all ${
+              className={`flex items-center gap-1.5 pb-2.5 px-2 border-b-2 transition-all whitespace-nowrap shrink-0 ${
                 activeMode === 'discourse'
                   ? 'border-accent text-accent'
                   : 'border-transparent text-zinc-400 hover:text-zinc-200'
@@ -336,7 +336,7 @@ export function TheologicaAiCanvasModal({
               <button
                 type="button"
                 onClick={() => setActiveMode('expand')}
-                className={`flex items-center gap-1.5 pb-2.5 px-2 border-b-2 transition-all ${
+                className={`flex items-center gap-1.5 pb-2.5 px-2 border-b-2 transition-all whitespace-nowrap shrink-0 ${
                   activeMode === 'expand'
                     ? 'border-accent text-accent'
                     : 'border-transparent text-zinc-400 hover:text-zinc-200'
@@ -350,7 +350,7 @@ export function TheologicaAiCanvasModal({
             <button
               type="button"
               onClick={() => setActiveMode('synthesize')}
-              className={`flex items-center gap-1.5 pb-2.5 px-2 border-b-2 transition-all ${
+              className={`flex items-center gap-1.5 pb-2.5 px-2 border-b-2 transition-all whitespace-nowrap shrink-0 ${
                 activeMode === 'synthesize'
                   ? 'border-accent text-accent'
                   : 'border-transparent text-zinc-400 hover:text-zinc-200'
@@ -469,9 +469,9 @@ export function TheologicaAiCanvasModal({
               )}
 
               {/* Theological Perspective Lens Bar */}
-              <div className="flex items-center justify-between py-2 px-3 rounded-xl bg-zinc-100 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/60 text-xs">
-                <span className="font-semibold text-zinc-500 dark:text-zinc-400">Tradition Lens:</span>
-                <div className="flex items-center gap-1">
+              <div className="flex items-center justify-between flex-wrap gap-2 py-2 px-3 rounded-xl bg-zinc-100 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/60 text-xs">
+                <span className="font-semibold text-zinc-500 dark:text-zinc-400 shrink-0">Tradition Lens:</span>
+                <div className="flex items-center flex-wrap gap-1">
                   {[
                     { id: 'canonical', label: 'Canonical', icon: '🕊️' },
                     { id: 'patristic', label: 'Patristic', icon: '🏛️' },
@@ -610,13 +610,13 @@ export function TheologicaAiCanvasModal({
 
         {/* Modal Footer */}
         {!isLoading && (
-          <div className={`flex items-center justify-between px-6 py-3.5 border-t shrink-0 ${
+          <div className={`flex items-center justify-between flex-wrap gap-2 px-6 py-3.5 border-t shrink-0 ${
             isDark ? 'border-zinc-800 bg-[#141416]' : 'border-zinc-100 bg-zinc-50'
           }`}>
             <span className="text-[11px] text-zinc-500 hidden sm:inline">
               Press <kbd className="px-1 py-0.5 rounded bg-zinc-800 border border-zinc-700 font-mono text-[10px]">{mod.symbol}+Enter</kbd> to generate
             </span>
-            <div className="flex items-center gap-2 ml-auto">
+            <div className="flex items-center gap-2 ml-auto flex-wrap">
               <button
                 type="button"
                 onClick={onClose}
