@@ -1465,7 +1465,7 @@ export default function App() {
                 verseRef: `${activeBook.name} ${activeChapter}:${verseNum}`,
               });
             }}
-            className="cursor-pointer border-b border-dotted border-border-soft/60 hover:border-accent hover:text-accent transition-colors inline-block max-w-full break-words"
+            className="cursor-pointer border-b border-dotted border-border-soft/60 hover:border-accent hover:text-accent transition-colors inline align-baseline break-words px-0.5"
             title={`Click to study "${token}" in original ${isOldTestament ? 'Hebrew' : 'Greek'}`}
           >
             {token}
@@ -1484,35 +1484,34 @@ export default function App() {
               verseRef: `${activeBook.name} ${activeChapter}:${verseNum}`,
             });
           }}
-          className="inline-flex flex-col items-center cursor-pointer group mx-0.5 select-none align-baseline max-w-full break-inside-avoid"
+          className="inline-block text-center align-baseline cursor-pointer group px-0.5 select-none max-w-full break-inside-avoid"
           title={`${match.lemma} (${match.strongs}) - Click to inspect`}
         >
-          {/* Subtle Original Language Gloss */}
-          <span className="flex items-center gap-0.5 leading-none mb-0.5 select-none opacity-75 group-hover:opacity-100 transition-opacity">
+          {/* Subtle Original Language Gloss positioned directly ON TOP of the English word */}
+          <span className="block text-center leading-none mb-1 select-none pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity">
             <span
-              className={`text-[10px] font-serif font-normal ${
+              className={`text-[10px] sm:text-[11px] font-serif font-normal inline-block ${
                 isOldTestament
-                  ? 'text-amber-700/80 dark:text-amber-300/80'
-                  : 'text-cyan-700/80 dark:text-cyan-300/80'
+                  ? 'text-amber-700/90 dark:text-amber-300/90'
+                  : 'text-cyan-700/90 dark:text-cyan-300/90'
               }`}
             >
               {match.lemma}
             </span>
             {interlinearShowStrongs && (
-              <span className="text-[8px] font-mono text-muted/70 ml-0.5">
+              <span className="text-[8px] font-mono text-muted/80 ml-1 inline-block">
                 {match.strongs}
+              </span>
+            )}
+            {interlinearShowTranslit && (
+              <span className="block text-[8px] italic text-muted/70 leading-none mt-0.5">
+                /{match.transliteration}/
               </span>
             )}
           </span>
 
-          {interlinearShowTranslit && (
-            <span className="text-[8px] italic text-muted/60 leading-none mb-0.5">
-              /{match.transliteration}/
-            </span>
-          )}
-
-          {/* English Token - Natural flowing text with subtle dotted underline */}
-          <span className="border-b border-dotted border-border-soft/80 group-hover:border-accent group-hover:text-accent transition-colors leading-tight font-serif break-words">
+          {/* English Token: sits directly on the sentence typographic baseline */}
+          <span className="block text-center border-b border-dotted border-border-soft/80 group-hover:border-accent group-hover:text-accent transition-colors leading-normal font-serif break-words">
             {token}
           </span>
         </span>
@@ -2537,7 +2536,7 @@ export default function App() {
                       <div className="h-4 bg-fg/10 rounded w-3/4"></div>
                     </div>
                   ) : bibleVerses.length > 0 ? (
-                    <div className="font-serif text-[17px] sm:text-[18px] leading-[1.85] text-fg space-y-3.5 w-full break-words">
+                    <div className={`font-serif text-[17px] sm:text-[18px] ${isInterlinearMode ? 'leading-[2.6] sm:leading-[2.8]' : 'leading-[1.85]'} text-fg space-y-3.5 w-full break-words`}>
                       {bibleVerses.map((v, index) => (
                         <p 
                           key={v.verse} 
@@ -2929,7 +2928,7 @@ export default function App() {
                       <div className="h-4 bg-fg/10 rounded w-3/4"></div>
                     </div>
                   ) : bibleVerses.length > 0 ? (
-                    <div className="font-serif text-[18px] leading-[1.85] text-fg space-y-3.5 w-full break-words">
+                    <div className={`font-serif text-[18px] ${isInterlinearMode ? 'leading-[2.6] sm:leading-[2.8]' : 'leading-[1.85]'} text-fg space-y-3.5 w-full break-words`}>
                       {bibleVerses.map((v, index) => (
                         <p 
                           key={v.verse} 
