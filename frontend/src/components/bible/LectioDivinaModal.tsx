@@ -1,20 +1,17 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Heart, 
-  Sparkles, 
   Check, 
   ChevronRight, 
   ChevronLeft, 
   Play, 
   Pause, 
   RotateCcw, 
-  BookOpen, 
   Feather, 
-  Save, 
-  Volume2
+  Save 
 } from 'lucide-react';
 
 interface LectioDivinaModalProps {
@@ -43,7 +40,6 @@ export function LectioDivinaModal({
   theme,
   onSaveToNotes,
 }: LectioDivinaModalProps) {
-  const isDark = theme === 'dark';
   const [currentStage, setCurrentStage] = useState<Stage>('lectio');
   const [reflectedPhrase, setReflectedPhrase] = useState('');
   const [prayerResponse, setPrayerResponse] = useState('');
@@ -119,25 +115,22 @@ export function LectioDivinaModal({
   const currentStageIndex = STAGES.findIndex((s) => s.id === currentStage);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
       <div 
-        className={`w-full max-w-2xl rounded-3xl shadow-2xl border overflow-hidden flex flex-col max-h-[92vh] transition-all ${
-          isDark 
-            ? 'bg-[#151518] border-zinc-700/80 text-zinc-100 shadow-[0_25px_70px_rgba(0,0,0,0.85)]' 
-            : 'bg-[#faf9f6] border-amber-200/80 text-zinc-900 shadow-2xl'
-        }`}
+        className="w-full max-w-2xl rounded-3xl shadow-2xl border border-border bg-bg text-fg overflow-hidden flex flex-col max-h-[92vh] ring-1 ring-border transition-all"
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200/80 dark:border-zinc-800">
+        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-border bg-surface/30">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-amber-500/15 text-amber-500 border border-amber-500/30">
+            <div className="p-2 rounded-xl bg-accent/15 text-accent border border-accent/25">
               <Heart size={18} />
             </div>
             <div>
-              <h2 className="text-base font-serif font-bold tracking-tight">
+              <h2 className="text-base font-serif font-bold text-fg tracking-tight">
                 Lectio Divina
               </h2>
-              <p className="text-xs text-zinc-400">
+              <p className="text-xs text-muted">
                 Ancient Christian Contemplative Prayer & Scripture Meditation
               </p>
             </div>
@@ -146,14 +139,15 @@ export function LectioDivinaModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/30 transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface transition-colors cursor-pointer"
+            title="Close modal"
           >
             <X size={18} />
           </button>
         </div>
 
         {/* 4-Stage Progress Stepper */}
-        <div className="px-3 sm:px-6 py-2.5 sm:py-3 border-b border-zinc-200 dark:border-zinc-800/80 bg-zinc-100/50 dark:bg-zinc-900/40 flex items-center justify-around sm:justify-between flex-wrap gap-1">
+        <div className="px-3 sm:px-6 py-2.5 sm:py-3 border-b border-border bg-surface/40 flex items-center justify-around sm:justify-between flex-wrap gap-1">
           {STAGES.map((st, i) => {
             const isActive = currentStage === st.id;
             const isCompleted = currentStageIndex > i;
@@ -164,10 +158,10 @@ export function LectioDivinaModal({
                 onClick={() => setCurrentStage(st.id)}
                 className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer ${
                   isActive
-                    ? 'bg-amber-500 text-white font-bold shadow-xs'
+                    ? 'bg-accent text-accent-on font-semibold shadow-xs'
                     : isCompleted
-                      ? 'text-amber-500 dark:text-amber-400 font-semibold'
-                      : 'text-zinc-400 hover:text-zinc-200'
+                      ? 'text-accent font-semibold hover:bg-accent/10'
+                      : 'text-muted hover:text-fg hover:bg-surface'
                 }`}
               >
                 <span>{st.icon}</span>
@@ -183,20 +177,16 @@ export function LectioDivinaModal({
           {currentStage === 'lectio' && (
             <div className="space-y-5 animate-in fade-in duration-200">
               <div className="text-center space-y-1">
-                <span className="text-xs uppercase tracking-widest text-amber-500 font-bold">Stage 1: Lectio (Read)</span>
-                <h3 className="text-xl font-serif font-bold text-zinc-100">
+                <span className="text-xs uppercase tracking-widest text-accent font-bold">Stage 1: Lectio (Read)</span>
+                <h3 className="text-xl font-serif font-bold text-fg">
                   {passageReference || 'Scripture Passage'}
                 </h3>
-                <p className="text-xs text-zinc-400 max-w-md mx-auto">
+                <p className="text-xs text-muted max-w-md mx-auto">
                   Read slowly, with gentle breath. Let the words wash over your mind without rushing.
                 </p>
               </div>
 
-              <div className={`p-4 sm:p-6 rounded-2xl border leading-relaxed font-serif text-base sm:text-lg italic shadow-inner max-h-64 overflow-y-auto custom-scroll break-words ${
-                isDark 
-                  ? 'bg-zinc-900/80 border-zinc-800 text-zinc-200' 
-                  : 'bg-white border-amber-100 text-zinc-800'
-              }`}>
+              <div className="p-4 sm:p-6 rounded-2xl border border-border bg-surface/50 leading-relaxed font-serif text-base sm:text-lg italic text-fg shadow-inner max-h-64 overflow-y-auto custom-scroll break-words">
                 &ldquo;{passageText || 'The LORD is my shepherd; I shall not want. He makes me lie down in green pastures. He leads me beside still waters. He restores my soul.'}&rdquo;
               </div>
 
@@ -204,7 +194,7 @@ export function LectioDivinaModal({
                 <button
                   type="button"
                   onClick={() => setCurrentStage('meditatio')}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 text-white font-semibold text-xs hover:bg-amber-600 transition-all cursor-pointer shadow-md"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-accent text-accent-on font-semibold text-xs hover:bg-accent/90 transition-all cursor-pointer shadow-sm active:scale-98"
                 >
                   <span>Proceed to Meditatio (Reflect)</span>
                   <ChevronRight size={15} />
@@ -217,15 +207,15 @@ export function LectioDivinaModal({
           {currentStage === 'meditatio' && (
             <div className="space-y-5 animate-in fade-in duration-200">
               <div className="text-center space-y-1">
-                <span className="text-xs uppercase tracking-widest text-amber-500 font-bold">Stage 2: Meditatio (Reflect)</span>
-                <h3 className="text-xl font-serif font-bold text-zinc-100">What word strikes your heart?</h3>
-                <p className="text-xs text-zinc-400 max-w-md mx-auto">
+                <span className="text-xs uppercase tracking-widest text-accent font-bold">Stage 2: Meditatio (Reflect)</span>
+                <h3 className="text-xl font-serif font-bold text-fg">What word strikes your heart?</h3>
+                <p className="text-xs text-muted max-w-md mx-auto">
                   Hold this word in your spirit like a pearl. How does it touch your present life today?
                 </p>
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-zinc-400">
+                <label className="text-xs font-semibold text-muted">
                   The word, phrase, or impression that captured your attention:
                 </label>
                 <input
@@ -233,11 +223,7 @@ export function LectioDivinaModal({
                   value={reflectedPhrase}
                   onChange={(e) => setReflectedPhrase(e.target.value)}
                   placeholder="e.g., 'He restores my soul' or 'Still waters'..."
-                  className={`w-full px-4 py-3 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 ${
-                    isDark 
-                      ? 'bg-zinc-900 border-zinc-700 text-zinc-100 placeholder-zinc-500' 
-                      : 'bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400'
-                  }`}
+                  className="w-full px-4 py-3 rounded-xl border border-border bg-surface text-fg placeholder:text-meta text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-all"
                 />
               </div>
 
@@ -245,7 +231,7 @@ export function LectioDivinaModal({
                 <button
                   type="button"
                   onClick={() => setCurrentStage('lectio')}
-                  className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 cursor-pointer"
+                  className="flex items-center gap-1.5 text-xs text-muted hover:text-fg hover:bg-surface px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
                 >
                   <ChevronLeft size={15} />
                   <span>Back to Scripture</span>
@@ -254,7 +240,7 @@ export function LectioDivinaModal({
                 <button
                   type="button"
                   onClick={() => setCurrentStage('oratio')}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 text-white font-semibold text-xs hover:bg-amber-600 transition-all cursor-pointer shadow-md ml-auto"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-accent text-accent-on font-semibold text-xs hover:bg-accent/90 transition-all cursor-pointer shadow-sm active:scale-98 ml-auto"
                 >
                   <span>Proceed to Oratio (Pray)</span>
                   <ChevronRight size={15} />
@@ -267,15 +253,15 @@ export function LectioDivinaModal({
           {currentStage === 'oratio' && (
             <div className="space-y-5 animate-in fade-in duration-200">
               <div className="text-center space-y-1">
-                <span className="text-xs uppercase tracking-widest text-amber-500 font-bold">Stage 3: Oratio (Pray)</span>
-                <h3 className="text-xl font-serif font-bold text-zinc-100">Speak to God in response</h3>
-                <p className="text-xs text-zinc-400 max-w-md mx-auto">
+                <span className="text-xs uppercase tracking-widest text-accent font-bold">Stage 3: Oratio (Pray)</span>
+                <h3 className="text-xl font-serif font-bold text-fg">Speak to God in response</h3>
+                <p className="text-xs text-muted max-w-md mx-auto">
                   Dialogue with your Creator about what He revealed. Pour out your gratitude, confession, or need.
                 </p>
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-zinc-400">
+                <label className="text-xs font-semibold text-muted">
                   Your prayer of response:
                 </label>
                 <textarea
@@ -283,11 +269,7 @@ export function LectioDivinaModal({
                   onChange={(e) => setPrayerResponse(e.target.value)}
                   placeholder="Lord, in light of Your word, I bring before You..."
                   rows={4}
-                  className={`w-full p-4 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 resize-none ${
-                    isDark 
-                      ? 'bg-zinc-900 border-zinc-700 text-zinc-100 placeholder-zinc-500' 
-                      : 'bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400'
-                  }`}
+                  className="w-full p-4 rounded-xl border border-border bg-surface text-fg placeholder:text-meta text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent resize-none transition-all"
                 />
               </div>
 
@@ -295,7 +277,7 @@ export function LectioDivinaModal({
                 <button
                   type="button"
                   onClick={() => setCurrentStage('meditatio')}
-                  className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 cursor-pointer"
+                  className="flex items-center gap-1.5 text-xs text-muted hover:text-fg hover:bg-surface px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
                 >
                   <ChevronLeft size={15} />
                   <span>Back to Meditatio</span>
@@ -308,7 +290,7 @@ export function LectioDivinaModal({
                     setTimeRemaining(timerDuration);
                     setIsTimerRunning(true);
                   }}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 text-white font-semibold text-xs hover:bg-amber-600 transition-all cursor-pointer shadow-md ml-auto"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-accent text-accent-on font-semibold text-xs hover:bg-accent/90 transition-all cursor-pointer shadow-sm active:scale-98 ml-auto"
                 >
                   <span>Proceed to Contemplatio (Rest)</span>
                   <ChevronRight size={15} />
@@ -321,17 +303,17 @@ export function LectioDivinaModal({
           {currentStage === 'contemplatio' && (
             <div className="space-y-6 text-center animate-in fade-in duration-200">
               <div className="space-y-1">
-                <span className="text-xs uppercase tracking-widest text-amber-500 font-bold">Stage 4: Contemplatio (Rest)</span>
-                <h3 className="text-xl font-serif font-bold text-zinc-100">Rest quietly in God&apos;s love</h3>
-                <p className="text-xs text-zinc-400 max-w-sm mx-auto">
+                <span className="text-xs uppercase tracking-widest text-accent font-bold">Stage 4: Contemplatio (Rest)</span>
+                <h3 className="text-xl font-serif font-bold text-fg">Rest quietly in God&apos;s love</h3>
+                <p className="text-xs text-muted max-w-sm mx-auto">
                   Release all words and striving. Simply abide in the presence of the One who loves you unconditionally.
                 </p>
               </div>
 
               {/* Countdown Timer Display */}
               <div className="flex flex-col items-center justify-center py-4">
-                <div className="w-36 h-36 rounded-full border-4 border-amber-500/30 flex items-center justify-center relative">
-                  <div className="text-3xl font-mono font-bold tracking-tight text-amber-400">
+                <div className="w-36 h-36 rounded-full border-4 border-accent/30 bg-surface/30 flex items-center justify-center relative shadow-inner">
+                  <div className="text-3xl font-mono font-bold tracking-tight text-accent">
                     {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')}
                   </div>
                 </div>
@@ -340,7 +322,8 @@ export function LectioDivinaModal({
                   <button
                     type="button"
                     onClick={() => setIsTimerRunning(!isTimerRunning)}
-                    className="p-2.5 rounded-full bg-amber-500 text-white hover:bg-amber-600 transition-all cursor-pointer shadow-sm"
+                    className="p-2.5 rounded-full bg-accent text-accent-on hover:bg-accent/90 transition-all cursor-pointer shadow-sm active:scale-95"
+                    title={isTimerRunning ? "Pause Timer" : "Start Timer"}
                   >
                     {isTimerRunning ? <Pause size={16} /> : <Play size={16} />}
                   </button>
@@ -351,7 +334,7 @@ export function LectioDivinaModal({
                       setIsTimerRunning(false);
                       setTimeRemaining(timerDuration);
                     }}
-                    className="p-2.5 rounded-full bg-zinc-800 text-zinc-300 hover:text-white transition-all cursor-pointer"
+                    className="p-2.5 rounded-full bg-surface text-fg-2 hover:text-fg hover:bg-surface-warm border border-border-soft transition-all cursor-pointer"
                     title="Reset Timer"
                   >
                     <RotateCcw size={16} />
@@ -371,8 +354,8 @@ export function LectioDivinaModal({
                       }}
                       className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
                         timerDuration === sec
-                          ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
-                          : 'text-zinc-500 hover:text-zinc-300'
+                          ? 'bg-accent/15 text-accent border border-accent/40 shadow-xs'
+                          : 'text-muted hover:text-fg hover:bg-surface border border-transparent'
                       }`}
                     >
                       {sec / 60}m
@@ -385,9 +368,9 @@ export function LectioDivinaModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-zinc-200 dark:border-zinc-800 flex flex-wrap gap-2 items-center justify-between bg-zinc-50/50 dark:bg-zinc-900/30">
-          <div className="text-xs text-zinc-400 flex items-center gap-1.5">
-            <Feather size={14} className="text-amber-500 shrink-0" />
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-border bg-surface/30 flex flex-wrap gap-2 items-center justify-between">
+          <div className="text-xs text-muted flex items-center gap-1.5">
+            <Feather size={14} className="text-accent shrink-0" />
             <span className="hidden sm:inline">&ldquo;Be still and know that I am God.&rdquo; — Psalm 46:10</span>
             <span className="sm:hidden text-[11px]">Psalm 46:10</span>
           </div>
@@ -401,7 +384,7 @@ export function LectioDivinaModal({
                 className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer shadow-sm ${
                   isSaved
                     ? 'bg-emerald-600 text-white'
-                    : 'bg-amber-500 text-white hover:bg-amber-600 active:scale-95'
+                    : 'bg-accent text-accent-on hover:bg-accent/90 active:scale-95'
                 }`}
               >
                 {isSaved ? <Check size={14} /> : <Save size={14} />}

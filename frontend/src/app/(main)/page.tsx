@@ -472,6 +472,78 @@ export default function App() {
     backlinks: null,
   });
   const [isMobileMoreMenuOpen, setIsMobileMoreMenuOpen] = useState(false);
+  const [isMobileTyping, setIsMobileTyping] = useState(false);
+
+  // Hide mobile bottom toolbar when typing or virtual keyboard is active (prevents toolbar from showing/interfering on scroll)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const isInputElement = (el: Element | null): boolean => {
+      if (!el) return false;
+      const tag = el.tagName?.toLowerCase();
+      if (tag === 'textarea' || (el as HTMLElement).isContentEditable) return true;
+      if (tag === 'input') {
+        const type = (el as HTMLInputElement).type?.toLowerCase();
+        return !['checkbox', 'radio', 'button', 'submit', 'reset', 'range', 'color', 'file'].includes(type);
+      }
+      return false;
+    };
+
+    const handleFocusIn = (e: FocusEvent) => {
+      if (window.innerWidth >= 1024) return;
+      if (isInputElement(e.target as Element)) {
+        setIsMobileTyping(true);
+      }
+    };
+
+    const handleFocusOut = () => {
+      setTimeout(() => {
+        if (!isInputElement(document.activeElement)) {
+          setIsMobileTyping(false);
+        }
+      }, 100);
+    };
+
+    // If user scrolls anywhere on the screen while an input/textarea is focused, guarantee bottom toolbar remains hidden
+    const handleScroll = () => {
+      if (window.innerWidth < 1024 && isInputElement(document.activeElement)) {
+        setIsMobileTyping(true);
+      }
+    };
+
+    // Detect virtual keyboard expansion / collapse on mobile browsers via visualViewport
+    const vv = window.visualViewport;
+    const handleViewportResize = () => {
+      if (window.innerWidth >= 1024) {
+        setIsMobileTyping(false);
+        return;
+      }
+      if (vv && window.innerHeight) {
+        const isKeyboardOpen = vv.height < window.innerHeight * 0.85;
+        if (isKeyboardOpen && isInputElement(document.activeElement)) {
+          setIsMobileTyping(true);
+        } else if (!isInputElement(document.activeElement) && vv.height >= window.innerHeight * 0.88) {
+          setIsMobileTyping(false);
+        }
+      }
+    };
+
+    window.addEventListener('focusin', handleFocusIn);
+    window.addEventListener('focusout', handleFocusOut);
+    window.addEventListener('scroll', handleScroll, { passive: true, capture: true });
+    if (vv) {
+      vv.addEventListener('resize', handleViewportResize);
+    }
+
+    return () => {
+      window.removeEventListener('focusin', handleFocusIn);
+      window.removeEventListener('focusout', handleFocusOut);
+      window.removeEventListener('scroll', handleScroll, { capture: true });
+      if (vv) {
+        vv.removeEventListener('resize', handleViewportResize);
+      }
+    };
+  }, []);
 
   // Load and persist interlinear preferences
   useEffect(() => {
@@ -3896,7 +3968,9 @@ export default function App() {
       </main>
         {/* Mobile Bottom Navigation */}
         <div 
-          className="lg:hidden shrink-0 h-[calc(64px+env(safe-area-inset-bottom))] bg-bg border-t border-border flex items-center justify-around px-2 z-50 w-full"
+          className={`lg:hidden shrink-0 h-[calc(64px+env(safe-area-inset-bottom))] bg-bg border-t border-border flex items-center justify-around px-2 z-50 w-full transition-all duration-200 ${
+            isMobileTyping ? 'hidden pointer-events-none' : 'flex'
+          }`}
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
           {['study', 'canvas', 'devotional', 'notes', 'chats', 'tracker'].map(tab => (
