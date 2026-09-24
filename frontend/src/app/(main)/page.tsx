@@ -1465,7 +1465,7 @@ export default function App() {
                 verseRef: `${activeBook.name} ${activeChapter}:${verseNum}`,
               });
             }}
-            className="cursor-pointer hover:bg-accent/15 hover:text-accent rounded px-0.5 transition-colors inline-block max-w-full break-words"
+            className="cursor-pointer border-b border-dotted border-border-soft/60 hover:border-accent hover:text-accent transition-colors inline-block max-w-full break-words"
             title={`Click to study "${token}" in original ${isOldTestament ? 'Hebrew' : 'Greek'}`}
           >
             {token}
@@ -1484,37 +1484,35 @@ export default function App() {
               verseRef: `${activeBook.name} ${activeChapter}:${verseNum}`,
             });
           }}
-          className={`inline-flex flex-col items-center cursor-pointer group/word mx-0.5 px-1.5 py-0.5 rounded-lg border transition-all select-none align-baseline max-w-full break-inside-avoid ${
-            isOldTestament
-              ? 'bg-amber-500/10 hover:bg-amber-500/25 border-amber-500/30 text-fg'
-              : 'bg-cyan-500/10 hover:bg-cyan-500/25 border-cyan-500/30 text-fg'
-          }`}
-          title={`Original language: ${match.lemma} (${match.strongs}) - Click to inspect word study`}
+          className="inline-flex flex-col items-center cursor-pointer group mx-0.5 select-none align-baseline max-w-full break-inside-avoid"
+          title={`${match.lemma} (${match.strongs}) - Click to inspect`}
         >
-          <div className="flex items-center gap-0.5 leading-none mb-0.5 max-w-full flex-wrap justify-center">
+          {/* Subtle Original Language Gloss */}
+          <span className="flex items-center gap-0.5 leading-none mb-0.5 select-none opacity-75 group-hover:opacity-100 transition-opacity">
             <span
-              className={`text-[11px] font-serif font-bold truncate max-w-full ${
+              className={`text-[10px] font-serif font-normal ${
                 isOldTestament
-                  ? 'text-amber-600 dark:text-amber-400'
-                  : 'text-cyan-600 dark:text-cyan-300'
+                  ? 'text-amber-700/80 dark:text-amber-300/80'
+                  : 'text-cyan-700/80 dark:text-cyan-300/80'
               }`}
             >
               {match.lemma}
             </span>
             {interlinearShowStrongs && (
-              <span className="text-[9px] font-mono px-1 rounded bg-accent/20 text-accent font-semibold ml-0.5 shrink-0">
+              <span className="text-[8px] font-mono text-muted/70 ml-0.5">
                 {match.strongs}
               </span>
             )}
-          </div>
+          </span>
 
           {interlinearShowTranslit && (
-            <span className="text-[9px] italic text-muted leading-none mb-0.5 truncate max-w-full">
+            <span className="text-[8px] italic text-muted/60 leading-none mb-0.5">
               /{match.transliteration}/
             </span>
           )}
 
-          <span className="font-serif leading-tight font-medium break-words">
+          {/* English Token - Natural flowing text with subtle dotted underline */}
+          <span className="border-b border-dotted border-border-soft/80 group-hover:border-accent group-hover:text-accent transition-colors leading-tight font-serif break-words">
             {token}
           </span>
         </span>
@@ -2564,15 +2562,10 @@ export default function App() {
                                 setVerseInterlinearTarget(v.verse);
                                 setIsVerseInterlinearOpen(true);
                               }}
-                              className={`inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded font-sans font-medium transition-colors select-none cursor-pointer align-baseline relative -top-0.5 mr-1.5 shrink-0 ${
-                                isOldTestament
-                                  ? 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-600 dark:text-amber-400'
-                                  : 'bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-600 dark:text-cyan-400'
-                              }`}
-                              title={`Open word-by-word Interlinear study for verse ${v.verse}`}
+                              className="inline-flex items-center text-muted/40 hover:text-accent transition-colors select-none cursor-pointer align-baseline relative -top-0.5 mr-1 shrink-0 p-0.5"
+                              title={`Open word-by-word original language table for verse ${v.verse}`}
                             >
-                              <Languages size={10} />
-                              <span>Interlinear</span>
+                              <Languages size={11} />
                             </button>
                           )}
                           {chapterBacklinksMap.has(v.verse) && (
@@ -2587,7 +2580,7 @@ export default function App() {
                                   backlinks: bInfo,
                                 });
                               }}
-                              className="inline-flex items-center gap-0.5 text-[10px] px-1 py-0.2 rounded bg-accent/15 hover:bg-accent/25 text-accent font-sans font-medium transition-colors select-none cursor-pointer align-baseline relative -top-0.5 mr-1.5 shrink-0"
+                              className="inline-flex items-center gap-0.5 text-[10px] px-1 py-0.5 text-accent/80 hover:text-accent font-sans font-medium transition-colors select-none cursor-pointer align-baseline relative -top-0.5 mr-1 shrink-0"
                               title={`${chapterBacklinksMap.get(v.verse)!.totalCount} backlinks on verse ${v.verse}`}
                             >
                               <Layers size={10} />
@@ -2963,15 +2956,10 @@ export default function App() {
                                 setVerseInterlinearTarget(v.verse);
                                 setIsVerseInterlinearOpen(true);
                               }}
-                              className={`inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded font-sans font-medium transition-colors select-none cursor-pointer align-baseline relative -top-0.5 mr-1.5 shrink-0 ${
-                                isOldTestament
-                                  ? 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-600 dark:text-amber-400'
-                                  : 'bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-600 dark:text-cyan-400'
-                              }`}
-                              title={`Open word-by-word Interlinear study for verse ${v.verse}`}
+                              className="inline-flex items-center text-muted/40 hover:text-accent transition-colors select-none cursor-pointer align-baseline relative -top-0.5 mr-1 shrink-0 p-0.5"
+                              title={`Open word-by-word original language table for verse ${v.verse}`}
                             >
-                              <Languages size={10} />
-                              <span>Interlinear</span>
+                              <Languages size={11} />
                             </button>
                           )}
                           {chapterBacklinksMap.has(v.verse) && (
@@ -2986,7 +2974,7 @@ export default function App() {
                                   backlinks: bInfo,
                                 });
                               }}
-                              className="inline-flex items-center gap-0.5 text-[10px] px-1 py-0.2 rounded bg-accent/15 hover:bg-accent/25 text-accent font-sans font-medium transition-colors select-none cursor-pointer align-baseline relative -top-0.5 mr-1.5 shrink-0"
+                              className="inline-flex items-center gap-0.5 text-[10px] px-1 py-0.5 text-accent/80 hover:text-accent font-sans font-medium transition-colors select-none cursor-pointer align-baseline relative -top-0.5 mr-1 shrink-0"
                               title={`${chapterBacklinksMap.get(v.verse)!.totalCount} backlinks on verse ${v.verse}`}
                             >
                               <Layers size={10} />
@@ -3173,7 +3161,7 @@ export default function App() {
         {toolbarPosition && (
           <div 
             onMouseDown={(e) => e.preventDefault()}
-            className={`floating-verse-toolbar fixed z-50 flex items-center gap-1.5 sm:gap-2 bg-surface/95 border border-border-soft p-2 rounded-2xl shadow-2xl backdrop-blur-md max-w-[calc(100vw-24px)] overflow-x-auto no-scrollbar custom-scroll ${
+            className={`floating-verse-toolbar fixed z-50 flex items-center gap-1 sm:gap-1.5 bg-surface/95 border border-border-soft p-1.5 rounded-xl shadow-xl backdrop-blur-md max-w-[calc(100vw-24px)] overflow-x-auto no-scrollbar custom-scroll ${
               toolbarPosition.isBelow ? 'translate-y-2' : '-translate-y-full'
             }`}
             style={{ 
@@ -3186,88 +3174,88 @@ export default function App() {
               type="button" 
               onMouseDown={(e) => e.preventDefault()} 
               onClick={() => saveHighlight('yellow')} 
-              className="w-7 h-7 sm:w-8 sm:h-8 min-w-[28px] sm:min-w-[32px] rounded-full bg-yellow-500 hover:scale-110 active:scale-95 transition-transform shadow-sm cursor-pointer" 
+              className="w-5 h-5 sm:w-5.5 sm:h-5.5 min-w-[20px] sm:min-w-[22px] rounded-full bg-yellow-400 hover:scale-120 active:scale-90 transition-transform shadow-xs cursor-pointer ring-1 ring-black/10 dark:ring-white/10" 
               title="Highlight Yellow" 
             />
             <button 
               type="button" 
               onMouseDown={(e) => e.preventDefault()} 
               onClick={() => saveHighlight('green')} 
-              className="w-7 h-7 sm:w-8 sm:h-8 min-w-[28px] sm:min-w-[32px] rounded-full bg-green-500 hover:scale-110 active:scale-95 transition-transform shadow-sm cursor-pointer" 
+              className="w-5 h-5 sm:w-5.5 sm:h-5.5 min-w-[20px] sm:min-w-[22px] rounded-full bg-green-500 hover:scale-120 active:scale-90 transition-transform shadow-xs cursor-pointer ring-1 ring-black/10 dark:ring-white/10" 
               title="Highlight Green" 
             />
             <button 
               type="button" 
               onMouseDown={(e) => e.preventDefault()} 
               onClick={() => saveHighlight('blue')} 
-              className="w-7 h-7 sm:w-8 sm:h-8 min-w-[28px] sm:min-w-[32px] rounded-full bg-blue-500 hover:scale-110 active:scale-95 transition-transform shadow-sm cursor-pointer" 
+              className="w-5 h-5 sm:w-5.5 sm:h-5.5 min-w-[20px] sm:min-w-[22px] rounded-full bg-blue-500 hover:scale-120 active:scale-90 transition-transform shadow-xs cursor-pointer ring-1 ring-black/10 dark:ring-white/10" 
               title="Highlight Blue" 
             />
             <button 
               type="button" 
               onMouseDown={(e) => e.preventDefault()} 
               onClick={() => saveHighlight('pink')} 
-              className="w-7 h-7 sm:w-8 sm:h-8 min-w-[28px] sm:min-w-[32px] rounded-full bg-pink-500 hover:scale-110 active:scale-95 transition-transform shadow-sm cursor-pointer" 
+              className="w-5 h-5 sm:w-5.5 sm:h-5.5 min-w-[20px] sm:min-w-[22px] rounded-full bg-pink-400 hover:scale-120 active:scale-90 transition-transform shadow-xs cursor-pointer ring-1 ring-black/10 dark:ring-white/10" 
               title="Highlight Pink" 
             />
             <button 
               type="button" 
               onMouseDown={(e) => e.preventDefault()} 
               onClick={() => saveHighlight('purple')} 
-              className="w-7 h-7 sm:w-8 sm:h-8 min-w-[28px] sm:min-w-[32px] rounded-full bg-purple-500 hover:scale-110 active:scale-95 transition-transform shadow-sm cursor-pointer" 
+              className="w-5 h-5 sm:w-5.5 sm:h-5.5 min-w-[20px] sm:min-w-[22px] rounded-full bg-purple-400 hover:scale-120 active:scale-90 transition-transform shadow-xs cursor-pointer ring-1 ring-black/10 dark:ring-white/10" 
               title="Highlight Purple" 
             />
-            <div className="w-[1px] h-6 bg-border-soft mx-0.5" />
+            <div className="w-[1px] h-5 bg-border-soft mx-0.5" />
             <button 
               type="button"
               onMouseDown={(e) => e.preventDefault()} 
               onClick={askAiAboutHighlight} 
-              className="flex items-center justify-center h-8 sm:h-9 px-3 rounded-xl bg-accent text-white hover:bg-[#d87654] active:scale-95 transition-all text-xs sm:text-sm font-semibold shadow-sm gap-1.5 cursor-pointer shrink-0"
+              className="flex items-center justify-center h-7 sm:h-8 px-2.5 rounded-lg bg-accent text-white hover:bg-[#d87654] active:scale-95 transition-all text-xs font-semibold shadow-xs gap-1.5 cursor-pointer shrink-0"
               title="Ask AI about this verse"
             >
-              <Sparkles size={15} /> <span>Ask AI</span>
+              <Sparkles size={13} /> <span>Ask AI</span>
             </button>
             <button 
               type="button"
               onMouseDown={(e) => e.preventDefault()} 
               onClick={addHighlightToChat} 
-              className="flex items-center justify-center h-8 sm:h-9 px-3 rounded-xl bg-surface border border-border-soft text-fg hover:bg-border-soft active:scale-95 transition-all text-xs sm:text-sm font-semibold shadow-sm gap-1.5 cursor-pointer shrink-0" 
+              className="flex items-center justify-center h-7 sm:h-8 px-2.5 rounded-lg bg-surface border border-border-soft text-fg hover:bg-border-soft active:scale-95 transition-all text-xs font-semibold shadow-xs gap-1.5 cursor-pointer shrink-0" 
               title="Add to Chat"
             >
-              <MessageSquarePlus size={15} />
+              <MessageSquarePlus size={13} />
               <span>Quote</span>
             </button>
             <button 
               type="button"
               onMouseDown={(e) => e.preventDefault()} 
               onClick={addHighlightToCanvas} 
-              className="flex items-center justify-center h-8 sm:h-9 px-3 rounded-xl bg-surface border border-border-soft text-fg hover:bg-border-soft active:scale-95 transition-all text-xs sm:text-sm font-semibold shadow-sm gap-1.5 cursor-pointer shrink-0" 
+              className="flex items-center justify-center h-7 sm:h-8 px-2.5 rounded-lg bg-surface border border-border-soft text-fg hover:bg-border-soft active:scale-95 transition-all text-xs font-semibold shadow-xs gap-1.5 cursor-pointer shrink-0" 
               title="Send to Canvas"
             >
-              <Workflow size={15} />
+              <Workflow size={13} />
               <span>Canvas</span>
             </button>
             <button 
               type="button"
               onMouseDown={(e) => e.preventDefault()} 
               onClick={handleSelectionWordStudy} 
-              className="flex items-center justify-center h-8 sm:h-9 px-3 rounded-xl bg-surface border border-border-soft text-fg hover:bg-border-soft active:scale-95 transition-all text-xs sm:text-sm font-semibold shadow-sm gap-1.5 cursor-pointer shrink-0" 
+              className="flex items-center justify-center h-7 sm:h-8 px-2.5 rounded-lg bg-surface border border-border-soft text-fg hover:bg-border-soft active:scale-95 transition-all text-xs font-semibold shadow-xs gap-1.5 cursor-pointer shrink-0" 
               title="Inspect Hebrew/Greek Word Study"
             >
-              <Languages size={15} className="text-accent" />
+              <Languages size={13} className="text-accent" />
               <span>Word Study</span>
             </button>
             {toolbarPosition.highlightId && (
               <>
-                <div className="w-[1px] h-6 bg-border-soft mx-0.5" />
+                <div className="w-[1px] h-5 bg-border-soft mx-0.5" />
                 <button 
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => deleteHighlight(toolbarPosition.highlightId!)} 
-                  className="flex items-center justify-center h-8 sm:h-9 px-2.5 rounded-xl bg-surface border border-border-soft text-error hover:bg-error hover:text-white transition-all shadow-sm cursor-pointer shrink-0"
+                  className="flex items-center justify-center h-7 sm:h-8 px-2 rounded-lg bg-surface border border-border-soft text-error hover:bg-error hover:text-white transition-all shadow-xs cursor-pointer shrink-0"
                   title="Delete Highlight"
                 >
-                  <Trash2 size={15} />
+                  <Trash2 size={13} />
                 </button>
               </>
             )}
