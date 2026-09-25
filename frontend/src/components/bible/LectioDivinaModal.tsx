@@ -221,10 +221,10 @@ export function LectioDivinaModal({
           </button>
         </div>
 
-        {/* 4-Stage Navigation Toolbar with permanent labels */}
+        {/* 4-Stage Navigation Toolbar */}
         <div className="px-3 sm:px-6 py-2.5 border-b border-border bg-surface/30">
           <div className="grid grid-cols-4 gap-1 sm:gap-1.5 p-1 rounded-2xl bg-surface border border-border/70 shadow-xs">
-            {STAGES.map((st, i) => {
+            {STAGES.map((st) => {
               const isActive = currentStage === st.id;
               const isStageDone = 
                 (st.id === 'lectio') ? (currentStageIndex > 0) :
@@ -237,32 +237,21 @@ export function LectioDivinaModal({
                   key={st.id}
                   type="button"
                   onClick={() => setCurrentStage(st.id)}
-                  className={`flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 py-1.5 sm:py-2 px-1 sm:px-2.5 rounded-xl transition-all cursor-pointer relative select-none ${
+                  className={`flex items-center justify-center gap-1 sm:gap-1.5 py-2 sm:py-2.5 px-1 sm:px-3 rounded-xl transition-all cursor-pointer relative select-none ${
                     isActive
                       ? 'bg-accent text-accent-on font-semibold shadow-xs ring-1 ring-accent/30'
                       : isStageDone
                         ? 'text-accent hover:bg-accent/10 font-medium'
-                        : 'text-muted hover:text-fg hover:bg-surface-warm'
+                        : 'text-muted hover:text-fg hover:bg-surface-warm font-medium'
                   }`}
-                  title={`${st.latin}: ${st.subtitle}`}
+                  title={`${st.latin} (${st.title}): ${st.subtitle}`}
                 >
-                  <div className="flex items-center gap-1">
-                    <span className={`text-[10px] sm:text-xs font-mono font-bold px-1.5 py-0.5 rounded-md leading-none ${
-                      isActive 
-                        ? 'bg-accent-on/20 text-accent-on' 
-                        : isStageDone
-                          ? 'bg-accent/15 text-accent'
-                          : 'bg-surface-warm text-muted'
-                    }`}>
-                      {i + 1}
-                    </span>
-                    {isStageDone && !isActive && (
-                      <Check size={11} className="text-accent" />
-                    )}
-                  </div>
-                  <span className="text-[11px] sm:text-xs font-semibold tracking-tight truncate">
+                  <span className="text-[11.5px] sm:text-xs font-semibold tracking-tight truncate">
                     {st.latin}
                   </span>
+                  {isStageDone && !isActive && (
+                    <Check size={12} className="text-accent shrink-0" strokeWidth={2.5} />
+                  )}
                 </button>
               );
             })}
@@ -275,7 +264,7 @@ export function LectioDivinaModal({
           {currentStage === 'lectio' && (
             <div className="space-y-5 animate-in fade-in duration-200">
               <div className="text-center space-y-1">
-                <span className="text-xs uppercase tracking-widest text-accent font-bold">Stage 1: Lectio (Read)</span>
+                <span className="text-xs uppercase tracking-widest text-accent font-bold">Lectio &bull; Read</span>
                 <h3 className="text-xl font-serif font-bold text-fg">
                   {passageReference || 'Scripture Passage'}
                 </h3>
@@ -315,7 +304,7 @@ export function LectioDivinaModal({
           {currentStage === 'meditatio' && (
             <div className="space-y-5 animate-in fade-in duration-200">
               <div className="text-center space-y-1">
-                <span className="text-xs uppercase tracking-widest text-accent font-bold">Stage 2: Meditatio (Reflect)</span>
+                <span className="text-xs uppercase tracking-widest text-accent font-bold">Meditatio &bull; Reflect</span>
                 <h3 className="text-xl font-serif font-bold text-fg">What word strikes your heart?</h3>
                 <p className="text-xs text-muted max-w-md mx-auto">
                   Hold this word in your spirit like a pearl. How does it touch your present life today?
@@ -366,7 +355,7 @@ export function LectioDivinaModal({
           {currentStage === 'oratio' && (
             <div className="space-y-5 animate-in fade-in duration-200">
               <div className="text-center space-y-1">
-                <span className="text-xs uppercase tracking-widest text-accent font-bold">Stage 3: Oratio (Pray)</span>
+                <span className="text-xs uppercase tracking-widest text-accent font-bold">Oratio &bull; Pray</span>
                 <h3 className="text-xl font-serif font-bold text-fg">Speak to God in response</h3>
                 <p className="text-xs text-muted max-w-md mx-auto">
                   Dialogue with your Creator about what He revealed. Pour out your gratitude, confession, or need.
@@ -421,7 +410,7 @@ export function LectioDivinaModal({
           {currentStage === 'contemplatio' && (
             <div className="space-y-6 text-center animate-in fade-in duration-200">
               <div className="space-y-1">
-                <span className="text-xs uppercase tracking-widest text-accent font-bold">Stage 4: Contemplatio (Rest)</span>
+                <span className="text-xs uppercase tracking-widest text-accent font-bold">Contemplatio &bull; Rest</span>
                 <h3 className="text-xl font-serif font-bold text-fg">Rest quietly in God&apos;s love</h3>
                 <p className="text-xs text-muted max-w-md mx-auto">
                   {isFinished
@@ -463,7 +452,7 @@ export function LectioDivinaModal({
                               onClick={() => setCurrentStage('meditatio')}
                               className="text-accent hover:underline text-[10px]"
                             >
-                              Go to Stage 2 &rarr;
+                              Go to Meditatio &rarr;
                             </button>
                           </div>
                           <input
@@ -485,7 +474,7 @@ export function LectioDivinaModal({
                               onClick={() => setCurrentStage('oratio')}
                               className="text-accent hover:underline text-[10px]"
                             >
-                              Go to Stage 3 &rarr;
+                              Go to Oratio &rarr;
                             </button>
                           </div>
                           <textarea
@@ -629,7 +618,7 @@ export function LectioDivinaModal({
                 disabled={!canSaveToNotes || isSaving}
                 title={
                   !isFinished
-                    ? "Complete contemplation in Stage 4 to save"
+                    ? "Complete contemplation in Contemplatio to save"
                     : !hasMeditatioText && !hasOratioText
                       ? "Add reflection in Meditatio and prayer in Oratio to save"
                       : !hasMeditatioText
