@@ -4089,6 +4089,7 @@ export default function App() {
           onClose={() => setIsLectioModalOpen(false)}
           passageReference={`${activeBook.name} ${activeChapter}`}
           passageText={bibleVerses.map(v => `${v.verse} ${v.text}`).join('\n')}
+          verses={bibleVerses}
           theme={theme as 'dark' | 'light'}
           onSaveToNotes={handleSaveLectioToNotes}
         />

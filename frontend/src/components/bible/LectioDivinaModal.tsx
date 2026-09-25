@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   X, 
   Heart, 
@@ -11,25 +11,27 @@ import {
   Pause, 
   RotateCcw, 
   Feather, 
-  Save 
+  Save,
+  AlertCircle
 } from 'lucide-react';
 
 interface LectioDivinaModalProps {
   isOpen: boolean;
   onClose: () => void;
   passageReference: string;
-  passageText: string;
+  passageText?: string;
+  verses?: { verse: number; text: string }[];
   theme: 'dark' | 'light';
   onSaveToNotes?: (title: string, content: string) => Promise<void>;
 }
 
 type Stage = 'lectio' | 'meditatio' | 'oratio' | 'contemplatio';
 
-const STAGES: { id: Stage; title: string; subtitle: string; latin: string; icon: string }[] = [
-  { id: 'lectio', title: 'Read', subtitle: 'Listen for God\'s voice in the text', latin: 'Lectio', icon: '📖' },
-  { id: 'meditatio', title: 'Reflect', subtitle: 'What word or phrase touches your heart?', latin: 'Meditatio', icon: '🕊️' },
-  { id: 'oratio', title: 'Pray', subtitle: 'Respond honestly in prayer to the Father', latin: 'Oratio', icon: '🙏' },
-  { id: 'contemplatio', title: 'Rest', subtitle: 'Be still in His loving presence', latin: 'Contemplatio', icon: '🕯️' },
+const STAGES: { id: Stage; title: string; subtitle: string; latin: string }[] = [
+  { id: 'lectio', title: 'Read', subtitle: 'Listen for God\'s voice in the text', latin: 'Lectio' },
+  { id: 'meditatio', title: 'Reflect', subtitle: 'What word or phrase touches your heart?', latin: 'Meditatio' },
+  { id: 'oratio', title: 'Pray', subtitle: 'Respond honestly in prayer to the Father', latin: 'Oratio' },
+  { id: 'contemplatio', title: 'Rest', subtitle: 'Be still in His loving presence', latin: 'Contemplatio' },
 ];
 
 export function LectioDivinaModal({
@@ -37,6 +39,7 @@ export function LectioDivinaModal({
   onClose,
   passageReference,
   passageText,
+  verses,
   theme,
   onSaveToNotes,
 }: LectioDivinaModalProps) {
@@ -51,6 +54,55 @@ export function LectioDivinaModal({
   const [timerDuration, setTimerDuration] = useState(120); // 2 minutes default
   const [timeRemaining, setTimeRemaining] = useState(120);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
+
+  // Clean and format verses so each starts on an enter/line break with no spacing inside lines
+  const formattedVerses: { verse: number | string; text: string }[] = useMemo(() => {
+    if (verses && verses.length > 0) {
+      return verses.map((v) => ({
+        verse: v.verse,
+        text: v.text
+          .replace(/\[\s*[HG]\d+\s*\]/g, '')
+          .replace(/<\/?em>/gi, '')
+          .replace(/\s+/g, ' ')
+          .trim()
+      }));
+    }
+    if (passageText) {
+      const lines = passageText.split('\n').filter((l) => l.trim().length > 0);
+      return lines.map((line, idx) => {
+        const match = line.match(/^(\d+)\s*(.*)$/);
+        if (match) {
+          return {
+            verse: parseInt(match[1], 10),
+            text: match[2]
+              .replace(/\[\s*[HG]\d+\s*\]/g, '')
+              .replace(/<\/?em>/gi, '')
+              .replace(/\s+/g, ' ')
+              .trim()
+          };
+        }
+        return {
+          verse: idx + 1,
+          text: line
+            .replace(/\[\s*[HG]\d+\s*\]/g, '')
+            .replace(/<\/?em>/gi, '')
+            .replace(/\s+/g, ' ')
+            .trim()
+        };
+      });
+    }
+    return [
+      {
+        verse: 1,
+        text: 'The LORD is my shepherd; I shall not want. He makes me lie down in green pastures. He leads me beside still waters. He restores my soul.'
+      }
+    ];
+  }, [verses, passageText]);
+
+  // Validation rules
+  const hasMeditatioText = reflectedPhrase.trim().length > 0;
+  const hasOratioText = prayerResponse.trim().length > 0;
+  const canSaveToNotes = isFinished && hasMeditatioText && hasOratioText;
 
   // Reset state when modal is closed
   useEffect(() => {
@@ -113,13 +165,14 @@ export function LectioDivinaModal({
   };
 
   const handleSaveToNotes = async () => {
-    if (!onSaveToNotes || !isFinished) return;
+    if (!onSaveToNotes || !canSaveToNotes) return;
     setIsSaving(true);
     try {
       const title = `Lectio Divina: ${passageReference || 'Scripture Reflection'}`;
-      const content = `## Scripture: ${passageReference}\n\n> "${passageText}"\n\n` +
-        `### Word or Phrase Stirring My Heart (Meditatio)\n${reflectedPhrase || '*Resting in the whole text.*'}\n\n` +
-        `### Prayer of Response (Oratio)\n${prayerResponse || '*Offered silent prayer before the Lord.*'}\n\n` +
+      const versesMd = formattedVerses.map((v) => `**${v.verse}** ${v.text}`).join('\n\n');
+      const content = `## Scripture: ${passageReference}\n\n${versesMd}\n\n` +
+        `### Word or Phrase Stirring My Heart (Meditatio)\n${reflectedPhrase.trim()}\n\n` +
+        `### Prayer of Response (Oratio)\n${prayerResponse.trim()}\n\n` +
         `*Completed with Contemplatio on ${new Date().toLocaleDateString()}*`;
 
       await onSaveToNotes(title, content);
@@ -168,30 +221,52 @@ export function LectioDivinaModal({
           </button>
         </div>
 
-        {/* 4-Stage Progress Stepper */}
-        <div className="px-3 sm:px-6 py-2.5 sm:py-3 border-b border-border bg-surface/40 flex items-center justify-around sm:justify-between flex-wrap gap-1">
-          {STAGES.map((st, i) => {
-            const isActive = currentStage === st.id;
-            const isCompleted = currentStageIndex > i || (i === 3 && isFinished);
-            return (
-              <button
-                key={st.id}
-                type="button"
-                onClick={() => setCurrentStage(st.id)}
-                className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer ${
-                  isActive
-                    ? 'bg-accent text-accent-on font-semibold shadow-xs'
-                    : isCompleted
-                      ? 'text-accent font-semibold hover:bg-accent/10'
-                      : 'text-muted hover:text-fg hover:bg-surface'
-                }`}
-              >
-                <span>{st.icon}</span>
-                <span className="hidden sm:inline">{st.latin}</span>
-                {isCompleted && !isActive && <Check size={12} className="text-accent ml-0.5" />}
-              </button>
-            );
-          })}
+        {/* 4-Stage Navigation Toolbar with permanent labels */}
+        <div className="px-3 sm:px-6 py-2.5 border-b border-border bg-surface/30">
+          <div className="grid grid-cols-4 gap-1 sm:gap-1.5 p-1 rounded-2xl bg-surface border border-border/70 shadow-xs">
+            {STAGES.map((st, i) => {
+              const isActive = currentStage === st.id;
+              const isStageDone = 
+                (st.id === 'lectio') ? (currentStageIndex > 0) :
+                (st.id === 'meditatio') ? (hasMeditatioText) :
+                (st.id === 'oratio') ? (hasOratioText) :
+                (isFinished);
+
+              return (
+                <button
+                  key={st.id}
+                  type="button"
+                  onClick={() => setCurrentStage(st.id)}
+                  className={`flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 py-1.5 sm:py-2 px-1 sm:px-2.5 rounded-xl transition-all cursor-pointer relative select-none ${
+                    isActive
+                      ? 'bg-accent text-accent-on font-semibold shadow-xs ring-1 ring-accent/30'
+                      : isStageDone
+                        ? 'text-accent hover:bg-accent/10 font-medium'
+                        : 'text-muted hover:text-fg hover:bg-surface-warm'
+                  }`}
+                  title={`${st.latin}: ${st.subtitle}`}
+                >
+                  <div className="flex items-center gap-1">
+                    <span className={`text-[10px] sm:text-xs font-mono font-bold px-1.5 py-0.5 rounded-md leading-none ${
+                      isActive 
+                        ? 'bg-accent-on/20 text-accent-on' 
+                        : isStageDone
+                          ? 'bg-accent/15 text-accent'
+                          : 'bg-surface-warm text-muted'
+                    }`}>
+                      {i + 1}
+                    </span>
+                    {isStageDone && !isActive && (
+                      <Check size={11} className="text-accent" />
+                    )}
+                  </div>
+                  <span className="text-[11px] sm:text-xs font-semibold tracking-tight truncate">
+                    {st.latin}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Stage Content */}
@@ -205,15 +280,25 @@ export function LectioDivinaModal({
                   {passageReference || 'Scripture Passage'}
                 </h3>
                 <p className="text-xs text-muted max-w-md mx-auto">
-                  Read slowly, with gentle breath. Let the words wash over your mind without rushing.
+                  Read slowly, with gentle breath. Let each verse settle into your spirit without rushing.
                 </p>
               </div>
 
-              <div className="p-4 sm:p-6 rounded-2xl border border-border bg-surface/50 leading-relaxed font-serif text-base sm:text-lg italic text-fg shadow-inner max-h-64 overflow-y-auto custom-scroll break-words">
-                &ldquo;{passageText || 'The LORD is my shepherd; I shall not want. He makes me lie down in green pastures. He leads me beside still waters. He restores my soul.'}&rdquo;
+              {/* Formatted Verses List */}
+              <div className="p-4 sm:p-6 rounded-2xl border border-border bg-surface/50 font-serif shadow-inner max-h-72 sm:max-h-80 overflow-y-auto custom-scroll space-y-2.5 text-left">
+                {formattedVerses.map((v) => (
+                  <div key={v.verse} className="flex items-start gap-2.5 text-fg leading-snug">
+                    <span className="font-mono text-xs font-bold text-accent select-none pt-0.5 min-w-[20px] text-right shrink-0">
+                      {v.verse}
+                    </span>
+                    <p className="text-sm sm:text-base text-fg/90 flex-1 break-words">
+                      {v.text}
+                    </p>
+                  </div>
+                ))}
               </div>
 
-              <div className="text-center">
+              <div className="text-center pt-1">
                 <button
                   type="button"
                   onClick={() => setCurrentStage('meditatio')}
@@ -238,8 +323,13 @@ export function LectioDivinaModal({
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-muted">
-                  The word, phrase, or impression that captured your attention:
+                <label className="text-xs font-semibold text-muted flex items-center justify-between">
+                  <span>The word, phrase, or impression that captured your attention:</span>
+                  {hasMeditatioText && (
+                    <span className="text-accent text-[11px] font-medium flex items-center gap-1">
+                      <Check size={12} /> Ready
+                    </span>
+                  )}
                 </label>
                 <input
                   type="text"
@@ -284,8 +374,13 @@ export function LectioDivinaModal({
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-muted">
-                  Your prayer of response:
+                <label className="text-xs font-semibold text-muted flex items-center justify-between">
+                  <span>Your prayer of response:</span>
+                  {hasOratioText && (
+                    <span className="text-accent text-[11px] font-medium flex items-center gap-1">
+                      <Check size={12} /> Ready
+                    </span>
+                  )}
                 </label>
                 <textarea
                   value={prayerResponse}
@@ -328,39 +423,109 @@ export function LectioDivinaModal({
               <div className="space-y-1">
                 <span className="text-xs uppercase tracking-widest text-accent font-bold">Stage 4: Contemplatio (Rest)</span>
                 <h3 className="text-xl font-serif font-bold text-fg">Rest quietly in God&apos;s love</h3>
-                <p className="text-xs text-muted max-w-sm mx-auto">
+                <p className="text-xs text-muted max-w-md mx-auto">
                   {isFinished
-                    ? "Your contemplation is complete. You can now save your full reflection to your Notes below, or rest here longer in His presence."
+                    ? (canSaveToNotes
+                        ? "Your contemplation is complete. You can now save your full reflection to your Notes below, or rest here longer in His presence."
+                        : "You finished the contemplation! Please fill in your Meditatio reflection and Oratio prayer below to save your session to Notes.")
                     : "Release all words and striving. Simply abide in the presence of the One who loves you unconditionally."}
                 </p>
               </div>
 
               {isFinished ? (
-                <div className="py-6 px-4 rounded-2xl bg-surface/50 border border-border text-center space-y-4 animate-in zoom-in-95 duration-200">
+                <div className="py-6 px-4 sm:px-6 rounded-2xl bg-surface/50 border border-border text-center space-y-4 animate-in zoom-in-95 duration-200">
                   <div className="w-12 h-12 mx-auto rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center justify-center">
                     <Check size={24} className="stroke-[2.5]" />
                   </div>
                   <div className="space-y-1">
                     <h4 className="font-serif font-bold text-base text-fg">Contemplation Complete</h4>
                     <p className="text-xs text-muted max-w-sm mx-auto">
-                      All four stages of Lectio Divina have been fulfilled. Save your reflection, stirring phrase, and prayer directly into your Notes.
+                      {canSaveToNotes
+                        ? "All four stages of Lectio Divina have been fulfilled. Save your reflection, stirring phrase, and prayer directly into your Notes."
+                        : "Almost done! Add some text to your Meditatio and Oratio stages below to unlock saving to your Notes."}
                     </p>
                   </div>
-                  {onSaveToNotes && (
-                    <button
-                      type="button"
-                      onClick={handleSaveToNotes}
-                      disabled={isSaving}
-                      className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold transition-all shadow-sm cursor-pointer ${
-                        isSaved
-                          ? 'bg-emerald-600 text-white'
-                          : 'bg-accent text-accent-on hover:bg-accent/90 active:scale-95'
-                      }`}
-                    >
-                      {isSaved ? <Check size={14} /> : <Save size={14} />}
-                      <span>{isSaved ? 'Saved to Notes!' : 'Save Reflection to Notes'}</span>
-                    </button>
+
+                  {/* Inline quick-completion if Meditatio or Oratio is empty */}
+                  {(!hasMeditatioText || !hasOratioText) && (
+                    <div className="space-y-3.5 pt-1 text-left max-w-lg mx-auto bg-surface/80 p-4 rounded-2xl border border-border/80 shadow-xs">
+                      <div className="text-xs font-semibold text-fg flex items-center gap-1.5 pb-1 border-b border-border/60">
+                        <AlertCircle size={14} className="text-amber-500 shrink-0" />
+                        <span>Required to save to Notes:</span>
+                      </div>
+
+                      {!hasMeditatioText && (
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between text-[11px] font-semibold text-muted">
+                            <span>Meditatio (What word or phrase touched you?):</span>
+                            <button
+                              type="button"
+                              onClick={() => setCurrentStage('meditatio')}
+                              className="text-accent hover:underline text-[10px]"
+                            >
+                              Go to Stage 2 &rarr;
+                            </button>
+                          </div>
+                          <input
+                            type="text"
+                            value={reflectedPhrase}
+                            onChange={(e) => setReflectedPhrase(e.target.value)}
+                            placeholder="e.g., 'He restores my soul' or a key phrase..."
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-surface text-fg placeholder:text-meta text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-all"
+                          />
+                        </div>
+                      )}
+
+                      {!hasOratioText && (
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between text-[11px] font-semibold text-muted">
+                            <span>Oratio (Your prayer of response):</span>
+                            <button
+                              type="button"
+                              onClick={() => setCurrentStage('oratio')}
+                              className="text-accent hover:underline text-[10px]"
+                            >
+                              Go to Stage 3 &rarr;
+                            </button>
+                          </div>
+                          <textarea
+                            value={prayerResponse}
+                            onChange={(e) => setPrayerResponse(e.target.value)}
+                            placeholder="Lord, in response to Your word, I pray..."
+                            rows={3}
+                            className="w-full p-3.5 rounded-xl border border-border bg-surface text-fg placeholder:text-meta text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent resize-none transition-all"
+                          />
+                        </div>
+                      )}
+                    </div>
                   )}
+
+                  {onSaveToNotes && (
+                    <div className="pt-1">
+                      <button
+                        type="button"
+                        onClick={handleSaveToNotes}
+                        disabled={!canSaveToNotes || isSaving}
+                        className={`inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-semibold transition-all shadow-sm select-none ${
+                          isSaved
+                            ? 'bg-emerald-600 text-white cursor-default'
+                            : !canSaveToNotes
+                              ? 'bg-surface text-muted/50 border border-border/80 cursor-not-allowed opacity-50'
+                              : 'bg-accent text-accent-on hover:bg-accent/90 active:scale-95 cursor-pointer ring-1 ring-accent/30'
+                        }`}
+                      >
+                        {isSaved ? <Check size={14} /> : <Save size={14} />}
+                        <span>
+                          {isSaved
+                            ? 'Saved to Notes!'
+                            : !canSaveToNotes
+                              ? 'Fill Meditatio & Oratio to Save'
+                              : 'Save Full Reflection to Notes'}
+                        </span>
+                      </button>
+                    </div>
+                  )}
+
                   <div className="pt-1">
                     <button
                       type="button"
@@ -461,22 +626,36 @@ export function LectioDivinaModal({
               <button
                 type="button"
                 onClick={handleSaveToNotes}
-                disabled={!isFinished || isSaving}
+                disabled={!canSaveToNotes || isSaving}
                 title={
                   !isFinished
-                    ? "Complete all 4 stages of Lectio Divina to save to Notes"
-                    : "Save reflection to Notes"
+                    ? "Complete contemplation in Stage 4 to save"
+                    : !hasMeditatioText && !hasOratioText
+                      ? "Add reflection in Meditatio and prayer in Oratio to save"
+                      : !hasMeditatioText
+                        ? "Add reflection in Meditatio to save"
+                        : !hasOratioText
+                          ? "Add prayer in Oratio to save"
+                          : "Save reflection to Notes"
                 }
                 className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-xs font-semibold transition-all shadow-sm select-none ${
                   isSaved
                     ? 'bg-emerald-600 text-white cursor-default'
-                    : !isFinished
+                    : !canSaveToNotes
                       ? 'bg-surface text-muted/50 border border-border/60 cursor-not-allowed opacity-50'
                       : 'bg-accent text-accent-on hover:bg-accent/90 active:scale-95 cursor-pointer ring-1 ring-accent/30'
                 }`}
               >
                 {isSaved ? <Check size={14} /> : <Save size={14} />}
-                <span>{isSaved ? 'Saved!' : 'Save to Notes'}</span>
+                <span>
+                  {isSaved
+                    ? 'Saved!'
+                    : !isFinished
+                      ? 'Save to Notes'
+                      : !hasMeditatioText || !hasOratioText
+                        ? 'Requires Meditatio & Oratio'
+                        : 'Save to Notes'}
+                </span>
               </button>
             )}
           </div>
@@ -485,3 +664,4 @@ export function LectioDivinaModal({
     </div>
   );
 }
+
