@@ -45,11 +45,25 @@ export function LectioDivinaModal({
   const [prayerResponse, setPrayerResponse] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [isFinished, setIsFinished] = useState(false);
 
   // Contemplation Timer (Seconds)
   const [timerDuration, setTimerDuration] = useState(120); // 2 minutes default
   const [timeRemaining, setTimeRemaining] = useState(120);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
+
+  // Reset state when modal is closed
+  useEffect(() => {
+    if (!isOpen) {
+      setCurrentStage('lectio');
+      setReflectedPhrase('');
+      setPrayerResponse('');
+      setIsFinished(false);
+      setIsSaved(false);
+      setTimeRemaining(120);
+      setIsTimerRunning(false);
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -58,6 +72,7 @@ export function LectioDivinaModal({
         setTimeRemaining((prev) => {
           if (prev <= 1) {
             setIsTimerRunning(false);
+            setIsFinished(true);
             playGentleBell();
             return 0;
           }
@@ -90,8 +105,15 @@ export function LectioDivinaModal({
     }
   };
 
+  const handleCompleteContemplation = () => {
+    setIsTimerRunning(false);
+    setTimeRemaining(0);
+    setIsFinished(true);
+    playGentleBell();
+  };
+
   const handleSaveToNotes = async () => {
-    if (!onSaveToNotes) return;
+    if (!onSaveToNotes || !isFinished) return;
     setIsSaving(true);
     try {
       const title = `Lectio Divina: ${passageReference || 'Scripture Reflection'}`;
@@ -150,7 +172,7 @@ export function LectioDivinaModal({
         <div className="px-3 sm:px-6 py-2.5 sm:py-3 border-b border-border bg-surface/40 flex items-center justify-around sm:justify-between flex-wrap gap-1">
           {STAGES.map((st, i) => {
             const isActive = currentStage === st.id;
-            const isCompleted = currentStageIndex > i;
+            const isCompleted = currentStageIndex > i || (i === 3 && isFinished);
             return (
               <button
                 key={st.id}
@@ -166,6 +188,7 @@ export function LectioDivinaModal({
               >
                 <span>{st.icon}</span>
                 <span className="hidden sm:inline">{st.latin}</span>
+                {isCompleted && !isActive && <Check size={12} className="text-accent ml-0.5" />}
               </button>
             );
           })}
@@ -306,63 +329,121 @@ export function LectioDivinaModal({
                 <span className="text-xs uppercase tracking-widest text-accent font-bold">Stage 4: Contemplatio (Rest)</span>
                 <h3 className="text-xl font-serif font-bold text-fg">Rest quietly in God&apos;s love</h3>
                 <p className="text-xs text-muted max-w-sm mx-auto">
-                  Release all words and striving. Simply abide in the presence of the One who loves you unconditionally.
+                  {isFinished
+                    ? "Your contemplation is complete. You can now save your full reflection to your Notes below, or rest here longer in His presence."
+                    : "Release all words and striving. Simply abide in the presence of the One who loves you unconditionally."}
                 </p>
               </div>
 
-              {/* Countdown Timer Display */}
-              <div className="flex flex-col items-center justify-center py-4">
-                <div className="w-36 h-36 rounded-full border-4 border-accent/30 bg-surface/30 flex items-center justify-center relative shadow-inner">
-                  <div className="text-3xl font-mono font-bold tracking-tight text-accent">
-                    {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')}
+              {isFinished ? (
+                <div className="py-6 px-4 rounded-2xl bg-surface/50 border border-border text-center space-y-4 animate-in zoom-in-95 duration-200">
+                  <div className="w-12 h-12 mx-auto rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center justify-center">
+                    <Check size={24} className="stroke-[2.5]" />
                   </div>
-                </div>
-
-                <div className="flex items-center gap-2 mt-4">
-                  <button
-                    type="button"
-                    onClick={() => setIsTimerRunning(!isTimerRunning)}
-                    className="p-2.5 rounded-full bg-accent text-accent-on hover:bg-accent/90 transition-all cursor-pointer shadow-sm active:scale-95"
-                    title={isTimerRunning ? "Pause Timer" : "Start Timer"}
-                  >
-                    {isTimerRunning ? <Pause size={16} /> : <Play size={16} />}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsTimerRunning(false);
-                      setTimeRemaining(timerDuration);
-                    }}
-                    className="p-2.5 rounded-full bg-surface text-fg-2 hover:text-fg hover:bg-surface-warm border border-border-soft transition-all cursor-pointer"
-                    title="Reset Timer"
-                  >
-                    <RotateCcw size={16} />
-                  </button>
-                </div>
-
-                {/* Duration Presets */}
-                <div className="flex items-center gap-1.5 mt-3">
-                  {[60, 120, 300].map((sec) => (
+                  <div className="space-y-1">
+                    <h4 className="font-serif font-bold text-base text-fg">Contemplation Complete</h4>
+                    <p className="text-xs text-muted max-w-sm mx-auto">
+                      All four stages of Lectio Divina have been fulfilled. Save your reflection, stirring phrase, and prayer directly into your Notes.
+                    </p>
+                  </div>
+                  {onSaveToNotes && (
                     <button
-                      key={sec}
                       type="button"
-                      onClick={() => {
-                        setTimerDuration(sec);
-                        setTimeRemaining(sec);
-                        setIsTimerRunning(false);
-                      }}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
-                        timerDuration === sec
-                          ? 'bg-accent/15 text-accent border border-accent/40 shadow-xs'
-                          : 'text-muted hover:text-fg hover:bg-surface border border-transparent'
+                      onClick={handleSaveToNotes}
+                      disabled={isSaving}
+                      className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold transition-all shadow-sm cursor-pointer ${
+                        isSaved
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-accent text-accent-on hover:bg-accent/90 active:scale-95'
                       }`}
                     >
-                      {sec / 60}m
+                      {isSaved ? <Check size={14} /> : <Save size={14} />}
+                      <span>{isSaved ? 'Saved to Notes!' : 'Save Reflection to Notes'}</span>
                     </button>
-                  ))}
+                  )}
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsFinished(false);
+                        setTimeRemaining(timerDuration);
+                        setIsTimerRunning(true);
+                      }}
+                      className="text-xs text-muted hover:text-fg transition-colors cursor-pointer inline-flex items-center gap-1"
+                    >
+                      <RotateCcw size={12} />
+                      <span>Continue Contemplation</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                /* Countdown Timer Display */
+                <div className="flex flex-col items-center justify-center py-4">
+                  <div className="w-36 h-36 rounded-full border-4 border-accent/30 bg-surface/30 flex items-center justify-center relative shadow-inner">
+                    <div className="text-3xl font-mono font-bold tracking-tight text-accent">
+                      {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 mt-4">
+                    <button
+                      type="button"
+                      onClick={() => setIsTimerRunning(!isTimerRunning)}
+                      className="p-2.5 rounded-full bg-accent text-accent-on hover:bg-accent/90 transition-all cursor-pointer shadow-sm active:scale-95"
+                      title={isTimerRunning ? "Pause Timer" : "Start Timer"}
+                    >
+                      {isTimerRunning ? <Pause size={16} /> : <Play size={16} />}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsTimerRunning(false);
+                        setTimeRemaining(timerDuration);
+                      }}
+                      className="p-2.5 rounded-full bg-surface text-fg-2 hover:text-fg hover:bg-surface-warm border border-border-soft transition-all cursor-pointer"
+                      title="Reset Timer"
+                    >
+                      <RotateCcw size={16} />
+                    </button>
+                  </div>
+
+                  {/* Duration Presets */}
+                  <div className="flex items-center gap-1.5 mt-3">
+                    {[60, 120, 300].map((sec) => (
+                      <button
+                        key={sec}
+                        type="button"
+                        onClick={() => {
+                          setTimerDuration(sec);
+                          setTimeRemaining(sec);
+                          setIsTimerRunning(false);
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
+                          timerDuration === sec
+                            ? 'bg-accent/15 text-accent border border-accent/40 shadow-xs'
+                            : 'text-muted hover:text-fg hover:bg-surface border border-transparent'
+                        }`}
+                      >
+                        {sec / 60}m
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Complete Contemplation Button */}
+                  <div className="pt-4">
+                    <button
+                      type="button"
+                      onClick={handleCompleteContemplation}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-surface text-fg-2 hover:text-fg hover:bg-surface-warm border border-border-soft text-xs font-semibold transition-all cursor-pointer shadow-xs active:scale-98"
+                      title="Complete your contemplation period"
+                    >
+                      <Check size={14} className="text-accent" />
+                      <span>Finish Contemplation</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -380,11 +461,18 @@ export function LectioDivinaModal({
               <button
                 type="button"
                 onClick={handleSaveToNotes}
-                disabled={isSaving}
-                className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer shadow-sm ${
+                disabled={!isFinished || isSaving}
+                title={
+                  !isFinished
+                    ? "Complete all 4 stages of Lectio Divina to save to Notes"
+                    : "Save reflection to Notes"
+                }
+                className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-xs font-semibold transition-all shadow-sm select-none ${
                   isSaved
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-accent text-accent-on hover:bg-accent/90 active:scale-95'
+                    ? 'bg-emerald-600 text-white cursor-default'
+                    : !isFinished
+                      ? 'bg-surface text-muted/50 border border-border/60 cursor-not-allowed opacity-50'
+                      : 'bg-accent text-accent-on hover:bg-accent/90 active:scale-95 cursor-pointer ring-1 ring-accent/30'
                 }`}
               >
                 {isSaved ? <Check size={14} /> : <Save size={14} />}
