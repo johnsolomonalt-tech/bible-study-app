@@ -1712,16 +1712,60 @@ export function getOrGenerateInterlinearWord(
   };
 }
 
-// =========================================================================
-// 4. VERSE INTERLINEAR TOKENIZER
-// =========================================================================
+export const STOPWORDS = new Set([
+  'the', 'and', 'of', 'to', 'in', 'is', 'was', 'were', 'are', 'be', 'been', 'being',
+  'that', 'this', 'these', 'those', 'it', 'its', 'as', 'at', 'by', 'for', 'from', 'with',
+  'on', 'not', 'or', 'an', 'a', 'so', 'then', 'there', 'their', 'his', 'her', 'they', 'them',
+  'he', 'she', 'we', 'us', 'our', 'you', 'your', 'thy', 'thine', 'thee', 'thou', 'ye',
+  'unto', 'upon', 'into', 'out', 'up', 'down', 'also'
+]);
 
 export interface VerseInterlinearToken {
   index: number;
   rawText: string;
+  cleanWord?: string;
   isWord: boolean;
   word?: InterlinearWord;
   strongsId?: string;
+}
+
+/**
+ * Preload authentic lexical definitions for all Strong's tags present in a chapter.
+ * Fills CLIENT_LEXICON_CACHE in a single batch request so rendering has zero lag.
+ */
+export async function preloadChapterLexicon(verses: { text: string }[]): Promise<void> {
+  if (typeof window === 'undefined' || !verses || verses.length === 0) return;
+
+  const ids = new Set<string>();
+  for (const v of verses) {
+    if (!v.text) continue;
+    const matches = v.text.match(/\[([HG]\d+)\]/g);
+    if (matches) {
+      for (const m of matches) {
+        const id = m.replace(/[\[\]]/g, '').toUpperCase();
+        if (!CLIENT_LEXICON_CACHE.has(id)) {
+          ids.add(id);
+        }
+      }
+    }
+  }
+
+  if (ids.size === 0) return;
+
+  try {
+    const idList = Array.from(ids).join(',');
+    const res = await fetch(`/api/bible/lexicon?ids=${idList}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.words) {
+        for (const [id, word] of Object.entries(data.words)) {
+          CLIENT_LEXICON_CACHE.set(id, word as InterlinearWord);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to batch preload chapter lexicon:', err);
+  }
 }
 
 /**
@@ -1736,36 +1780,74 @@ export function getVerseInterlinearTokens(
 ): VerseInterlinearToken[] {
   if (!verseText) return [];
 
-  // Match words possibly followed by [H1234] or [G1234] tags, or sequences of spaces/punctuation
-  const rawParts = verseText.split(/([A-Za-z0-9'’]+(?:\[[HG]\d+\])*)/);
+  // Normalize verse text:
+  // 1. Strip italics markup like <em>...</em>
+  // 2. Normalize internal bracket whitespace e.g. [ H3063 ] -> [H3063]
+  // 3. Connect tags separated from words by whitespace: "word [H1234]" -> "word[H1234]"
+  // 4. Combine adjacent tags: "[H1234] [H5678]" -> "[H1234][H5678]"
+  // 5. Strip any orphaned leading tag
+  const cleanedVerseText = verseText
+    .replace(/<\/?em>/gi, '')
+    .replace(/\[\s*([HG]\d+)\s*\]/g, '[$1]')
+    .replace(/\s+(\[[HG]\d+\])/g, '$1')
+    .replace(/(\[[HG]\d+\])\s+(\[[HG]\d+\])/g, '$1$2')
+    .replace(/^\[[HG]\d+\]\s*/, '');
+
+  // Match: word, optional trailing punctuation, and optional Strong's tag(s) [H1234] or [G1234]
+  const regex = /([A-Za-z0-9'’]+)([.,;:!?\"'()\-]*)((?:\[[HG]\d+\])+)?/g;
+  let match: RegExpExecArray | null;
+  const tokens: VerseInterlinearToken[] = [];
+  let lastIndex = 0;
   let tokenIdx = 0;
 
-  return rawParts
-    .filter(p => p.length > 0)
-    .map(part => {
-      const isWord = /^[A-Za-z0-9'’]+(?:\[[HG]\d+\])*$/.test(part);
-      if (!isWord) {
-        return {
-          index: tokenIdx++,
-          rawText: part,
-          isWord: false
-        };
-      }
-
-      // Extract Strong's ID if present (e.g. Jezreel[H3157])
-      const strongsMatch = part.match(/\[([HG]\d+)\]/);
-      const strongsId = strongsMatch ? strongsMatch[1] : undefined;
-      const cleanWord = part.replace(/\[.*?\]/g, '');
-
-      const word = getOrGenerateInterlinearWord(cleanWord, isOldTestament, verseRef, strongsId);
-      return {
+  while ((match = regex.exec(cleanedVerseText)) !== null) {
+    if (match.index > lastIndex) {
+      const space = cleanedVerseText.slice(lastIndex, match.index);
+      tokens.push({
         index: tokenIdx++,
-        rawText: cleanWord,
-        isWord: true,
-        strongsId,
-        word
-      };
+        rawText: space,
+        cleanWord: '',
+        isWord: false
+      });
+    }
+
+    const [full, word, punct, tags] = match;
+    const strongsId = tags ? tags.match(/([HG]\d+)/)?.[1] : undefined;
+    const displayText = word + punct;
+
+    // Resolve word if Strong's tag is present or if it's a known non-stopword
+    let resolvedWord: InterlinearWord | undefined;
+    if (strongsId) {
+      resolvedWord = getOrGenerateInterlinearWord(word, isOldTestament, verseRef, strongsId);
+    } else {
+      const lower = word.toLowerCase();
+      if (!STOPWORDS.has(lower)) {
+        resolvedWord = findInterlinearWord(word, isOldTestament) || undefined;
+      }
+    }
+
+    tokens.push({
+      index: tokenIdx++,
+      rawText: displayText,
+      cleanWord: word,
+      isWord: true,
+      strongsId,
+      word: resolvedWord
     });
+
+    lastIndex = match.index + full.length;
+  }
+
+  if (lastIndex < cleanedVerseText.length) {
+    tokens.push({
+      index: tokenIdx++,
+      rawText: cleanedVerseText.slice(lastIndex),
+      cleanWord: '',
+      isWord: false
+    });
+  }
+
+  return tokens;
 }
 
 // =========================================================================

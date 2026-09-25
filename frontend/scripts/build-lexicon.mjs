@@ -175,6 +175,14 @@ async function main() {
     NT: {}
   };
 
+const STOPWORDS = new Set([
+  'the', 'and', 'of', 'to', 'in', 'is', 'was', 'were', 'are', 'be', 'been', 'being',
+  'that', 'this', 'these', 'those', 'it', 'its', 'as', 'at', 'by', 'for', 'from', 'with',
+  'on', 'not', 'or', 'an', 'a', 'so', 'then', 'there', 'their', 'his', 'her', 'they', 'them',
+  'he', 'she', 'we', 'us', 'our', 'you', 'your', 'thy', 'thine', 'thee', 'thou', 'ye',
+  'unto', 'upon', 'into', 'out', 'up', 'down', 'also'
+]);
+
   function indexDictionary(lexicon, target) {
     const rawMap = Object.create(null); // word -> Array<{ id: string, priority: number, occurrences: number }>
 
@@ -182,6 +190,7 @@ async function main() {
       if (!word) return;
       const clean = word.toLowerCase().replace(/[^a-z]/g, '');
       if (clean.length < 2) return;
+      if (STOPWORDS.has(clean)) return; // Never map common English grammatical particles to random biblical words!
       if (!rawMap[clean]) rawMap[clean] = [];
       const existing = rawMap[clean].find(e => e.id === id);
       if (!existing) {

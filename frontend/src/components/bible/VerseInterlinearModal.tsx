@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { InterlinearWord, getVerseInterlinearTokens, fetchInterlinearWord } from '@/lib/interlinearData';
+import { InterlinearWord, getVerseInterlinearTokens, fetchInterlinearWord, preloadChapterLexicon } from '@/lib/interlinearData';
 import { getStrongsPassage } from '@/lib/bibleProvider';
 import { NodeCategory } from '@/types/canvas';
 import {
@@ -60,9 +60,12 @@ export function VerseInterlinearModal({
   // Load Strong's tagged chapter for accurate word-level alignment
   useEffect(() => {
     if (!isOpen) return;
+    let isCancelled = false;
     getStrongsPassage(bookName, chapter)
-      .then((ch) => {
+      .then(async (ch) => {
         if (ch && ch.verses) {
+          await preloadChapterLexicon(ch.verses);
+          if (isCancelled) return;
           const map: Record<number, string> = {};
           ch.verses.forEach((v) => {
             map[v.verse] = v.text;
@@ -71,6 +74,9 @@ export function VerseInterlinearModal({
         }
       })
       .catch(() => {});
+    return () => {
+      isCancelled = true;
+    };
   }, [isOpen, bookName, chapter]);
 
   // Find selected verse text
@@ -96,7 +102,7 @@ export function VerseInterlinearModal({
     if (!isOpen) return;
     tokens.forEach((t) => {
       if (t.isWord) {
-        fetchInterlinearWord(t.rawText, isOldTestament, `${bookName} ${chapter}:${currentVerseObj.verse}`, t.strongsId)
+        fetchInterlinearWord(t.cleanWord || t.rawText, isOldTestament, `${bookName} ${chapter}:${currentVerseObj.verse}`, t.strongsId)
           .then((w) => {
             if (w) {
               setResolvedWords((prev) => ({ ...prev, [t.index]: w }));
@@ -107,7 +113,7 @@ export function VerseInterlinearModal({
     });
   }, [isOpen, tokens, isOldTestament, bookName, chapter, currentVerseObj.verse]);
 
-  // Only the words (filtering out plain punctuation spaces)
+  // Only authentic words (filtering out plain punctuation spaces and unmapped stopwords)
   const wordTokens = useMemo(() => {
     return tokens
       .filter((t) => t.isWord)
@@ -115,7 +121,7 @@ export function VerseInterlinearModal({
         ...t,
         word: resolvedWords[t.index] || t.word
       }))
-      .filter((t) => !!t.word);
+      .filter((t) => !!t.word && t.word.lemma && t.word.lemma !== '—');
   }, [tokens, resolvedWords]);
 
   const handleSpeak = (text: string) => {

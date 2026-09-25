@@ -56,7 +56,36 @@ export async function GET(req: NextRequest) {
   const testament = searchParams.get('testament')?.toUpperCase() as 'OT' | 'NT' | undefined;
   const verseRef = searchParams.get('verseRef')?.trim();
 
-  // 1. Direct Strong's ID Lookup (e.g. H3157 or G3056)
+  // 1. Batch Strong's IDs Lookup (e.g. ?ids=H1,H5862,H3157)
+  const idsParam = searchParams.get('ids')?.trim().toUpperCase();
+  if (idsParam) {
+    const requestedIds = idsParam.split(',').map((s) => s.trim()).filter(Boolean);
+    const words: Record<string, LexiconWordPayload> = {};
+    for (const rawId of requestedIds) {
+      let rawEntry: any = null;
+      if (rawId.startsWith('H') && HEBREW_DATA) {
+        rawEntry = HEBREW_DATA[rawId];
+      } else if (rawId.startsWith('G') && GREEK_DATA) {
+        rawEntry = GREEK_DATA[rawId];
+      }
+      if (rawEntry) {
+        words[rawId] = {
+          ...rawEntry,
+          keyVerses: verseRef ? [verseRef] : [],
+        };
+      }
+    }
+    return NextResponse.json(
+      { success: true, words },
+      {
+        headers: {
+          'Cache-Control': 'public, max-age=31536000, immutable',
+        },
+      }
+    );
+  }
+
+  // 2. Direct Strong's ID Lookup (e.g. H3157 or G3056)
   if (id) {
     let rawEntry: any = null;
     if (id.startsWith('H') && HEBREW_DATA) {
