@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
-import { InterlinearWord, getVerseInterlinearTokens } from '@/lib/interlinearData';
+import React, { useState, useMemo, useEffect } from 'react';
+import { InterlinearWord, getVerseInterlinearTokens, fetchInterlinearWord } from '@/lib/interlinearData';
+import { getStrongsPassage } from '@/lib/bibleProvider';
 import { NodeCategory } from '@/types/canvas';
 import {
   X,
@@ -51,8 +52,26 @@ export function VerseInterlinearModal({
   const [selectedVerseNum, setSelectedVerseNum] = useState<number>(initialVerse || 1);
   const [hasExportedAll, setHasExportedAll] = useState(false);
   const [addedWordIds, setAddedWordIds] = useState<Record<string, boolean>>({});
+  const [strongsVersesMap, setStrongsVersesMap] = useState<Record<number, string>>({});
+  const [resolvedWords, setResolvedWords] = useState<Record<number, InterlinearWord>>({});
 
   const isDark = theme === 'dark';
+
+  // Load Strong's tagged chapter for accurate word-level alignment
+  useEffect(() => {
+    if (!isOpen) return;
+    getStrongsPassage(bookName, chapter)
+      .then((ch) => {
+        if (ch && ch.verses) {
+          const map: Record<number, string> = {};
+          ch.verses.forEach((v) => {
+            map[v.verse] = v.text;
+          });
+          setStrongsVersesMap(map);
+        }
+      })
+      .catch(() => {});
+  }, [isOpen, bookName, chapter]);
 
   // Find selected verse text
   const currentVerseObj = useMemo(() => {
@@ -62,19 +81,42 @@ export function VerseInterlinearModal({
     );
   }, [verses, selectedVerseNum]);
 
-  // Tokenize verse into original language words
+  // Tokenize verse into original language words using Strong's-tagged text if available
+  const taggedText = strongsVersesMap[currentVerseObj.verse];
   const tokens = useMemo(() => {
     return getVerseInterlinearTokens(
-      currentVerseObj.text,
+      taggedText || currentVerseObj.text,
       isOldTestament,
       `${bookName} ${chapter}:${currentVerseObj.verse}`
     );
-  }, [currentVerseObj, isOldTestament, bookName, chapter]);
+  }, [taggedText, currentVerseObj, isOldTestament, bookName, chapter]);
+
+  // Asynchronously resolve authentic lexical data for all words in the verse
+  useEffect(() => {
+    if (!isOpen) return;
+    tokens.forEach((t) => {
+      if (t.isWord) {
+        fetchInterlinearWord(t.rawText, isOldTestament, `${bookName} ${chapter}:${currentVerseObj.verse}`, t.strongsId)
+          .then((w) => {
+            if (w) {
+              setResolvedWords((prev) => ({ ...prev, [t.index]: w }));
+            }
+          })
+          .catch(() => {});
+      }
+    });
+  }, [isOpen, tokens, isOldTestament, bookName, chapter, currentVerseObj.verse]);
 
   // Only the words (filtering out plain punctuation spaces)
   const wordTokens = useMemo(() => {
-    return tokens.filter((t) => t.isWord && t.word);
-  }, [tokens]);
+    return tokens
+      .filter((t) => t.isWord)
+      .map((t) => ({
+        ...t,
+        word: resolvedWords[t.index] || t.word
+      }))
+      .filter((t) => !!t.word);
+  }, [tokens, resolvedWords]);
 
   const handleSpeak = (text: string) => {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
@@ -317,6 +359,13 @@ export function VerseInterlinearModal({
                         </div>
                       </div>
                     </div>
+
+                    {/* Derivation / Etymology */}
+                    {w.derivation && (
+                      <div className="text-[11px] text-zinc-500 dark:text-zinc-400 font-serif italic line-clamp-1">
+                        {w.derivation}
+                      </div>
+                    )}
 
                     {/* Definition */}
                     <p className="text-xs text-zinc-600 dark:text-zinc-300 line-clamp-2 leading-relaxed">

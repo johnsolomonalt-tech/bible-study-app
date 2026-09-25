@@ -16,7 +16,7 @@ import { ScriptureBacklinksDrawer } from '@/components/bible/ScriptureBacklinksD
 import { InterlinearHoverCard } from '@/components/bible/InterlinearHoverCard';
 import { InterlinearModeRibbon } from '@/components/bible/InterlinearModeRibbon';
 import { VerseInterlinearModal } from '@/components/bible/VerseInterlinearModal';
-import { findInterlinearWord, getOrGenerateInterlinearWord, InterlinearWord } from '@/lib/interlinearData';
+import { findInterlinearWord, getOrGenerateInterlinearWord, fetchInterlinearWord, getVerseInterlinearTokens, InterlinearWord } from '@/lib/interlinearData';
 import { getScriptureBacklinks, BacklinksResult } from '@/lib/backlinks';
 import { TheologicalLensSelector, TheologicalLensType } from '@/components/chat/TheologicalLensSelector';
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from 'react-resizable-panels';
@@ -29,7 +29,7 @@ import {
   VerseClickHandler 
 } from '@/lib/bibleReferences';
 import { TranslationSelector } from '@/components/bible/TranslationSelector';
-import { getPassage } from '@/lib/bibleProvider';
+import { getPassage, getStrongsPassage } from '@/lib/bibleProvider';
 import { AVAILABLE_TRANSLATIONS } from '@/types/bible';
 import { parseVerseFootnote, getCleanScriptureText } from '@/lib/verseParser';
 import { 
@@ -462,6 +462,23 @@ export default function App() {
     position: { x: number; y: number } | null;
     verseRef: string;
   } | null>(null);
+  const [strongsVersesMap, setStrongsVersesMap] = useState<Record<number, string>>({});
+
+  // Pre-load Strong's tagged chapter for accurate word-by-word reverse interlinear alignment
+  useEffect(() => {
+    if (!isInterlinearMode) return;
+    getStrongsPassage(activeBook.name, activeChapter)
+      .then((ch) => {
+        if (ch && ch.verses) {
+          const map: Record<number, string> = {};
+          ch.verses.forEach((v) => {
+            map[v.verse] = v.text;
+          });
+          setStrongsVersesMap(map);
+        }
+      })
+      .catch(() => {});
+  }, [isInterlinearMode, activeBook.name, activeChapter]);
   const [backlinksDrawerState, setBacklinksDrawerState] = useState<{
     isOpen: boolean;
     reference: string;
@@ -1490,29 +1507,132 @@ export default function App() {
     setBacklinksDrawerState((prev) => ({ ...prev, isOpen: false }));
   };
 
-  const handleSelectionWordStudy = () => {
+  const handleSelectionWordStudy = async () => {
     const rawText = selectedText || selectionRange?.toString().trim() || '';
     if (!rawText) return;
     const firstWord = rawText.split(/\s+/)[0].replace(/[^a-zA-Z]/g, '');
     if (!firstWord) return;
-    const wordObj = getOrGenerateInterlinearWord(
-      firstWord,
-      isOldTestament,
-      `${activeBook.name} ${activeChapter}:${selectionVerse || 1}`
-    );
-    setActiveInterlinearWord({
-      word: wordObj,
-      position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
-      verseRef: `${activeBook.name} ${activeChapter}:${selectionVerse || 1}`,
-    });
+    const verseRef = `${activeBook.name} ${activeChapter}:${selectionVerse || 1}`;
     setToolbarPosition(null);
     window.getSelection()?.removeAllRanges();
+
+    // Check synchronous lookup first for 0ms render
+    const syncWord = getOrGenerateInterlinearWord(firstWord, isOldTestament, verseRef);
+    setActiveInterlinearWord({
+      word: syncWord,
+      position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
+      verseRef,
+    });
+
+    // Asynchronously resolve authentic Strong's entry (e.g. Jezreel -> H3157)
+    const authenticWord = await fetchInterlinearWord(firstWord, isOldTestament, verseRef);
+    if (authenticWord && authenticWord.id !== syncWord.id) {
+      setActiveInterlinearWord({
+        word: authenticWord,
+        position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
+        verseRef,
+      });
+    }
   };
 
   const renderTextWithInterlinear = (rawStr: string, verseNum: number) => {
     if (!isInterlinearMode) {
       return rawStr;
     }
+    const verseRef = `${activeBook.name} ${activeChapter}:${verseNum}`;
+    const taggedStr = strongsVersesMap[verseNum];
+
+    if (taggedStr) {
+      const tokens = getVerseInterlinearTokens(taggedStr, isOldTestament, verseRef);
+      return tokens.map((token, tIdx) => {
+        if (!token.isWord || !token.word) {
+          return <span key={tIdx}>{token.rawText}</span>;
+        }
+
+        const match = token.word;
+        const hasAuthenticLemma = match.lemma && match.lemma !== '—';
+
+        if (!hasAuthenticLemma) {
+          return (
+            <span
+              key={tIdx}
+              onClick={async (e) => {
+                e.stopPropagation();
+                const syncWord = getOrGenerateInterlinearWord(token.rawText, isOldTestament, verseRef, token.strongsId);
+                setActiveInterlinearWord({
+                  word: syncWord,
+                  position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
+                  verseRef,
+                });
+                const authentic = await fetchInterlinearWord(token.rawText, isOldTestament, verseRef, token.strongsId);
+                if (authentic) {
+                  setActiveInterlinearWord({
+                    word: authentic,
+                    position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
+                    verseRef,
+                  });
+                }
+              }}
+              className="cursor-pointer border-b border-dotted border-border-soft/60 hover:border-accent hover:text-accent transition-colors inline align-baseline break-words px-0.5"
+              title={`Click to study "${token.rawText}" in original ${isOldTestament ? 'Hebrew' : 'Greek'}`}
+            >
+              {token.rawText}
+            </span>
+          );
+        }
+
+        return (
+          <span
+            key={tIdx}
+            onClick={async (e) => {
+              e.stopPropagation();
+              setActiveInterlinearWord({
+                word: match,
+                position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
+                verseRef,
+              });
+              const authentic = await fetchInterlinearWord(token.rawText, isOldTestament, verseRef, token.strongsId);
+              if (authentic) {
+                setActiveInterlinearWord({
+                  word: authentic,
+                  position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
+                  verseRef,
+                });
+              }
+            }}
+            className="inline-block text-center align-baseline cursor-pointer group px-0.5 select-none max-w-full break-inside-avoid"
+            title={`${match.lemma} (${match.strongs}) - Click to inspect`}
+          >
+            <span className="block text-center leading-none mb-1 select-none pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity">
+              <span
+                className={`text-[10px] sm:text-[11px] font-serif font-normal inline-block ${
+                  isOldTestament
+                    ? 'text-amber-700/90 dark:text-amber-300/90'
+                    : 'text-cyan-700/90 dark:text-cyan-300/90'
+                }`}
+              >
+                {match.lemma}
+              </span>
+              {interlinearShowStrongs && match.strongs && (
+                <span className="text-[8px] font-mono text-muted/80 ml-1 inline-block">
+                  {match.strongs}
+                </span>
+              )}
+              {interlinearShowTranslit && match.transliteration && (
+                <span className="block text-[8px] italic text-muted/70 leading-none mt-0.5">
+                  /{match.transliteration}/
+                </span>
+              )}
+            </span>
+
+            <span className="block text-center border-b border-dotted border-border-soft/80 group-hover:border-accent group-hover:text-accent transition-colors leading-normal font-serif break-words">
+              {token.rawText}
+            </span>
+          </span>
+        );
+      });
+    }
+
     const tokens = rawStr.split(/(\s+|[.,;:!?"'()\[\]]+)/);
     return tokens.map((token, tIdx) => {
       if (/^[\s.,;:!?"'()\[\]]+$/.test(token) || !token.trim()) {
@@ -1520,22 +1640,29 @@ export default function App() {
       }
       const match = findInterlinearWord(token, isOldTestament);
       if (!match) {
-        // Universal fallback: every word in the verse is clickable for original language study
         return (
           <span
             key={tIdx}
-            onClick={(e) => {
+            onClick={async (e) => {
               e.stopPropagation();
-              const genWord = getOrGenerateInterlinearWord(
+              const syncWord = getOrGenerateInterlinearWord(
                 token,
                 isOldTestament,
-                `${activeBook.name} ${activeChapter}:${verseNum}`
+                verseRef
               );
               setActiveInterlinearWord({
-                word: genWord,
+                word: syncWord,
                 position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
-                verseRef: `${activeBook.name} ${activeChapter}:${verseNum}`,
+                verseRef,
               });
+              const authentic = await fetchInterlinearWord(token, isOldTestament, verseRef);
+              if (authentic) {
+                setActiveInterlinearWord({
+                  word: authentic,
+                  position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
+                  verseRef,
+                });
+              }
             }}
             className="cursor-pointer border-b border-dotted border-border-soft/60 hover:border-accent hover:text-accent transition-colors inline align-baseline break-words px-0.5"
             title={`Click to study "${token}" in original ${isOldTestament ? 'Hebrew' : 'Greek'}`}
@@ -1548,18 +1675,25 @@ export default function App() {
       return (
         <span
           key={tIdx}
-          onClick={(e) => {
+          onClick={async (e) => {
             e.stopPropagation();
             setActiveInterlinearWord({
               word: match,
               position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
-              verseRef: `${activeBook.name} ${activeChapter}:${verseNum}`,
+              verseRef,
             });
+            const authentic = await fetchInterlinearWord(token, isOldTestament, verseRef);
+            if (authentic) {
+              setActiveInterlinearWord({
+                word: authentic,
+                position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
+                verseRef,
+              });
+            }
           }}
           className="inline-block text-center align-baseline cursor-pointer group px-0.5 select-none max-w-full break-inside-avoid"
           title={`${match.lemma} (${match.strongs}) - Click to inspect`}
         >
-          {/* Subtle Original Language Gloss positioned directly ON TOP of the English word */}
           <span className="block text-center leading-none mb-1 select-none pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity">
             <span
               className={`text-[10px] sm:text-[11px] font-serif font-normal inline-block ${
@@ -1582,7 +1716,6 @@ export default function App() {
             )}
           </span>
 
-          {/* English Token: sits directly on the sentence typographic baseline */}
           <span className="block text-center border-b border-dotted border-border-soft/80 group-hover:border-accent group-hover:text-accent transition-colors leading-normal font-serif break-words">
             {token}
           </span>

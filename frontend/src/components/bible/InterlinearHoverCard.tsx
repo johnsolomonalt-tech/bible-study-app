@@ -120,6 +120,18 @@ export function InterlinearHoverCard({
         </button>
       </div>
 
+      {/* Root & Derivation */}
+      {word.derivation && (
+        <div className="mb-3 px-2.5 py-1.5 rounded-xl bg-zinc-100/90 dark:bg-zinc-800/50 border border-zinc-200/70 dark:border-zinc-700/50">
+          <div className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+            Root & Derivation
+          </div>
+          <div className="text-xs text-zinc-800 dark:text-zinc-200 mt-0.5">
+            {word.derivation}
+          </div>
+        </div>
+      )}
+
       {/* Theological Definition */}
       <div className="space-y-2 mb-3.5">
         <div className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
@@ -128,6 +140,16 @@ export function InterlinearHoverCard({
         <p className="text-xs leading-relaxed text-zinc-700 dark:text-zinc-300 break-words">
           {word.definition}
         </p>
+        {word.outline && word.outline !== word.definition && (
+          <div className="pt-2 border-t border-zinc-200/60 dark:border-zinc-800">
+            <div className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1">
+              Biblical Usage
+            </div>
+            <p className="text-xs leading-relaxed text-zinc-600 dark:text-zinc-400 break-words">
+              {word.outline}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Frequency & Key Passages */}

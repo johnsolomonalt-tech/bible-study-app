@@ -19,6 +19,9 @@ export interface InterlinearWord {
   occurrences: number;      // NT or OT frequency
   testament: 'OT' | 'NT';
   keyVerses: string[];
+  derivation?: string;
+  outline?: string;
+  kjvDef?: string;
 }
 
 // =========================================================================
@@ -1518,19 +1521,47 @@ export function lemmatizeEnglishToken(token: string): string {
 }
 
 // =========================================================================
-// 3. WORD LOOKUP & UNIVERSAL CONTEXTUAL GENERATOR
+// 3. AUTHENTIC STRONG'S LEXICON ENGINE & IN-MEMORY CACHE
 // =========================================================================
+
+export const CLIENT_LEXICON_CACHE = new Map<string, InterlinearWord>();
+
+// Pre-seed cache with curated entries for instant 0ms access
+if (typeof window !== 'undefined' || true) {
+  Object.values(HEBREW_LEXICON).forEach(w => {
+    CLIENT_LEXICON_CACHE.set(w.id, w);
+    CLIENT_LEXICON_CACHE.set(`OT:${w.gloss.toLowerCase().replace(/[^a-z]/g, '')}`, w);
+    CLIENT_LEXICON_CACHE.set(`OT:${w.transliteration.toLowerCase().replace(/[^a-z]/g, '')}`, w);
+  });
+  Object.values(GREEK_LEXICON).forEach(w => {
+    CLIENT_LEXICON_CACHE.set(w.id, w);
+    CLIENT_LEXICON_CACHE.set(`NT:${w.gloss.toLowerCase().replace(/[^a-z]/g, '')}`, w);
+    CLIENT_LEXICON_CACHE.set(`NT:${w.transliteration.toLowerCase().replace(/[^a-z]/g, '')}`, w);
+  });
+  Object.values(LEXICON_ENTRIES).forEach(w => {
+    CLIENT_LEXICON_CACHE.set(w.id, w);
+    CLIENT_LEXICON_CACHE.set(`${w.testament}:${w.gloss.toLowerCase().replace(/[^a-z]/g, '')}`, w);
+    CLIENT_LEXICON_CACHE.set(`${w.testament}:${w.transliteration.toLowerCase().replace(/[^a-z]/g, '')}`, w);
+  });
+}
 
 /**
  * Match a raw English word to an authentic original language lexicon entry.
  * Uses testament-specific dictionaries (Hebrew for OT, Greek for NT) and
- * falls back to general biblical matches.
+ * falls back to in-memory cached entries.
  */
 export function findInterlinearWord(rawWord: string, isOldTestament = false): InterlinearWord | null {
   if (!rawWord) return null;
   const stem = lemmatizeEnglishToken(rawWord);
   if (!stem) return null;
 
+  const testamentKey = isOldTestament ? 'OT' : 'NT';
+
+  // 1. Direct cache lookup
+  const cached = CLIENT_LEXICON_CACHE.get(`${testamentKey}:${stem}`);
+  if (cached) return cached;
+
+  // 2. Curated lexicon lookup
   if (isOldTestament) {
     if (HEBREW_LEXICON[stem]) return HEBREW_LEXICON[stem];
     if (LEXICON_ENTRIES[stem] && LEXICON_ENTRIES[stem].testament === 'OT') return LEXICON_ENTRIES[stem];
@@ -1539,7 +1570,7 @@ export function findInterlinearWord(rawWord: string, isOldTestament = false): In
     if (LEXICON_ENTRIES[stem] && LEXICON_ENTRIES[stem].testament === 'NT') return LEXICON_ENTRIES[stem];
   }
 
-  // Secondary fallback across all entries
+  // 3. Fallback across all entries
   if (LEXICON_ENTRIES[stem]) {
     return LEXICON_ENTRIES[stem];
   }
@@ -1548,65 +1579,137 @@ export function findInterlinearWord(rawWord: string, isOldTestament = false): In
 }
 
 /**
- * Guaranteed word study resolver:
- * If the word exists in the curated dictionary, returns it.
- * If not, dynamically synthesizes an authentic contextual morphological word study
- * so EVERY word in ANY Bible verse can be clicked and inspected!
+ * Asynchronously loads authentic Strong's concordance lexical data from the API
+ * and caches it in memory.
+ */
+export async function fetchInterlinearWord(
+  rawWord: string,
+  isOldTestament = false,
+  verseRef?: string,
+  strongsId?: string
+): Promise<InterlinearWord> {
+  const testament = isOldTestament ? 'OT' : 'NT';
+
+  // 1. If explicit Strong's ID provided (or in rawWord tag like Jezreel,[H3157])
+  let targetId = strongsId;
+  if (!targetId) {
+    const tagMatch = rawWord.match(/\[([HG]\d+)\]/);
+    if (tagMatch) {
+      targetId = tagMatch[1];
+    }
+  }
+
+  if (targetId) {
+    const cached = CLIENT_LEXICON_CACHE.get(targetId);
+    if (cached) return cached;
+
+    try {
+      const res = await fetch(`/api/bible/lexicon?id=${targetId}${verseRef ? `&verseRef=${encodeURIComponent(verseRef)}` : ''}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.word) {
+          CLIENT_LEXICON_CACHE.set(targetId, data.word);
+          return data.word;
+        }
+      }
+    } catch (err) {
+      console.warn(`Failed to fetch Strong's ID ${targetId}:`, err);
+    }
+  }
+
+  // 2. Lookup by English word / stem
+  const clean = rawWord.replace(/\[.*?\]/g, '').replace(/[^a-zA-Z]/g, '').trim();
+  const lower = clean.toLowerCase();
+
+  // Check cache first
+  const cachedWord = CLIENT_LEXICON_CACHE.get(`${testament}:${lower}`) || findInterlinearWord(clean, isOldTestament);
+  if (cachedWord) return cachedWord;
+
+  try {
+    const res = await fetch(`/api/bible/lexicon?word=${encodeURIComponent(clean)}&testament=${testament}${verseRef ? `&verseRef=${encodeURIComponent(verseRef)}` : ''}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.word) {
+        CLIENT_LEXICON_CACHE.set(data.word.id, data.word);
+        CLIENT_LEXICON_CACHE.set(`${testament}:${lower}`, data.word);
+        return data.word;
+      }
+    }
+  } catch (err) {
+    console.warn(`Failed to query lexicon for "${clean}":`, err);
+  }
+
+  // 3. If word is an unindexed English particle (e.g. "and", "the", "in", "unto")
+  return {
+    id: isOldTestament ? 'H-PART' : 'G-PART',
+    lemma: '—',
+    transliteration: clean,
+    strongs: isOldTestament ? 'Hebrew-Text' : 'Greek-Text',
+    language: isOldTestament ? 'Hebrew' : 'Greek',
+    partOfSpeech: inferPartOfSpeech(clean),
+    pronunciation: clean,
+    gloss: capitalizeFirst(clean),
+    definition: `English translation particle/connector representing underlying ${isOldTestament ? 'Hebrew/Aramaic' : 'Greek'} syntax in ${verseRef || 'Scripture'}.`,
+    occurrences: 1,
+    testament,
+    keyVerses: verseRef ? [verseRef] : []
+  };
+}
+
+/**
+ * Synchronous word resolver for immediate UI display:
+ * Checks curated entries and memory cache. If absent, triggers an async prefetch
+ * and returns a clean, non-hallucinated placeholder with true English lemma.
  */
 export function getOrGenerateInterlinearWord(
   rawWord: string,
   isOldTestament = false,
-  verseRef?: string
+  verseRef?: string,
+  strongsId?: string
 ): InterlinearWord {
+  // Check for Strong's tag in rawWord if not passed
+  let targetId = strongsId;
+  if (!targetId) {
+    const tagMatch = rawWord.match(/\[([HG]\d+)\]/);
+    if (tagMatch) {
+      targetId = tagMatch[1];
+    }
+  }
+
+  if (targetId && CLIENT_LEXICON_CACHE.has(targetId)) {
+    return CLIENT_LEXICON_CACHE.get(targetId)!;
+  }
+
   const existing = findInterlinearWord(rawWord, isOldTestament);
   if (existing) return existing;
 
-  const clean = rawWord.replace(/[^a-zA-Z]/g, '').trim();
+  const clean = rawWord.replace(/\[.*?\]/g, '').replace(/[^a-zA-Z]/g, '').trim();
   const lower = clean.toLowerCase();
+  const testament = isOldTestament ? 'OT' : 'NT';
 
-  if (isOldTestament) {
-    // Synthesize authentic Hebrew lexical node
-    const pseudoStrongsNum = 1000 + (Math.abs(hashString(lower)) % 7500);
-    const strongsCode = `H${pseudoStrongsNum}`;
-    const translit = pseudoTransliterateHebrew(lower);
-    const hebrewScript = generateHebrewGlyphs(lower);
+  const cached = CLIENT_LEXICON_CACHE.get(`${testament}:${lower}`);
+  if (cached) return cached;
 
-    return {
-      id: strongsCode,
-      lemma: hebrewScript,
-      transliteration: translit,
-      strongs: strongsCode,
-      language: 'Hebrew',
-      partOfSpeech: inferPartOfSpeech(lower),
-      pronunciation: pseudoPronounce(translit),
-      gloss: capitalizeFirst(lower),
-      definition: `Original Hebrew terminology rendered as "${clean}" in ${verseRef || 'Scripture'}. Pertains to biblical covenantal thought, narrative movement, or sacred instruction.`,
-      occurrences: 12 + (Math.abs(hashString(lower)) % 140),
-      testament: 'OT',
-      keyVerses: verseRef ? [verseRef] : ['Genesis 1:1']
-    };
-  } else {
-    // Synthesize authentic Greek lexical node
-    const pseudoStrongsNum = 1000 + (Math.abs(hashString(lower)) % 4500);
-    const strongsCode = `G${pseudoStrongsNum}`;
-    const translit = pseudoTransliterateGreek(lower);
-    const greekScript = generateGreekGlyphs(lower);
-
-    return {
-      id: strongsCode,
-      lemma: greekScript,
-      transliteration: translit,
-      strongs: strongsCode,
-      language: 'Greek',
-      partOfSpeech: inferPartOfSpeech(lower),
-      pronunciation: pseudoPronounce(translit),
-      gloss: capitalizeFirst(lower),
-      definition: `New Testament Koine Greek vocabulary translated as "${clean}" in ${verseRef || 'the apostolic canon'}. Embodies apostolic theology, redemption, and fellowship.`,
-      occurrences: 8 + (Math.abs(hashString(lower)) % 180),
-      testament: 'NT',
-      keyVerses: verseRef ? [verseRef] : ['John 1:1']
-    };
+  // Background warm-up fetch without blocking synchronous render
+  if (typeof window !== 'undefined' && clean.length > 1) {
+    fetchInterlinearWord(rawWord, isOldTestament, verseRef, targetId).catch(() => {});
   }
+
+  // Return clean, dignified placeholder without fake glyphs
+  return {
+    id: targetId || (isOldTestament ? 'OT-LEX' : 'NT-LEX'),
+    lemma: '—',
+    transliteration: clean,
+    strongs: targetId || (isOldTestament ? 'OT-Lex' : 'NT-Lex'),
+    language: isOldTestament ? 'Hebrew' : 'Greek',
+    partOfSpeech: inferPartOfSpeech(clean),
+    pronunciation: clean,
+    gloss: capitalizeFirst(clean),
+    definition: `Biblical term rendered as "${clean}" in ${verseRef || 'Scripture'}. Loading authentic Strong's concordance analysis...`,
+    occurrences: 1,
+    testament,
+    keyVerses: verseRef ? [verseRef] : []
+  };
 }
 
 // =========================================================================
@@ -1618,11 +1721,13 @@ export interface VerseInterlinearToken {
   rawText: string;
   isWord: boolean;
   word?: InterlinearWord;
+  strongsId?: string;
 }
 
 /**
  * Decomposes any verse string into sequential word/punctuation tokens
- * with mapped original language metadata.
+ * with mapped original language metadata. Seamlessly handles Strong's-tagged
+ * verses like "father[H1] of Etam;[H5862] Jezreel,[H3157]".
  */
 export function getVerseInterlinearTokens(
   verseText: string,
@@ -1631,14 +1736,14 @@ export function getVerseInterlinearTokens(
 ): VerseInterlinearToken[] {
   if (!verseText) return [];
 
-  // Match words or sequences of punctuation/spaces
-  const rawParts = verseText.split(/([A-Za-z0-9'’]+)/);
+  // Match words possibly followed by [H1234] or [G1234] tags, or sequences of spaces/punctuation
+  const rawParts = verseText.split(/([A-Za-z0-9'’]+(?:\[[HG]\d+\])*)/);
   let tokenIdx = 0;
 
   return rawParts
     .filter(p => p.length > 0)
     .map(part => {
-      const isWord = /^[A-Za-z0-9'’]+$/.test(part);
+      const isWord = /^[A-Za-z0-9'’]+(?:\[[HG]\d+\])*$/.test(part);
       if (!isWord) {
         return {
           index: tokenIdx++,
@@ -1647,11 +1752,17 @@ export function getVerseInterlinearTokens(
         };
       }
 
-      const word = getOrGenerateInterlinearWord(part, isOldTestament, verseRef);
+      // Extract Strong's ID if present (e.g. Jezreel[H3157])
+      const strongsMatch = part.match(/\[([HG]\d+)\]/);
+      const strongsId = strongsMatch ? strongsMatch[1] : undefined;
+      const cleanWord = part.replace(/\[.*?\]/g, '');
+
+      const word = getOrGenerateInterlinearWord(cleanWord, isOldTestament, verseRef, strongsId);
       return {
         index: tokenIdx++,
-        rawText: part,
+        rawText: cleanWord,
         isWord: true,
+        strongsId,
         word
       };
     });
@@ -1660,15 +1771,6 @@ export function getVerseInterlinearTokens(
 // =========================================================================
 // 5. HELPER UTILITIES
 // =========================================================================
-
-function hashString(str: string): number {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = (hash << 5) - hash + str.charCodeAt(i);
-    hash |= 0;
-  }
-  return hash;
-}
 
 function capitalizeFirst(s: string): string {
   if (!s) return '';
@@ -1683,60 +1785,3 @@ function inferPartOfSpeech(word: string): string {
   return "Noun / Verb";
 }
 
-function pseudoPronounce(translit: string): string {
-  const parts = translit.split(/([aeiouy]+)/i).filter(Boolean);
-  if (parts.length <= 1) return translit.toUpperCase();
-  return parts.map((p, i) => i === 0 ? p.toUpperCase() : p.toLowerCase()).join('-');
-}
-
-function pseudoTransliterateHebrew(str: string): string {
-  const vowels = ['a', 'e', 'i', 'o', 'u'];
-  const consonants = ['b', 'd', 'h', 'z', 'ch', 't', 'y', 'k', 'l', 'm', 'n', 's', 'p', 'ts', 'q', 'r', 'sh'];
-  let res = '';
-  for (let i = 0; i < Math.min(str.length, 5); i++) {
-    const code = str.charCodeAt(i);
-    if (i % 2 === 0) {
-      res += consonants[code % consonants.length];
-    } else {
-      res += vowels[code % vowels.length];
-    }
-  }
-  return res || 'dabar';
-}
-
-function generateHebrewGlyphs(str: string): string {
-  const HEBREW_LETTERS = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט', 'י', 'כ', 'ל', 'מ', 'נ', 'ס', 'ע', 'פ', 'צ', 'ק', 'ר', 'ש', 'ת'];
-  let res = '';
-  const len = Math.max(3, Math.min(str.length, 5));
-  for (let i = 0; i < len; i++) {
-    const code = str.charCodeAt(i % str.length);
-    res += HEBREW_LETTERS[(code + i * 3) % HEBREW_LETTERS.length];
-  }
-  return res;
-}
-
-function pseudoTransliterateGreek(str: string): string {
-  const vowels = ['a', 'e', 'i', 'o', 'u', 'y'];
-  const consonants = ['b', 'g', 'd', 'z', 'th', 'k', 'l', 'm', 'n', 'x', 'p', 'r', 's', 't', 'ph', 'ch', 'ps'];
-  let res = '';
-  for (let i = 0; i < Math.min(str.length, 6); i++) {
-    const code = str.charCodeAt(i);
-    if (i % 2 === 0) {
-      res += consonants[code % consonants.length];
-    } else {
-      res += vowels[code % vowels.length];
-    }
-  }
-  return res + (res.endsWith('s') ? '' : 'os');
-}
-
-function generateGreekGlyphs(str: string): string {
-  const GREEK_LETTERS = ['α', 'β', 'γ', 'δ', 'ε', 'ζ', 'η', 'θ', 'ι', 'κ', 'λ', 'μ', 'ν', 'ξ', 'ο', 'π', 'ρ', 'σ', 'τ', 'υ', 'φ', 'χ', 'ψ', 'ω'];
-  let res = '';
-  const len = Math.max(4, Math.min(str.length, 6));
-  for (let i = 0; i < len; i++) {
-    const code = str.charCodeAt(i % str.length);
-    res += GREEK_LETTERS[(code + i * 2) % GREEK_LETTERS.length];
-  }
-  return res;
-}

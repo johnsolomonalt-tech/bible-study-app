@@ -93,8 +93,8 @@ export async function getPassage(
     return { chapter: persisted, verse: singleVerse };
   }
 
-  // 3. Local Translations (BSB, WEB, KJV)
-  const isLocal = ['bsb', 'web', 'kjv'].includes(versionKey);
+  // 3. Local Translations (BSB, WEB, KJV, KJV_STRONGS)
+  const isLocal = ['bsb', 'web', 'kjv', 'kjv_strongs'].includes(versionKey);
   if (isLocal) {
     const bookCacheKey = `${versionKey}:${bookCode}`;
     let bookData: BibleBookData | undefined = BOOK_MEMORY_CACHE.get(bookCacheKey);
@@ -170,5 +170,21 @@ export async function getVerseText(
     return result.verse?.text;
   } catch {
     return undefined;
+  }
+}
+
+/**
+ * Fetch Strong's tagged KJV passage for exact interlinear alignment
+ */
+export async function getStrongsPassage(
+  book: string,
+  chapter: number
+): Promise<BibleChapter | null> {
+  try {
+    const result = await getPassage('kjv_strongs', book, chapter);
+    return result.chapter;
+  } catch (err) {
+    console.warn(`Could not load Strong's tagged passage for ${book} ${chapter}:`, err);
+    return null;
   }
 }
