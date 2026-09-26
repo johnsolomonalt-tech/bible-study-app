@@ -31,6 +31,8 @@ export const metadata: Metadata = {
 };
 
 import type { Viewport } from 'next';
+import { ClerkProvider } from '@clerk/nextjs';
+
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
@@ -45,7 +47,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <ClerkProvider>
+      <html lang="en" suppressHydrationWarning>
       <head>
         <link id="dynamic-favicon" rel="icon" href="/logo-dark.png" type="image/png" />
         <link id="dynamic-apple-icon" rel="apple-touch-icon" href="/logo-dark.png" type="image/png" />
@@ -95,5 +98,6 @@ export default function RootLayout({
         {children}
       </body>
     </html>
+    </ClerkProvider>
   );
 }

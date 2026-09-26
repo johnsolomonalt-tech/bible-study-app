@@ -43,6 +43,7 @@ import {
   ValidTab,
   ValidMobileView
 } from '@/lib/appPreferences';
+import { initSessionTracking, trackClientEvent } from '@/lib/analyticsClient';
 
 // --- All 66 Books ---
 const otStr = "Genesis:50,Exodus:40,Leviticus:27,Numbers:36,Deuteronomy:34,Joshua:24,Judges:21,Ruth:4,1 Samuel:31,2 Samuel:24,1 Kings:22,2 Kings:25,1 Chronicles:29,2 Chronicles:36,Ezra:10,Nehemiah:13,Esther:10,Job:42,Psalms:150,Proverbs:31,Ecclesiastes:12,Song of Solomon:8,Isaiah:66,Jeremiah:52,Lamentations:5,Ezekiel:48,Daniel:12,Hosea:14,Joel:3,Amos:9,Obadiah:1,Jonah:4,Micah:7,Nahum:3,Habakkuk:3,Zephaniah:3,Haggai:2,Zechariah:14,Malachi:4";
@@ -463,6 +464,18 @@ export default function App() {
     verseRef: string;
   } | null>(null);
   const [strongsVersesMap, setStrongsVersesMap] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    if (isLectioModalOpen) {
+      trackClientEvent('lectio_started');
+    }
+  }, [isLectioModalOpen]);
+
+  useEffect(() => {
+    if (isInterlinearMode) {
+      trackClientEvent('interlinear_opened');
+    }
+  }, [isInterlinearMode]);
 
   // Pre-load Strong's tagged chapter for accurate word-by-word reverse interlinear alignment
   useEffect(() => {
@@ -1094,6 +1107,7 @@ export default function App() {
 
   // Load Data
   useEffect(() => {
+    initSessionTracking();
     fetchWithAuth(`${API_URL}/api/notes`).then(r => r.json()).then(data => {
       setNotes(data);
       if (Array.isArray(data) && data.length > 0) {
@@ -1124,6 +1138,15 @@ export default function App() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Analytics: track major feature tab activations
+  useEffect(() => {
+    if (activeTab === 'canvas') {
+      trackClientEvent('canvas_opened');
+    } else if (activeTab === 'chats') {
+      trackClientEvent('ai_chat_opened');
+    }
+  }, [activeTab]);
 
   // Helper to clean verse text and strip verse numbers cleanly
   const cleanVerseText = (rawText: string, startVerse?: number | null, endVerse?: number | null): string => {
@@ -2164,6 +2187,11 @@ export default function App() {
     setIsAiTyping(true);
     setTimeout(scrollToBottom, 50);
 
+    trackClientEvent('ai_chat_prompt', {
+      translation: translation.toUpperCase(),
+      mode: isImageReq ? 'image' : 'study',
+    });
+
     const messagePromise = fetchWithAuth(`${API_URL}/api/chats/${targetChatId}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2258,6 +2286,7 @@ export default function App() {
           body: JSON.stringify({ title: chapterTitle, content: newContent })
         });
         const newNote = await res.json();
+        trackClientEvent('note_created');
         
         setNotes(prev => {
           const latestTemp = prev.find(n => n.id === tempId);
@@ -2287,6 +2316,7 @@ export default function App() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chapterId: currentChapterId })
     });
+    trackClientEvent('reading_tracker_updated');
   };
 
   const toggleAnyChapter = async (id: string) => {
@@ -2297,6 +2327,7 @@ export default function App() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chapterId: id })
     });
+    trackClientEvent('reading_tracker_updated');
   };
 
   const { isLoaded, userId } = useAuth();

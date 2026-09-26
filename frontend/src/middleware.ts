@@ -1,6 +1,50 @@
-import { clerkMiddleware } from "@clerk/nextjs/server";
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 
-export default clerkMiddleware();
+const isDevRoute = createRouteMatcher(['/dev(.*)', '/api/dev(.*)']);
+
+export default clerkMiddleware(async (auth, req) => {
+  if (isDevRoute(req)) {
+    const { userId, sessionClaims } = await auth();
+
+    // 1. Gate: Must be an authenticated Clerk session
+    if (!userId) {
+      if (req.nextUrl.pathname.startsWith('/api/dev')) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+      const homeUrl = new URL('/', req.url);
+      return NextResponse.redirect(homeUrl);
+    }
+
+    // 2. Strict Admin Identity Gate via Environment Variables (if configured)
+    const allowedUserIds = (process.env.ADMIN_USER_IDS || process.env.ADMIN_USER_ID || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const allowedEmails = (process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || '')
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+
+    if (allowedUserIds.length > 0 || allowedEmails.length > 0) {
+      const email = ((sessionClaims?.email as string) || '').toLowerCase();
+      const isAllowedId = allowedUserIds.includes(userId);
+      const isAllowedEmail = Boolean(email && allowedEmails.includes(email));
+
+      if (!isAllowedId && !isAllowedEmail) {
+        // Reject non-admin logged-in users cleanly
+        if (req.nextUrl.pathname.startsWith('/api/dev')) {
+          return NextResponse.json({ error: 'Forbidden. Admin access only.' }, { status: 403 });
+        }
+        const homeUrl = new URL('/', req.url);
+        return NextResponse.redirect(homeUrl);
+      }
+    }
+  }
+
+  return NextResponse.next();
+});
 
 export const config = {
   matcher: [

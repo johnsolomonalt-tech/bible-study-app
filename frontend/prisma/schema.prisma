@@ -70,3 +70,27 @@ model Canvas {
   @@unique([userId, boardId])
   @@index([userId])
 }
+
+model AnalyticsEvent {
+  id          String   @id @default(cuid())
+  eventType   String
+  anonymousId String   @default("anon")
+  metadata    Json?
+  timestamp   DateTime @default(now())
+
+  @@index([eventType, timestamp])
+  @@index([timestamp])
+  @@index([anonymousId, timestamp])
+}
+
+model DevAdminConfig {
+  id             String   @id @default("default")
+  passwordHash   String
+  salt           String
+  adminUserId    String?
+  adminEmail     String?
+  allowedEmails  String[] @default([])
+  allowedUserIds String[] @default([])
+  updatedAt      DateTime @updatedAt
+}
+
