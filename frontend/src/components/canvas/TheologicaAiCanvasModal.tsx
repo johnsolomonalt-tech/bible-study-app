@@ -262,30 +262,24 @@ export function TheologicaAiCanvasModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/75 backdrop-blur-md animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div 
-        className={`w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden flex flex-col max-h-[92vh] transition-all ${
-          isDark 
-            ? 'bg-[#18181b] border-zinc-700/80 text-zinc-100 shadow-[0_25px_60px_rgba(0,0,0,0.8)]' 
-            : 'bg-white border-zinc-200 text-zinc-900 shadow-2xl'
-        }`}
+        className="w-full max-w-2xl rounded-2xl border border-border shadow-2xl overflow-hidden flex flex-col max-h-[92vh] bg-surface text-fg transition-all"
       >
         {/* Header */}
-        <div className={`flex items-center justify-between px-6 py-4 border-b shrink-0 ${
-          isDark ? 'border-zinc-800 bg-[#141416]' : 'border-zinc-100 bg-zinc-50'
-        }`}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface-warm/40 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-accent to-amber-600 flex items-center justify-center text-white shadow-md">
+            <div className="w-9 h-9 rounded-xl bg-accent/15 border border-accent/30 flex items-center justify-center text-accent shadow-xs">
               <Sparkles size={18} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-[15px] font-bold tracking-tight">Theologica AI</h2>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-accent/15 text-accent border border-accent/30 tracking-wide uppercase">
+                <h2 className="text-[15px] font-bold tracking-tight text-fg">Theologica AI</h2>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-accent/15 text-accent border border-accent/30 tracking-wider uppercase">
                   Canvas Architect
                 </span>
               </div>
-              <p className="text-xs text-zinc-400">
+              <p className="text-xs text-muted">
                 Architect interactive theological knowledge graphs and study boards
               </p>
             </div>
@@ -293,7 +287,7 @@ export function TheologicaAiCanvasModal({
           <button 
             type="button" 
             onClick={handleCancelOrClose}
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface-warm transition-colors cursor-pointer"
             title={isLoading ? "Cancel generation and close" : "Close"}
             aria-label="Close"
           >
@@ -303,16 +297,14 @@ export function TheologicaAiCanvasModal({
 
         {/* Mode Navigation Tabs */}
         {!isLoading && (
-          <div className={`flex border-b px-4 sm:px-6 pt-2 gap-2 text-xs font-semibold shrink-0 overflow-x-auto no-scrollbar ${
-            isDark ? 'border-zinc-800 bg-[#161618]' : 'border-zinc-100 bg-zinc-50/50'
-          }`}>
+          <div className="flex border-b border-border px-4 sm:px-6 py-2.5 gap-1.5 text-xs font-semibold shrink-0 overflow-x-auto no-scrollbar bg-surface-warm/20">
             <button
               type="button"
               onClick={() => setActiveMode('generate')}
-              className={`flex items-center gap-1.5 pb-2.5 px-2 border-b-2 transition-all whitespace-nowrap shrink-0 ${
+              className={`flex items-center gap-1.5 py-1.5 px-3 rounded-lg transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                 activeMode === 'generate'
-                  ? 'border-accent text-accent'
-                  : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                  ? 'bg-surface text-accent shadow-xs border border-border font-semibold'
+                  : 'text-muted hover:text-fg hover:bg-surface/50 border border-transparent'
               }`}
             >
               <Network size={14} />
@@ -322,10 +314,10 @@ export function TheologicaAiCanvasModal({
             <button
               type="button"
               onClick={() => setActiveMode('discourse')}
-              className={`flex items-center gap-1.5 pb-2.5 px-2 border-b-2 transition-all whitespace-nowrap shrink-0 ${
+              className={`flex items-center gap-1.5 py-1.5 px-3 rounded-lg transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                 activeMode === 'discourse'
-                  ? 'border-accent text-accent'
-                  : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                  ? 'bg-surface text-accent shadow-xs border border-border font-semibold'
+                  : 'text-muted hover:text-fg hover:bg-surface/50 border border-transparent'
               }`}
             >
               <Workflow size={14} />
@@ -336,10 +328,10 @@ export function TheologicaAiCanvasModal({
               <button
                 type="button"
                 onClick={() => setActiveMode('expand')}
-                className={`flex items-center gap-1.5 pb-2.5 px-2 border-b-2 transition-all whitespace-nowrap shrink-0 ${
+                className={`flex items-center gap-1.5 py-1.5 px-3 rounded-lg transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                   activeMode === 'expand'
-                    ? 'border-accent text-accent'
-                    : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                    ? 'bg-surface text-accent shadow-xs border border-border font-semibold'
+                    : 'text-muted hover:text-fg hover:bg-surface/50 border border-transparent'
                 }`}
               >
                 <Compass size={14} />
@@ -350,10 +342,10 @@ export function TheologicaAiCanvasModal({
             <button
               type="button"
               onClick={() => setActiveMode('synthesize')}
-              className={`flex items-center gap-1.5 pb-2.5 px-2 border-b-2 transition-all whitespace-nowrap shrink-0 ${
+              className={`flex items-center gap-1.5 py-1.5 px-3 rounded-lg transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                 activeMode === 'synthesize'
-                  ? 'border-accent text-accent'
-                  : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                  ? 'bg-surface text-accent shadow-xs border border-border font-semibold'
+                  : 'text-muted hover:text-fg hover:bg-surface/50 border border-transparent'
               }`}
             >
               <FileText size={14} />
@@ -367,42 +359,37 @@ export function TheologicaAiCanvasModal({
           {/* STATE: GENERATING BOARD (High-polish HUD) */}
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-10 px-4 space-y-6 animate-in fade-in zoom-in-95">
-              {/* Pulsing Visual Orb */}
-              <div className="relative flex items-center justify-center">
-                <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-accent/20 to-amber-500/20 animate-ping opacity-60" />
-                <div className="absolute w-16 h-16 rounded-full border-2 border-accent border-t-transparent animate-spin" />
-                <div className="absolute w-12 h-12 rounded-2xl bg-accent text-white flex items-center justify-center shadow-lg shadow-accent/40">
-                  <Sparkles size={24} className="animate-pulse" />
+              {/* Refined Visual Orb */}
+              <div className="relative flex items-center justify-center w-20 h-20">
+                <div className="absolute inset-0 rounded-2xl bg-accent/10 border border-accent/20 animate-pulse" />
+                <div className="w-12 h-12 rounded-xl bg-accent/15 text-accent border border-accent/35 flex items-center justify-center shadow-xs">
+                  <Sparkles size={22} className="animate-pulse text-accent" />
                 </div>
               </div>
 
               {/* Status Header */}
               <div className="text-center space-y-1.5">
-                <h3 className="text-sm font-bold text-zinc-100 tracking-tight">
+                <h3 className="text-sm font-bold text-fg tracking-tight">
                   {isFinishingUp ? 'Finishing Up Your Canvas Board' : 'Architecting Your Canvas Board'}
                 </h3>
-                <p className="text-xs text-accent font-medium animate-pulse">
+                <p className="text-xs text-accent font-medium">
                   {isFinishingUp ? 'Finalizing theological canvas layout...' : (MILESTONES[loadingStep] || 'Generating...')}
                 </p>
               </div>
 
               {/* Progress Milestones or Finishing Up Replacement */}
               {isFinishingUp ? (
-                <div className={`w-full max-w-md p-5 rounded-xl border text-center space-y-2.5 animate-in fade-in duration-300 ${
-                  isDark ? 'bg-zinc-900/70 border-zinc-800' : 'bg-zinc-50 border-zinc-200'
-                }`}>
+                <div className="w-full max-w-md p-5 rounded-xl border border-border bg-surface-warm/40 text-center space-y-2.5 animate-in fade-in duration-300">
                   <div className="flex items-center justify-center gap-2 text-accent font-semibold text-xs">
                     <Loader2 size={16} className="animate-spin text-accent" />
                     <span>Finishing up...</span>
                   </div>
-                  <p className="text-xs text-zinc-400">
+                  <p className="text-xs text-muted">
                     Finalizing card formatting, connections, and placing cards on your canvas. Almost ready!
                   </p>
                 </div>
               ) : (
-                <div className={`w-full max-w-md p-4 rounded-xl border space-y-2.5 text-xs ${
-                  isDark ? 'bg-zinc-900/70 border-zinc-800' : 'bg-zinc-50 border-zinc-200'
-                }`}>
+                <div className="w-full max-w-md p-4 rounded-xl border border-border bg-surface-warm/40 space-y-2.5 text-xs">
                   {MILESTONES.map((milestone, idx) => {
                     const isDone = idx < loadingStep;
                     const isCurrent = idx === loadingStep;
@@ -411,15 +398,15 @@ export function TheologicaAiCanvasModal({
                       <div 
                         key={idx} 
                         className={`flex items-center gap-2.5 transition-all duration-300 ${
-                          isDone ? 'text-emerald-400' : isCurrent ? 'text-accent font-semibold' : 'text-zinc-600'
+                          isDone ? 'text-emerald-500 font-medium' : isCurrent ? 'text-accent font-semibold' : 'text-muted/60'
                         }`}
                       >
                         {isDone ? (
-                          <CheckCircle2 size={15} className="shrink-0 text-emerald-400" />
+                          <CheckCircle2 size={15} className="shrink-0 text-emerald-500" />
                         ) : isCurrent ? (
                           <Loader2 size={15} className="shrink-0 animate-spin text-accent" />
                         ) : (
-                          <div className="w-3.5 h-3.5 rounded-full border border-zinc-700 shrink-0 ml-0.5" />
+                          <div className="w-3.5 h-3.5 rounded-full border border-border-soft shrink-0 ml-0.5" />
                         )}
                         <span className="truncate">{milestone}</span>
                       </div>
@@ -428,7 +415,7 @@ export function TheologicaAiCanvasModal({
                 </div>
               )}
 
-              <div className="text-[11px] text-zinc-500 text-center">
+              <div className="text-[11px] text-muted text-center">
                 Theologica AI assigns collision-free layout coordinates so cards snap neatly into position.
               </div>
 
@@ -436,7 +423,7 @@ export function TheologicaAiCanvasModal({
               <button
                 type="button"
                 onClick={handleCancelOrClose}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white hover:bg-zinc-800 border border-zinc-700/60 transition-all flex items-center gap-2 cursor-pointer shadow-sm active:scale-95"
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-muted hover:text-fg hover:bg-surface-warm border border-border transition-all flex items-center gap-2 cursor-pointer shadow-xs active:scale-95"
               >
                 <X size={14} />
                 <span>Cancel Generation</span>
@@ -447,30 +434,26 @@ export function TheologicaAiCanvasModal({
             <>
               {/* Context Banner */}
               {activeMode === 'expand' && selectedNode ? (
-                <div className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs border ${
-                  isDark ? 'bg-zinc-800/80 border-accent/40 text-zinc-200' : 'bg-amber-50/70 border-amber-300 text-zinc-800'
-                }`}>
+                <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs border border-accent/40 bg-accent/10 text-fg">
                   <Network size={15} className="text-accent shrink-0" />
                   <div className="truncate">
-                    <span className="text-zinc-400">Target Card: </span>
+                    <span className="text-muted">Target Card: </span>
                     <span className="font-semibold text-accent">{selectedNode.data.title}</span>
-                    <span className="text-zinc-500 ml-1">({selectedNode.data.category})</span>
+                    <span className="text-muted ml-1">({selectedNode.data.category})</span>
                   </div>
                 </div>
               ) : (
-                <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs border ${
-                  isDark ? 'bg-zinc-900/60 border-zinc-800 text-zinc-400' : 'bg-zinc-50 border-zinc-200 text-zinc-600'
-                }`}>
+                <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs border border-border bg-surface-warm/40 text-muted">
                   <Layers size={14} className="shrink-0 text-accent" />
                   <span>
-                    Operating across board: <strong className="text-zinc-200">{currentGraph.nodes.length} cards</strong> on canvas
+                    Operating across board: <strong className="text-fg">{currentGraph.nodes.length} cards</strong> on canvas
                   </span>
                 </div>
               )}
 
               {/* Theological Perspective Lens Bar */}
-              <div className="flex items-center justify-between flex-wrap gap-2 py-2 px-3 rounded-xl bg-zinc-100 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/60 text-xs">
-                <span className="font-semibold text-zinc-500 dark:text-zinc-400 shrink-0">Tradition Lens:</span>
+              <div className="flex items-center justify-between flex-wrap gap-2 py-2 px-3 rounded-xl bg-surface-warm/60 border border-border text-xs">
+                <span className="font-semibold text-muted shrink-0">Tradition Lens:</span>
                 <div className="flex items-center flex-wrap gap-1">
                   {[
                     { id: 'canonical', label: 'Canonical', icon: '🕊️' },
@@ -483,10 +466,10 @@ export function TheologicaAiCanvasModal({
                       key={l.id}
                       type="button"
                       onClick={() => setSelectedLens(l.id as any)}
-                      className={`px-2 py-0.5 rounded-lg text-[11px] font-medium transition-all cursor-pointer ${
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all cursor-pointer ${
                         selectedLens === l.id
-                          ? 'bg-accent text-white font-semibold shadow-xs'
-                          : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/30'
+                          ? 'bg-accent text-accent-on font-semibold shadow-xs'
+                          : 'text-muted hover:text-fg hover:bg-surface border border-transparent'
                       }`}
                     >
                       <span>{l.icon} {l.label}</span>
@@ -497,7 +480,7 @@ export function TheologicaAiCanvasModal({
 
               {/* Suggestions Chips */}
               <div>
-                <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-2">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-muted mb-2">
                   {activeMode === 'expand' 
                     ? 'Suggested expansions for card' 
                     : activeMode === 'discourse'
@@ -518,11 +501,7 @@ export function TheologicaAiCanvasModal({
                         setPrompt(item.query);
                         handleSubmit(item.query);
                       }}
-                      className={`text-xs text-left px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${
-                        isDark 
-                          ? 'bg-zinc-800/80 border-zinc-700 text-zinc-300 hover:bg-zinc-700 hover:text-white hover:border-accent' 
-                          : 'bg-zinc-50 border-zinc-200 text-zinc-700 hover:bg-zinc-100 hover:text-black hover:border-accent'
-                      }`}
+                      className="text-xs text-left px-3 py-1.5 rounded-xl border border-border bg-surface text-fg hover:bg-surface-warm hover:border-accent/60 transition-all cursor-pointer shadow-xs"
                     >
                       {item.label}
                     </button>
@@ -532,9 +511,9 @@ export function TheologicaAiCanvasModal({
 
               {/* Custom Input */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-zinc-300 flex items-center justify-between">
+                <label className="text-xs font-semibold text-fg flex items-center justify-between">
                   <span>Your Study Prompt:</span>
-                  <span className="text-[11px] text-zinc-500 font-normal">Supports scripture citations & topics</span>
+                  <span className="text-[11px] text-muted font-normal">Supports scripture citations & topics</span>
                 </label>
                 <textarea
                   value={prompt}
@@ -557,11 +536,7 @@ export function TheologicaAiCanvasModal({
                       : "e.g. Map John 15:1-8 (The Vine and Branches) with theology, historical context, and discipleship applications..."
                   }
                   rows={3}
-                  className={`w-full p-3.5 rounded-xl border text-xs resize-none focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all ${
-                    isDark 
-                      ? 'bg-[#121214] border-zinc-700 text-zinc-100 placeholder-zinc-500' 
-                      : 'bg-zinc-50 border-zinc-300 text-zinc-900 placeholder-zinc-400'
-                  }`}
+                  className="w-full p-3.5 rounded-xl border border-border bg-surface text-fg placeholder:text-muted/60 text-xs resize-none focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent transition-all"
                 />
               </div>
 
@@ -575,29 +550,29 @@ export function TheologicaAiCanvasModal({
 
               {/* Synthesis Markdown Output Preview */}
               {synthesisResult && (
-                <div className={`p-4 rounded-xl border space-y-3 ${isDark ? 'bg-zinc-900/60 border-zinc-700' : 'bg-zinc-50 border-zinc-200'}`}>
-                  <div className="flex items-center justify-between border-b pb-2 border-zinc-700/50">
-                    <span className="text-xs font-bold text-zinc-300">Canvas Synthesis</span>
+                <div className="p-4 rounded-xl border border-border bg-surface-warm/40 space-y-3">
+                  <div className="flex items-center justify-between border-b pb-2 border-border">
+                    <span className="text-xs font-bold text-fg">Canvas Synthesis</span>
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
                         onClick={handleCopySynthesis}
-                        className="flex items-center gap-1 text-xs px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors cursor-pointer"
+                        className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-surface border border-border hover:bg-surface-warm text-fg transition-colors cursor-pointer"
                       >
-                        {copiedSynthesis ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                        {copiedSynthesis ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
                         <span>{copiedSynthesis ? 'Copied' : 'Copy'}</span>
                       </button>
                       <button
                         type="button"
                         onClick={handleCreateSynthesisCard}
-                        className="flex items-center gap-1 text-xs px-2.5 py-1 rounded bg-accent hover:bg-accent/90 text-white transition-colors cursor-pointer"
+                        className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-accent hover:opacity-90 text-accent-on transition-colors cursor-pointer shadow-xs"
                       >
                         <BookOpen size={12} />
                         <span>Insert as Card</span>
                       </button>
                     </div>
                   </div>
-                  <div className={`prose prose-sm max-w-none text-xs max-h-56 overflow-y-auto ${isDark ? 'prose-invert text-zinc-300' : 'text-zinc-700'}`}>
+                  <div className={`prose prose-sm max-w-none text-xs max-h-56 overflow-y-auto ${isDark ? 'prose-invert text-fg' : 'text-fg'}`}>
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
                       {synthesisResult}
                     </ReactMarkdown>
@@ -610,17 +585,15 @@ export function TheologicaAiCanvasModal({
 
         {/* Modal Footer */}
         {!isLoading && (
-          <div className={`flex items-center justify-between flex-wrap gap-2 px-6 py-3.5 border-t shrink-0 ${
-            isDark ? 'border-zinc-800 bg-[#141416]' : 'border-zinc-100 bg-zinc-50'
-          }`}>
-            <span className="text-[11px] text-zinc-500 hidden sm:inline">
-              Press <kbd className="px-1 py-0.5 rounded bg-zinc-800 border border-zinc-700 font-mono text-[10px]">{mod.symbol}+Enter</kbd> to generate
+          <div className="flex items-center justify-between flex-wrap gap-2 px-6 py-3.5 border-t border-border bg-surface-warm/30 shrink-0">
+            <span className="text-[11px] text-muted hidden sm:inline">
+              Press <kbd className="px-1.5 py-0.5 rounded bg-surface border border-border font-mono text-[10px] text-muted">{mod.symbol}+Enter</kbd> to generate
             </span>
             <div className="flex items-center gap-2 ml-auto flex-wrap">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+                className="px-4 py-2 rounded-xl text-xs font-medium text-muted hover:text-fg transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -628,7 +601,7 @@ export function TheologicaAiCanvasModal({
                 type="button"
                 onClick={() => handleSubmit()}
                 disabled={!prompt.trim()}
-                className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-accent text-white text-xs font-semibold hover:bg-accent/90 disabled:opacity-50 active:scale-95 transition-all shadow-md cursor-pointer"
+                className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-accent text-accent-on text-xs font-semibold hover:opacity-90 disabled:opacity-50 active:scale-95 transition-all shadow-xs cursor-pointer"
               >
                 <Sparkles size={14} />
                 <span>

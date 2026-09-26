@@ -2092,13 +2092,9 @@ function InnerCanvasBoard({
               <button
                 type="button"
                 onClick={() => setIsAiModalOpen(true)}
-                className={`w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border text-xs sm:text-sm font-medium active:scale-95 transition-all cursor-pointer ${
-                  isDark 
-                    ? 'border-zinc-700 hover:bg-zinc-800/60 text-zinc-200 hover:text-white' 
-                    : 'border-zinc-200 hover:bg-zinc-100 text-zinc-700'
-                }`}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-surface text-fg hover:border-accent hover:text-accent text-xs sm:text-sm font-medium active:scale-95 transition-all cursor-pointer shadow-xs"
               >
-                <Sparkles size={15} className="text-amber-400" />
+                <Sparkles size={15} className="text-accent" />
                 <span>Generate with AI</span>
               </button>
             </div>
@@ -2153,11 +2149,9 @@ function InnerCanvasBoard({
                   setPaneContextMenu(null);
                   setIsAiModalOpen(true);
                 }}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-                  isDark ? 'hover:bg-zinc-800 text-amber-300' : 'hover:bg-amber-50 text-amber-700'
-                }`}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer hover:bg-accent/10 text-accent"
               >
-                <Sparkles size={16} className="text-amber-400 shrink-0" />
+                <Sparkles size={16} className="text-accent shrink-0" />
                 <span>Theologica AI</span>
               </button>
             </div>
@@ -2212,11 +2206,9 @@ function InnerCanvasBoard({
               setPaneContextMenu(null);
               setIsAiModalOpen(true);
             }}
-            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-              isDark ? 'hover:bg-zinc-800 text-amber-300' : 'hover:bg-amber-50 text-amber-700'
-            }`}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer hover:bg-accent/10 text-accent"
           >
-            <Sparkles size={16} className="text-amber-400 shrink-0" />
+            <Sparkles size={16} className="text-accent shrink-0" />
             <span>Theologica AI</span>
           </button>
 
@@ -2304,8 +2296,8 @@ function InnerCanvasBoard({
 
       {/* Floating Theologica AI Success Toast (Desktop only) */}
       {aiToast && !isMobile && (
-        <div className="hidden sm:flex absolute bottom-6 left-1/2 -translate-x-1/2 z-40 items-center gap-3 px-4 py-2.5 rounded-2xl bg-[#1e1e22]/95 border border-accent/60 shadow-2xl text-xs text-white backdrop-blur-md animate-in fade-in slide-in-from-bottom-3">
-          <Sparkles size={15} className="text-accent animate-pulse shrink-0" />
+        <div className="hidden sm:flex absolute bottom-6 left-1/2 -translate-x-1/2 z-40 items-center gap-3 px-4 py-2.5 rounded-2xl bg-surface/95 border border-accent/40 shadow-2xl text-xs text-fg backdrop-blur-md animate-in fade-in slide-in-from-bottom-3">
+          <Sparkles size={15} className="text-accent shrink-0" />
           <span className="font-medium">{aiToast.message}</span>
           <button
             type="button"
@@ -2313,7 +2305,7 @@ function InnerCanvasBoard({
               handleUndo();
               setAiToast(null);
             }}
-            className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-colors cursor-pointer"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-warm hover:bg-border text-muted hover:text-fg transition-colors cursor-pointer text-xs font-medium border border-border"
           >
             <Undo2 size={12} />
             <span>Undo</span>

@@ -2791,9 +2791,15 @@ export default function App() {
         {/* Left: Logo */}
         <div className="flex-1 flex items-center min-w-0">
           <div className="font-display text-[20px] tracking-tight text-accent flex items-center gap-2.5 select-none">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={theme === 'light' ? '/logo-light.png' : '/logo-dark.png'} alt="Theologica Logo" className="w-8 h-8 object-contain drop-shadow-sm rounded-lg shrink-0" />
-            <span className="inline font-semibold">Theologica</span>
+            <div className="relative w-8 h-8 rounded-xl overflow-hidden shadow-xs ring-1 ring-accent/35 bg-accent/15 flex items-center justify-center shrink-0 transition-colors">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img 
+                src={(theme === 'light' || theme === 'sepia') ? '/logo-light.png' : '/logo-dark.png'} 
+                alt="Theologica Logo" 
+                className="w-full h-full object-contain p-0.5 filter contrast-105" 
+              />
+            </div>
+            <span className="inline font-semibold tracking-tight">Theologica</span>
           </div>
         </div>
 
