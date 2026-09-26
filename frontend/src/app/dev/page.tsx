@@ -416,7 +416,7 @@ export default function DevDashboardPage() {
               </div>
               <p className="text-[11px] text-[#87867f] mt-1.5 flex items-center gap-1">
                 <Key size={11} className="text-accent" />
-                Default initial passcode is <span className="font-mono text-accent">1234</span>
+                <span>Enter your private developer access code</span>
               </p>
             </div>
 
@@ -1362,7 +1362,7 @@ export default function DevDashboardPage() {
                   type="password"
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
-                  placeholder="Enter current passcode (default 1234)"
+                  placeholder="Enter current passcode"
                   required
                   className="w-full px-3 py-2 rounded-xl bg-[var(--bg)] border border-[var(--border)] text-xs text-[var(--fg)] focus:outline-none focus:border-accent"
                 />
