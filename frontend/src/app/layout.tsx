@@ -63,10 +63,17 @@ export default function RootLayout({
                 }
                 if (theme === 'light') {
                   document.documentElement.setAttribute('data-theme', 'light');
+                } else if (theme === 'sepia') {
+                  document.documentElement.setAttribute('data-theme', 'sepia');
                 } else {
                   document.documentElement.removeAttribute('data-theme');
                 }
-                var iconPath = theme === 'light' ? '/logo-light.png' : '/logo-dark.png';
+                var accentMatch = document.cookie.match(/(^|;)\s*theologica_accent_color=([^;]+)/);
+                var accent = accentMatch ? decodeURIComponent(accentMatch[2]) : localStorage.getItem('theologica_accent_color');
+                if (accent) {
+                  document.documentElement.style.setProperty('--accent', accent);
+                }
+                var iconPath = (theme === 'light' || theme === 'sepia') ? '/logo-light.png' : '/logo-dark.png';
                 var fav = document.getElementById('dynamic-favicon') || document.querySelector("link[rel~='icon']");
                 if (fav) fav.href = iconPath;
                 var appleFav = document.getElementById('dynamic-apple-icon') || document.querySelector("link[rel~='apple-touch-icon']");

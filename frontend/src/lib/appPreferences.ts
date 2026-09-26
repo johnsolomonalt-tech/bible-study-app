@@ -17,13 +17,35 @@ export const PREF_KEYS = {
   MOBILE_STUDY_VIEW: 'theologica_mobile_study_view',
   DEVOTIONAL_TIME: 'theologica_devotional_time',
   THEME: 'theme',
+  ACCENT_COLOR: 'theologica_accent_color',
   TRACKER_FORMAT: 'trackerFormat',
   TRACKER_EXPANDED_TESTAMENTS: 'theologica_tracker_testaments',
   TRACKER_EXPANDED_BOOKS: 'theologica_tracker_books',
   ACTIVE_NOTE_ID: 'theologica_active_note_id',
   ACTIVE_CHAT_ID: 'theologica_active_chat_id',
   COOKIE_CONSENT: 'theologica_cookie_consent',
+  // Reader & Typography Preferences
+  READER_FONT_FAMILY: 'theologica_reader_font_family',
+  READER_FONT_SIZE: 'theologica_reader_font_size',
+  READER_LINE_HEIGHT: 'theologica_reader_line_height',
+  READER_LAYOUT: 'theologica_reader_layout',
+  SHOW_VERSE_NUMBERS: 'theologica_show_verse_numbers',
+  SHOW_FOOTNOTES: 'theologica_show_footnotes',
+  SHOW_BACKLINKS_BADGES: 'theologica_show_backlinks_badges',
+  // Audio & TTS Preferences
+  TTS_SPEED: 'theologica_tts_speed',
+  TTS_VOICE: 'theologica_tts_voice',
+  AUDIO_AUTO_SCROLL: 'theologica_audio_auto_scroll',
+  AUDIO_AUTO_ADVANCE: 'theologica_audio_auto_advance',
+  // Study & AI Preferences
+  THEOLOGICAL_LENS: 'theologica_theological_lens',
+  DAILY_CHAPTER_GOAL: 'theologica_daily_chapter_goal',
 } as const;
+
+export type ReaderFontFamily = 'serif' | 'sans' | 'mono';
+export type ReaderFontSize = 'sm' | 'md' | 'lg' | 'xl';
+export type ReaderLineHeight = 'compact' | 'standard' | 'relaxed';
+export type ReaderLayout = 'verse' | 'paragraph';
 
 export const VALID_TABS = ['study', 'canvas', 'devotional', 'notes', 'chats', 'tracker'] as const;
 export type ValidTab = typeof VALID_TABS[number];

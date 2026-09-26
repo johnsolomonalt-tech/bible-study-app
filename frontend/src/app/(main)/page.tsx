@@ -18,7 +18,7 @@ import { InterlinearModeRibbon } from '@/components/bible/InterlinearModeRibbon'
 import { VerseInterlinearModal } from '@/components/bible/VerseInterlinearModal';
 import { findInterlinearWord, getOrGenerateInterlinearWord, fetchInterlinearWord, getVerseInterlinearTokens, preloadChapterLexicon, STOPWORDS, InterlinearWord } from '@/lib/interlinearData';
 import { getScriptureBacklinks, BacklinksResult } from '@/lib/backlinks';
-import { TheologicalLensSelector, TheologicalLensType } from '@/components/chat/TheologicalLensSelector';
+import { TheologicalLensSelector, TheologicalLensType, THEOLOGICAL_LENS_OPTIONS } from '@/components/chat/TheologicalLensSelector';
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from 'react-resizable-panels';
 import type { PanelImperativeHandle } from 'react-resizable-panels';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -41,8 +41,13 @@ import {
   VALID_TABS, 
   VALID_MOBILE_VIEWS,
   ValidTab,
-  ValidMobileView
+  ValidMobileView,
+  ReaderFontFamily,
+  ReaderFontSize,
+  ReaderLineHeight,
+  ReaderLayout
 } from '@/lib/appPreferences';
+import { SettingsModal } from '@/components/settings/SettingsModal';
 import { initSessionTracking, trackClientEvent } from '@/lib/analyticsClient';
 
 // --- All 66 Books ---
@@ -802,8 +807,27 @@ export default function App() {
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [theme, setTheme] = useState('dark');
+  const [accentColor, setAccentColor] = useState('#c96442');
   const [trackerFormat, setTrackerFormat] = useState<'percent' | 'fraction'>('percent');
+  const [dailyChapterGoal, setDailyChapterGoal] = useState(3);
+
+  // Reader Typography States
+  const [readerFontFamily, setReaderFontFamily] = useState<ReaderFontFamily>('serif');
+  const [readerFontSize, setReaderFontSize] = useState<ReaderFontSize>('md');
+  const [readerLineHeight, setReaderLineHeight] = useState<ReaderLineHeight>('standard');
+  const [readerLayout, setReaderLayout] = useState<ReaderLayout>('verse');
+  const [showVerseNumbers, setShowVerseNumbers] = useState(true);
+  const [showFootnotes, setShowFootnotes] = useState(true);
+  const [showBacklinksBadges, setShowBacklinksBadges] = useState(true);
+
+  // Audio & TTS States
+  const [ttsSpeed, setTtsSpeed] = useState(0.9);
+  const [ttsVoice, setTtsVoice] = useState('');
+  const [autoScrollAudio, setAutoScrollAudio] = useState(true);
+  const [autoAdvanceAudio, setAutoAdvanceAudio] = useState(false);
+
   const preferencesRestoredRef = useRef(false);
+  const isFirstBookMountRef = useRef(true);
 
   // Restore all saved session preferences & temporary UI states on mount
   useEffect(() => {
@@ -868,13 +892,73 @@ export default function App() {
       setDevotionalTime(devoTimePref);
     }
 
-    // 7. Theme & Tracker
+    // 7. Theme, Accent & Tracker
     const savedTheme = getPreference(PREF_KEYS.THEME) || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-    if (savedTheme === 'light' || savedTheme === 'dark') setTheme(savedTheme);
+    if (savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'sepia') {
+      setTheme(savedTheme);
+      if (savedTheme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+      else if (savedTheme === 'sepia') document.documentElement.setAttribute('data-theme', 'sepia');
+      else document.documentElement.removeAttribute('data-theme');
+    }
+
+    const savedAccent = getPreference(PREF_KEYS.ACCENT_COLOR);
+    if (savedAccent) {
+      setAccentColor(savedAccent);
+      document.documentElement.style.setProperty('--accent', savedAccent);
+    }
 
     const savedTracker = getPreference(PREF_KEYS.TRACKER_FORMAT) as 'percent' | 'fraction';
     if (savedTracker === 'percent' || savedTracker === 'fraction') setTrackerFormat(savedTracker);
 
+    const savedGoal = getPreference(PREF_KEYS.DAILY_CHAPTER_GOAL);
+    if (savedGoal) {
+      const parsed = parseInt(savedGoal, 10);
+      if (!isNaN(parsed) && parsed >= 1 && parsed <= 20) setDailyChapterGoal(parsed);
+    }
+
+    // 8. Reader Preferences
+    const savedFont = getPreference(PREF_KEYS.READER_FONT_FAMILY) as ReaderFontFamily;
+    if (savedFont && ['serif', 'sans', 'mono'].includes(savedFont)) setReaderFontFamily(savedFont);
+
+    const savedSize = getPreference(PREF_KEYS.READER_FONT_SIZE) as ReaderFontSize;
+    if (savedSize && ['sm', 'md', 'lg', 'xl'].includes(savedSize)) setReaderFontSize(savedSize);
+
+    const savedLeading = getPreference(PREF_KEYS.READER_LINE_HEIGHT) as ReaderLineHeight;
+    if (savedLeading && ['compact', 'standard', 'relaxed'].includes(savedLeading)) setReaderLineHeight(savedLeading);
+
+    const savedLayout = getPreference(PREF_KEYS.READER_LAYOUT) as ReaderLayout;
+    if (savedLayout && ['verse', 'paragraph'].includes(savedLayout)) setReaderLayout(savedLayout);
+
+    const savedVerseNums = getPreference(PREF_KEYS.SHOW_VERSE_NUMBERS);
+    if (savedVerseNums !== '') setShowVerseNumbers(savedVerseNums === 'true');
+
+    const savedFootnotesPref = getPreference(PREF_KEYS.SHOW_FOOTNOTES);
+    if (savedFootnotesPref !== '') setShowFootnotes(savedFootnotesPref === 'true');
+
+    const savedBacklinks = getPreference(PREF_KEYS.SHOW_BACKLINKS_BADGES);
+    if (savedBacklinks !== '') setShowBacklinksBadges(savedBacklinks === 'true');
+
+    // 9. Audio Preferences
+    const savedSpeed = getPreference(PREF_KEYS.TTS_SPEED);
+    if (savedSpeed) {
+      const parsed = parseFloat(savedSpeed);
+      if (!isNaN(parsed) && parsed > 0.4 && parsed < 3) setTtsSpeed(parsed);
+    }
+
+    const savedVoice = getPreference(PREF_KEYS.TTS_VOICE);
+    if (savedVoice) setTtsVoice(savedVoice);
+
+    const savedAutoScroll = getPreference(PREF_KEYS.AUDIO_AUTO_SCROLL);
+    if (savedAutoScroll !== '') setAutoScrollAudio(savedAutoScroll === 'true');
+
+    const savedAutoAdvance = getPreference(PREF_KEYS.AUDIO_AUTO_ADVANCE);
+    if (savedAutoAdvance !== '') setAutoAdvanceAudio(savedAutoAdvance === 'true');
+
+    // 10. Study & AI
+    const savedLens = getPreference(PREF_KEYS.THEOLOGICAL_LENS) as TheologicalLensType;
+    if (savedLens && THEOLOGICAL_LENS_OPTIONS.some(o => o.id === savedLens)) setTheologicalLens(savedLens);
+
+    // 11. Tracker Collections
     const savedTestaments = getPreference(PREF_KEYS.TRACKER_EXPANDED_TESTAMENTS);
     if (savedTestaments) {
       try {
@@ -899,11 +983,15 @@ export default function App() {
     }
   }, [translation]);
 
-  // Persist active book & chapter
+  // Persist active book & chapter (guarded so initial load doesn't expand books)
   useEffect(() => {
     if (typeof window !== 'undefined' && activeBook?.name && activeChapter) {
       setPreference(PREF_KEYS.LAST_BOOK, activeBook.name);
       setPreference(PREF_KEYS.LAST_CHAPTER, activeChapter.toString());
+    }
+    if (isFirstBookMountRef.current) {
+      isFirstBookMountRef.current = false;
+      return;
     }
     if (activeBook?.name) {
       setExpandedBook(activeBook.name);
@@ -979,7 +1067,21 @@ export default function App() {
         [PREF_KEYS.MOBILE_STUDY_VIEW]: mobileStudyView,
         [PREF_KEYS.DEVOTIONAL_TIME]: devotionalTime,
         [PREF_KEYS.THEME]: theme,
+        [PREF_KEYS.ACCENT_COLOR]: accentColor,
         [PREF_KEYS.TRACKER_FORMAT]: trackerFormat,
+        [PREF_KEYS.DAILY_CHAPTER_GOAL]: String(dailyChapterGoal),
+        [PREF_KEYS.READER_FONT_FAMILY]: readerFontFamily,
+        [PREF_KEYS.READER_FONT_SIZE]: readerFontSize,
+        [PREF_KEYS.READER_LINE_HEIGHT]: readerLineHeight,
+        [PREF_KEYS.READER_LAYOUT]: readerLayout,
+        [PREF_KEYS.SHOW_VERSE_NUMBERS]: String(showVerseNumbers),
+        [PREF_KEYS.SHOW_FOOTNOTES]: String(showFootnotes),
+        [PREF_KEYS.SHOW_BACKLINKS_BADGES]: String(showBacklinksBadges),
+        [PREF_KEYS.TTS_SPEED]: String(ttsSpeed),
+        [PREF_KEYS.TTS_VOICE]: ttsVoice,
+        [PREF_KEYS.AUDIO_AUTO_SCROLL]: String(autoScrollAudio),
+        [PREF_KEYS.AUDIO_AUTO_ADVANCE]: String(autoAdvanceAudio),
+        [PREF_KEYS.THEOLOGICAL_LENS]: theologicalLens,
         ...(activeNoteId !== null ? { [PREF_KEYS.ACTIVE_NOTE_ID]: String(activeNoteId) } : {}),
         ...(activeChatId !== null ? { [PREF_KEYS.ACTIVE_CHAT_ID]: String(activeChatId) } : {}),
       });
@@ -1010,14 +1112,28 @@ export default function App() {
     mobileStudyView,
     devotionalTime,
     theme,
+    accentColor,
     trackerFormat,
+    dailyChapterGoal,
+    readerFontFamily,
+    readerFontSize,
+    readerLineHeight,
+    readerLayout,
+    showVerseNumbers,
+    showFootnotes,
+    showBacklinksBadges,
+    ttsSpeed,
+    ttsVoice,
+    autoScrollAudio,
+    autoAdvanceAudio,
+    theologicalLens,
     activeNoteId,
     activeChatId,
   ]);
 
   // Dynamic favicon and theme sync effect across browser tab and mobile
   useEffect(() => {
-    const iconUrl = theme === 'light' ? '/logo-light.png' : '/logo-dark.png';
+    const iconUrl = (theme === 'light' || theme === 'sepia') ? '/logo-light.png' : '/logo-dark.png';
 
     // 1. Update dynamic favicon
     const favLink = document.getElementById('dynamic-favicon') as HTMLLinkElement | null;
@@ -1037,7 +1153,7 @@ export default function App() {
     });
 
     // 4. Update theme-color meta for mobile address bar
-    const themeColor = theme === 'light' ? '#faf9f5' : '#141413';
+    const themeColor = theme === 'light' ? '#faf9f5' : theme === 'sepia' ? '#f8f1e3' : '#141413';
     let metaTheme = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
     if (!metaTheme) {
       metaTheme = document.createElement('meta');
@@ -1047,18 +1163,308 @@ export default function App() {
     metaTheme.content = themeColor;
   }, [theme]);
 
-  const toggleTheme = () => {
-    const newTheme = theme === 'dark' ? 'light' : 'dark';
+  // Unified Settings Handlers
+  const handleThemeChange = (newTheme: 'dark' | 'light' | 'sepia') => {
     setTheme(newTheme);
     setPreference(PREF_KEYS.THEME, newTheme);
     if (newTheme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else if (newTheme === 'sepia') document.documentElement.setAttribute('data-theme', 'sepia');
     else document.documentElement.removeAttribute('data-theme');
+  };
+
+  const handleAccentColorChange = (hex: string) => {
+    setAccentColor(hex);
+    setPreference(PREF_KEYS.ACCENT_COLOR, hex);
+    document.documentElement.style.setProperty('--accent', hex);
+  };
+
+  const handleReaderFontFamilyChange = (val: ReaderFontFamily) => {
+    setReaderFontFamily(val);
+    setPreference(PREF_KEYS.READER_FONT_FAMILY, val);
+  };
+
+  const handleReaderFontSizeChange = (val: ReaderFontSize) => {
+    setReaderFontSize(val);
+    setPreference(PREF_KEYS.READER_FONT_SIZE, val);
+  };
+
+  const handleReaderLineHeightChange = (val: ReaderLineHeight) => {
+    setReaderLineHeight(val);
+    setPreference(PREF_KEYS.READER_LINE_HEIGHT, val);
+  };
+
+  const handleReaderLayoutChange = (val: ReaderLayout) => {
+    setReaderLayout(val);
+    setPreference(PREF_KEYS.READER_LAYOUT, val);
+  };
+
+  const handleToggleVerseNumbers = (val: boolean) => {
+    setShowVerseNumbers(val);
+    setPreference(PREF_KEYS.SHOW_VERSE_NUMBERS, String(val));
+  };
+
+  const handleToggleFootnotes = (val: boolean) => {
+    setShowFootnotes(val);
+    setPreference(PREF_KEYS.SHOW_FOOTNOTES, String(val));
+  };
+
+  const handleToggleBacklinksBadges = (val: boolean) => {
+    setShowBacklinksBadges(val);
+    setPreference(PREF_KEYS.SHOW_BACKLINKS_BADGES, String(val));
+  };
+
+  const handleTtsSpeedChange = (val: number) => {
+    setTtsSpeed(val);
+    setPreference(PREF_KEYS.TTS_SPEED, String(val));
+  };
+
+  const handleTtsVoiceChange = (val: string) => {
+    setTtsVoice(val);
+    setPreference(PREF_KEYS.TTS_VOICE, val);
+  };
+
+  const handleToggleAutoScrollAudio = (val: boolean) => {
+    setAutoScrollAudio(val);
+    setPreference(PREF_KEYS.AUDIO_AUTO_SCROLL, String(val));
+  };
+
+  const handleToggleAutoAdvanceAudio = (val: boolean) => {
+    setAutoAdvanceAudio(val);
+    setPreference(PREF_KEYS.AUDIO_AUTO_ADVANCE, String(val));
+  };
+
+  const handleTheologicalLensChange = (lens: TheologicalLensType) => {
+    setTheologicalLens(lens);
+    setPreference(PREF_KEYS.THEOLOGICAL_LENS, lens);
+  };
+
+  const handleDailyChapterGoalChange = (goal: number) => {
+    setDailyChapterGoal(goal);
+    setPreference(PREF_KEYS.DAILY_CHAPTER_GOAL, String(goal));
+  };
+
+  const handleDefaultTranslationChange = (version: string) => {
+    setTranslation(version.toLowerCase());
+    setPreference(PREF_KEYS.BIBLE_VERSION, version.toLowerCase());
+  };
+
+  const handleTrackerFormatChange = (newFormat: 'percent' | 'fraction') => {
+    setTrackerFormat(newFormat);
+    setPreference(PREF_KEYS.TRACKER_FORMAT, newFormat);
+  };
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    handleThemeChange(newTheme);
   };
 
   const toggleTrackerFormat = () => {
     const newFormat = trackerFormat === 'percent' ? 'fraction' : 'percent';
-    setTrackerFormat(newFormat);
-    setPreference(PREF_KEYS.TRACKER_FORMAT, newFormat);
+    handleTrackerFormatChange(newFormat);
+  };
+
+  // Reader Dynamic CSS Classes
+  const getReaderFontClass = () => {
+    if (readerFontFamily === 'sans') return 'font-sans-reader';
+    if (readerFontFamily === 'mono') return 'font-mono-reader';
+    return 'font-serif';
+  };
+
+  const getReaderSizeClass = (isMobile = false) => {
+    if (readerFontSize === 'sm') return isMobile ? 'text-[15px]' : 'text-[15px] sm:text-[16px]';
+    if (readerFontSize === 'lg') return isMobile ? 'text-[19px]' : 'text-[19px] sm:text-[20px]';
+    if (readerFontSize === 'xl') return isMobile ? 'text-[22px]' : 'text-[22px] sm:text-[23px]';
+    return isMobile ? 'text-[17px]' : 'text-[17px] sm:text-[18px]';
+  };
+
+  const getReaderLeadingClass = () => {
+    if (isInterlinearMode) {
+      if (readerLineHeight === 'compact') return 'leading-[2.4] sm:leading-[2.5]';
+      if (readerLineHeight === 'relaxed') return 'leading-[3.0] sm:leading-[3.2]';
+      return 'leading-[2.6] sm:leading-[2.8]';
+    }
+    if (readerLineHeight === 'compact') return 'leading-[1.55] sm:leading-[1.6]';
+    if (readerLineHeight === 'relaxed') return 'leading-[2.15] sm:leading-[2.25]';
+    return 'leading-[1.85]';
+  };
+
+  // Data Export & Import Handlers
+  const handleExportData = () => {
+    try {
+      const exportPayload = {
+        appName: "Theologica",
+        version: "1.0",
+        exportedAt: new Date().toISOString(),
+        preferences: {
+          theme,
+          accentColor,
+          readerFontFamily,
+          readerFontSize,
+          readerLineHeight,
+          readerLayout,
+          showVerseNumbers,
+          showFootnotes,
+          showBacklinksBadges,
+          ttsSpeed,
+          ttsVoice,
+          autoScrollAudio,
+          autoAdvanceAudio,
+          defaultTranslation: translation,
+          theologicalLens,
+          trackerFormat,
+          dailyChapterGoal,
+          completedChapters,
+        },
+        notes,
+        highlights,
+      };
+      const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `theologica-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Export error", err);
+    }
+  };
+
+  const handleImportData = async (file: File): Promise<boolean> => {
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if (!data || typeof data !== 'object') return false;
+
+      // 1. Restore preferences
+      if (data.preferences) {
+        const p = data.preferences;
+        if (p.theme && ['dark', 'light', 'sepia'].includes(p.theme)) {
+          handleThemeChange(p.theme);
+        }
+        if (p.accentColor) {
+          handleAccentColorChange(p.accentColor);
+        }
+        if (p.readerFontFamily && ['serif', 'sans', 'mono'].includes(p.readerFontFamily)) {
+          handleReaderFontFamilyChange(p.readerFontFamily);
+        }
+        if (p.readerFontSize && ['sm', 'md', 'lg', 'xl'].includes(p.readerFontSize)) {
+          handleReaderFontSizeChange(p.readerFontSize);
+        }
+        if (p.readerLineHeight && ['compact', 'standard', 'relaxed'].includes(p.readerLineHeight)) {
+          handleReaderLineHeightChange(p.readerLineHeight);
+        }
+        if (p.readerLayout && ['verse', 'paragraph'].includes(p.readerLayout)) {
+          handleReaderLayoutChange(p.readerLayout);
+        }
+        if (typeof p.showVerseNumbers === 'boolean') {
+          handleToggleVerseNumbers(p.showVerseNumbers);
+        }
+        if (typeof p.showFootnotes === 'boolean') {
+          handleToggleFootnotes(p.showFootnotes);
+        }
+        if (typeof p.showBacklinksBadges === 'boolean') {
+          handleToggleBacklinksBadges(p.showBacklinksBadges);
+        }
+        if (typeof p.ttsSpeed === 'number') {
+          handleTtsSpeedChange(p.ttsSpeed);
+        }
+        if (p.ttsVoice) {
+          handleTtsVoiceChange(p.ttsVoice);
+        }
+        if (typeof p.autoScrollAudio === 'boolean') {
+          handleToggleAutoScrollAudio(p.autoScrollAudio);
+        }
+        if (typeof p.autoAdvanceAudio === 'boolean') {
+          handleToggleAutoAdvanceAudio(p.autoAdvanceAudio);
+        }
+        if (p.theologicalLens) {
+          handleTheologicalLensChange(p.theologicalLens);
+        }
+        if (p.trackerFormat && ['percent', 'fraction'].includes(p.trackerFormat)) {
+          handleTrackerFormatChange(p.trackerFormat);
+        }
+        if (typeof p.dailyChapterGoal === 'number') {
+          handleDailyChapterGoalChange(p.dailyChapterGoal);
+        }
+        if (Array.isArray(p.completedChapters)) {
+          setCompletedChapters(p.completedChapters);
+        }
+      }
+
+      // 2. Restore notes if provided
+      if (Array.isArray(data.notes) && data.notes.length > 0) {
+        for (const note of data.notes) {
+          if (note.title !== undefined) {
+            try {
+              const res = await fetchWithAuth(`${API_URL}/api/notes`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: note.title, content: note.content || '' })
+              });
+              if (res.ok) {
+                const created = await res.json();
+                setNotes(prev => [created, ...prev.filter(n => n.id !== created.id)]);
+              }
+            } catch {}
+          }
+        }
+      }
+
+      // 3. Restore highlights if provided
+      if (Array.isArray(data.highlights) && data.highlights.length > 0) {
+        for (const hl of data.highlights) {
+          if (hl.book && hl.chapter && hl.verse && hl.text && hl.color) {
+            try {
+              const res = await fetchWithAuth(`${API_URL}/api/highlights`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  book: hl.book,
+                  chapter: hl.chapter,
+                  verse: hl.verse,
+                  text: hl.text,
+                  color: hl.color
+                })
+              });
+              if (res.ok) {
+                const created = await res.json();
+                setHighlights(prev => [...prev.filter(h => h.id !== created.id), created]);
+              }
+            } catch {}
+          }
+        }
+      }
+
+      return true;
+    } catch (e) {
+      console.error("Import error", e);
+      return false;
+    }
+  };
+
+  const handleResetPreferences = () => {
+    handleThemeChange('dark');
+    handleAccentColorChange('#c96442');
+    handleReaderFontFamilyChange('serif');
+    handleReaderFontSizeChange('md');
+    handleReaderLineHeightChange('standard');
+    handleReaderLayoutChange('verse');
+    handleToggleVerseNumbers(true);
+    handleToggleFootnotes(true);
+    handleToggleBacklinksBadges(true);
+    handleTtsSpeedChange(0.9);
+    handleTtsVoiceChange('');
+    handleToggleAutoScrollAudio(true);
+    handleToggleAutoAdvanceAudio(false);
+    handleTheologicalLensChange('canonical');
+    handleTrackerFormatChange('percent');
+    handleDailyChapterGoalChange(3);
+    setShowLeftSidebar(true);
+    setShowRightSidebar(true);
+    setShowBottomNotes(true);
   };
   const [chatInput, setChatInput] = useState('');
   const [chatQuotes, setChatQuotes] = useState<{id: string, text: string, reference: string}[]>([]);
@@ -1703,13 +2109,15 @@ export default function App() {
     const { mainText, footnote } = parseVerseFootnote(text);
     const verseHighlights = highlights.filter(h => h.verse === verse);
     if (verseHighlights.length === 0) {
-      if (!footnote) return <>{renderTextWithInterlinear(mainText, verse)}</>;
+      if (!footnote || !showFootnotes) return <>{renderTextWithInterlinear(mainText, verse)}</>;
       return (
         <>
           {renderTextWithInterlinear(mainText, verse)}
-          <span className="text-gray-500 text-sm italic ml-2 select-none break-words inline" data-footnote="true">
-            {footnote}
-          </span>
+          {showFootnotes && (
+            <span className="text-gray-500 text-sm italic ml-2 select-none break-words inline" data-footnote="true">
+              {footnote}
+            </span>
+          )}
         </>
       );
     }
@@ -1793,7 +2201,7 @@ export default function App() {
             <span key={i}>{renderTextWithInterlinear(seg.text, verse)}</span>
           )
         )}
-        {footnote && (
+        {showFootnotes && footnote && (
           <span className="text-gray-500 text-sm italic ml-2 select-none break-words inline" data-footnote="true">
             {footnote}
           </span>
@@ -2006,45 +2414,77 @@ export default function App() {
     const textToSpeak = getCleanScriptureText(bibleVerses[index].text);
     
     const utterance = new SpeechSynthesisUtterance(textToSpeak);
-    utterance.rate = 0.9; // Slightly slower for reverence
+    utterance.rate = ttsSpeed;
     
-    // Select the best available premium voice
-    const preferredVoices = [
-      'Samantha',                 // macOS / iOS (excellent female voice)
-      'Siri Female',              // macOS / iOS
-      'Siri',                     // macOS / iOS
-      'Google UK English Female', // Android / Chrome
-      'Google US English',        // Android / Chrome
-      'Microsoft Zira',           // Windows Female
-      'Microsoft Mark'            // Windows Male
-    ];
-    
+    // Select voice: user preference first, then preferred system voices, then fallback
     let selectedVoice = null;
-    for (const voiceName of preferredVoices) {
-      selectedVoice = voices.find(v => v.name.includes(voiceName) && v.lang.startsWith('en'));
-      if (selectedVoice) break;
+    if (ttsVoice && voices.length > 0) {
+      selectedVoice = voices.find(v => v.name === ttsVoice) || null;
     }
-    
-    // Fallback to any english voice if no premium voice is found
     if (!selectedVoice) {
-      selectedVoice = voices.find(v => v.lang.startsWith('en')) || null;
+      const preferredVoices = [
+        'Samantha',                 // macOS / iOS (excellent female voice)
+        'Siri Female',              // macOS / iOS
+        'Siri',                     // macOS / iOS
+        'Google UK English Female', // Android / Chrome
+        'Google US English',        // Android / Chrome
+        'Microsoft Zira',           // Windows Female
+        'Microsoft Mark'            // Windows Male
+      ];
+      for (const voiceName of preferredVoices) {
+        selectedVoice = voices.find(v => v.name.includes(voiceName) && v.lang.startsWith('en'));
+        if (selectedVoice) break;
+      }
+      if (!selectedVoice) {
+        selectedVoice = voices.find(v => v.lang.startsWith('en')) || null;
+      }
     }
     
     if (selectedVoice) {
       utterance.voice = selectedVoice;
     }
 
+    if (autoScrollAudio) {
+      scrollToAndHighlightVerse(bibleVerses[index].verse);
+    }
+
     utterance.onend = () => {
       if (isSpeakingRef.current) {
-        playVerse(index + 1);
+        if (index + 1 < bibleVerses.length) {
+          playVerse(index + 1);
+        } else if (autoAdvanceAudio) {
+          // Seamlessly advance to next chapter
+          if (activeChapter < activeBook.chapters) {
+            setActiveChapter(prev => prev + 1);
+          } else {
+            const curIdx = ALL_BOOKS.findIndex(b => b.name === activeBook.name);
+            if (curIdx !== -1 && curIdx + 1 < ALL_BOOKS.length) {
+              setActiveBook(ALL_BOOKS[curIdx + 1]);
+              setActiveChapter(1);
+            } else {
+              setIsSpeaking(false);
+              isSpeakingRef.current = false;
+              setCurrentSpeakingVerseIndex(null);
+            }
+          }
+        } else {
+          setIsSpeaking(false);
+          isSpeakingRef.current = false;
+          setCurrentSpeakingVerseIndex(null);
+        }
       }
     };
     
     utterance.onerror = (e) => {
       console.error("Speech Synthesis Error", e);
-      // Try to gracefully continue on minor errors
       if (isSpeakingRef.current) {
-         playVerse(index + 1);
+        if (index + 1 < bibleVerses.length) {
+          playVerse(index + 1);
+        } else {
+          setIsSpeaking(false);
+          isSpeakingRef.current = false;
+          setCurrentSpeakingVerseIndex(null);
+        }
       }
     };
     
@@ -2397,38 +2837,54 @@ export default function App() {
         </div>
 
         {/* SETTINGS MODAL */}
-        {isSettingsOpen && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-            <div className="bg-bg w-full max-w-sm rounded-[24px] p-6 shadow-2xl ring-1 ring-border">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-display text-fg">Settings</h2>
-                <button onClick={() => setIsSettingsOpen(false)} className="text-muted hover:text-fg transition-colors">✕</button>
-              </div>
-              
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-between p-4 bg-surface rounded-[16px] ring-1 ring-border">
-                  <div>
-                    <div className="text-[15px] font-medium text-fg">Appearance</div>
-                    <div className="text-[13px] text-muted">{theme === 'dark' ? 'Dark Mode' : 'Light Mode'}</div>
-                  </div>
-                  <button onClick={toggleTheme} className="w-12 h-6 rounded-full bg-border-soft relative transition-colors" style={{ backgroundColor: theme === 'light' ? 'var(--accent)' : 'var(--border-soft)' }}>
-                    <div className="w-5 h-5 rounded-full bg-bg absolute top-0.5 transition-transform" style={{ transform: theme === 'light' ? 'translateX(26px)' : 'translateX(2px)' }} />
-                  </button>
-                </div>
-                
-                <div className="flex items-center justify-between p-4 bg-surface rounded-[16px] ring-1 ring-border">
-                  <div>
-                    <div className="text-[15px] font-medium text-fg">Tracker Format</div>
-                    <div className="text-[13px] text-muted">{trackerFormat === 'percent' ? 'Percentage (%)' : 'Fractions (1/10)'}</div>
-                  </div>
-                  <button onClick={toggleTrackerFormat} className="text-[13px] font-semibold bg-bg px-3 py-1.5 rounded-lg text-fg ring-1 ring-border hover:bg-surface-warm transition-colors">
-                    Toggle
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        <SettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          theme={theme}
+          onThemeChange={handleThemeChange}
+          accentColor={accentColor}
+          onAccentColorChange={handleAccentColorChange}
+          showLeftSidebar={showLeftSidebar}
+          onToggleLeftSidebar={setShowLeftSidebar}
+          showRightSidebar={showRightSidebar}
+          onToggleRightSidebar={setShowRightSidebar}
+          showBottomNotes={showBottomNotes}
+          onToggleBottomNotes={setShowBottomNotes}
+          readerFontFamily={readerFontFamily}
+          onReaderFontFamilyChange={handleReaderFontFamilyChange}
+          readerFontSize={readerFontSize}
+          onReaderFontSizeChange={handleReaderFontSizeChange}
+          readerLineHeight={readerLineHeight}
+          onReaderLineHeightChange={handleReaderLineHeightChange}
+          readerLayout={readerLayout}
+          onReaderLayoutChange={handleReaderLayoutChange}
+          showVerseNumbers={showVerseNumbers}
+          onToggleVerseNumbers={handleToggleVerseNumbers}
+          showFootnotes={showFootnotes}
+          onToggleFootnotes={handleToggleFootnotes}
+          showBacklinksBadges={showBacklinksBadges}
+          onToggleBacklinksBadges={handleToggleBacklinksBadges}
+          ttsSpeed={ttsSpeed}
+          onTtsSpeedChange={handleTtsSpeedChange}
+          ttsVoice={ttsVoice}
+          onTtsVoiceChange={handleTtsVoiceChange}
+          availableVoices={voices}
+          autoScrollAudio={autoScrollAudio}
+          onToggleAutoScrollAudio={handleToggleAutoScrollAudio}
+          autoAdvanceAudio={autoAdvanceAudio}
+          onToggleAutoAdvanceAudio={handleToggleAutoAdvanceAudio}
+          defaultTranslation={translation}
+          onDefaultTranslationChange={handleDefaultTranslationChange}
+          theologicalLens={theologicalLens}
+          onTheologicalLensChange={handleTheologicalLensChange}
+          trackerFormat={trackerFormat}
+          onTrackerFormatChange={handleTrackerFormatChange}
+          dailyChapterGoal={dailyChapterGoal}
+          onDailyChapterGoalChange={handleDailyChapterGoalChange}
+          onExportData={handleExportData}
+          onImportData={handleImportData}
+          onResetPreferences={handleResetPreferences}
+        />
         
       </header>
       
@@ -2724,61 +3180,130 @@ export default function App() {
                       <div className="h-4 bg-fg/10 rounded w-3/4"></div>
                     </div>
                   ) : bibleVerses.length > 0 ? (
-                    <div className={`font-serif text-[17px] sm:text-[18px] ${isInterlinearMode ? 'leading-[2.6] sm:leading-[2.8]' : 'leading-[1.85]'} text-fg space-y-3.5 w-full break-words`}>
-                      {bibleVerses.map((v, index) => (
-                        <p 
-                          key={v.verse} 
-                          data-verse={v.verse} 
-                          className={`group relative rounded-lg py-1 px-1.5 sm:px-2 -mx-1 sm:-mx-2 transition-colors duration-200 break-words ${
-                            currentSpeakingVerseIndex === index ? 'text-accent bg-accent/5' : ''
-                          }`}
-                        >
-                          <sup 
-                            onClick={handleVerseNumberClick}
-                            onTouchEnd={handleVerseNumberClick}
-                            className="verse-number select-none text-[11px] font-sans font-semibold text-muted/80 mr-1.5 cursor-default align-baseline relative -top-0.5 inline-block shrink-0"
-                            title={`Verse ${v.verse}`}
-                          >
-                            {v.verse}
-                          </sup>
-                          {isInterlinearMode && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setVerseInterlinearTarget(v.verse);
-                                setIsVerseInterlinearOpen(true);
-                              }}
-                              className="inline-flex items-center text-muted/40 hover:text-accent transition-colors select-none cursor-pointer align-baseline relative -top-0.5 mr-1 shrink-0 p-0.5"
-                              title={`Open word-by-word original language table for verse ${v.verse}`}
+                    <div className={`${getReaderFontClass()} ${getReaderSizeClass(true)} ${getReaderLeadingClass()} text-fg w-full break-words`}>
+                      {readerLayout === 'paragraph' ? (
+                        <div className="break-words">
+                          {bibleVerses.map((v, index) => (
+                            <span 
+                              key={v.verse} 
+                              data-verse={v.verse} 
+                              className={`inline rounded-sm px-0.5 transition-colors duration-200 ${
+                                currentSpeakingVerseIndex === index ? 'text-accent bg-accent/10' : ''
+                              }`}
                             >
-                              <Languages size={11} />
-                            </button>
-                          )}
-                          {chapterBacklinksMap.has(v.verse) && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const bInfo = chapterBacklinksMap.get(v.verse)!;
-                                setBacklinksDrawerState({
-                                  isOpen: true,
-                                  reference: `${activeBook.name} ${activeChapter}:${v.verse}`,
-                                  backlinks: bInfo,
-                                });
-                              }}
-                              className="inline-flex items-center gap-0.5 text-[10px] px-1 py-0.5 text-accent/80 hover:text-accent font-sans font-medium transition-colors select-none cursor-pointer align-baseline relative -top-0.5 mr-1 shrink-0"
-                              title={`${chapterBacklinksMap.get(v.verse)!.totalCount} backlinks on verse ${v.verse}`}
+                              {showVerseNumbers && (
+                                <sup 
+                                  onClick={handleVerseNumberClick}
+                                  onTouchEnd={handleVerseNumberClick}
+                                  className={`verse-number select-none text-[11px] font-sans font-semibold mr-1 cursor-default align-baseline relative -top-0.5 inline-block shrink-0 ${
+                                    currentSpeakingVerseIndex === index ? 'text-accent' : 'text-muted/80'
+                                  }`}
+                                  title={`Verse ${v.verse}`}
+                                >
+                                  {v.verse}
+                                </sup>
+                              )}
+                              {isInterlinearMode && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setVerseInterlinearTarget(v.verse);
+                                    setIsVerseInterlinearOpen(true);
+                                  }}
+                                  className="inline-flex items-center text-muted/40 hover:text-accent transition-colors select-none cursor-pointer align-baseline relative -top-0.5 mr-1 shrink-0 p-0.5"
+                                  title={`Open word-by-word original language table for verse ${v.verse}`}
+                                >
+                                  <Languages size={11} />
+                                </button>
+                              )}
+                              {showBacklinksBadges && chapterBacklinksMap.has(v.verse) && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const bInfo = chapterBacklinksMap.get(v.verse)!;
+                                    setBacklinksDrawerState({
+                                      isOpen: true,
+                                      reference: `${activeBook.name} ${activeChapter}:${v.verse}`,
+                                      backlinks: bInfo,
+                                    });
+                                  }}
+                                  className="inline-flex items-center gap-0.5 text-[10px] px-1 py-0.5 text-accent/80 hover:text-accent font-sans font-medium transition-colors select-none cursor-pointer align-baseline relative -top-0.5 mr-1 shrink-0"
+                                  title={`${chapterBacklinksMap.get(v.verse)!.totalCount} backlinks on verse ${v.verse}`}
+                                >
+                                  <Layers size={10} />
+                                  <span>{chapterBacklinksMap.get(v.verse)!.totalCount}</span>
+                                </button>
+                              )}
+                              <span className="verse-text break-words">
+                                {renderVerseContent(v.verse, v.text)}
+                              </span>{" "}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="space-y-3.5 w-full break-words">
+                          {bibleVerses.map((v, index) => (
+                            <p 
+                              key={v.verse} 
+                              data-verse={v.verse} 
+                              className={`group relative rounded-lg py-1 px-1.5 sm:px-2 -mx-1 sm:-mx-2 transition-colors duration-200 break-words ${
+                                currentSpeakingVerseIndex === index ? 'text-accent bg-accent/5' : ''
+                              }`}
                             >
-                              <Layers size={10} />
-                              <span>{chapterBacklinksMap.get(v.verse)!.totalCount}</span>
-                            </button>
-                          )}
-                          <span className="verse-text break-words">
-                            {renderVerseContent(v.verse, v.text)}
-                          </span>
-                        </p>
-                      ))}
+                              {showVerseNumbers && (
+                                <sup 
+                                  onClick={handleVerseNumberClick}
+                                  onTouchEnd={handleVerseNumberClick}
+                                  className={`verse-number select-none text-[11px] font-sans font-semibold mr-1.5 cursor-default align-baseline relative -top-0.5 inline-block shrink-0 ${
+                                    currentSpeakingVerseIndex === index ? 'text-accent' : 'text-muted/80'
+                                  }`}
+                                  title={`Verse ${v.verse}`}
+                                >
+                                  {v.verse}
+                                </sup>
+                              )}
+                              {isInterlinearMode && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setVerseInterlinearTarget(v.verse);
+                                    setIsVerseInterlinearOpen(true);
+                                  }}
+                                  className="inline-flex items-center text-muted/40 hover:text-accent transition-colors select-none cursor-pointer align-baseline relative -top-0.5 mr-1 shrink-0 p-0.5"
+                                  title={`Open word-by-word original language table for verse ${v.verse}`}
+                                >
+                                  <Languages size={11} />
+                                </button>
+                              )}
+                              {showBacklinksBadges && chapterBacklinksMap.has(v.verse) && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const bInfo = chapterBacklinksMap.get(v.verse)!;
+                                    setBacklinksDrawerState({
+                                      isOpen: true,
+                                      reference: `${activeBook.name} ${activeChapter}:${v.verse}`,
+                                      backlinks: bInfo,
+                                    });
+                                  }}
+                                  className="inline-flex items-center gap-0.5 text-[10px] px-1 py-0.5 text-accent/80 hover:text-accent font-sans font-medium transition-colors select-none cursor-pointer align-baseline relative -top-0.5 mr-1 shrink-0"
+                                  title={`${chapterBacklinksMap.get(v.verse)!.totalCount} backlinks on verse ${v.verse}`}
+                                >
+                                  <Layers size={10} />
+                                  <span>{chapterBacklinksMap.get(v.verse)!.totalCount}</span>
+                                </button>
+                              )}
+                              <span className="verse-text break-words">
+                                {renderVerseContent(v.verse, v.text)}
+                              </span>
+                            </p>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <span className="text-muted">Loading chapter...</span>
@@ -3116,63 +3641,130 @@ export default function App() {
                       <div className="h-4 bg-fg/10 rounded w-3/4"></div>
                     </div>
                   ) : bibleVerses.length > 0 ? (
-                    <div className={`font-serif text-[18px] ${isInterlinearMode ? 'leading-[2.6] sm:leading-[2.8]' : 'leading-[1.85]'} text-fg space-y-3.5 w-full break-words`}>
-                      {bibleVerses.map((v, index) => (
-                        <p 
-                          key={v.verse} 
-                          data-verse={v.verse} 
-                          className={`group relative rounded-lg py-1 px-2 -mx-2 transition-colors duration-300 break-words ${
-                            currentSpeakingVerseIndex === index ? 'text-accent bg-accent/5' : ''
-                          }`}
-                        >
-                          <sup 
-                            onClick={handleVerseNumberClick}
-                            onTouchEnd={handleVerseNumberClick}
-                            className={`verse-number select-none text-[11px] font-sans font-semibold mr-1.5 cursor-default align-baseline relative -top-0.5 inline-block shrink-0 ${
-                              currentSpeakingVerseIndex === index ? 'text-accent' : 'text-muted/80'
-                            }`}
-                            title={`Verse ${v.verse}`}
-                          >
-                            {v.verse}
-                          </sup>
-                          {isInterlinearMode && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setVerseInterlinearTarget(v.verse);
-                                setIsVerseInterlinearOpen(true);
-                              }}
-                              className="inline-flex items-center text-muted/40 hover:text-accent transition-colors select-none cursor-pointer align-baseline relative -top-0.5 mr-1 shrink-0 p-0.5"
-                              title={`Open word-by-word original language table for verse ${v.verse}`}
+                    <div className={`${getReaderFontClass()} ${getReaderSizeClass(false)} ${getReaderLeadingClass()} text-fg w-full break-words`}>
+                      {readerLayout === 'paragraph' ? (
+                        <div className="break-words">
+                          {bibleVerses.map((v, index) => (
+                            <span 
+                              key={v.verse} 
+                              data-verse={v.verse} 
+                              className={`inline rounded-sm px-0.5 transition-colors duration-200 ${
+                                currentSpeakingVerseIndex === index ? 'text-accent bg-accent/10' : ''
+                              }`}
                             >
-                              <Languages size={11} />
-                            </button>
-                          )}
-                          {chapterBacklinksMap.has(v.verse) && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const bInfo = chapterBacklinksMap.get(v.verse)!;
-                                setBacklinksDrawerState({
-                                  isOpen: true,
-                                  reference: `${activeBook.name} ${activeChapter}:${v.verse}`,
-                                  backlinks: bInfo,
-                                });
-                              }}
-                              className="inline-flex items-center gap-0.5 text-[10px] px-1 py-0.5 text-accent/80 hover:text-accent font-sans font-medium transition-colors select-none cursor-pointer align-baseline relative -top-0.5 mr-1 shrink-0"
-                              title={`${chapterBacklinksMap.get(v.verse)!.totalCount} backlinks on verse ${v.verse}`}
+                              {showVerseNumbers && (
+                                <sup 
+                                  onClick={handleVerseNumberClick}
+                                  onTouchEnd={handleVerseNumberClick}
+                                  className={`verse-number select-none text-[11px] font-sans font-semibold mr-1 cursor-default align-baseline relative -top-0.5 inline-block shrink-0 ${
+                                    currentSpeakingVerseIndex === index ? 'text-accent' : 'text-muted/80'
+                                  }`}
+                                  title={`Verse ${v.verse}`}
+                                >
+                                  {v.verse}
+                                </sup>
+                              )}
+                              {isInterlinearMode && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setVerseInterlinearTarget(v.verse);
+                                    setIsVerseInterlinearOpen(true);
+                                  }}
+                                  className="inline-flex items-center text-muted/40 hover:text-accent transition-colors select-none cursor-pointer align-baseline relative -top-0.5 mr-1 shrink-0 p-0.5"
+                                  title={`Open word-by-word original language table for verse ${v.verse}`}
+                                >
+                                  <Languages size={11} />
+                                </button>
+                              )}
+                              {showBacklinksBadges && chapterBacklinksMap.has(v.verse) && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const bInfo = chapterBacklinksMap.get(v.verse)!;
+                                    setBacklinksDrawerState({
+                                      isOpen: true,
+                                      reference: `${activeBook.name} ${activeChapter}:${v.verse}`,
+                                      backlinks: bInfo,
+                                    });
+                                  }}
+                                  className="inline-flex items-center gap-0.5 text-[10px] px-1 py-0.5 text-accent/80 hover:text-accent font-sans font-medium transition-colors select-none cursor-pointer align-baseline relative -top-0.5 mr-1 shrink-0"
+                                  title={`${chapterBacklinksMap.get(v.verse)!.totalCount} backlinks on verse ${v.verse}`}
+                                >
+                                  <Layers size={10} />
+                                  <span>{chapterBacklinksMap.get(v.verse)!.totalCount}</span>
+                                </button>
+                              )}
+                              <span className="verse-text break-words">
+                                {renderVerseContent(v.verse, v.text)}
+                              </span>{" "}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="space-y-3.5 w-full break-words">
+                          {bibleVerses.map((v, index) => (
+                            <p 
+                              key={v.verse} 
+                              data-verse={v.verse} 
+                              className={`group relative rounded-lg py-1 px-2 -mx-2 transition-colors duration-300 break-words ${
+                                currentSpeakingVerseIndex === index ? 'text-accent bg-accent/5' : ''
+                              }`}
                             >
-                              <Layers size={10} />
-                              <span>{chapterBacklinksMap.get(v.verse)!.totalCount}</span>
-                            </button>
-                          )}
-                          <span className="verse-text break-words">
-                            {renderVerseContent(v.verse, v.text)}
-                          </span>
-                        </p>
-                      ))}
+                              {showVerseNumbers && (
+                                <sup 
+                                  onClick={handleVerseNumberClick}
+                                  onTouchEnd={handleVerseNumberClick}
+                                  className={`verse-number select-none text-[11px] font-sans font-semibold mr-1.5 cursor-default align-baseline relative -top-0.5 inline-block shrink-0 ${
+                                    currentSpeakingVerseIndex === index ? 'text-accent' : 'text-muted/80'
+                                  }`}
+                                  title={`Verse ${v.verse}`}
+                                >
+                                  {v.verse}
+                                </sup>
+                              )}
+                              {isInterlinearMode && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setVerseInterlinearTarget(v.verse);
+                                    setIsVerseInterlinearOpen(true);
+                                  }}
+                                  className="inline-flex items-center text-muted/40 hover:text-accent transition-colors select-none cursor-pointer align-baseline relative -top-0.5 mr-1 shrink-0 p-0.5"
+                                  title={`Open word-by-word original language table for verse ${v.verse}`}
+                                >
+                                  <Languages size={11} />
+                                </button>
+                              )}
+                              {showBacklinksBadges && chapterBacklinksMap.has(v.verse) && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const bInfo = chapterBacklinksMap.get(v.verse)!;
+                                    setBacklinksDrawerState({
+                                      isOpen: true,
+                                      reference: `${activeBook.name} ${activeChapter}:${v.verse}`,
+                                      backlinks: bInfo,
+                                    });
+                                  }}
+                                  className="inline-flex items-center gap-0.5 text-[10px] px-1 py-0.5 text-accent/80 hover:text-accent font-sans font-medium transition-colors select-none cursor-pointer align-baseline relative -top-0.5 mr-1 shrink-0"
+                                  title={`${chapterBacklinksMap.get(v.verse)!.totalCount} backlinks on verse ${v.verse}`}
+                                >
+                                  <Layers size={10} />
+                                  <span>{chapterBacklinksMap.get(v.verse)!.totalCount}</span>
+                                </button>
+                              )}
+                              <span className="verse-text break-words">
+                                {renderVerseContent(v.verse, v.text)}
+                              </span>
+                            </p>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <span className="text-meta">Loading...</span>

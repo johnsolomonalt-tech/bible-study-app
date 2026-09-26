@@ -37,6 +37,24 @@
   --error: #ef4444;
 }
 
+:root[data-theme='sepia'] {
+  --bg: #f8f1e3;
+  --surface: #ede3ce;
+  --surface-warm: #e3d7bf;
+  --surface-hover: #ded0b4;
+  --fg: #2c251e;
+  --fg-2: #5c4f42;
+  --fg-hover: #1c1713;
+  --muted: #8c7a68;
+  --meta: #a39280;
+  --border: #e3d7bf;
+  --border-soft: #d4c5a9;
+  --accent: #b45309;
+  --accent-on: #ffffff;
+  --focus-ring: 0 0 0 3px rgba(180, 83, 9, 0.3);
+  --error: #ef4444;
+}
+
 @theme {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
@@ -70,6 +88,8 @@ body {
 
 .font-serif { font-family: var(--font-merriweather), serif; }
 .font-display { font-family: var(--font-merriweather), serif; font-weight: 400; }
+.font-sans-reader { font-family: var(--font-inter), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+.font-mono-reader { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
 
 .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
 .custom-scroll::-webkit-scrollbar-track { background: transparent; }
