@@ -3300,15 +3300,6 @@ export default function App() {
                           <span>Lectio Divina (Prayer Mode)</span>
                         </button>
 
-                        {/* Theological Tradition Lens */}
-                        <div className="w-full flex items-center justify-between px-3 py-2 rounded-xl hover:bg-fg/5 text-xs font-medium transition-colors">
-                          <div className="flex items-center gap-2.5">
-                            <Sparkles size={16} className="text-accent" />
-                            <span className="text-fg">AI Perspective</span>
-                          </div>
-                          <TheologicalLensSelector currentLens={theologicalLens} onSelectLens={setTheologicalLens} compact />
-                        </div>
-
                         {/* Mark Completed */}
                         <button
                           type="button"
@@ -3495,13 +3486,13 @@ export default function App() {
 
             {/* Mobile Right Sidebar: Study AI */}
             <aside className={`w-full border-l border-border bg-bg flex-col ${mobileStudyView === 'ai' ? 'flex' : 'hidden'}`}>
-              <header className="h-[60px] border-b border-border flex items-center justify-between px-4 text-[15px] font-medium text-fg shrink-0">
-                <div className="flex items-center gap-2">
-                  <button onClick={() => setMobileStudyView('reader')} className="p-2 mr-1 text-fg-2 hover:text-fg">
+              <header className="h-[60px] border-b border-border flex items-center justify-between px-3 sm:px-4 text-[15px] font-medium text-fg shrink-0 gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <button onClick={() => setMobileStudyView('reader')} className="p-1.5 -ml-1 text-fg-2 hover:text-fg shrink-0 cursor-pointer" title="Back to reader">
                     <ChevronLeft size={20} />
                   </button>
-                  <Sparkles size={16} className="text-accent" />
-                  <span>Study AI</span>
+                  <Sparkles size={16} className="text-accent shrink-0" />
+                  <span className="truncate">Study AI</span>
                 </div>
                 <TheologicalLensSelector currentLens={theologicalLens} onSelectLens={setTheologicalLens} compact />
               </header>
@@ -3909,15 +3900,6 @@ export default function App() {
                         theme={theme as 'dark' | 'light'}
                       />
 
-                      {/* Desktop Theological Lens Selector on wide screens */}
-                      <div className="hidden xl:flex items-center">
-                        <TheologicalLensSelector 
-                          currentLens={theologicalLens} 
-                          onSelectLens={setTheologicalLens}
-                          compact
-                        />
-                      </div>
-
                       {/* Desktop 3-dots more menu when secondary tools collapse */}
                       <div className="relative 2xl:hidden desktop-more-menu-container">
                         <button
@@ -3988,15 +3970,6 @@ export default function App() {
                                 </span>
                               )}
                             </button>
-
-                            {/* Theological Tradition Lens */}
-                            <div className="w-full flex items-center justify-between px-3 py-2 rounded-xl hover:bg-fg/5 text-xs font-medium transition-colors">
-                              <div className="flex items-center gap-2.5">
-                                <Sparkles size={16} className="text-accent" />
-                                <span className="text-fg">AI Perspective</span>
-                              </div>
-                              <TheologicalLensSelector currentLens={theologicalLens} onSelectLens={setTheologicalLens} compact />
-                            </div>
 
                             {/* Mark Completed */}
                             <button
@@ -4221,13 +4194,13 @@ export default function App() {
             {/* Right Sidebar: Study AI */}
             {showRightSidebar && (
               <Panel panelRef={rightPanelRef} defaultSize="25" minSize="20" className={`w-full lg:w-auto border-l border-border bg-bg flex-col ${mobileStudyView === 'ai' ? 'flex' : 'hidden lg:flex'}`}>
-              <header className="h-[60px] border-b border-border flex items-center justify-between px-4 lg:px-6 text-[15px] font-medium text-fg shrink-0">
-                <div className="flex items-center gap-2">
-                  <button onClick={() => setMobileStudyView('reader')} className="lg:hidden p-2 mr-1 text-fg-2 hover:text-fg">
+              <header className="h-[60px] border-b border-border flex items-center justify-between px-2.5 sm:px-3 lg:px-4 text-[15px] font-medium text-fg shrink-0 gap-1.5">
+                <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                  <button onClick={() => setMobileStudyView('reader')} className="lg:hidden p-1.5 -ml-1 text-fg-2 hover:text-fg shrink-0 cursor-pointer" title="Back to reader">
                     <ChevronLeft size={20} />
                   </button>
-                  <Sparkles size={16} className="hidden lg:block text-accent" />
-                  <span>Study AI</span>
+                  <Sparkles size={16} className="hidden lg:block text-accent shrink-0" />
+                  <span className="truncate">Study AI</span>
                 </div>
                 <TheologicalLensSelector currentLens={theologicalLens} onSelectLens={setTheologicalLens} compact />
               </header>

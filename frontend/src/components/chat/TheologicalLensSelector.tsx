@@ -83,7 +83,7 @@ export function TheologicalLensSelector({
 }: TheologicalLensSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [menuCoords, setMenuCoords] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [menuCoords, setMenuCoords] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
 
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -97,10 +97,10 @@ export function TheologicalLensSelector({
   const updatePosition = useCallback(() => {
     if (!buttonRef.current) return;
     const rect = buttonRef.current.getBoundingClientRect();
-    const desiredWidth = 296;
+    const desiredWidth = 284;
     const width = Math.min(desiredWidth, window.innerWidth - 24);
 
-    // Right-align dropdown with button's right edge
+    // Right-align dropdown with button's right edge so it extends leftward into the study area if needed
     let left = rect.right - width;
 
     // Boundary checks: keep inside viewport with 12px margin
@@ -109,16 +109,24 @@ export function TheologicalLensSelector({
       left = window.innerWidth - width - 12;
     }
 
-    // Vertical position: place below button by default
-    let top = rect.bottom + 6;
-    const estimatedMenuHeight = 420;
+    const margin = 12;
+    const spaceBelow = window.innerHeight - rect.bottom - margin;
+    const spaceAbove = rect.top - margin;
+    const preferredHeight = 430;
 
-    // If dropdown would overflow bottom edge and there's space above, flip upward
-    if (top + estimatedMenuHeight > window.innerHeight && rect.top > estimatedMenuHeight) {
-      top = Math.max(12, rect.top - estimatedMenuHeight - 6);
+    let top: number;
+    let maxHeight: number;
+
+    // If there is enough space below (at least 220px) or more space below than above
+    if (spaceBelow >= 220 || spaceBelow >= spaceAbove) {
+      top = rect.bottom + 6;
+      maxHeight = Math.min(preferredHeight, Math.max(160, spaceBelow - 6));
+    } else {
+      maxHeight = Math.min(preferredHeight, Math.max(160, spaceAbove - 6));
+      top = Math.max(12, rect.top - maxHeight - 6);
     }
 
-    setMenuCoords({ top, left, width });
+    setMenuCoords({ top, left, width, maxHeight });
   }, []);
 
   useEffect(() => {
@@ -166,9 +174,9 @@ export function TheologicalLensSelector({
         type="button"
         onClick={() => {
           if (!isOpen) updatePosition();
-          setIsOpen(!isOpen)}
-        }
-        className={`flex items-center gap-1.5 rounded-lg border transition-all cursor-pointer font-sans select-none ${
+          setIsOpen(!isOpen);
+        }}
+        className={`flex items-center gap-1 sm:gap-1.5 rounded-lg border transition-all cursor-pointer font-sans select-none shrink-0 ${
           compact
             ? 'px-2 py-1 text-[11px]'
             : 'px-2.5 py-1.5 text-[12px]'
@@ -181,13 +189,13 @@ export function TheologicalLensSelector({
         title={`Theological Perspective: ${selected.name} (${selected.tagline})`}
       >
         <span className="shrink-0">{selected.icon}</span>
-        <span className="font-semibold tracking-tight">{selected.name}</span>
+        <span className="font-semibold tracking-tight truncate max-w-[75px] xs:max-w-[100px] sm:max-w-none">{selected.name}</span>
         {!compact && (
           <span className="text-[10px] opacity-75 hidden sm:inline">
             Lens
           </span>
         )}
-        <ChevronDown size={11} className={`opacity-70 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown size={11} className={`opacity-70 transition-transform shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {/* Dropdown Menu via Portal to document.body (bypasses panel overflow clipping so it extends cleanly over the study area) */}
@@ -199,11 +207,12 @@ export function TheologicalLensSelector({
             top: `${menuCoords.top}px`,
             left: `${menuCoords.left}px`,
             width: `${menuCoords.width}px`,
+            maxHeight: `${menuCoords.maxHeight}px`,
             zIndex: 99999,
           }}
-          className="rounded-2xl bg-surface border border-border shadow-2xl overflow-hidden divide-y divide-border/60 animate-in fade-in-0 zoom-in-95 duration-100 backdrop-blur-xl"
+          className="flex flex-col rounded-2xl bg-surface border border-border shadow-2xl overflow-hidden divide-y divide-border/60 animate-in fade-in-0 zoom-in-95 duration-100 backdrop-blur-xl"
         >
-          <div className="px-3.5 py-2.5 bg-bg/80 border-b border-border/40">
+          <div className="px-3.5 py-2.5 bg-bg/80 border-b border-border/40 shrink-0">
             <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted uppercase tracking-wider">
               <Sparkles size={11} className="text-accent" />
               <span>Tradition Perspective Lens</span>
@@ -213,7 +222,7 @@ export function TheologicalLensSelector({
             </p>
           </div>
 
-          <div className="p-1.5 space-y-1 max-h-[calc(100vh-140px)] overflow-y-auto custom-scroll">
+          <div className="p-1.5 space-y-1 overflow-y-auto flex-1 min-h-0 custom-scroll">
             {THEOLOGICAL_LENS_OPTIONS.map((lens) => {
               const isCurrent = lens.id === currentLens;
               return (
