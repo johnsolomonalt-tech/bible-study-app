@@ -49,6 +49,7 @@ import {
 } from '@/lib/appPreferences';
 import { SettingsModal } from '@/components/settings/SettingsModal';
 import { initSessionTracking, trackClientEvent } from '@/lib/analyticsClient';
+import { NotesWorkspace, NoteItem } from '@/components/notes/NotesWorkspace';
 
 // --- All 66 Books ---
 const otStr = "Genesis:50,Exodus:40,Leviticus:27,Numbers:36,Deuteronomy:34,Joshua:24,Judges:21,Ruth:4,1 Samuel:31,2 Samuel:24,1 Kings:22,2 Kings:25,1 Chronicles:29,2 Chronicles:36,Ezra:10,Nehemiah:13,Esther:10,Job:42,Psalms:150,Proverbs:31,Ecclesiastes:12,Song of Solomon:8,Isaiah:66,Jeremiah:52,Lamentations:5,Ezekiel:48,Daniel:12,Hosea:14,Joel:3,Amos:9,Obadiah:1,Jonah:4,Micah:7,Nahum:3,Habakkuk:3,Zephaniah:3,Haggai:2,Zechariah:14,Malachi:4";
@@ -782,7 +783,7 @@ export default function App() {
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 
   // Notes State
-  const [notes, setNotes] = useState<{id: number, title: string, content: string}[]>([]);
+  const [notes, setNotes] = useState<NoteItem[]>([]);
   const [activeNoteId, setActiveNoteId] = useState<number | null>(null);
   const tempNoteIdRef = useRef<number | null>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -4171,8 +4172,32 @@ export default function App() {
               {/* Quick Note Split */}
                 {showBottomNotes && (
                 <Panel panelRef={bottomPanelRef} defaultSize="25" minSize="20" className="hidden lg:flex border-t border-border bg-bg flex-col shrink-0">
-                <div className="h-10 border-b border-border flex items-center px-6 text-[11px] font-bold text-muted uppercase tracking-widest">
-                  Quick Note — {chapterTitle}
+                <div className="h-10 border-b border-border flex items-center justify-between px-6 text-[11px] font-bold text-muted uppercase tracking-widest">
+                  <span>Quick Note — {chapterTitle}</span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (chapterNote) {
+                        setActiveTab('notes');
+                        setActiveNoteId(chapterNote.id);
+                      } else {
+                        const res = await fetchWithAuth(`${API_URL}/api/notes`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ title: chapterTitle, content: '' })
+                        });
+                        const newNote = await res.json();
+                        setNotes(prev => [newNote, ...prev]);
+                        setActiveTab('notes');
+                        setActiveNoteId(newNote.id);
+                      }
+                    }}
+                    className="text-[11px] font-semibold text-accent hover:underline flex items-center gap-1 normal-case tracking-normal cursor-pointer"
+                    title="Open in full Study Notebook with rich formatting and AI"
+                  >
+                    <span>Open in Full Notes</span>
+                    <ChevronRight size={13} />
+                  </button>
                 </div>
                 <textarea 
                   className="flex-1 bg-transparent p-6 focus:outline-none resize-none text-[15px] leading-relaxed text-fg custom-scroll" 
@@ -4967,91 +4992,32 @@ export default function App() {
 
         {/* NOTES TAB */}
         {activeTab === 'notes' && (
-          <div className="flex w-full h-full">
-            <aside className={`w-full lg:w-[280px] border-r border-border bg-bg flex-col shrink-0 ${activeNoteId ? 'hidden lg:flex' : 'flex'}`}>
-              <header className="h-[60px] border-b border-border flex items-center justify-between px-5 shrink-0">
-                <span className="text-[15px] font-medium text-fg">Notebooks</span>
-                <button 
-                  onClick={async () => {
-                    const res = await fetchWithAuth(`${API_URL}/api/notes`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ title: 'New Note', content: '' })
-                    });
-                    const newNote = await res.json();
-                    setNotes([newNote, ...notes]);
-                    setActiveNoteId(newNote.id);
-                  }}
-                  className="p-2 text-fg-2 hover:text-fg hover:bg-surface rounded-lg transition-colors cursor-pointer"
-                >
-                  <Plus size={16} />
-                </button>
-              </header>
-              <div className="flex-1 overflow-y-auto custom-scroll p-3 pb-24 lg:pb-3">
-                {notes.map(n => (
-                  <div 
-                    key={n.id} 
-                    onClick={() => setActiveNoteId(n.id)} 
-                    className={`group flex items-center justify-between w-full px-4 py-3 rounded-lg text-[14px] transition-colors mb-1 cursor-pointer ${activeNoteId === n.id ? 'bg-surface text-fg ring-shadow' : 'text-muted hover:bg-surface hover:text-fg'}`}
-                  >
-                    <span className="truncate pr-2">{n.title || 'Untitled Note'}</span>
-                    <div className="flex items-center gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity shrink-0">
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRenameNoteSidebar(n.id, n.title, n.content);
-                        }} 
-                        className="p-2 lg:p-1 min-w-[44px] min-h-[44px] lg:min-w-0 lg:min-h-0 text-meta hover:text-fg-hover transition-colors cursor-pointer"
-                        title="Rename Note"
-                      >
-                        <Edit size={14} />
-                      </button>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteNote(n.id);
-                        }} 
-                        className="p-2 lg:p-1 min-w-[44px] min-h-[44px] lg:min-w-0 lg:min-h-0 text-meta hover:text-accent transition-colors cursor-pointer"
-                        title="Delete Note"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </aside>
-            <section className={`flex-1 flex-col bg-bg ${activeNoteId ? 'flex' : 'hidden lg:flex'}`}>
-              {activeNoteId ? (
-                <>
-                  <header className="h-[60px] border-b border-border flex items-center px-4 lg:px-8 shrink-0">
-                    <button onClick={() => setActiveNoteId(null)} className="lg:hidden p-2 mr-2 text-fg-2 hover:text-fg cursor-pointer">
-                      <ChevronLeft size={20} />
-                    </button>
-                    <input 
-                      type="text" 
-                      value={activeNote.title} 
-                      onChange={(e) => updateNote(activeNote.id, e.target.value, activeNote.content)}
-                      className="bg-transparent text-[20px] font-medium text-fg focus:outline-none w-full" 
-                      placeholder="Note Title..."
-                    />
-                  </header>
-                  <textarea 
-                    className="flex-1 bg-transparent p-4 sm:p-8 lg:p-16 pb-24 lg:pb-16 focus:outline-none resize-none text-[16px] leading-[1.8] text-fg custom-scroll" 
-                    value={activeNote.content} 
-                    onChange={(e) => updateNote(activeNote.id, activeNote.title, e.target.value)}
-                    placeholder="Start typing your note here..."
-                  />
-                </>
-              ) : (
-                <div className="flex-1 flex flex-col items-center justify-center text-meta">
-                  <Edit size={24} className="mb-4" />
-                  <p className="text-[15px]">Select a note or create a new one.</p>
-                </div>
-              )}
-            </section>
-          </div>
+          <NotesWorkspace
+            notes={notes}
+            activeNoteId={activeNoteId}
+            onSelectNote={setActiveNoteId}
+            onCreateNote={async (initialData) => {
+              const res = await fetchWithAuth(`${API_URL}/api/notes`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                  title: initialData?.title || 'New Note', 
+                  content: initialData?.content || '' 
+                })
+              });
+              const newNote = await res.json();
+              setNotes(prev => [newNote, ...prev]);
+              return newNote;
+            }}
+            onUpdateNote={updateNote}
+            onDeleteNote={handleDeleteNote}
+            onNavigateToVerse={navigateToVerse}
+            theologicalLens={theologicalLens}
+            currentTranslation={translation}
+            theme={theme as 'dark' | 'light'}
+          />
         )}
+
 
         {/* CANVAS TAB */}
         <div className={`flex-1 w-full h-full relative overflow-hidden ${activeTab === 'canvas' ? 'flex flex-col' : 'hidden'}`}>
