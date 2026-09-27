@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { checkDevAuthorization } from '@/lib/devGuard';
-import { getRecentAnonymousEvents } from '@/lib/analyticsService';
+import { getRecentAnonymousEvents, clearAllAnalyticsEvents } from '@/lib/analyticsService';
 
 export async function GET(req: Request) {
   const guard = await checkDevAuthorization();
@@ -21,5 +21,23 @@ export async function GET(req: Request) {
   } catch (err: any) {
     console.error('Failed to fetch recent events:', err);
     return NextResponse.json({ error: 'Failed to fetch recent events' }, { status: 500 });
+  }
+}
+
+export async function DELETE() {
+  const guard = await checkDevAuthorization();
+  if (!guard.authorized) {
+    return guard.response;
+  }
+
+  try {
+    await clearAllAnalyticsEvents();
+    return NextResponse.json({
+      success: true,
+      message: 'All telemetry events have been reset successfully',
+    });
+  } catch (err: any) {
+    console.error('Failed to clear events:', err);
+    return NextResponse.json({ error: 'Failed to clear events' }, { status: 500 });
   }
 }

@@ -109,6 +109,10 @@ export default function DevDashboardPage() {
   const [emailStatusMsg, setEmailStatusMsg] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState(false);
 
+  // Reset Telemetry State
+  const [isResettingTelemetry, setIsResettingTelemetry] = useState(false);
+  const [resetStatusMsg, setResetStatusMsg] = useState<string | null>(null);
+
   // 1. Fetch Stats & Check Lock Status
   const loadDashboardData = useCallback(async (range: '24h' | '7d' | '30d' = timeRange) => {
     setIsLoadingStats(true);
@@ -202,6 +206,29 @@ export default function DevDashboardPage() {
       setStats(null);
     } catch {
       setIsUnlocked(false);
+    }
+  };
+
+  // Handle Reset Telemetry Data
+  const handleResetTelemetry = async () => {
+    if (!window.confirm('Are you sure you want to reset all telemetry data? This will clear test visitors and historical event logs.')) {
+      return;
+    }
+    setIsResettingTelemetry(true);
+    setResetStatusMsg(null);
+    try {
+      const res = await fetch('/api/dev/events', { method: 'DELETE' });
+      if (res.ok) {
+        setResetStatusMsg('Telemetry data reset successfully.');
+        await loadDashboardData();
+        setTimeout(() => setResetStatusMsg(null), 4000);
+      } else {
+        setResetStatusMsg('Failed to reset telemetry.');
+      }
+    } catch {
+      setResetStatusMsg('Network error.');
+    } finally {
+      setIsResettingTelemetry(false);
     }
   };
 
@@ -1320,6 +1347,29 @@ export default function DevDashboardPage() {
                   </p>
                 )}
               </div>
+            </div>
+
+            {/* Reset Telemetry Data Card */}
+            <div className="p-6 rounded-3xl bg-[var(--surface)] border border-red-500/20 shadow-sm space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold text-red-400">Reset Telemetry Data</h3>
+                  <p className="text-xs text-[var(--muted)] mt-0.5">
+                    Clear all past test telemetry events and reset visitor statistics back to zero.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleResetTelemetry}
+                  disabled={isResettingTelemetry}
+                  className="px-3.5 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-xs font-semibold text-red-400 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {isResettingTelemetry ? 'Resetting...' : 'Reset All Events'}
+                </button>
+              </div>
+              {resetStatusMsg && (
+                <p className="text-xs text-emerald-400 font-medium">{resetStatusMsg}</p>
+              )}
             </div>
           </div>
         )}

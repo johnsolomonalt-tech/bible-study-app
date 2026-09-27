@@ -358,7 +358,7 @@ export default function App() {
     document.addEventListener('mousedown', handleGlobalClick);
     return () => document.removeEventListener('mousedown', handleGlobalClick);
   }, []);
-  const { getToken } = useAuth();
+  const { getToken, isLoaded, userId } = useAuth();
   
   const [isOnline, setIsOnline] = useState(true);
   useEffect(() => {
@@ -1529,7 +1529,7 @@ export default function App() {
 
   // Load Data
   useEffect(() => {
-    initSessionTracking();
+    initSessionTracking(userId);
     fetchWithAuth(`${API_URL}/api/notes`).then(r => r.json()).then(data => {
       setNotes(data);
       if (Array.isArray(data) && data.length > 0) {
@@ -2787,8 +2787,6 @@ export default function App() {
     trackClientEvent('reading_tracker_updated');
   };
 
-  const { isLoaded, userId } = useAuth();
-  
   if (!isLoaded) return <div className="h-screen w-full flex items-center justify-center bg-bg text-white">Loading...</div>;
   
   if (!userId) {

@@ -14,14 +14,13 @@ const MAX_MEMORY_EVENTS = 2000;
 const memoryEvents: RawAnalyticsEvent[] = [];
 
 /**
- * Anonymize user identifier to ensure zero PII is stored.
+ * Anonymize user identifier deterministically to ensure zero PII is stored
+ * while preserving consistent unique-visitor counting (1 visitor across multiple sessions).
  */
 export function anonymizeIdentifier(rawId: string): string {
-  if (!rawId || rawId === 'anon' || rawId === 'anonymous') {
-    return 'anon_' + crypto.randomBytes(3).toString('hex');
-  }
+  const cleanId = (rawId || 'unknown_guest').trim();
   const salt = process.env.ANALYTICS_SALT || 'theologica_analytics_anonymizer_salt';
-  return 'usr_' + crypto.createHash('sha256').update(rawId + salt).digest('hex').substring(0, 12);
+  return 'usr_' + crypto.createHash('sha256').update(cleanId + salt).digest('hex').substring(0, 12);
 }
 
 /**
@@ -246,4 +245,16 @@ export async function getRecentAnonymousEvents(limit: number = 50): Promise<RawA
   }
 
   return memoryEvents.slice(0, limit);
+}
+
+/**
+ * Clear all recorded telemetry events (admin maintenance / reset).
+ */
+export async function clearAllAnalyticsEvents(): Promise<void> {
+  memoryEvents.length = 0;
+  try {
+    await prisma.analyticsEvent.deleteMany({});
+  } catch (err) {
+    console.warn('Prisma clear events error:', err);
+  }
 }
