@@ -33,24 +33,25 @@ export function NoteMarkdownRenderer({
 
           // Custom blockquote (Scripture / Quotes)
           blockquote: ({ children }: any) => (
-            <blockquote className="border-l-[3.5px] border-accent bg-accent/5 py-3 px-5 my-4 italic rounded-r-xl shadow-2xs text-fg-hover text-[15px] leading-relaxed">
+            <blockquote className="border-l-[3.5px] border-accent bg-accent/8 py-3.5 px-5 my-4 italic rounded-r-xl shadow-2xs text-fg text-[15.5px] leading-relaxed font-serif">
               {linkifyBibleReferences(children, onVerseClick)}
             </blockquote>
           ),
 
-          // Custom headings
+          // Custom headings with warm editorial styling
           h1: ({ children }: any) => (
-            <h1 className="text-2xl font-bold mb-3 mt-6 text-fg tracking-tight pb-1.5 border-b border-border/40">
+            <h1 className="font-display font-serif text-2xl sm:text-3xl font-bold mb-4 mt-7 text-fg tracking-tight pb-2 border-b border-border/60">
               {linkifyBibleReferences(children, onVerseClick)}
             </h1>
           ),
           h2: ({ children }: any) => (
-            <h2 className="text-xl font-bold mb-2.5 mt-5 text-fg tracking-tight">
-              {linkifyBibleReferences(children, onVerseClick)}
+            <h2 className="font-display font-serif text-xl sm:text-2xl font-bold mb-3 mt-6 text-fg tracking-tight flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-accent inline-block shrink-0" />
+              <span>{linkifyBibleReferences(children, onVerseClick)}</span>
             </h2>
           ),
           h3: ({ children }: any) => (
-            <h3 className="text-lg font-semibold mb-2 mt-4 text-fg-hover">
+            <h3 className="text-[16px] font-semibold mb-2 mt-5 text-fg-hover">
               {linkifyBibleReferences(children, onVerseClick)}
             </h3>
           ),
