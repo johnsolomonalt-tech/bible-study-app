@@ -27,15 +27,6 @@ async function getSafeUserId(req?: Request): Promise<string | null> {
               }
             } catch {}
           }
-          try {
-            const parts = token.split('.');
-            if (parts.length === 3) {
-              const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
-              if (payload && typeof payload.sub === 'string' && payload.sub.startsWith('user_')) {
-                return payload.sub;
-              }
-            }
-          } catch {}
         }
       }
     } catch {}

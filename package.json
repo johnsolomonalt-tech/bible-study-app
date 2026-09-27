@@ -2,9 +2,11 @@
   "name": "bible-study-app",
   "version": "1.0.0",
   "scripts": {
-    "dev": "concurrently \"npm run dev --prefix frontend\" \"npm run dev --prefix backend\"",
+    "dev": "npm run dev --prefix frontend",
     "build": "cd frontend && npm install --include=dev && npm run build",
-    "install:all": "npm install --prefix frontend && npm install --prefix backend"
+    "test": "npm test --prefix frontend",
+    "lint": "npm run lint --prefix frontend",
+    "install:all": "npm install --prefix frontend"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

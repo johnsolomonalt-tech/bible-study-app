@@ -263,7 +263,7 @@ async function processAiMessage({
         })
       );
 
-      const isBibleRelatedText = validationResponse.candidates?.[0]?.content?.parts?.[0]?.text?.trim().toUpperCase() || '';
+      const isBibleRelatedText = (validationResponse.text ?? validationResponse.candidates?.[0]?.content?.parts?.[0]?.text ?? '').trim().toUpperCase();
       const isBibleRelated = isBibleRelatedText.includes('YES');
 
       if (!isBibleRelated) {

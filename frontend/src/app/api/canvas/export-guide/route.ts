@@ -192,7 +192,7 @@ MANDATORY RULES:
             temperature: 0.35,
           }
         });
-        return response.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+        return (response.text ?? '').trim();
       });
 
       if (guideText) {

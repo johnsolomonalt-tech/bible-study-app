@@ -100,9 +100,10 @@ export async function GET(req: Request) {
 
     const cacheKey = `${activeUserId}_${boardId}`;
 
+    let dbRecord: any = null;
     if (userId) {
       try {
-        const record = await prisma.canvas.findUnique({
+        dbRecord = await prisma.canvas.findUnique({
           where: {
             userId_boardId: {
               userId,
@@ -110,39 +111,53 @@ export async function GET(req: Request) {
             },
           },
         });
-
-        if (record) {
-          const payload: CanvasStatePayload = {
-            nodes: (record.nodes as any) || [],
-            edges: (record.edges as any) || [],
-            viewport: (record.viewport as any) || undefined,
-          };
-
-          memoryCache[cacheKey] = {
-            title: record.title,
-            updatedAt: record.updatedAt.toISOString(),
-            payload,
-          };
-
-          return NextResponse.json({
-            id: record.boardId,
-            title: record.title,
-            updatedAt: record.updatedAt.toISOString(),
-            ...payload,
-          });
-        }
       } catch (dbErr) {
         console.warn('Canvas: PostgreSQL query failed, falling back to memory cache:', dbErr);
       }
     }
 
-    // Check memory cache
-    if (memoryCache[cacheKey]) {
+    // If not found in current user's scope, allow public retrieval for shared links
+    if (!dbRecord) {
+      try {
+        dbRecord = await prisma.canvas.findFirst({
+          where: { boardId },
+        });
+      } catch (dbErr) {
+        console.warn('Canvas: PostgreSQL global board lookup failed:', dbErr);
+      }
+    }
+
+    if (dbRecord) {
+      const payload: CanvasStatePayload = {
+        nodes: (dbRecord.nodes as any) || [],
+        edges: (dbRecord.edges as any) || [],
+        viewport: (dbRecord.viewport as any) || undefined,
+      };
+
+      memoryCache[cacheKey] = {
+        title: dbRecord.title,
+        updatedAt: dbRecord.updatedAt.toISOString(),
+        payload,
+      };
+
+      return NextResponse.json({
+        id: dbRecord.boardId,
+        title: dbRecord.title,
+        updatedAt: dbRecord.updatedAt.toISOString(),
+        ...payload,
+      });
+    }
+
+    // Check memory cache for active user or any cached entry matching boardId
+    const cachedEntry = memoryCache[cacheKey] ||
+      Object.entries(memoryCache).find(([k]) => k.endsWith(`_${boardId}`))?.[1];
+
+    if (cachedEntry) {
       return NextResponse.json({
         id: boardId,
-        title: memoryCache[cacheKey].title,
-        updatedAt: memoryCache[cacheKey].updatedAt,
-        ...memoryCache[cacheKey].payload,
+        title: cachedEntry.title,
+        updatedAt: cachedEntry.updatedAt,
+        ...cachedEntry.payload,
       });
     }
 
