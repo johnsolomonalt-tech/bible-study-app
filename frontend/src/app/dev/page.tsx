@@ -55,6 +55,9 @@ interface SystemHealth {
   geminiAi: {
     status: string;
     configured: boolean;
+    primaryModel?: string;
+    fallbackModels?: string[];
+    modelFamily?: string;
   };
   pixazoImage: {
     status: string;
@@ -1592,7 +1595,7 @@ export default function DevDashboardPage() {
                     </div>
                     <div>
                       <h3 className="text-sm font-semibold text-[var(--fg)]">Gemini AI Engine</h3>
-                      <p className="text-[11px] text-[var(--muted)]">Gemini 2.5 Flash / Pro</p>
+                      <p className="text-[11px] text-[var(--muted)]">Gemini 3 Flash Series</p>
                     </div>
                   </div>
                   <span
@@ -1610,11 +1613,23 @@ export default function DevDashboardPage() {
                     {systemHealth?.geminiAi?.configured ? 'Active' : 'Unconfigured'}
                   </span>
                 </div>
-                <div className="pt-2 flex items-baseline justify-between border-t border-[var(--border)] text-xs">
-                  <span className="text-[var(--muted)]">API Status</span>
-                  <span className="font-mono text-[var(--fg)]">
-                    Chat, Canvas & Notes AI Ready
-                  </span>
+                <div className="space-y-1.5 pt-2 border-t border-[var(--border)] text-xs">
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-[var(--muted)]">Primary Model:</span>
+                    <span className="font-mono text-[var(--fg)] font-semibold">
+                      {systemHealth?.geminiAi?.primaryModel || 'gemini-3.1-flash-lite'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-[var(--muted)]">Fallback Chain:</span>
+                    <span className="font-mono text-[var(--fg-2)] text-[10px]">
+                      3.5, 3.6, 3.7, 3.8 Flash
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-[var(--muted)]">Latency Target:</span>
+                    <span className="font-mono text-emerald-400 text-[10px]">3 - 5s rapid stream</span>
+                  </div>
                 </div>
               </div>
 

@@ -22,8 +22,15 @@ export async function GET() {
     dbError = err?.message || 'Database unreachable';
   }
 
-  // 2. Gemini AI Key
+  // 2. Gemini AI Key & Models
   const geminiConfigured = Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.length > 5);
+  const activeAiModels = [
+    'gemini-3.1-flash-lite',
+    'gemini-3.5-flash',
+    'gemini-3.6-flash',
+    'gemini-3.7-flash',
+    'gemini-3.8-flash',
+  ];
 
   // 3. Pixazo API Key
   const pixazoConfigured = Boolean(process.env.PIXAZO_API_KEY && process.env.PIXAZO_API_KEY.length > 5);
@@ -63,6 +70,9 @@ export async function GET() {
       geminiAi: {
         status: geminiConfigured ? 'operational' : 'unconfigured',
         configured: geminiConfigured,
+        primaryModel: 'gemini-3.1-flash-lite',
+        fallbackModels: activeAiModels.slice(1),
+        modelFamily: 'Gemini 3 Flash Series',
       },
       pixazoImage: {
         status: pixazoConfigured ? 'operational' : 'unconfigured',
