@@ -93,14 +93,14 @@ export function CanvasSidebar({
       {/* Mobile backdrop overlay to tap-dismiss */}
       <div 
         onClick={onToggle}
-        className="fixed inset-0 bg-black/50 z-20 sm:hidden animate-in fade-in duration-200"
+        className="fixed inset-0 bg-black/50 z-30 md:hidden animate-in fade-in duration-200"
         aria-hidden="true"
       />
       <aside 
-        className={`absolute left-0 top-0 bottom-0 w-72 sm:w-80 z-30 flex flex-col border-r shadow-2xl backdrop-blur-xl transition-all duration-200 animate-in slide-in-from-left-4 ${
+        className={`fixed md:relative inset-y-0 left-0 z-40 md:z-20 w-72 lg:w-80 h-full shrink-0 flex flex-col border-r transition-all duration-200 animate-in slide-in-from-left-4 ${
           isDark 
-            ? 'bg-[#18181b]/95 border-zinc-800 text-zinc-100' 
-            : 'bg-white/95 border-zinc-200 text-zinc-800'
+            ? 'bg-[#18181b] border-zinc-800 text-zinc-100 shadow-2xl md:shadow-none' 
+            : 'bg-white border-zinc-200 text-zinc-800 shadow-2xl md:shadow-none'
         }`}
       >
       {/* Sidebar Header */}

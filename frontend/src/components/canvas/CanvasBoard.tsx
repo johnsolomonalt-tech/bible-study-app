@@ -294,7 +294,12 @@ function InnerCanvasBoard({
 
   // Boards List state
   const [boards, setBoards] = useState<CanvasBoardMetadata[]>([]);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 768;
+    }
+    return true;
+  });
 
   // Theologica AI Modal state
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
@@ -2120,8 +2125,11 @@ function InnerCanvasBoard({
 
     if (isActiveTab) {
       setIsCreatePageActive(true);
+      if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+        setIsSidebarOpen(true);
+      }
     }
-  }, [focusTrigger]);
+  }, [focusTrigger, isActiveTab]);
 
   // Support ?importCanvas=... parameter and ?imported=1
   useEffect(() => {
@@ -2185,7 +2193,7 @@ function InnerCanvasBoard({
   return (
     <div 
       ref={containerRef}
-      className="relative w-full h-full overflow-hidden select-none transition-colors duration-200"
+      className="relative w-full h-full overflow-hidden select-none flex flex-row transition-colors duration-200"
       style={{
         backgroundColor: isDark ? '#161618' : '#F6F6F6',
       }}
@@ -2199,57 +2207,60 @@ function InnerCanvasBoard({
         onSelectBoard={(id) => {
           handleSelectBoard(id);
           setIsCreatePageActive(false);
+          if (isMobile) setIsSidebarOpen(false);
         }}
         onCreateBoard={() => {
           setIsCreatePageActive(true);
-          setIsSidebarOpen(false);
+          if (isMobile) setIsSidebarOpen(false);
         }}
         onRenameBoard={handleRenameBoard}
         onDeleteBoard={handleDeleteBoard}
         onOpenImportModal={() => {
           setIsImportModalOpen(true);
-          setIsSidebarOpen(false);
+          if (isMobile) setIsSidebarOpen(false);
         }}
         theme={theme}
       />
 
-      {isCreatePageActive || (boards.length === 0 && !activeBoardId) ? (
-        <CanvasStartPage
-          onGenerateCanvas={handleGenerateFromStartPage}
-          onCreateBlankCanvas={() => {
-            handleCreateBoard();
-            setIsCreatePageActive(false);
-          }}
-          onOpenImportModal={() => setIsImportModalOpen(true)}
-          onSelectBoard={(id) => {
-            handleSelectBoard(id);
-            setIsCreatePageActive(false);
-          }}
-          onResumeActiveBoard={
-            activeBoardId && nodes.length > 0
-              ? () => setIsCreatePageActive(false)
-              : undefined
-          }
-          activeBoard={
-            activeBoardId
-              ? { id: activeBoardId, title: boardTitle, nodeCount: nodes.length }
-              : null
-          }
-          recentBoards={boards}
-          onOpenSidebar={() => setIsSidebarOpen(true)}
-          isGenerating={isStartPageGenerating}
-          generatingStep={startPageGeneratingStep}
-          onCancelGeneration={() => {
-            if (startPageAbortControllerRef.current) {
-              startPageAbortControllerRef.current.abort();
-              startPageAbortControllerRef.current = null;
+      {/* Main Content Area */}
+      <div className="flex-1 h-full relative overflow-hidden flex flex-col min-w-0">
+        {isCreatePageActive || (boards.length === 0 && !activeBoardId) ? (
+          <CanvasStartPage
+            onGenerateCanvas={handleGenerateFromStartPage}
+            onCreateBlankCanvas={() => {
+              handleCreateBoard();
+              setIsCreatePageActive(false);
+            }}
+            onOpenImportModal={() => setIsImportModalOpen(true)}
+            onSelectBoard={(id) => {
+              handleSelectBoard(id);
+              setIsCreatePageActive(false);
+            }}
+            onResumeActiveBoard={
+              activeBoardId && nodes.length > 0
+                ? () => setIsCreatePageActive(false)
+                : undefined
             }
-            setIsStartPageGenerating(false);
-          }}
-          theme={theme}
-        />
-      ) : (
-        <>
+            activeBoard={
+              activeBoardId
+                ? { id: activeBoardId, title: boardTitle, nodeCount: nodes.length }
+                : null
+            }
+            onOpenSidebar={() => setIsSidebarOpen(true)}
+            isSidebarOpen={isSidebarOpen}
+            isGenerating={isStartPageGenerating}
+            generatingStep={startPageGeneratingStep}
+            onCancelGeneration={() => {
+              if (startPageAbortControllerRef.current) {
+                startPageAbortControllerRef.current.abort();
+                startPageAbortControllerRef.current = null;
+              }
+              setIsStartPageGenerating(false);
+            }}
+            theme={theme}
+          />
+        ) : (
+          <>
           {/* Top Action Toolbar */}
           <CanvasToolbar
             boardTitle={boardTitle}
@@ -2574,6 +2585,7 @@ function InnerCanvasBoard({
       )}
         </>
       )}
+      </div>
 
       {/* Theologica AI Canvas Architect Modal */}
       <TheologicaAiCanvasModal

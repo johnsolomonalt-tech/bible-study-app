@@ -11,19 +11,16 @@ import {
   Plus, 
   Download, 
   ArrowRight, 
-  Layers, 
-  Clock, 
-  Loader2, 
+  PanelLeft,
   CheckCircle2, 
+  Loader2, 
   X, 
   AlertCircle,
-  Lightbulb,
-  Compass
+  Lightbulb
 } from 'lucide-react';
-import { CanvasBoardMetadata } from '@/types/canvas';
 import { validateBiblePrompt } from '@/lib/bibleValidation';
 
-type CanvasMode = 'generate' | 'discourse' | 'synthesize';
+export type CanvasMode = 'generate' | 'discourse' | 'synthesize';
 
 interface CanvasStartPageProps {
   onGenerateCanvas: (prompt: string, mode: CanvasMode, lens: string) => Promise<void>;
@@ -32,23 +29,22 @@ interface CanvasStartPageProps {
   onSelectBoard: (boardId: string) => void;
   onResumeActiveBoard?: () => void;
   activeBoard?: { id: string; title: string; nodeCount: number } | null;
-  recentBoards: CanvasBoardMetadata[];
   onOpenSidebar: () => void;
+  isSidebarOpen?: boolean;
   isGenerating: boolean;
   generatingStep: number;
   onCancelGeneration: () => void;
   theme: 'dark' | 'light';
 }
 
-const PRESET_TOPICS = [
+const PRESET_IDEAS = [
   { label: "Romans 8:28-30 (Golden Chain)", query: "Map Romans 8:28-30 (The Golden Chain of Redemption) with scripture, doctrinal implications, and applications" },
   { label: "Covenant of Grace", query: "Theological structure and biblical progression of the Covenant of Grace across the Old and New Testaments" },
   { label: "Beatitudes in Matthew 5", query: "Mind-map of the Beatitudes in Matthew 5 with kingdom virtues and modern Christian applications" },
-  { label: "Messianic Prophecies", query: "Old Testament Messianic prophecies and their direct fulfillment in Jesus Christ" },
-  { label: "Philippians 2:5-11 (Christ Hymn)", query: "Logic diagram of Philippians 2:5-11 from kenosis (humiliation) to exaltation and universal confession" },
+  { label: "Philippians 2:5-11 (Christ Hymn)", query: "Logic diagram of Philippians 2:5-11 from humiliation to exaltation" },
 ];
 
-const DISCOURSE_TOPICS = [
+const DISCOURSE_IDEAS = [
   { label: "Romans 8:28-39 (Sovereignty to Glory)", query: "Discourse analysis of Romans 8:28-39 diagramming Paul's logical chain from foreknowledge to eternal security" },
   { label: "Ephesians 2:1-10 (Grace & Calling)", query: "Argument flowchart of Ephesians 2:1-10 diagramming condition of sin, divine intervention ('But God'), and grace unto good works" },
   { label: "Galatians 3:1-14 (Faith vs Law)", query: "Discourse tree of Paul's argument in Galatians 3 contrasting works of the law with the promise to Abraham" },
@@ -58,11 +54,10 @@ export function CanvasStartPage({
   onGenerateCanvas,
   onCreateBlankCanvas,
   onOpenImportModal,
-  onSelectBoard,
   onResumeActiveBoard,
   activeBoard,
-  recentBoards,
   onOpenSidebar,
+  isSidebarOpen = true,
   isGenerating,
   generatingStep,
   onCancelGeneration,
@@ -117,355 +112,277 @@ export function CanvasStartPage({
 
   return (
     <div 
-      className="w-full h-full overflow-y-auto custom-scroll flex flex-col items-center justify-start p-4 sm:p-6 md:p-10 select-none animate-in fade-in duration-300"
+      className="w-full h-full overflow-y-auto custom-scroll flex flex-col justify-between p-4 sm:p-6 md:p-8 select-none animate-in fade-in duration-200"
       style={{
         backgroundColor: isDark ? '#161618' : '#F6F6F6',
       }}
     >
-      <div className="w-full max-w-2xl my-auto space-y-6">
-        {/* Top Active Canvas Banner (Resume editing) */}
-        {activeBoard && activeBoard.nodeCount > 0 && onResumeActiveBoard && !isGenerating && (
-          <div className="flex items-center justify-between p-3 px-4 rounded-2xl border border-accent/30 bg-accent/10 backdrop-blur-md text-xs transition-all shadow-sm">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <Layers size={15} className="text-accent shrink-0" />
-              <div className="truncate">
-                <span className="text-zinc-500 dark:text-zinc-400">Open canvas: </span>
-                <span className="font-bold text-accent">{activeBoard.title}</span>
-                <span className="text-zinc-500 dark:text-zinc-400 ml-1.5">({activeBoard.nodeCount} cards)</span>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={onResumeActiveBoard}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent text-white font-semibold text-xs hover:bg-accent/90 transition-all cursor-pointer shrink-0 ml-2"
-            >
-              <span>Resume Canvas</span>
-              <ArrowRight size={13} />
-            </button>
-          </div>
+      {/* Top Bar Navigation */}
+      <div className="w-full flex items-center justify-between shrink-0 mb-4">
+        {/* Toggle Canvases Sidebar (if collapsed or mobile) */}
+        {!isSidebarOpen ? (
+          <button
+            type="button"
+            onClick={onOpenSidebar}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer shadow-xs ${
+              isDark 
+                ? 'border-zinc-800 bg-zinc-900/90 text-zinc-300 hover:text-white hover:border-zinc-700' 
+                : 'border-zinc-200 bg-white text-zinc-700 hover:text-zinc-950 hover:border-zinc-300'
+            }`}
+            title="Open Canvases Sidebar"
+          >
+            <PanelLeft size={14} className="text-accent" />
+            <span>Your Canvases</span>
+          </button>
+        ) : (
+          <div />
         )}
 
-        {/* Central Creation Card */}
-        <div 
-          className={`w-full rounded-3xl border shadow-2xl backdrop-blur-xl p-5 sm:p-8 transition-all duration-300 ${
-            isDark 
-              ? 'bg-[#1c1c20]/95 border-zinc-800/90 text-zinc-100 shadow-black/40' 
-              : 'bg-white/95 border-zinc-200/90 text-zinc-900 shadow-zinc-200/60'
-          }`}
-        >
-          {isGenerating ? (
-            /* HUD GENERATION STATE */
-            <div className="py-8 px-2 flex flex-col items-center justify-center space-y-6 animate-in fade-in zoom-in-95 text-center">
-              <div className="relative flex items-center justify-center w-20 h-20">
-                <div className="absolute inset-0 rounded-2xl bg-accent/15 border border-accent/30 animate-pulse" />
-                <div className="w-12 h-12 rounded-xl bg-accent/20 text-accent border border-accent/40 flex items-center justify-center shadow-xs">
-                  <Sparkles size={24} className="animate-pulse text-accent" />
-                </div>
-              </div>
+        {/* Return to Open Canvas (if active) */}
+        {activeBoard && activeBoard.nodeCount > 0 && onResumeActiveBoard && !isGenerating && (
+          <button
+            type="button"
+            onClick={onResumeActiveBoard}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer shadow-xs ml-auto ${
+              isDark 
+                ? 'border-accent/40 bg-accent/10 text-accent hover:bg-accent/20' 
+                : 'border-accent/40 bg-accent/10 text-accent hover:bg-accent/20'
+            }`}
+          >
+            <Workflow size={13} className="text-accent shrink-0" />
+            <span className="truncate max-w-[180px] sm:max-w-xs">Return to &quot;{activeBoard.title}&quot;</span>
+            <ArrowRight size={12} className="shrink-0" />
+          </button>
+        )}
+      </div>
 
-              <div className="space-y-1.5">
-                <h3 className="text-base sm:text-lg font-bold tracking-tight">
-                  Architecting Your Canvas Board
-                </h3>
-                <p className="text-xs text-accent font-medium">
-                  {MILESTONES[generatingStep] || 'Finalizing cards and connections...'}
-                </p>
+      {/* Main Center Area */}
+      <div className="w-full max-w-2xl mx-auto my-auto flex flex-col items-center space-y-6">
+        {isGenerating ? (
+          /* HUD GENERATION STATE */
+          <div 
+            className={`w-full max-w-lg rounded-2xl border p-6 sm:p-8 flex flex-col items-center text-center space-y-6 shadow-xl backdrop-blur-md animate-in fade-in zoom-in-95 ${
+              isDark ? 'bg-[#1c1c20] border-zinc-800 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
+            }`}
+          >
+            <div className="relative flex items-center justify-center w-16 h-16">
+              <div className="absolute inset-0 rounded-2xl bg-accent/15 border border-accent/30 animate-pulse" />
+              <div className="w-10 h-10 rounded-xl bg-accent/20 text-accent border border-accent/40 flex items-center justify-center shadow-xs">
+                <Sparkles size={20} className="animate-pulse text-accent" />
               </div>
+            </div>
 
-              <div className="w-full max-w-md p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-100/50 dark:bg-zinc-900/50 space-y-2.5 text-xs text-left">
-                {MILESTONES.map((m, idx) => {
-                  const isDone = idx < generatingStep;
-                  const isCurrent = idx === generatingStep;
+            <div className="space-y-1">
+              <h3 className="text-base font-bold tracking-tight">
+                Architecting Canvas Board
+              </h3>
+              <p className="text-xs text-accent font-medium">
+                {MILESTONES[generatingStep] || 'Finalizing cards and connections...'}
+              </p>
+            </div>
+
+            <div className={`w-full p-3.5 rounded-xl border text-xs text-left space-y-2.5 ${
+              isDark ? 'bg-zinc-900/60 border-zinc-800' : 'bg-zinc-50 border-zinc-200'
+            }`}>
+              {MILESTONES.map((m, idx) => {
+                const isDone = idx < generatingStep;
+                const isCurrent = idx === generatingStep;
+                return (
+                  <div 
+                    key={idx} 
+                    className={`flex items-center gap-2.5 transition-all duration-300 ${
+                      isDone ? 'text-emerald-500 font-medium' : isCurrent ? 'text-accent font-semibold' : 'text-zinc-500'
+                    }`}
+                  >
+                    {isDone ? (
+                      <CheckCircle2 size={14} className="shrink-0 text-emerald-500" />
+                    ) : isCurrent ? (
+                      <Loader2 size={14} className="shrink-0 animate-spin text-accent" />
+                    ) : (
+                      <div className="w-3.5 h-3.5 rounded-full border border-zinc-400 dark:border-zinc-700 shrink-0 ml-0.5" />
+                    )}
+                    <span className="truncate">{m}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              onClick={onCancelGeneration}
+              className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 border border-zinc-700 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+            >
+              <X size={13} />
+              <span>Cancel</span>
+            </button>
+          </div>
+        ) : (
+          /* CLEAN START VIEW */
+          <>
+            {/* Hero Header */}
+            <div className="flex flex-col items-center text-center space-y-2 px-2">
+              <div className="w-11 h-11 rounded-2xl bg-accent/15 border border-accent/30 text-accent flex items-center justify-center shadow-xs">
+                <Sparkles size={20} className="text-accent" />
+              </div>
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+                Architect a Theological Canvas
+              </h1>
+              <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 max-w-md leading-relaxed">
+                Transform Scripture passages, doctrines, and theological themes into an interactive visual whiteboard graph.
+              </p>
+            </div>
+
+            {/* Unified Input Card */}
+            <div 
+              className={`w-full rounded-2xl border transition-all duration-200 shadow-xl ${
+                isDark 
+                  ? 'bg-[#1c1c20] border-zinc-800 focus-within:border-accent/80 focus-within:ring-2 focus-within:ring-accent/15' 
+                  : 'bg-white border-zinc-200 focus-within:border-accent/80 focus-within:ring-2 focus-within:ring-accent/15 shadow-zinc-200/50'
+              } p-3.5 sm:p-4 space-y-3`}
+            >
+              {/* Architecture Mode Selector Pills */}
+              <div className="flex items-center gap-1.5 pb-2 border-b border-zinc-100 dark:border-zinc-800/80 overflow-x-auto no-scrollbar">
+                {[
+                  { id: 'generate', label: 'Mind-Map', icon: Network },
+                  { id: 'discourse', label: 'Logic Flowchart', icon: Workflow },
+                  { id: 'synthesize', label: 'Topic Synthesis', icon: FileText },
+                ].map((m) => {
+                  const Icon = m.icon;
+                  const isSelected = mode === m.id;
                   return (
-                    <div 
-                      key={idx} 
-                      className={`flex items-center gap-2.5 transition-all duration-300 ${
-                        isDone ? 'text-emerald-500 font-medium' : isCurrent ? 'text-accent font-semibold' : 'text-zinc-500'
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setMode(m.id as CanvasMode)}
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap ${
+                        isSelected
+                          ? 'bg-accent/15 text-accent font-semibold border border-accent/30'
+                          : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60'
                       }`}
                     >
-                      {isDone ? (
-                        <CheckCircle2 size={15} className="shrink-0 text-emerald-500" />
-                      ) : isCurrent ? (
-                        <Loader2 size={15} className="shrink-0 animate-spin text-accent" />
-                      ) : (
-                        <div className="w-3.5 h-3.5 rounded-full border border-zinc-300 dark:border-zinc-700 shrink-0 ml-0.5" />
-                      )}
-                      <span className="truncate">{m}</span>
-                    </div>
+                      <Icon size={13} />
+                      <span>{m.label}</span>
+                    </button>
                   );
                 })}
               </div>
 
-              <button
-                type="button"
-                onClick={onCancelGeneration}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 border border-zinc-700 transition-all flex items-center gap-2 cursor-pointer shadow-xs active:scale-95"
-              >
-                <X size={14} />
-                <span>Cancel Generation</span>
-              </button>
-            </div>
-          ) : (
-            /* NORMAL START VIEW */
-            <div className="space-y-5">
-              {/* Header */}
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-accent/15 border border-accent/30 flex items-center justify-center text-accent shadow-xs shrink-0">
-                  <Workflow size={22} />
+              {/* Study Prompt Textarea */}
+              <TextareaAutosize
+                ref={textareaRef}
+                minRows={3}
+                maxRows={6}
+                value={prompt}
+                onChange={(e) => {
+                  setPrompt(e.target.value);
+                  if (validationError) setValidationError(null);
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder={
+                  mode === 'discourse'
+                    ? "e.g. Diagram the logical argument and flow of Romans 8:28-39 or Galatians 3:1-14..."
+                    : mode === 'synthesize'
+                    ? "e.g. Synthesize the key doctrines and study takeaways on the Covenant of Grace..."
+                    : "e.g. Map Romans 8:28-30 (The Golden Chain) with scripture, doctrinal implications, and applications..."
+                }
+                className="w-full bg-transparent text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none resize-none leading-relaxed block"
+              />
+
+              {/* Bottom Row inside Card */}
+              <div className="flex items-center justify-between pt-2 border-t border-zinc-100 dark:border-zinc-800/80 gap-2 flex-wrap">
+                {/* Tradition Lens Selector Dropdown */}
+                <div className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+                  <BookOpen size={13} className="text-accent shrink-0" />
+                  <span className="hidden sm:inline font-medium">Tradition:</span>
+                  <select
+                    value={selectedLens}
+                    onChange={(e) => setSelectedLens(e.target.value as any)}
+                    className={`text-xs font-medium px-2 py-1 rounded-lg border bg-transparent focus:outline-none cursor-pointer ${
+                      isDark ? 'border-zinc-700 text-zinc-200 bg-zinc-800/80' : 'border-zinc-200 text-zinc-800 bg-zinc-50'
+                    }`}
+                  >
+                    <option value="canonical">Canonical Biblical</option>
+                    <option value="patristic">Patristic & Early Church</option>
+                    <option value="reformation">Reformed & Protestant</option>
+                    <option value="scholarly">Scholarly & Exegetical</option>
+                    <option value="contemplative">Devotional & Formational</option>
+                  </select>
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h1 className="text-base sm:text-lg font-bold tracking-tight">
-                      Create with Theologica AI
-                    </h1>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-accent/15 text-accent border border-accent/30 uppercase tracking-wider">
-                      Architect
-                    </span>
-                  </div>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    Architect interactive scripture mind-maps, logic flowcharts, and doctrinal graphs.
-                  </p>
-                </div>
-              </div>
 
-              {/* Mode Selector Tabs */}
-              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs overflow-x-auto no-scrollbar">
-                <button
-                  type="button"
-                  onClick={() => setMode('generate')}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg transition-all font-medium whitespace-nowrap cursor-pointer ${
-                    mode === 'generate'
-                      ? 'bg-white dark:bg-zinc-800 text-accent font-semibold shadow-xs'
-                      : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
-                  }`}
-                >
-                  <Network size={14} />
-                  <span>Mind-Map</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setMode('discourse')}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg transition-all font-medium whitespace-nowrap cursor-pointer ${
-                    mode === 'discourse'
-                      ? 'bg-white dark:bg-zinc-800 text-accent font-semibold shadow-xs'
-                      : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
-                  }`}
-                >
-                  <Workflow size={14} />
-                  <span>Logic Flowchart</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setMode('synthesize')}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg transition-all font-medium whitespace-nowrap cursor-pointer ${
-                    mode === 'synthesize'
-                      ? 'bg-white dark:bg-zinc-800 text-accent font-semibold shadow-xs'
-                      : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
-                  }`}
-                >
-                  <FileText size={14} />
-                  <span>Topic Synthesis</span>
-                </button>
-              </div>
-
-              {/* Primary AI Study Prompt Box */}
-              <div className="space-y-2">
-                <div className="relative rounded-2xl border-2 border-zinc-200 dark:border-zinc-700/80 bg-zinc-50/60 dark:bg-zinc-900/60 shadow-xs focus-within:border-accent focus-within:ring-4 focus-within:ring-accent/15 transition-all p-3.5 sm:p-4">
-                  <TextareaAutosize
-                    ref={textareaRef}
-                    minRows={3}
-                    maxRows={7}
-                    value={prompt}
-                    onChange={(e) => {
-                      setPrompt(e.target.value);
-                      if (validationError) setValidationError(null);
-                    }}
-                    onKeyDown={handleKeyDown}
-                    placeholder={
-                      mode === 'discourse'
-                        ? "e.g. Diagram the logical argument and flow of Romans 8:28-39 or Galatians 3:1-14..."
-                        : mode === 'synthesize'
-                        ? "e.g. Synthesize the key doctrines, biblical connections, and study takeaways on the Covenant of Grace..."
-                        : "e.g. Map Romans 8:28-30 (The Golden Chain of Redemption) with scripture, doctrinal implications, and applications..."
-                    }
-                    className="w-full bg-transparent text-[14px] sm:text-[15px] text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none resize-none leading-relaxed block"
-                    autoFocus
-                  />
-
-                  {/* Prompt Box Action Bar */}
-                  <div className="flex items-center justify-between pt-3 mt-2 border-t border-zinc-200/80 dark:border-zinc-800">
-                    <div className="flex items-center gap-1.5 text-[11px] text-zinc-400">
-                      <span className="hidden sm:inline">Press</span>
-                      <kbd className="px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 font-mono text-[10px] text-zinc-700 dark:text-zinc-300 font-medium">Enter</kbd>
-                      <span className="hidden sm:inline">to generate</span>
-                      <span className="text-zinc-400 hidden sm:inline">·</span>
-                      <span className="hidden sm:inline"><kbd className="px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 font-mono text-[10px] text-zinc-700 dark:text-zinc-300 font-medium">Shift+Enter</kbd> for newline</span>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleStartSubmit()}
-                      disabled={!prompt.trim()}
-                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent text-white text-xs font-semibold hover:bg-accent/90 disabled:opacity-40 disabled:hover:bg-accent active:scale-95 transition-all shadow-md cursor-pointer"
-                    >
-                      <Sparkles size={14} />
-                      <span>Generate Canvas</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Validation Error Message */}
-              {validationError && (
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs">
-                  <AlertCircle size={15} className="shrink-0" />
-                  <span>{validationError}</span>
-                </div>
-              )}
-
-              {/* Tradition Lens Selector */}
-              <div className="flex items-center justify-between flex-wrap gap-2 py-2 px-3 rounded-xl bg-zinc-100/60 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-xs">
-                <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 font-semibold">
-                  <BookOpen size={13} className="text-accent" />
-                  <span>Tradition Lens:</span>
-                </div>
-                <div className="flex items-center flex-wrap gap-1">
-                  {[
-                    { id: 'canonical', label: 'Canonical', icon: '🕊️' },
-                    { id: 'patristic', label: 'Patristic', icon: '🏛️' },
-                    { id: 'reformation', label: 'Reformed', icon: '📜' },
-                    { id: 'scholarly', label: 'Scholarly', icon: '🔍' },
-                    { id: 'contemplative', label: 'Devotional', icon: '🌿' },
-                  ].map((l) => (
-                    <button
-                      key={l.id}
-                      type="button"
-                      onClick={() => setSelectedLens(l.id as any)}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all cursor-pointer ${
-                        selectedLens === l.id
-                          ? 'bg-accent text-white font-semibold shadow-xs'
-                          : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
-                      }`}
-                    >
-                      <span>{l.icon} {l.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Suggestion Chips */}
-              <div className="space-y-1.5">
-                <div className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
-                  <Lightbulb size={13} className="text-amber-500 shrink-0" />
-                  <span>Need inspiration? Try a sample topic:</span>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {(mode === 'discourse' ? DISCOURSE_TOPICS : PRESET_TOPICS).map((item, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => {
-                        setPrompt(item.query);
-                        handleStartSubmit(item.query);
-                      }}
-                      className="text-xs text-left px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-800/80 text-zinc-800 dark:text-zinc-200 hover:border-accent/60 hover:text-accent transition-all cursor-pointer shadow-xs flex items-center gap-1.5 group"
-                    >
-                      <span>{item.label}</span>
-                      <ArrowRight size={11} className="text-zinc-400 group-hover:text-accent group-hover:translate-x-0.5 transition-all" />
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Alternative Creation Actions Row */}
-              <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between flex-wrap gap-2 text-xs">
+                {/* Submit button & shortcut */}
                 <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-zinc-400 hidden sm:inline">Press ↵ Enter</span>
                   <button
                     type="button"
-                    onClick={onCreateBlankCanvas}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-medium transition-colors cursor-pointer"
+                    onClick={() => handleStartSubmit()}
+                    disabled={!prompt.trim()}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent text-white text-xs font-semibold hover:bg-accent/90 disabled:opacity-40 disabled:hover:bg-accent active:scale-95 transition-all shadow-sm cursor-pointer"
                   >
-                    <Plus size={14} />
-                    <span>Blank Canvas</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={onOpenImportModal}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-medium transition-colors cursor-pointer"
-                  >
-                    <Download size={14} />
-                    <span>Import Shared Canvas</span>
+                    <Sparkles size={14} />
+                    <span>Generate Canvas</span>
                   </button>
                 </div>
-
-                {recentBoards.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={onOpenSidebar}
-                    className="text-accent hover:underline font-semibold flex items-center gap-1 cursor-pointer"
-                  >
-                    <span>View All Canvases ({recentBoards.length})</span>
-                    <ArrowRight size={12} />
-                  </button>
-                )}
               </div>
             </div>
-          )}
-        </div>
 
-        {/* Recent Canvases Row (Quick switcher) */}
-        {!isGenerating && recentBoards.length > 0 && (
-          <div className="space-y-2.5 pt-2">
-            <div className="flex items-center justify-between px-1">
-              <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-                Or continue a recent canvas:
+            {/* Validation Error Message */}
+            {validationError && (
+              <div className="w-full flex items-center gap-2 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs">
+                <AlertCircle size={14} className="shrink-0" />
+                <span>{validationError}</span>
+              </div>
+            )}
+
+            {/* Sample Inspiration Chips */}
+            <div className="flex flex-wrap items-center justify-center gap-1.5 max-w-xl">
+              <span className="text-[11px] text-zinc-400 mr-1 flex items-center gap-1">
+                <Lightbulb size={12} className="text-amber-500" /> Ideas:
               </span>
-              <button
-                type="button"
-                onClick={onOpenSidebar}
-                className="text-xs text-accent hover:underline font-semibold"
-              >
-                Manage Canvases
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
-              {recentBoards.slice(0, 3).map((board) => (
-                <div
-                  key={board.id}
-                  onClick={() => onSelectBoard(board.id)}
-                  className={`group p-3.5 rounded-2xl border transition-all cursor-pointer shadow-sm hover:border-accent/60 hover:shadow-md flex flex-col justify-between ${
+              {(mode === 'discourse' ? DISCOURSE_IDEAS : PRESET_IDEAS).map((item, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    setPrompt(item.query);
+                    handleStartSubmit(item.query);
+                  }}
+                  className={`text-[11px] px-2.5 py-1 rounded-full border transition-all cursor-pointer shadow-2xs ${
                     isDark 
-                      ? 'bg-[#1c1c20]/80 border-zinc-800/80 hover:bg-zinc-800/80' 
-                      : 'bg-white border-zinc-200 hover:bg-zinc-50'
+                      ? 'border-zinc-800 bg-zinc-900/60 text-zinc-300 hover:border-accent/60 hover:text-accent' 
+                      : 'border-zinc-200 bg-white text-zinc-600 hover:border-accent/60 hover:text-accent'
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-6 h-6 rounded-lg bg-accent/15 text-accent flex items-center justify-center shrink-0">
-                        <Layers size={13} />
-                      </div>
-                      <span className="text-xs font-bold truncate group-hover:text-accent transition-colors">
-                        {board.title || 'Untitled Canvas'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between text-[11px] text-zinc-400 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60">
-                    <span>{board.nodeCount || 0} cards</span>
-                    <span className="group-hover:translate-x-0.5 text-accent font-semibold transition-transform flex items-center gap-0.5">
-                      Open <ArrowRight size={11} />
-                    </span>
-                  </div>
-                </div>
+                  {item.label}
+                </button>
               ))}
             </div>
-          </div>
+
+            {/* Subtle Secondary Actions */}
+            <div className="flex items-center justify-center gap-3 pt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              <button
+                type="button"
+                onClick={onCreateBlankCanvas}
+                className="flex items-center gap-1.5 hover:text-accent transition-colors cursor-pointer"
+              >
+                <Plus size={13} />
+                <span>Blank Canvas</span>
+              </button>
+              <span>·</span>
+              <button
+                type="button"
+                onClick={onOpenImportModal}
+                className="flex items-center gap-1.5 hover:text-accent transition-colors cursor-pointer"
+              >
+                <Download size={13} />
+                <span>Import Shared Canvas</span>
+              </button>
+            </div>
+          </>
         )}
       </div>
+
+      {/* Empty bottom spacer for symmetrical vertical centering */}
+      <div className="shrink-0 h-4" />
     </div>
   );
 }
