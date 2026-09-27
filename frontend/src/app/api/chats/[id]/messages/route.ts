@@ -9,8 +9,14 @@ import { BIBLE_VERSE_REGEX } from '@/lib/bibleReferences';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
-// Ordered fallback chain — fastest operational models prioritized
-const CHAT_MODELS = ['gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-3.8-flash', 'gemini-flash-latest'];
+// Ordered fallback chain — fastest operational models prioritized (3-5s response speed)
+const CHAT_MODELS = [
+  'gemini-3.1-flash-lite',
+  'gemini-3.5-flash',
+  'gemini-3.6-flash',
+  'gemini-3.7-flash',
+  'gemini-3.8-flash'
+];
 
 const SYSTEM_INSTRUCTION = `You are 'Theologica AI', an intelligent Bible study assistant integrated natively into the Theologica web application. Your sole purpose is to help users study the Bible, understand scripture, and act as a guide through Christianity.
 

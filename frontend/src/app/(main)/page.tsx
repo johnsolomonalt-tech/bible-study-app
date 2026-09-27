@@ -441,26 +441,6 @@ const AiThinkingAccordion = ({ thought }: { thought: string }) => {
   );
 };
 
-const AI_STUDY_STAGE_PRESETS = [
-  "Searching Scripture canon & verified manuscript database...",
-  "Examining original Hebrew Masoretic & Greek NT lemmas...",
-  "Parsing grammatical syntax & Strong's concordance roots...",
-  "Tracing cross-canonical covenantal themes & typology...",
-  "Consulting historic commentaries & church traditions...",
-  "Formulating theological reasoning & exegesis...",
-  "Synthesizing scriptural study & original language insights...",
-  "Structuring verse-by-verse breakdown & pastoral application...",
-  "Polishing study with verified biblical citations & cross-references...",
-];
-
-const AI_IMAGE_STAGE_PRESETS = [
-  "Translating biblical narrative into sacred visual iconography...",
-  "Harmonizing classical chiaroscuro lighting & sacred textures...",
-  "Connecting to Flux high-resolution sacred art engine...",
-  "Rendering reverent biblical scene with historic aesthetics...",
-  "Finalizing high-fidelity sacred artwork canvas...",
-];
-
 const AiThinkingIndicator = ({ 
   status, 
   thinkingText, 
@@ -471,15 +451,9 @@ const AiThinkingIndicator = ({
   isFullView?: boolean; 
 }) => {
   const [showLiveThoughts, setShowLiveThoughts] = useState(true);
-  const [displayStatus, setDisplayStatus] = useState<string>(() => status || "Grounding in verified Scripture...");
   const [elapsedMs, setElapsedMs] = useState(0);
 
-  const queueRef = useRef<string[]>([]);
-  const lastProcessedRef = useRef<string>('');
-  const fallbackIndexRef = useRef<number>(0);
-  const isImageMode = Boolean(status?.toLowerCase().includes('art') || status?.toLowerCase().includes('image'));
-
-  // Elapsed real-time ticker (updates every 100ms)
+  // Real-time elapsed stopwatch (updates every 100ms)
   useEffect(() => {
     const startTime = Date.now();
     const timer = setInterval(() => {
@@ -487,49 +461,6 @@ const AiThinkingIndicator = ({
     }, 100);
     return () => clearInterval(timer);
   }, []);
-
-  // When parent passes a new status, queue it so it gets displayed smoothly
-  useEffect(() => {
-    if (status && status !== lastProcessedRef.current) {
-      if (!queueRef.current.includes(status)) {
-        queueRef.current.push(status);
-      }
-      // If currently showing default placeholder, transition immediately
-      if (!lastProcessedRef.current || displayStatus === 'Ready' || displayStatus === 'Connecting to Theologica AI...') {
-        const next = queueRef.current.shift();
-        if (next) {
-          lastProcessedRef.current = next;
-          setDisplayStatus(next);
-        }
-      }
-    }
-  }, [status, displayStatus]);
-
-  // Smooth cadence loop: cycle every 1400ms so no status is flashed instantaneously
-  // and so the indicator never stays statically stuck on a single message
-  useEffect(() => {
-    const interval = setInterval(() => {
-      // 1. If we have queued real statuses from server, show next
-      if (queueRef.current.length > 0) {
-        const next = queueRef.current.shift();
-        if (next && next !== displayStatus) {
-          lastProcessedRef.current = next;
-          setDisplayStatus(next);
-          return;
-        }
-      }
-
-      // 2. Otherwise advance dynamically through rich exegetical study stages
-      const presets = isImageMode ? AI_IMAGE_STAGE_PRESETS : AI_STUDY_STAGE_PRESETS;
-      fallbackIndexRef.current = (fallbackIndexRef.current + 1) % presets.length;
-      const nextPreset = presets[fallbackIndexRef.current];
-      if (nextPreset !== displayStatus) {
-        setDisplayStatus(nextPreset);
-      }
-    }, 1400);
-
-    return () => clearInterval(interval);
-  }, [displayStatus, isImageMode]);
 
   const elapsedSec = (elapsedMs / 1000).toFixed(1);
 
@@ -555,10 +486,10 @@ const AiThinkingIndicator = ({
               <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '300ms' }} />
             </div>
             <span 
-              key={displayStatus} 
-              className="text-[12.5px] sm:text-[13px] text-fg font-medium truncate inline-block animate-in fade-in slide-in-from-bottom-1 duration-200"
+              key={status} 
+              className="text-[12.5px] sm:text-[13px] text-fg font-medium truncate inline-block animate-in fade-in duration-150"
             >
-              {displayStatus}
+              {status || "Grounding in verified Scripture..."}
             </span>
           </div>
 
