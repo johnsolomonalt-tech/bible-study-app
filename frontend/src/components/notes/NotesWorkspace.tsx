@@ -366,22 +366,26 @@ export function NotesWorkspace({
             </span>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={() => setIsTemplatesOpen(true)}
-              className="p-2 text-muted hover:text-fg hover:bg-surface rounded-lg transition-colors cursor-pointer"
-              title="Templates Library"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-semibold text-accent bg-accent/10 hover:bg-accent/20 border border-accent/25 hover:border-accent/40 transition-all cursor-pointer shadow-2xs group"
+              title="Add note from a Study Template (SOAP, Sermon, Inductive, etc.)"
             >
-              <FilePlus size={17} />
+              <Sparkles size={13} className="text-accent group-hover:scale-110 transition-transform" />
+              <span>+ Template</span>
             </button>
             <button
+              type="button"
               onClick={handleCreateBlankNote}
-              className="flex items-center gap-1 p-2 text-muted hover:text-fg hover:bg-surface rounded-lg transition-colors cursor-pointer"
+              className="p-1.5 text-muted hover:text-fg hover:bg-surface border border-border/60 hover:border-border rounded-lg transition-colors cursor-pointer"
               title="New Blank Note"
             >
-              <Plus size={17} />
+              <Plus size={16} />
             </button>
           </div>
+
         </header>
 
         {/* Search Bar */}
