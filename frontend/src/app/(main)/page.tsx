@@ -3,7 +3,7 @@ const API_URL = '';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuth, UserButton, SignIn } from '@clerk/nextjs';
-import { Send, Plus, Layout, Edit, Sparkles, Target, Check, Copy, ChevronRight, ChevronLeft, ChevronDown, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow, ShieldCheck, Heart, Layers, Languages, MoreVertical, Search } from 'lucide-react';
+import { Send, Plus, Layout, Edit, Sparkles, Target, Check, Copy, ChevronRight, ChevronLeft, ChevronDown, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow, ShieldCheck, Heart, Layers, Languages, MoreVertical, Search, BookMarked, Quote, Compass, ArrowRight, Square } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import TextareaAutosize from 'react-textarea-autosize';
 import { getDevotionalForDay, DevotionalEntry } from '../../lib/devotionals';
@@ -19,6 +19,9 @@ import { VerseInterlinearModal } from '@/components/bible/VerseInterlinearModal'
 import { findInterlinearWord, getOrGenerateInterlinearWord, fetchInterlinearWord, getVerseInterlinearTokens, preloadChapterLexicon, STOPWORDS, InterlinearWord } from '@/lib/interlinearData';
 import { getScriptureBacklinks, BacklinksResult } from '@/lib/backlinks';
 import { TheologicalLensSelector, TheologicalLensType, THEOLOGICAL_LENS_OPTIONS } from '@/components/chat/TheologicalLensSelector';
+import { ChatEmptyState } from '@/components/chat/ChatEmptyState';
+import { ChatSlashCommands, SLASH_COMMANDS, SlashCommand } from '@/components/chat/ChatSlashCommands';
+import { ChatFollowUps } from '@/components/chat/ChatFollowUps';
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from 'react-resizable-panels';
 import type { PanelImperativeHandle } from 'react-resizable-panels';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -26,7 +29,8 @@ import {
   linkifyBibleReferences, 
   parseVerseReference, 
   createMarkdownComponents, 
-  VerseClickHandler 
+  VerseClickHandler,
+  BIBLE_VERSE_REGEX
 } from '@/lib/bibleReferences';
 import { TranslationSelector } from '@/components/bible/TranslationSelector';
 import { getPassage, getStrongsPassage } from '@/lib/bibleProvider';
@@ -82,15 +86,44 @@ const userMarkdownComponents = {
 // Typewriter configuration
 const seenMessages = new Set<string>();
 
-// Parse AI message content — handles __GENERATED_IMAGE__ markers
-function parseAiMessage(content: string): { imageBase64: string | null; textContent: string } {
-  const imageMatch = content.match(/__GENERATED_IMAGE__([\s\S]*?)__END_IMAGE__/);
+// Parse AI message content — handles __GENERATED_IMAGE__, __LENS__, and __SUGGESTED_FOLLOW_UPS__ markers
+function parseAiMessage(content: string): { 
+  imageBase64: string | null; 
+  textContent: string;
+  theologicalLens: TheologicalLensType | null;
+  suggestedFollowUps: string[];
+} {
+  let text = content || '';
+  let imageBase64: string | null = null;
+  let theologicalLens: TheologicalLensType | null = null;
+  let suggestedFollowUps: string[] = [];
+
+  const imageMatch = text.match(/__GENERATED_IMAGE__([\s\S]*?)__END_IMAGE__/);
   if (imageMatch) {
-    const imageBase64 = imageMatch[1];
-    const textContent = content.replace(/__GENERATED_IMAGE__[\s\S]*?__END_IMAGE__/, '').trim();
-    return { imageBase64, textContent };
+    imageBase64 = imageMatch[1];
+    text = text.replace(/__GENERATED_IMAGE__[\s\S]*?__END_IMAGE__/, '').trim();
   }
-  return { imageBase64: null, textContent: content };
+
+  const lensMatch = text.match(/__LENS__([a-zA-Z0-9_-]+)__END_LENS__/);
+  if (lensMatch) {
+    theologicalLens = lensMatch[1] as TheologicalLensType;
+    text = text.replace(/__LENS__[\s\S]*?__END_LENS__/, '').trim();
+  }
+
+  const followUpsMatch = text.match(/__SUGGESTED_FOLLOW_UPS__([\s\S]*?)__END_SUGGESTED_FOLLOW_UPS__/);
+  if (followUpsMatch) {
+    try {
+      const parsed = JSON.parse(followUpsMatch[1].trim());
+      if (Array.isArray(parsed)) {
+        suggestedFollowUps = parsed.map(String);
+      }
+    } catch {
+      // ignore parsing error
+    }
+    text = text.replace(/__SUGGESTED_FOLLOW_UPS__[\s\S]*?__END_SUGGESTED_FOLLOW_UPS__/, '').trim();
+  }
+
+  return { imageBase64, textContent: text, theologicalLens, suggestedFollowUps };
 }
 
 const seenTitles = new Set<string>();
@@ -180,13 +213,23 @@ const TypewriterMessage = ({ content, onVerseClick }: { content: string; onVerse
 const AiMessageActions = ({
   content,
   chatTitle,
-  onSendToCanvas
+  theologicalLens,
+  translation,
+  onSendToCanvas,
+  onSaveToNotes,
 }: {
   content: string;
   chatTitle?: string;
+  theologicalLens?: TheologicalLensType;
+  translation?: string;
   onSendToCanvas?: (content: string, title?: string) => void;
+  onSaveToNotes?: (content: string, title?: string) => Promise<boolean>;
 }) => {
   const [copied, setCopied] = useState(false);
+  const [copiedCitation, setCopiedCitation] = useState(false);
+  const [savedToNotes, setSavedToNotes] = useState(false);
+  const [savingNote, setSavingNote] = useState(false);
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
 
   const handleCopy = async () => {
     try {
@@ -199,8 +242,60 @@ const AiMessageActions = ({
     }
   };
 
+  const handleCopyCitation = async () => {
+    try {
+      const { textContent, theologicalLens: msgLens } = parseAiMessage(content);
+      const effectiveLens = msgLens || theologicalLens || 'canonical';
+      const lensMeta = THEOLOGICAL_LENS_OPTIONS.find(l => l.id === effectiveLens) || THEOLOGICAL_LENS_OPTIONS[0];
+      const citation = `"${textContent}"\n\n— Theologica Study AI (${lensMeta.name} Lens, ${translation || 'BSB'}, ${new Date().toLocaleDateString()})`;
+      await navigator.clipboard.writeText(citation);
+      setCopiedCitation(true);
+      setTimeout(() => setCopiedCitation(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy citation:', err);
+    }
+  };
+
+  const handleSaveToNotes = async () => {
+    if (!onSaveToNotes || savingNote) return;
+    try {
+      setSavingNote(true);
+      const ok = await onSaveToNotes(content, chatTitle);
+      if (ok) {
+        setSavedToNotes(true);
+        setTimeout(() => setSavedToNotes(false), 2500);
+      }
+    } catch (err) {
+      console.error('Failed to save to notes:', err);
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
+  const handleToggleAudio = () => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    if (isPlayingAudio) {
+      window.speechSynthesis.cancel();
+      setIsPlayingAudio(false);
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const { textContent } = parseAiMessage(content);
+    // Clean markdown syntax for smoother narration
+    const cleanSpeech = textContent
+      .replace(/[*_~`#>]/g, '')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/\n\n+/g, '. ');
+    const utterance = new SpeechSynthesisUtterance(cleanSpeech);
+    utterance.rate = 0.95;
+    utterance.onend = () => setIsPlayingAudio(false);
+    utterance.onerror = () => setIsPlayingAudio(false);
+    window.speechSynthesis.speak(utterance);
+    setIsPlayingAudio(true);
+  };
+
   return (
-    <div className="flex items-center gap-1.5 mt-2.5 pt-1.5 select-none text-muted">
+    <div className="flex items-center flex-wrap gap-1.5 mt-2.5 pt-1.5 select-none text-muted">
       <button
         type="button"
         onClick={handleCopy}
@@ -220,6 +315,68 @@ const AiMessageActions = ({
         )}
       </button>
 
+      <button
+        type="button"
+        onClick={handleCopyCitation}
+        className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted hover:text-fg px-2 py-1 rounded-md hover:bg-surface transition-all cursor-pointer"
+        title="Copy with scholarly citation"
+      >
+        {copiedCitation ? (
+          <>
+            <Check size={12} className="text-emerald-500" />
+            <span className="text-emerald-500 font-medium">Cited</span>
+          </>
+        ) : (
+          <>
+            <Quote size={12} />
+            <span>Cite</span>
+          </>
+        )}
+      </button>
+
+      {onSaveToNotes && (
+        <button
+          type="button"
+          onClick={handleSaveToNotes}
+          disabled={savingNote}
+          className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted hover:text-fg px-2 py-1 rounded-md hover:bg-surface transition-all cursor-pointer disabled:opacity-50"
+          title="Save insight to your Study Notes"
+        >
+          {savedToNotes ? (
+            <>
+              <Check size={12} className="text-emerald-500" />
+              <span className="text-emerald-500 font-medium">Saved</span>
+            </>
+          ) : (
+            <>
+              <BookMarked size={12} />
+              <span>{savingNote ? 'Saving...' : 'Note'}</span>
+            </>
+          )}
+        </button>
+      )}
+
+      {typeof window !== 'undefined' && 'speechSynthesis' in window && (
+        <button
+          type="button"
+          onClick={handleToggleAudio}
+          className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted hover:text-fg px-2 py-1 rounded-md hover:bg-surface transition-all cursor-pointer"
+          title={isPlayingAudio ? "Stop reading" : "Read insight aloud"}
+        >
+          {isPlayingAudio ? (
+            <>
+              <VolumeX size={12} className="text-accent animate-pulse" />
+              <span className="text-accent font-medium">Stop</span>
+            </>
+          ) : (
+            <>
+              <Volume2 size={12} />
+              <span>Listen</span>
+            </>
+          )}
+        </button>
+      )}
+
       {onSendToCanvas && (
         <button
           type="button"
@@ -237,20 +394,22 @@ const AiMessageActions = ({
 
 const AiThinkingIndicator = ({ status, isFullView }: { status: string; isFullView?: boolean }) => {
   return (
-    <div className={`flex flex-col items-start w-full ${isFullView ? 'max-w-3xl mx-auto' : ''} py-2`}>
+    <div className={`flex flex-col items-start w-full ${isFullView ? 'max-w-3xl mx-auto' : ''} py-3 animate-in fade-in duration-200`}>
       <div className="flex items-center gap-2 mb-2 select-none">
-        <div className="w-5 h-5 rounded-full bg-accent/10 border border-accent/30 flex items-center justify-center text-accent">
+        <div className="w-5 h-5 rounded-full bg-accent/15 border border-accent/40 flex items-center justify-center text-accent animate-pulse">
           <Sparkles size={11} />
         </div>
-        <span className="text-[11px] font-semibold tracking-wider uppercase text-muted">Study AI</span>
+        <span className="text-[11px] font-semibold tracking-wider uppercase text-muted">Theologica AI</span>
+        <span className="text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded font-mono font-medium">Active</span>
       </div>
-      <div className="flex items-center gap-2.5 text-[13px] text-muted font-medium py-1 select-none">
-        <div className="flex gap-1 items-center">
-          <span className="w-1.5 h-1.5 rounded-full bg-accent/70 animate-bounce" style={{ animationDelay: '0ms' }} />
-          <span className="w-1.5 h-1.5 rounded-full bg-accent/70 animate-bounce" style={{ animationDelay: '150ms' }} />
-          <span className="w-1.5 h-1.5 rounded-full bg-accent/70 animate-bounce" style={{ animationDelay: '300ms' }} />
+
+      <div className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl bg-surface/70 border border-border-soft/70 shadow-2xs select-none max-w-full">
+        <div className="flex gap-1 items-center shrink-0">
+          <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '0ms' }} />
+          <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '150ms' }} />
+          <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '300ms' }} />
         </div>
-        <span className="text-fg-2 transition-all duration-200">{status}</span>
+        <span className="text-[13px] text-fg font-medium truncate transition-all duration-200">{status}</span>
       </div>
     </div>
   );
@@ -262,7 +421,12 @@ const AiChatMessageView = ({
   totalMessages,
   onVerseClick,
   onSendToCanvas,
+  onSaveToNotes,
+  onSelectPrompt,
+  onSelectLensComparison,
   chatTitle,
+  activeLens = 'canonical',
+  translation = 'BSB',
   isFullView,
 }: {
   message: { role: string; content: string; imagePreview?: string };
@@ -270,7 +434,12 @@ const AiChatMessageView = ({
   totalMessages: number;
   onVerseClick?: VerseClickHandler;
   onSendToCanvas?: (content: string, title?: string) => void;
+  onSaveToNotes?: (content: string, title?: string) => Promise<boolean>;
+  onSelectPrompt?: (prompt: string) => void;
+  onSelectLensComparison?: (lens: TheologicalLensType, prompt: string) => void;
   chatTitle?: string;
+  activeLens?: TheologicalLensType;
+  translation?: string;
   isFullView?: boolean;
 }) => {
   const isUser = message.role === 'user';
@@ -279,12 +448,15 @@ const AiChatMessageView = ({
 
   if (isUser) {
     return (
-      <div className={`flex flex-col items-end w-full ${isFullView ? 'max-w-3xl mx-auto' : ''}`}>
+      <div className={`flex flex-col items-end w-full ${isFullView ? 'max-w-3xl mx-auto' : ''} py-1.5`}>
+        <div className="flex items-center gap-1.5 mb-1.5 select-none pr-1">
+          <span className="text-[11px] font-semibold tracking-wider uppercase text-muted">You</span>
+        </div>
         <div className={`${
           isFullView 
-            ? 'px-5 py-3 max-w-[85%] sm:max-w-[75%] text-[15px]' 
+            ? 'px-5 py-3.5 max-w-[85%] sm:max-w-[75%] text-[15px]' 
             : 'px-4 py-2.5 max-w-[90%] sm:max-w-[85%] text-[14px]'
-        } leading-relaxed bg-surface border border-border-soft/60 text-fg rounded-2xl shadow-sm break-words`}>
+        } leading-relaxed bg-surface border border-border-soft/80 text-fg rounded-2xl shadow-xs break-words`}>
           {message.imagePreview && (
             <img 
               src={message.imagePreview} 
@@ -298,16 +470,52 @@ const AiChatMessageView = ({
     );
   }
 
-  // Study AI message
-  const { imageBase64, textContent } = parseAiMessage(message.content);
+  // Theologica AI message
+  const { imageBase64, textContent, theologicalLens: msgLens, suggestedFollowUps } = parseAiMessage(message.content);
+  const effectiveLens = msgLens || activeLens;
+  const lensMeta = THEOLOGICAL_LENS_OPTIONS.find(l => l.id === effectiveLens) || THEOLOGICAL_LENS_OPTIONS[0];
+
+  const hasOriginalLanguages = /[\u0370-\u03FF\u0590-\u05FF]/.test(textContent);
+  const verseMatches = Array.from(textContent.matchAll(new RegExp(BIBLE_VERSE_REGEX.source, 'gi')));
+  const verseCount = verseMatches.length;
 
   return (
-    <div className={`flex flex-col items-start w-full ${isFullView ? 'max-w-3xl mx-auto' : ''} py-2`}>
-      <div className="flex items-center gap-2 mb-2 select-none">
-        <div className="w-5 h-5 rounded-full bg-accent/10 border border-accent/30 flex items-center justify-center text-accent">
+    <div className={`flex flex-col items-start w-full ${isFullView ? 'max-w-3xl mx-auto' : ''} py-2.5`}>
+      {/* Header with Lens & Language Badges */}
+      <div className="flex items-center gap-2 mb-2 select-none flex-wrap">
+        <div className="w-5 h-5 rounded-full bg-accent/10 border border-accent/30 flex items-center justify-center text-accent shrink-0">
           <Sparkles size={11} />
         </div>
-        <span className="text-[11px] font-semibold tracking-wider uppercase text-muted">Study AI</span>
+        <span className="text-[11px] font-semibold tracking-wider uppercase text-muted">Theologica AI</span>
+
+        {/* Theological Lens Badge */}
+        <span 
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border shadow-2xs"
+          style={{ 
+            backgroundColor: lensMeta.bgLight, 
+            borderColor: lensMeta.borderLight, 
+            color: lensMeta.accentColor 
+          }}
+        >
+          {lensMeta.icon}
+          <span>{lensMeta.name} Lens</span>
+        </span>
+
+        {/* Original Language Badge */}
+        {hasOriginalLanguages && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <span>א / Ω</span>
+            <span>Original Roots</span>
+          </span>
+        )}
+
+        {/* Scripture Citation Count */}
+        {verseCount > 0 && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
+            <BookOpen size={10} />
+            <span>{verseCount} {verseCount === 1 ? 'Reference' : 'References'}</span>
+          </span>
+        )}
       </div>
 
       <div className={`w-full ${isFullView ? 'text-[15px] leading-[1.75]' : 'text-[14px] leading-relaxed'} text-fg overflow-x-auto break-words markdown-body`}>
@@ -339,8 +547,23 @@ const AiChatMessageView = ({
       <AiMessageActions
         content={message.content}
         chatTitle={chatTitle}
+        theologicalLens={effectiveLens}
+        translation={translation}
         onSendToCanvas={onSendToCanvas}
+        onSaveToNotes={onSaveToNotes}
       />
+
+      {/* Tailored Follow-Ups and Multi-Lens Comparison */}
+      {isLast && onSelectPrompt && onSelectLensComparison && (
+        <ChatFollowUps
+          questions={suggestedFollowUps}
+          messageContent={textContent}
+          currentLens={effectiveLens}
+          onSelectQuestion={onSelectPrompt}
+          onSelectLensComparison={onSelectLensComparison}
+          isCompact={!isFullView}
+        />
+      )}
     </div>
   );
 };
@@ -1489,44 +1712,45 @@ export default function App() {
   const imageFileRef = useRef<HTMLInputElement>(null);
   const [cooldown, setCooldown] = useState(0);
   const [isAiTyping, setIsAiTyping] = useState(false);
-  const [aiActivityStatus, setAiActivityStatus] = useState('Thinking...');
+  const [aiActivityStatus, setAiActivityStatus] = useState('Ready');
   const [aiActivityType, setAiActivityType] = useState<'study' | 'image'>('study');
+  const [attachActiveChapter, setAttachActiveChapter] = useState(true);
+  const [showSlashCommands, setShowSlashCommands] = useState(false);
+  const chatInputRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!isAiTyping) {
-      setAiActivityStatus('Thinking...');
-      return;
+      setAiActivityStatus('Ready');
     }
+  }, [isAiTyping]);
 
-    if (aiActivityType === 'image') {
-      setAiActivityStatus('Thinking...');
-      const t1 = setTimeout(() => setAiActivityStatus('Envisioning biblical scene...'), 2000);
-      const t2 = setTimeout(() => setAiActivityStatus('Composing sacred artwork...'), 5000);
-      const t3 = setTimeout(() => setAiActivityStatus('Rendering image details...'), 9000);
-      const t4 = setTimeout(() => setAiActivityStatus('Finalizing artwork...'), 14000);
-      return () => {
-        clearTimeout(t1);
-        clearTimeout(t2);
-        clearTimeout(t3);
-        clearTimeout(t4);
-      };
+  // Ecosystem action: Save AI chat message to notes
+  const saveChatMessageToNotes = useCallback(async (content: string, title?: string) => {
+    try {
+      const { textContent, theologicalLens: msgLens } = parseAiMessage(content);
+      const effectiveLens = msgLens || theologicalLens;
+      const lensMeta = THEOLOGICAL_LENS_OPTIONS.find(l => l.id === effectiveLens);
+      const noteTitle = title ? `Study AI: ${title}` : `Study AI: ${activeBook?.name || 'Scripture'} ${activeChapter} (${lensMeta?.name || 'Study'})`;
+      const res = await fetchWithAuth(`${API_URL}/api/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: noteTitle,
+          content: textContent,
+        }),
+      });
+      if (res.ok) {
+        const newNote = await res.json();
+        setNotes(prev => [newNote, ...prev]);
+        trackClientEvent('note_created_from_chat');
+        return true;
+      }
+    } catch (err) {
+      console.error('Failed to save chat insight to notes:', err);
     }
-
-    // Default: Bible study query progression
-    setAiActivityStatus('Thinking...');
-    const t1 = setTimeout(() => setAiActivityStatus('Finding verses...'), 1800);
-    const t2 = setTimeout(() => setAiActivityStatus('Looking for Greek & Hebrew roots...'), 4200);
-    const t3 = setTimeout(() => setAiActivityStatus('Analyzing scriptural context & theology...'), 7200);
-    const t4 = setTimeout(() => setAiActivityStatus('Formulating response...'), 11000);
-
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
-      clearTimeout(t4);
-    };
-  }, [isAiTyping, aiActivityType]);
+    return false;
+  }, [fetchWithAuth, theologicalLens, activeBook, activeChapter]);
 
   // Load Data
   useEffect(() => {
@@ -2624,6 +2848,7 @@ export default function App() {
     
     const currentInput = textToSend;
     if (!overrideText) setChatInput(''); else setChatInput('');
+    setShowSlashCommands(false);
     setCooldown(30); // 30s cooldown
     const isImageReq = [
       'draw', 'generate an image', 'create an image', 'make an image', 'paint',
@@ -2633,6 +2858,21 @@ export default function App() {
       'show me what', 'generate a photo', 'create a photo', 'make a photo'
     ].some(kw => currentInput.toLowerCase().includes(kw)) && !currentImage;
     setAiActivityType(isImageReq ? 'image' : 'study');
+
+    const scriptureContextToSend = explicitScripture || (attachActiveChapter && activeBook && activeChapter ? {
+      reference: `${activeBook.name} ${activeChapter}`,
+      text: bibleVerses.slice(0, 30).map((v: { verse: number; text: string }) => `${v.verse}. ${cleanVerseText(v.text)}`).join(' '),
+      translation: translation.toUpperCase(),
+    } : undefined);
+
+    if (isImageReq) {
+      setAiActivityStatus('Initiating sacred artwork generation...');
+    } else if (scriptureContextToSend) {
+      setAiActivityStatus(`Connecting to Theologica AI with ${scriptureContextToSend.reference} context...`);
+    } else {
+      setAiActivityStatus('Connecting to Theologica AI...');
+    }
+
     setIsAiTyping(true);
     setTimeout(scrollToBottom, 50);
 
@@ -2641,13 +2881,16 @@ export default function App() {
       mode: isImageReq ? 'image' : 'study',
     });
 
-    const messagePromise = fetchWithAuth(`${API_URL}/api/chats/${targetChatId}/messages`, {
+    const messagePromise = fetchWithAuth(`${API_URL}/api/chats/${targetChatId}/messages?stream=true`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Accept': 'text/event-stream'
+      },
       body: JSON.stringify({ 
         content: currentInput,
         image: currentImage ? { base64: currentImage.base64, mimeType: currentImage.mimeType } : undefined,
-        scriptureContext: explicitScripture,
+        scriptureContext: scriptureContextToSend,
         translation: translation.toUpperCase(),
         theologicalLens,
       })
@@ -2664,19 +2907,67 @@ export default function App() {
     }
 
     const res = await messagePromise;
-    setIsAiTyping(false); // Hide 3 dots immediately once the message is back
     
     if (res.ok) {
-      const data = await res.json();
-      setChats(prev => prev.map(c => {
-        if (c.id === targetChatId) {
-          const msgs = c.messages;
-          const lastUserIdx = [...msgs].reverse().findIndex(m => m.role === 'user');
-          const sliceEnd = lastUserIdx >= 0 ? msgs.length - lastUserIdx : msgs.length;
-          return { ...c, messages: [...msgs.slice(0, sliceEnd - 1), { ...msgs[sliceEnd - 1], ...data.userMessage }, data.aiMessage] };
+      const isStream = res.headers.get('content-type')?.includes('text/event-stream');
+      if (isStream && res.body) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let streamResult: { userMessage?: any; aiMessage?: any } | null = null;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n\n');
+          buffer = lines.pop() || '';
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('data: ')) {
+              try {
+                const payload = JSON.parse(trimmed.slice(6));
+                if (payload.type === 'status' && payload.status) {
+                  setAiActivityStatus(payload.status);
+                } else if (payload.type === 'result') {
+                  streamResult = payload;
+                } else if (payload.type === 'error') {
+                  console.error('Server chat stream error:', payload.error);
+                }
+              } catch {
+                // ignore chunk parse failure
+              }
+            }
+          }
         }
-        return c;
-      }));
+
+        setIsAiTyping(false);
+
+        if (streamResult && streamResult.aiMessage) {
+          const data = streamResult;
+          setChats(prev => prev.map(c => {
+            if (c.id === targetChatId) {
+              const msgs = c.messages;
+              const lastUserIdx = [...msgs].reverse().findIndex(m => m.role === 'user');
+              const sliceEnd = lastUserIdx >= 0 ? msgs.length - lastUserIdx : msgs.length;
+              return { ...c, messages: [...msgs.slice(0, sliceEnd - 1), { ...msgs[sliceEnd - 1], ...data.userMessage }, data.aiMessage] };
+            }
+            return c;
+          }));
+        }
+      } else {
+        const data = await res.json();
+        setIsAiTyping(false);
+        setChats(prev => prev.map(c => {
+          if (c.id === targetChatId) {
+            const msgs = c.messages;
+            const lastUserIdx = [...msgs].reverse().findIndex(m => m.role === 'user');
+            const sliceEnd = lastUserIdx >= 0 ? msgs.length - lastUserIdx : msgs.length;
+            return { ...c, messages: [...msgs.slice(0, sliceEnd - 1), { ...msgs[sliceEnd - 1], ...data.userMessage }, data.aiMessage] };
+          }
+          return c;
+        }));
+      }
 
       if (namePromise) {
         namePromise.then(async (nameRes) => {
@@ -2689,6 +2980,7 @@ export default function App() {
         });
       }
     } else {
+      setIsAiTyping(false);
       const errorData = await res.json().catch(() => null);
       const errorMsg = { 
         id: Date.now(), 
@@ -3492,10 +3784,15 @@ export default function App() {
               <div className="flex-1 flex flex-col h-[calc(100%-60px)]">
                 <div className="flex-1 overflow-y-auto custom-scroll p-4 space-y-4">
                   {activeChat.messages.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-center text-muted p-4">
-                      <Sparkles size={32} className="mb-3 opacity-20" />
-                      <p className="text-sm">Ask a question about {activeBook.name} {activeChapter}</p>
-                    </div>
+                    <ChatEmptyState
+                      activeBook={activeBook}
+                      activeChapter={activeChapter}
+                      translation={translation}
+                      theologicalLens={theologicalLens}
+                      onSelectPrompt={(prompt) => handleSendMessage(undefined, prompt)}
+                      onSelectLens={setTheologicalLens}
+                      isCompact
+                    />
                   ) : (
                     activeChat.messages.map((m, i) => (
                       <AiChatMessageView
@@ -3505,7 +3802,15 @@ export default function App() {
                         totalMessages={activeChat.messages.length}
                         onVerseClick={navigateToVerse}
                         onSendToCanvas={sendChatMessageToCanvas}
+                        onSaveToNotes={saveChatMessageToNotes}
+                        onSelectPrompt={(prompt) => handleSendMessage(undefined, prompt)}
+                        onSelectLensComparison={(lens, prompt) => {
+                          setTheologicalLens(lens);
+                          handleSendMessage(undefined, prompt);
+                        }}
                         chatTitle={activeChat?.title}
+                        activeLens={theologicalLens}
+                        translation={translation}
                       />
                     ))
                   )}
@@ -3515,7 +3820,37 @@ export default function App() {
                   <div ref={messagesEndRef} />
                 </div>
                 <form onSubmit={handleSendMessage} className="p-3 border-t border-border bg-bg shrink-0">
-                  <div className="flex flex-col">
+                  <div className="flex flex-col relative">
+                    {/* Scripture Context Pill */}
+                    {attachActiveChapter && activeBook && (
+                      <div className="mb-2 flex items-center justify-between px-2.5 py-1 rounded-lg bg-surface border border-border-soft text-[11px] text-muted shadow-2xs">
+                        <div className="flex items-center gap-1.5 truncate">
+                          <BookOpen size={11} className="text-accent shrink-0" />
+                          <span className="font-medium text-fg truncate">{activeBook.name} {activeChapter}</span>
+                          <span className="text-[9px] uppercase font-bold text-muted bg-surface-warm px-1 rounded shrink-0">{translation}</span>
+                          <span className="text-[10px] text-emerald-400 font-medium shrink-0">Attached</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setAttachActiveChapter(false)}
+                          className="p-0.5 hover:text-fg hover:bg-surface-hover rounded transition-colors ml-1 cursor-pointer shrink-0"
+                          title="Unlink chapter context"
+                        >
+                          <X size={11} />
+                        </button>
+                      </div>
+                    )}
+                    {!attachActiveChapter && (
+                      <button
+                        type="button"
+                        onClick={() => setAttachActiveChapter(true)}
+                        className="mb-2 inline-flex items-center gap-1 self-start px-2 py-0.5 rounded-lg border border-dashed border-border-soft hover:border-accent/40 text-[10px] text-meta hover:text-muted transition-colors cursor-pointer"
+                      >
+                        <BookOpen size={10} />
+                        <span>+ Link {activeBook.name} {activeChapter}</span>
+                      </button>
+                    )}
+
                     {chatQuotes.length > 0 && (
                       <div className="mb-2">
                         <div className="flex items-center justify-between mb-1 px-1">
@@ -3565,23 +3900,46 @@ export default function App() {
                         </button>
                       </div>
                     )}
+
+                    {/* Slash Commands Popover */}
+                    {showSlashCommands && chatInput.startsWith('/') && (
+                      <ChatSlashCommands
+                        filter={chatInput}
+                        onSelectCommand={(cmd) => {
+                          setChatInput(cmd.template);
+                          if (cmd.lens) setTheologicalLens(cmd.lens);
+                          setShowSlashCommands(false);
+                          chatInputRef.current?.focus();
+                        }}
+                        onClose={() => setShowSlashCommands(false)}
+                      />
+                    )}
+
                     <div className="relative flex items-end bg-surface border border-border-soft/80 rounded-2xl shadow-sm focus-within:border-accent/60 focus-within:ring-2 focus-within:ring-accent/20 transition-all p-1.5">
                       <button 
                         type="button" 
                         onClick={() => imageFileRef.current?.click()} 
                         disabled={cooldown > 0 || !isOnline} 
-                        className="flex-shrink-0 p-2 text-muted hover:text-fg disabled:opacity-40 transition-colors mr-1"
+                        className="flex-shrink-0 p-2 text-muted hover:text-fg disabled:opacity-40 transition-colors mr-1 cursor-pointer"
                         title="Attach image"
                       >
                         <Paperclip size={16} />
                       </button>
                       <TextareaAutosize 
+                        ref={chatInputRef}
                         minRows={1}
                         maxRows={5}
                         className="flex-1 bg-transparent text-fg pl-1 pr-10 py-2 text-[14px] placeholder:text-meta focus:outline-none resize-none" 
-                        placeholder={!isOnline ? "Study AI is unavailable offline" : cooldown > 0 ? `Study AI is resting... (${cooldown}s)` : "Ask anything..."} 
+                        placeholder={!isOnline ? "Study AI is unavailable offline" : cooldown > 0 ? `Study AI is resting... (${cooldown}s)` : "Ask anything (type / for commands)..."} 
                         value={chatInput}
-                        onChange={(e) => setChatInput(e.target.value)}
+                        onChange={(e) => {
+                          setChatInput(e.target.value);
+                          if (e.target.value.startsWith('/')) {
+                            setShowSlashCommands(true);
+                          } else {
+                            setShowSlashCommands(false);
+                          }
+                        }}
                         onKeyDown={handleChatKeyDown}
                         disabled={cooldown > 0 || !isOnline}
                       />
@@ -4223,10 +4581,15 @@ export default function App() {
               </header>
               <div className="flex-1 overflow-y-auto custom-scroll p-5 space-y-6">
                 {activeChat.messages.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center text-meta text-sm">
-                    <Sparkles size={16} />
-                    <span className="mt-3">Ask Study AI a question</span>
-                  </div>
+                  <ChatEmptyState
+                    activeBook={activeBook}
+                    activeChapter={activeChapter}
+                    translation={translation}
+                    theologicalLens={theologicalLens}
+                    onSelectPrompt={(prompt) => handleSendMessage(undefined, prompt)}
+                    onSelectLens={setTheologicalLens}
+                    isCompact
+                  />
                 ) : (
                   activeChat.messages.map((m, i) => (
                     <AiChatMessageView
@@ -4236,7 +4599,15 @@ export default function App() {
                       totalMessages={activeChat.messages.length}
                       onVerseClick={navigateToVerse}
                       onSendToCanvas={sendChatMessageToCanvas}
+                      onSaveToNotes={saveChatMessageToNotes}
+                      onSelectPrompt={(prompt) => handleSendMessage(undefined, prompt)}
+                      onSelectLensComparison={(lens, prompt) => {
+                        setTheologicalLens(lens);
+                        handleSendMessage(undefined, prompt);
+                      }}
                       chatTitle={activeChat?.title}
+                      activeLens={theologicalLens}
+                      translation={translation}
                     />
                   ))
                 )}
@@ -4258,7 +4629,37 @@ export default function App() {
                     reader.readAsDataURL(file);
                     e.target.value = '';
                   }} />
-                  <div className="flex flex-col">
+                  <div className="flex flex-col relative">
+                    {/* Scripture Context Pill */}
+                    {attachActiveChapter && activeBook && (
+                      <div className="mb-2.5 flex items-center justify-between px-2.5 py-1 rounded-lg bg-surface border border-border-soft text-[11px] text-muted shadow-2xs">
+                        <div className="flex items-center gap-1.5 truncate">
+                          <BookOpen size={11} className="text-accent shrink-0" />
+                          <span className="font-medium text-fg truncate">{activeBook.name} {activeChapter}</span>
+                          <span className="text-[9px] uppercase font-bold text-muted bg-surface-warm px-1 rounded shrink-0">{translation}</span>
+                          <span className="text-[10px] text-emerald-400 font-medium shrink-0">Attached</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setAttachActiveChapter(false)}
+                          className="p-0.5 hover:text-fg hover:bg-surface-hover rounded transition-colors ml-1 cursor-pointer shrink-0"
+                          title="Unlink chapter context"
+                        >
+                          <X size={11} />
+                        </button>
+                      </div>
+                    )}
+                    {!attachActiveChapter && (
+                      <button
+                        type="button"
+                        onClick={() => setAttachActiveChapter(true)}
+                        className="mb-2.5 inline-flex items-center gap-1 self-start px-2 py-0.5 rounded-lg border border-dashed border-border-soft hover:border-accent/40 text-[10px] text-meta hover:text-muted transition-colors cursor-pointer"
+                      >
+                        <BookOpen size={10} />
+                        <span>+ Link {activeBook.name} {activeChapter}</span>
+                      </button>
+                    )}
+
                     {chatQuotes.length > 0 && (
                       <div className="mb-2.5">
                         <div className="flex items-center justify-between mb-1 px-1">
@@ -4308,24 +4709,47 @@ export default function App() {
                         </button>
                       </div>
                     )}
+
+                    {/* Slash Commands Popover */}
+                    {showSlashCommands && chatInput.startsWith('/') && (
+                      <ChatSlashCommands
+                        filter={chatInput}
+                        onSelectCommand={(cmd) => {
+                          setChatInput(cmd.template);
+                          if (cmd.lens) setTheologicalLens(cmd.lens);
+                          setShowSlashCommands(false);
+                          chatInputRef.current?.focus();
+                        }}
+                        onClose={() => setShowSlashCommands(false)}
+                      />
+                    )}
+
                     <div className="relative flex items-end bg-surface border border-border-soft/80 rounded-2xl shadow-sm focus-within:border-accent/60 focus-within:ring-2 focus-within:ring-accent/20 transition-all p-1.5">
                       <button 
                         type="button" 
                         onClick={() => imageFileRef.current?.click()} 
                         disabled={cooldown > 0 || !isOnline} 
-                        className="flex-shrink-0 p-2 text-muted hover:text-fg disabled:opacity-40 transition-colors mr-1"
+                        className="flex-shrink-0 p-2 text-muted hover:text-fg disabled:opacity-40 transition-colors mr-1 cursor-pointer"
                         title="Attach image"
                       >
                         <Paperclip size={16} />
                       </button>
                       <TextareaAutosize 
+                        ref={chatInputRef}
                         minRows={1}
                         maxRows={6}
                         value={chatInput} 
-                        onChange={e => setChatInput(e.target.value)}
+                        onChange={e => {
+                          setChatInput(e.target.value);
+                          if (e.target.value.startsWith('/')) {
+                            setShowSlashCommands(true);
+                          } else {
+                            setShowSlashCommands(false);
+                          }
+                        }}
                         onKeyDown={handleChatKeyDown}
                         disabled={cooldown > 0 || !isOnline}
-                        placeholder={!isOnline ? "Study AI is unavailable offline" : cooldown > 0 ? `Study AI is resting... (${cooldown}s)` : "Message Study AI..."}
+                        placeholder={!isOnline ? "Study AI is unavailable offline" : cooldown > 0 ? `Study AI is resting... (${cooldown}s)` : "Message Study AI (type / for commands)..."}
                         className="flex-1 bg-transparent text-fg pl-1 pr-10 py-2 text-[14px] focus:outline-none disabled:opacity-50 transition-all placeholder:text-meta resize-none"
                       />
                       <button 
@@ -4695,10 +5119,15 @@ export default function App() {
                   </header>
                   <div className="flex-1 overflow-y-auto custom-scroll p-4 sm:p-8 lg:p-12 space-y-6 sm:space-y-8 flex flex-col">
                     {activeChat.messages.length === 0 ? (
-                      <div className="flex-1 flex flex-col items-center justify-center text-meta">
-                        <Sparkles size={24} />
-                        <p className="mt-4 text-[15px]">Start a new conversation with Study AI</p>
-                      </div>
+                      <ChatEmptyState
+                        activeBook={activeBook}
+                        activeChapter={activeChapter}
+                        translation={translation}
+                        theologicalLens={theologicalLens}
+                        onSelectPrompt={(prompt) => handleSendMessage(undefined, prompt)}
+                        onSelectLens={setTheologicalLens}
+                        isCompact={false}
+                      />
                     ) : (
                       activeChat.messages.map((m, i) => (
                         <AiChatMessageView
@@ -4708,7 +5137,15 @@ export default function App() {
                           totalMessages={activeChat.messages.length}
                           onVerseClick={navigateToVerse}
                           onSendToCanvas={sendChatMessageToCanvas}
+                          onSaveToNotes={saveChatMessageToNotes}
+                          onSelectPrompt={(prompt) => handleSendMessage(undefined, prompt)}
+                          onSelectLensComparison={(lens, prompt) => {
+                            setTheologicalLens(lens);
+                            handleSendMessage(undefined, prompt);
+                          }}
                           chatTitle={activeChat?.title}
+                          activeLens={theologicalLens}
+                          translation={translation}
                           isFullView
                         />
                       ))
@@ -4719,7 +5156,37 @@ export default function App() {
                     <div ref={messagesEndRef} />
                   </div>
                   <form onSubmit={handleSendMessage} className="p-3 sm:p-6 border-t border-border w-full shrink-0">
-                    <div className="flex flex-col max-w-4xl mx-auto w-full">
+                    <div className="flex flex-col max-w-4xl mx-auto w-full relative">
+                      {/* Scripture Context Pill */}
+                      {attachActiveChapter && activeBook && (
+                        <div className="mb-2.5 flex items-center justify-between px-3 py-1.5 rounded-xl bg-surface border border-border-soft text-[12px] text-muted shadow-2xs">
+                          <div className="flex items-center gap-2 truncate">
+                            <BookOpen size={13} className="text-accent shrink-0" />
+                            <span className="font-medium text-fg truncate">Studying: {activeBook.name} {activeChapter}</span>
+                            <span className="text-[10px] uppercase font-bold text-muted bg-surface-warm px-1.5 py-0.5 rounded shrink-0">{translation}</span>
+                            <span className="text-[10px] text-emerald-400 font-medium bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-full shrink-0">Passage Attached</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setAttachActiveChapter(false)}
+                            className="p-1 hover:text-fg hover:bg-surface-hover rounded-lg transition-colors ml-2 cursor-pointer shrink-0"
+                            title="Unlink passage context from prompt"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      )}
+                      {!attachActiveChapter && (
+                        <button
+                          type="button"
+                          onClick={() => setAttachActiveChapter(true)}
+                          className="mb-2.5 inline-flex items-center gap-1.5 self-start px-2.5 py-1 rounded-xl border border-dashed border-border-soft hover:border-accent/50 text-[11px] text-meta hover:text-fg transition-all cursor-pointer bg-surface/40 hover:bg-surface"
+                        >
+                          <BookOpen size={12} className="text-accent" />
+                          <span>+ Attach {activeBook.name} {activeChapter} as Scripture context</span>
+                        </button>
+                      )}
+
                       {chatQuotes.length > 0 && (
                         <div className="mb-3 max-w-3xl">
                           <div className="flex items-center justify-between mb-1.5 px-1">
@@ -4769,24 +5236,47 @@ export default function App() {
                           </button>
                         </div>
                       )}
+
+                      {/* Slash Commands Popover */}
+                      {showSlashCommands && chatInput.startsWith('/') && (
+                        <ChatSlashCommands
+                          filter={chatInput}
+                          onSelectCommand={(cmd) => {
+                            setChatInput(cmd.template);
+                            if (cmd.lens) setTheologicalLens(cmd.lens);
+                            setShowSlashCommands(false);
+                            chatInputRef.current?.focus();
+                          }}
+                          onClose={() => setShowSlashCommands(false)}
+                        />
+                      )}
+
                       <div className="relative flex items-end bg-surface border border-border-soft/80 rounded-2xl shadow-md focus-within:border-accent/60 focus-within:ring-2 focus-within:ring-accent/20 transition-all p-2">
                         <button 
                           type="button" 
                           onClick={() => imageFileRef.current?.click()} 
                           disabled={cooldown > 0} 
-                          className="flex-shrink-0 p-2.5 text-muted hover:text-fg disabled:opacity-40 transition-colors mr-1"
+                          className="flex-shrink-0 p-2.5 text-muted hover:text-fg disabled:opacity-40 transition-colors mr-1 cursor-pointer"
                           title="Attach image"
                         >
                           <Paperclip size={18} />
                         </button>
                         <TextareaAutosize 
+                          ref={chatInputRef}
                           minRows={1}
                           maxRows={6}
                           value={chatInput} 
-                          onChange={e => setChatInput(e.target.value)}
+                          onChange={e => {
+                            setChatInput(e.target.value);
+                            if (e.target.value.startsWith('/')) {
+                              setShowSlashCommands(true);
+                            } else {
+                              setShowSlashCommands(false);
+                            }
+                          }}
                           onKeyDown={handleChatKeyDown}
                           disabled={cooldown > 0}
-                          placeholder={cooldown > 0 ? `Study AI is resting... (${cooldown}s remaining)` : "Message Study AI..."}
+                          placeholder={cooldown > 0 ? `Study AI is resting... (${cooldown}s remaining)` : "Message Study AI (type / for exegesis & language commands)..."}
                           className="flex-1 bg-transparent text-fg pl-1 pr-14 py-2 text-[15px] focus:outline-none disabled:opacity-50 transition-all placeholder:text-meta resize-none"
                         />
                         <button 

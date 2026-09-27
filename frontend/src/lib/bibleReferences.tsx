@@ -530,8 +530,13 @@ export const createMarkdownComponents = (onVerseClick?: VerseClickHandler) => ({
     </p>
   ),
   blockquote: ({ children }: any) => (
-    <blockquote className="border-l-[3px] border-[#c96442] bg-accent/10 py-3 px-5 my-5 italic rounded-r-xl shadow-sm text-fg-hover text-[15px]">
-      {onVerseClick ? linkifyBibleReferences(children, onVerseClick) : children}
+    <blockquote className="relative my-4 border-l-[3px] border-accent bg-surface/70 rounded-r-2xl py-3 px-4 shadow-sm text-fg font-serif leading-relaxed text-[15px] border-y border-r border-border-soft/40">
+      <div className="flex items-center gap-1.5 text-[10px] uppercase font-sans font-bold tracking-wider text-accent mb-1.5 select-none not-italic">
+        <span>Sacred Scripture</span>
+      </div>
+      <div className="italic text-fg-hover">
+        {onVerseClick ? linkifyBibleReferences(children, onVerseClick) : children}
+      </div>
     </blockquote>
   ),
   strong: ({ children }: any) => (
@@ -596,6 +601,21 @@ export const createMarkdownComponents = (onVerseClick?: VerseClickHandler) => ({
       );
     }
     return <a href={href} className="text-accent hover:underline" target="_blank" rel="noreferrer">{children}</a>;
+  },
+  code: ({ children }: any) => {
+    const text = String(children);
+    if (/[\u0370-\u03FF\u0590-\u05FF]/.test(text)) {
+      return (
+        <span className="font-serif text-[15px] px-2 py-0.5 rounded-md bg-accent/10 border border-accent/25 text-accent font-semibold inline-block mx-0.5 tracking-wide not-italic">
+          {children}
+        </span>
+      );
+    }
+    return (
+      <code className="px-1.5 py-0.5 rounded bg-surface border border-border-soft text-accent text-[13px] font-mono">
+        {children}
+      </code>
+    );
   },
 });
 

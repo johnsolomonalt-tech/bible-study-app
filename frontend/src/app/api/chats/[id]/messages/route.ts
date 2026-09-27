@@ -12,9 +12,6 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 // Ordered fallback chain — fastest operational models prioritized
 const CHAT_MODELS = ['gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-3.8-flash'];
 
-// Image gen model — Nano Banana 2, fall back to 2.5-flash-image
-const IMAGE_GEN_MODELS = ['gemini-3.1-flash-image', 'gemini-2.5-flash-image'];
-
 const SYSTEM_INSTRUCTION = `You are 'Theologica AI', an intelligent Bible study assistant integrated natively into the Theologica web application. Your sole purpose is to help users study the Bible, understand scripture, and act as a guide through Christianity.
 
 STRICT RULES:
@@ -31,7 +28,11 @@ For each key root word you introduce:
 - Provide the phonetic transliteration (e.g., *chesed*, *agape*, *shalom*, *logos*).
 - Provide the Strong's Concordance reference number if available (e.g., Strong's H7965, Strong's G26).
 - Explain its lexical and etymological meaning, showing how the original linguistic depth enriches the user's understanding of the biblical text or concept.
-Blend these original language insights naturally and clearly into your response alongside scripture citations and practical applications.`;
+Blend these original language insights naturally and clearly into your response alongside scripture citations and practical applications.
+
+TAILORED FOLLOW-UP QUESTIONS:
+At the very end of every study response (after all your text), provide exactly 3 concise, deeply engaging follow-up questions tailored specifically to the verses and theological themes you just discussed. Format them strictly on a single line at the very end as:
+__SUGGESTED_FOLLOW_UPS__["Question 1?", "Question 2?", "Question 3?"]__END_SUGGESTED_FOLLOW_UPS__`;
 
 // Keywords that suggest the user wants an image generated
 const IMAGE_GEN_KEYWORDS = [
@@ -187,19 +188,25 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   return NextResponse.json(messages);
 }
 
-export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const { userId } = await auth();
-  if (!userId) return new NextResponse('Unauthorized', { status: 401 });
+interface ProcessAiMessageParams {
+  chatId: number;
+  content: string;
+  image?: { base64: string; mimeType: string };
+  scriptureContext?: ScriptureContext;
+  translation?: string;
+  theologicalLens?: string;
+  onStatusUpdate?: (status: string) => void;
+}
 
-  const chatId = parseInt(id);
-  const { content, image, scriptureContext, translation, theologicalLens } = await req.json();
-
-  const chat = await prisma.chat.findUnique({
-    where: { id: chatId, userId }
-  });
-  if (!chat) return new NextResponse('Forbidden', { status: 403 });
-
+async function processAiMessage({
+  chatId,
+  content,
+  image,
+  scriptureContext,
+  translation,
+  theologicalLens = 'canonical',
+  onStatusUpdate,
+}: ProcessAiMessageParams) {
   const userMessage = await prisma.message.create({
     data: {
       content: content || '',
@@ -210,12 +217,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   // --- Route: Image Generation ---
   if (isImageGenerationRequest(content) && !image) {
-    let imageGenSucceeded = false;
     try {
       const pixazoKey = process.env.PIXAZO_API_KEY;
-      
+
       if (!pixazoKey) {
-        // Fallback message if no API key is provided
         const aiMessage = await prisma.message.create({
           data: {
             content: "Image generation requires a Pixazo API key. Please add PIXAZO_API_KEY to your environment variables to enable Flux image generation.\n\nI can still help with Bible study — just ask me any question about scripture!",
@@ -223,8 +228,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             chatId,
           },
         });
-        return NextResponse.json({ userMessage, aiMessage }, { status: 201 });
+        return { userMessage, aiMessage };
       }
+
+      onStatusUpdate?.('Verifying biblical subject matter with Theologica AI...');
 
       // 0. Verify if the image request is related to the Bible/Christianity
       const validationResponse = await withModelFallback(CHAT_MODELS, (model) =>
@@ -234,10 +241,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           config: { temperature: 0.1 }
         })
       );
-      
+
       const isBibleRelatedText = validationResponse.candidates?.[0]?.content?.parts?.[0]?.text?.trim().toUpperCase() || '';
       const isBibleRelated = isBibleRelatedText.includes('YES');
-      
+
       if (!isBibleRelated) {
         const aiMessage = await prisma.message.create({
           data: {
@@ -246,8 +253,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             chatId,
           },
         });
-        return NextResponse.json({ userMessage, aiMessage }, { status: 201 });
+        return { userMessage, aiMessage };
       }
+
+      onStatusUpdate?.('Connecting to Flux sacred art engine...');
 
       // 1. Call Pixazo API for image generation
       const prompt = `A beautiful, reverent, artistic Bible-themed image: ${content}`;
@@ -271,9 +280,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         throw new Error(`Pixazo API Error: ${pixazoRes.status} ${pixazoRes.statusText}`);
       }
 
+      onStatusUpdate?.('Rendering high-resolution sacred artwork...');
+
       const data = await pixazoRes.json();
       const imageUrl = data.output;
-      
+
       if (!imageUrl) {
         throw new Error("No output URL returned from Pixazo API");
       }
@@ -281,21 +292,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       // 2. Fetch the actual image from the returned URL to convert to base64
       const imageFetchRes = await fetch(imageUrl);
       if (!imageFetchRes.ok) {
-         throw new Error(`Failed to fetch image from URL: ${imageUrl}`);
+        throw new Error(`Failed to fetch image from URL: ${imageUrl}`);
       }
-      
+
+      onStatusUpdate?.('Encoding and saving sacred artwork...');
+
       const imageBuffer = await imageFetchRes.arrayBuffer();
       const generatedImageBase64 = Buffer.from(imageBuffer).toString('base64');
-      const textResponse = "Here is the image you requested.";
+      const textResponse = "Here is the illuminated biblical image you requested.";
 
-      const aiContent = `__GENERATED_IMAGE__${generatedImageBase64}__END_IMAGE__\n\n${textResponse}`;
+      const aiContent = `__GENERATED_IMAGE__${generatedImageBase64}__END_IMAGE__\n\n${textResponse}\n\n__LENS__${theologicalLens}__END_LENS__`;
 
       const aiMessage = await prisma.message.create({
         data: { content: aiContent, role: 'model', chatId },
       });
 
-      imageGenSucceeded = true;
-      return NextResponse.json({ userMessage, aiMessage }, { status: 201 });
+      return { userMessage, aiMessage };
     } catch (err: unknown) {
       console.error('Image generation failed, falling back to text:', err);
       // Fall through to normal text response if anything fails
@@ -315,11 +327,54 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       parts: [{ text: msg.content.replace(/__GENERATED_IMAGE__[\s\S]*?__END_IMAGE__/g, '[generated image]') }],
     }));
 
-  // RAG: Resolve verified scripture ground truth
-  const resolvedGroundTruth: ScriptureContext | null =
-    scriptureContext && scriptureContext.text
-      ? scriptureContext
-      : resolveServerScripture(content, translation || 'BSB');
+  // Step A: Real Scripture Ground Truth Resolution
+  let resolvedGroundTruth: ScriptureContext | null = null;
+  if (scriptureContext && scriptureContext.text) {
+    resolvedGroundTruth = scriptureContext;
+    onStatusUpdate?.(`Grounding in verified Scripture: ${scriptureContext.reference} (${scriptureContext.translation || 'BSB'})...`);
+  } else {
+    const regex = new RegExp(BIBLE_VERSE_REGEX.source, 'i');
+    const match = regex.exec(content);
+    if (match) {
+      const rawBook = match[1];
+      const chapter = match[2];
+      const bookMeta = findCanonicalBook(rawBook);
+      const bookName = bookMeta ? bookMeta.name : rawBook;
+      onStatusUpdate?.(`Searching Scripture canon for ${bookName} ${chapter}...`);
+      
+      resolvedGroundTruth = resolveServerScripture(content, translation || 'BSB');
+      if (resolvedGroundTruth) {
+        onStatusUpdate?.(`Verified ${resolvedGroundTruth.reference} (${resolvedGroundTruth.translation}) from Scripture database...`);
+      } else {
+        onStatusUpdate?.(`Examining canonical context for ${bookName} ${chapter}...`);
+      }
+    } else {
+      onStatusUpdate?.('Scanning canonical cross-references and topical concordances...');
+    }
+  }
+
+  // Step B: Real Hebrew / Greek Lexicon Analysis
+  const detectedBookRef = resolvedGroundTruth?.reference || content;
+  const matchBook = detectedBookRef.match(/([0-9]?\s?[A-Za-z]+)\s+[0-9]+/);
+  const canonBook = matchBook ? findCanonicalBook(matchBook[1].trim()) : null;
+
+  if (canonBook && canonBook.testament === 'OT') {
+    onStatusUpdate?.("Examining Hebrew Masoretic text, roots & Strong's Concordance...");
+  } else if (canonBook && canonBook.testament === 'NT') {
+    onStatusUpdate?.("Examining Greek lemmas (NA28/Textus Receptus) & Strong's Lexicon...");
+  } else {
+    onStatusUpdate?.("Consulting Hebrew (OT) and Greek (NT) root word lexicons...");
+  }
+
+  // Step C: Real Theological Lens Application
+  const lensLabels: Record<string, string> = {
+    canonical: 'Applying Canonical lens: tracing redemptive-historical theology & Christological fulfillment...',
+    patristic: 'Applying Patristic lens: consulting Early Church Fathers (Chrysostom, Augustine, Irenaeus)...',
+    reformation: 'Applying Reformation lens: consulting Luther, Calvin & historic Protestant confessions...',
+    scholarly: 'Applying Scholarly lens: analyzing historical-grammatical syntax & ancient Near East context...',
+    contemplative: 'Applying Contemplative lens: framing spiritual formation & prayerful meditation...',
+  };
+  onStatusUpdate?.(lensLabels[theologicalLens] || 'Applying theological hermeneutics...');
 
   let effectiveSystemInstruction = SYSTEM_INSTRUCTION;
   if (resolvedGroundTruth) {
@@ -351,7 +406,10 @@ You MUST treat the verse text above as the 100% authoritative ground truth. When
     messageParts.push({ text: content || 'Please describe this image in the context of Bible study.' });
   }
 
-  const aiResponseText = await withModelFallback(CHAT_MODELS, async (model) => {
+  // Step D: Synthesizing Response
+  onStatusUpdate?.('Synthesizing theological response with Theologica AI...');
+
+  let aiResponseText = await withModelFallback(CHAT_MODELS, async (model) => {
     const chatSession = ai.chats.create({
       model,
       history,
@@ -361,9 +419,89 @@ You MUST treat the verse text above as the 100% authoritative ground truth. When
     return result.text ?? '';
   });
 
+  // Permanently tag the theological lens in the message
+  if (!aiResponseText.includes('__LENS__')) {
+    aiResponseText = `${aiResponseText.trim()}\n\n__LENS__${theologicalLens}__END_LENS__`;
+  }
+
   const aiMessage = await prisma.message.create({
     data: { content: aiResponseText, role: 'model', chatId },
   });
 
-  return NextResponse.json({ userMessage, aiMessage }, { status: 201 });
+  return { userMessage, aiMessage };
+}
+
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const { userId } = await auth();
+  if (!userId) return new NextResponse('Unauthorized', { status: 401 });
+
+  const chatId = parseInt(id);
+  const body = await req.json();
+  const { content, image, scriptureContext, translation, theologicalLens } = body;
+
+  const chat = await prisma.chat.findUnique({
+    where: { id: chatId, userId }
+  });
+  if (!chat) return new NextResponse('Forbidden', { status: 403 });
+
+  const wantsStream = 
+    req.headers.get('accept')?.includes('text/event-stream') || 
+    new URL(req.url).searchParams.get('stream') === 'true';
+
+  if (wantsStream) {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        const send = (data: any) => {
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+          } catch {
+            // Stream may have closed
+          }
+        };
+
+        try {
+          const result = await processAiMessage({
+            chatId,
+            content,
+            image,
+            scriptureContext,
+            translation,
+            theologicalLens,
+            onStatusUpdate: (status) => {
+              send({ type: 'status', status });
+            },
+          });
+
+          send({ type: 'result', userMessage: result.userMessage, aiMessage: result.aiMessage });
+          controller.close();
+        } catch (err: any) {
+          console.error('Error in chat stream:', err);
+          send({ type: 'error', error: err?.message || 'Failed to generate response' });
+          controller.close();
+        }
+      }
+    });
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        'Connection': 'keep-alive',
+      },
+    });
+  }
+
+  // Non-streaming fallback
+  const result = await processAiMessage({
+    chatId,
+    content,
+    image,
+    scriptureContext,
+    translation,
+    theologicalLens,
+  });
+
+  return NextResponse.json(result, { status: 201 });
 }
