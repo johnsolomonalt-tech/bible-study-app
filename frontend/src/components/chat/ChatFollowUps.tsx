@@ -113,27 +113,32 @@ export const ChatFollowUps: React.FC<ChatFollowUpsProps> = ({
   if (followUps.length === 0 && otherLenses.length === 0) return null;
 
   return (
-    <div className="w-full mt-3 pt-3 border-t border-border/40 space-y-3 animate-in fade-in duration-200">
-      {/* Follow-up question chips */}
+    <div className="w-full mt-2.5 pt-2.5 border-t border-border/30 space-y-2.5 animate-in fade-in duration-200">
+      {/* Follow-up question bubbles side-by-side */}
       {followUps.length > 0 && (
         <div>
-          <div className="flex items-center gap-1.5 mb-2 select-none">
-            <Sparkles size={11} className="text-accent" />
+          <div className="flex items-center gap-1.5 mb-1.5 select-none">
+            <Sparkles size={11} className="text-accent shrink-0" />
             <span className="text-[10px] font-semibold uppercase tracking-wider text-muted">
               Tailored Follow-Ups
             </span>
           </div>
 
-          <div className="flex flex-col gap-1.5">
+          <div className={`grid gap-1.5 sm:gap-2 ${followUps.length === 1 ? 'grid-cols-1' : followUps.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
             {followUps.map((q, idx) => (
               <button
                 key={idx}
                 type="button"
                 onClick={() => onSelectQuestion(q)}
-                className="group w-full text-left px-3 py-2 rounded-xl bg-surface/50 hover:bg-surface border border-border-soft/50 hover:border-accent/50 text-[12px] sm:text-[13px] text-fg-hover hover:text-fg font-medium transition-all flex items-center justify-between gap-2 cursor-pointer shadow-2xs hover:shadow-xs"
+                title={q}
+                className="group relative flex flex-col justify-between p-2 sm:p-2.5 rounded-xl sm:rounded-2xl bg-surface/50 hover:bg-surface border border-border-soft/60 hover:border-accent/40 shadow-2xs hover:shadow-xs text-left transition-all duration-150 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer min-w-0"
               >
-                <span className="line-clamp-2 leading-snug">{q}</span>
-                <ArrowRight size={12} className="text-meta group-hover:text-accent shrink-0 group-hover:translate-x-0.5 transition-transform" />
+                <span className="text-[10.5px] sm:text-[11.5px] font-medium leading-tight sm:leading-snug text-fg-hover group-hover:text-fg line-clamp-3 break-words">
+                  {q}
+                </span>
+                <div className="flex items-center justify-end mt-1 text-meta/50 group-hover:text-accent transition-colors">
+                  <ArrowRight size={10} className="sm:size-[11px] group-hover:translate-x-0.5 transition-transform shrink-0" />
+                </div>
               </button>
             ))}
           </div>
@@ -142,9 +147,9 @@ export const ChatFollowUps: React.FC<ChatFollowUpsProps> = ({
 
       {/* Multi-Lens Comparison Row */}
       {!isCompact && (
-        <div className="pt-1">
-          <div className="flex items-center gap-1.5 mb-2 select-none">
-            <Compass size={11} className="text-muted" />
+        <div className="pt-0.5">
+          <div className="flex items-center gap-1.5 mb-1.5 select-none">
+            <Compass size={11} className="text-muted shrink-0" />
             <span className="text-[10px] font-semibold uppercase tracking-wider text-meta">
               Explore Another Tradition
             </span>
@@ -159,7 +164,7 @@ export const ChatFollowUps: React.FC<ChatFollowUpsProps> = ({
                   const prompt = `Re-examine the theological points discussed above specifically through the ${lens.name} lens (${lens.tagline}). Highlight distinctive historic insights from this tradition.`;
                   onSelectLensComparison(lens.id, prompt);
                 }}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface/40 hover:bg-surface border border-border-soft/40 hover:border-border text-[11px] text-muted hover:text-fg transition-all cursor-pointer group"
+                className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-surface/30 hover:bg-surface border border-border-soft/40 hover:border-border text-[10.5px] sm:text-[11px] text-muted hover:text-fg transition-all cursor-pointer group"
                 title={lens.description}
               >
                 <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: lens.accentColor }} />
