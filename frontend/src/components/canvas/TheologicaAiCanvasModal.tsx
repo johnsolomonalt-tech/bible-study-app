@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
+import TextareaAutosize from 'react-textarea-autosize';
 import { 
   Sparkles, 
   X, 
@@ -86,6 +87,27 @@ export function TheologicaAiCanvasModal({
   const [synthesisResult, setSynthesisResult] = useState<string | null>(null);
   const [copiedSynthesis, setCopiedSynthesis] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    if (isOpen && !isLoading) {
+      const timer = setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, isLoading, activeMode]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      // Block submission if user is composing via IME or keyCode 229 (Safari IME bug)
+      if (e.nativeEvent.isComposing || (e as any).keyCode === 229) {
+        return;
+      }
+      handleSubmit();
+    }
+  };
 
   const handleCancelOrClose = () => {
     if (abortControllerRef.current) {
@@ -432,28 +454,100 @@ export function TheologicaAiCanvasModal({
           ) : (
             /* STATE: NORMAL INTERACTIVE FORM */
             <>
-              {/* Context Banner */}
-              {activeMode === 'expand' && selectedNode ? (
+              {/* Context Banner for Node Expansion */}
+              {activeMode === 'expand' && selectedNode && (
                 <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs border border-accent/40 bg-accent/10 text-fg">
-                  <Network size={15} className="text-accent shrink-0" />
+                  <Compass size={15} className="text-accent shrink-0" />
                   <div className="truncate">
                     <span className="text-muted">Target Card: </span>
                     <span className="font-semibold text-accent">{selectedNode.data.title}</span>
                     <span className="text-muted ml-1">({selectedNode.data.category})</span>
                   </div>
                 </div>
-              ) : (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs border border-border bg-surface-warm/40 text-muted">
-                  <Layers size={14} className="shrink-0 text-accent" />
-                  <span>
-                    Operating across board: <strong className="text-fg">{currentGraph.nodes.length} cards</strong> on canvas
-                  </span>
-                </div>
               )}
 
+              {/* Primary AI Study Prompt Box */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="theologica-study-prompt" className="text-xs font-bold text-fg flex items-center gap-1.5">
+                    <Sparkles size={14} className="text-accent" />
+                    <span>
+                      {activeMode === 'expand'
+                        ? 'Card Expansion Prompt'
+                        : activeMode === 'discourse'
+                        ? 'Scripture Passage or Discourse Topic'
+                        : activeMode === 'synthesize'
+                        ? 'Synthesis & Summary Focus'
+                        : 'Study Topic or Scripture Passage'}
+                    </span>
+                  </label>
+                  <span className="text-[11px] text-muted hidden sm:inline">
+                    Enter any passage, doctrine, or theological theme
+                  </span>
+                </div>
+
+                <div className="relative rounded-2xl border-2 border-border/80 bg-surface shadow-xs focus-within:border-accent focus-within:ring-3 focus-within:ring-accent/15 transition-all p-3.5 sm:p-4">
+                  <TextareaAutosize
+                    id="theologica-study-prompt"
+                    ref={textareaRef}
+                    minRows={3}
+                    maxRows={8}
+                    value={prompt}
+                    onChange={(e) => {
+                      setPrompt(e.target.value);
+                      if (error) setError(null);
+                    }}
+                    onKeyDown={handleKeyDown}
+                    placeholder={
+                      activeMode === 'expand' && selectedNode
+                        ? `Instruct Theologica AI what to expand from "${selectedNode.data.title}" (e.g. historical context, original Greek/Hebrew nuance, practical applications)...`
+                        : activeMode === 'discourse'
+                        ? "e.g. Diagram the logical argument and exegetical flow of Romans 8:28-39..."
+                        : activeMode === 'synthesize'
+                        ? "e.g. Synthesize the key doctrines, theological connections, and applications from this canvas into a study outline..."
+                        : "e.g. Map Romans 8:28-30 (The Golden Chain of Redemption) with scripture, doctrinal implications, and applications..."
+                    }
+                    className="w-full bg-transparent text-[14px] text-fg placeholder:text-muted/60 focus:outline-none resize-none leading-relaxed block"
+                    autoFocus
+                  />
+
+                  {/* Prompt Box Action Bar */}
+                  <div className="flex items-center justify-between pt-3 mt-2 border-t border-border-soft/70">
+                    <div className="flex items-center gap-1.5 text-[11px] text-muted">
+                      <span className="hidden sm:inline">Press</span>
+                      <kbd className="px-1.5 py-0.5 rounded bg-surface-warm border border-border font-mono text-[10px] text-fg font-medium">Enter</kbd>
+                      <span className="hidden sm:inline">to generate</span>
+                      <span className="text-muted/50 hidden sm:inline">·</span>
+                      <span className="hidden sm:inline"><kbd className="px-1.5 py-0.5 rounded bg-surface-warm border border-border font-mono text-[10px] text-fg font-medium">Shift+Enter</kbd> for newline</span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleSubmit()}
+                      disabled={!prompt.trim() || isLoading}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent text-accent-on text-xs font-semibold hover:opacity-90 disabled:opacity-40 disabled:hover:opacity-40 active:scale-95 transition-all shadow-xs cursor-pointer"
+                    >
+                      <Sparkles size={14} />
+                      <span>
+                        {activeMode === 'expand'
+                          ? 'Expand Card'
+                          : activeMode === 'discourse'
+                          ? 'Generate Flowchart'
+                          : activeMode === 'synthesize'
+                          ? 'Synthesize'
+                          : 'Generate Canvas'}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               {/* Theological Perspective Lens Bar */}
-              <div className="flex items-center justify-between flex-wrap gap-2 py-2 px-3 rounded-xl bg-surface-warm/60 border border-border text-xs">
-                <span className="font-semibold text-muted shrink-0">Tradition Lens:</span>
+              <div className="flex items-center justify-between flex-wrap gap-2 py-2 px-3 rounded-xl bg-surface-warm/50 border border-border text-xs">
+                <div className="flex items-center gap-1.5 text-muted font-semibold">
+                  <BookOpen size={13} className="text-accent" />
+                  <span>Tradition Lens:</span>
+                </div>
                 <div className="flex items-center flex-wrap gap-1">
                   {[
                     { id: 'canonical', label: 'Canonical', icon: '🕊️' },
@@ -479,13 +573,16 @@ export function TheologicaAiCanvasModal({
               </div>
 
               {/* Suggestions Chips */}
-              <div>
-                <div className="text-[10px] font-bold uppercase tracking-wider text-muted mb-2">
-                  {activeMode === 'expand' 
-                    ? 'Suggested expansions for card' 
-                    : activeMode === 'discourse'
-                    ? 'Suggested discourse argument flowcharts'
-                    : 'Suggested study mind-maps'}
+              <div className="space-y-1.5">
+                <div className="text-[11px] font-semibold text-muted flex items-center gap-1.5">
+                  <Lightbulb size={13} className="text-amber-500 shrink-0" />
+                  <span>
+                    {activeMode === 'expand' 
+                      ? 'Or choose a preset expansion for this card:' 
+                      : activeMode === 'discourse'
+                      ? 'Or try a sample discourse flow:'
+                      : 'Or try a sample study mind-map:'}
+                  </span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {(activeMode === 'expand' 
@@ -501,43 +598,13 @@ export function TheologicaAiCanvasModal({
                         setPrompt(item.query);
                         handleSubmit(item.query);
                       }}
-                      className="text-xs text-left px-3 py-1.5 rounded-xl border border-border bg-surface text-fg hover:bg-surface-warm hover:border-accent/60 transition-all cursor-pointer shadow-xs"
+                      className="text-xs text-left px-3 py-1.5 rounded-xl border border-border bg-surface text-fg hover:bg-surface-warm hover:border-accent/60 transition-all cursor-pointer shadow-xs flex items-center gap-1.5 group"
                     >
-                      {item.label}
+                      <span>{item.label}</span>
+                      <ArrowRight size={11} className="text-muted group-hover:text-accent group-hover:translate-x-0.5 transition-all" />
                     </button>
                   ))}
                 </div>
-              </div>
-
-              {/* Custom Input */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-fg flex items-center justify-between">
-                  <span>Your Study Prompt:</span>
-                  <span className="text-[11px] text-muted font-normal">Supports scripture citations & topics</span>
-                </label>
-                <textarea
-                  value={prompt}
-                  onChange={(e) => {
-                    setPrompt(e.target.value);
-                    if (error) setError(null);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                      handleSubmit();
-                    }
-                  }}
-                  placeholder={
-                    activeMode === 'expand' && selectedNode
-                      ? `Instruct Theologica AI what to expand from "${selectedNode.data.title}"...`
-                      : activeMode === 'discourse'
-                      ? "e.g. Diagram the logical argument and exegetical flow of Romans 8:28-39..."
-                      : activeMode === 'synthesize'
-                      ? "e.g. Synthesize the key doctrines and applications from this canvas into a study outline..."
-                      : "e.g. Map John 15:1-8 (The Vine and Branches) with theology, historical context, and discipleship applications..."
-                  }
-                  rows={3}
-                  className="w-full p-3.5 rounded-xl border border-border bg-surface text-fg placeholder:text-muted/60 text-xs resize-none focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent transition-all"
-                />
               </div>
 
               {/* Error Message */}
@@ -586,9 +653,12 @@ export function TheologicaAiCanvasModal({
         {/* Modal Footer */}
         {!isLoading && (
           <div className="flex items-center justify-between flex-wrap gap-2 px-6 py-3.5 border-t border-border bg-surface-warm/30 shrink-0">
-            <span className="text-[11px] text-muted hidden sm:inline">
-              Press <kbd className="px-1.5 py-0.5 rounded bg-surface border border-border font-mono text-[10px] text-muted">{mod.symbol}+Enter</kbd> to generate
-            </span>
+            <div className="flex items-center gap-2 text-[11px] text-muted">
+              <Layers size={13} className="text-accent shrink-0" />
+              <span>
+                Operating across canvas: <strong className="text-fg">{currentGraph.nodes.length} cards</strong> on board
+              </span>
+            </div>
             <div className="flex items-center gap-2 ml-auto flex-wrap">
               <button
                 type="button"
