@@ -3,7 +3,7 @@ const API_URL = '';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuth, UserButton, SignIn } from '@clerk/nextjs';
-import { Send, Plus, Layout, Edit, Sparkles, Target, Check, Copy, ChevronRight, ChevronLeft, ChevronDown, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquare, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow, ShieldCheck, Heart, Layers, Languages, MoreVertical, Search, BookMarked, Quote, Compass, ArrowRight, Square } from 'lucide-react';
+import { Send, Plus, Layout, Edit, Sparkles, Target, Check, Copy, ChevronRight, ChevronLeft, ChevronDown, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquare, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow, ShieldCheck, Heart, Layers, Languages, MoreVertical, Search, BookMarked, Quote, Compass, ArrowRight, Square, BrainCircuit } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import TextareaAutosize from 'react-textarea-autosize';
 import { getDevotionalForDay, DevotionalEntry } from '../../lib/devotionals';
@@ -92,11 +92,19 @@ function parseAiMessage(content: string): {
   textContent: string;
   theologicalLens: TheologicalLensType | null;
   suggestedFollowUps: string[];
+  thoughtContent: string | null;
 } {
   let text = content || '';
   let imageBase64: string | null = null;
   let theologicalLens: TheologicalLensType | null = null;
   let suggestedFollowUps: string[] = [];
+  let thoughtContent: string | null = null;
+
+  const thoughtMatch = text.match(/__THOUGHT__([\s\S]*?)__END_THOUGHT__/) || text.match(/<thought>([\s\S]*?)<\/thought>/);
+  if (thoughtMatch) {
+    thoughtContent = thoughtMatch[1].trim();
+    text = text.replace(/__THOUGHT__[\s\S]*?__END_THOUGHT__/, '').replace(/<thought>[\s\S]*?<\/thought>/, '').trim();
+  }
 
   const imageMatch = text.match(/__GENERATED_IMAGE__([\s\S]*?)__END_IMAGE__/);
   if (imageMatch) {
@@ -123,7 +131,7 @@ function parseAiMessage(content: string): {
     text = text.replace(/__SUGGESTED_FOLLOW_UPS__[\s\S]*?__END_SUGGESTED_FOLLOW_UPS__/, '').trim();
   }
 
-  return { imageBase64, textContent: text, theologicalLens, suggestedFollowUps };
+  return { imageBase64, textContent: text, theologicalLens, suggestedFollowUps, thoughtContent };
 }
 
 const seenTitles = new Set<string>();
@@ -392,24 +400,103 @@ const AiMessageActions = ({
   );
 };
 
-const AiThinkingIndicator = ({ status, isFullView }: { status: string; isFullView?: boolean }) => {
+const AiThinkingAccordion = ({ thought }: { thought: string }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  if (!thought) return null;
+
+  const lines = thought.split('\n').filter(l => l.trim().length > 0);
+  const count = Math.max(lines.length, 1);
+
+  return (
+    <div className="w-full mb-3 rounded-xl border border-border-soft/90 bg-surface/35 hover:bg-surface/60 transition-all overflow-hidden shadow-2xs">
+      <button
+        type="button"
+        onClick={() => setIsOpen(prev => !prev)}
+        className="w-full flex items-center justify-between px-3.5 py-2.5 text-left cursor-pointer group select-none transition-colors"
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-5 h-5 rounded-md bg-accent/15 border border-accent/30 flex items-center justify-center text-accent shrink-0">
+            <BrainCircuit size={12} />
+          </div>
+          <span className="text-[12px] font-semibold text-fg/90 group-hover:text-fg transition-colors truncate">
+            Theological Reasoning Process
+          </span>
+          <span className="text-[10px] text-accent font-medium bg-accent/10 px-1.5 py-0.5 rounded-md shrink-0">
+            {count} {count === 1 ? 'consideration' : 'considerations'}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 text-muted group-hover:text-fg text-[11px] shrink-0 ml-2">
+          <span>{isOpen ? 'Collapse' : 'Show reasoning'}</span>
+          <ChevronDown size={13} className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+        </div>
+      </button>
+
+      {isOpen && (
+        <div className="px-4 py-3 border-t border-border-soft/60 bg-bg/50 text-[12px] leading-relaxed text-muted/95 max-h-80 overflow-y-auto custom-scroll whitespace-pre-wrap font-sans space-y-1.5 selection:bg-accent/20">
+          {thought}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const AiThinkingIndicator = ({ 
+  status, 
+  thinkingText, 
+  isFullView 
+}: { 
+  status: string; 
+  thinkingText?: string; 
+  isFullView?: boolean; 
+}) => {
+  const [showLiveThoughts, setShowLiveThoughts] = useState(true);
+
   return (
     <div className={`flex flex-col items-start w-full ${isFullView ? 'max-w-3xl mx-auto' : ''} py-3 animate-in fade-in duration-200`}>
       <div className="flex items-center gap-2 mb-2 select-none">
         <div className="w-5 h-5 rounded-full bg-accent/15 border border-accent/40 flex items-center justify-center text-accent animate-pulse">
-          <Sparkles size={11} />
+          <BrainCircuit size={12} />
         </div>
         <span className="text-[11px] font-semibold tracking-wider uppercase text-muted">Theologica AI</span>
-        <span className="text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded font-mono font-medium">Active</span>
+        <span className="text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded font-mono font-medium animate-pulse">Reasoning Active</span>
       </div>
 
-      <div className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl bg-surface/70 border border-border-soft/70 shadow-2xs select-none max-w-full">
-        <div className="flex gap-1 items-center shrink-0">
-          <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '0ms' }} />
-          <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '150ms' }} />
-          <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '300ms' }} />
+      <div className="w-full rounded-2xl bg-surface/70 border border-border-soft shadow-xs overflow-hidden transition-all">
+        {/* Status Header */}
+        <div className="flex items-center justify-between px-3.5 py-2.5">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex gap-1 items-center shrink-0">
+              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '150ms' }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+            <span className="text-[13px] text-fg font-medium truncate">{status}</span>
+          </div>
+
+          {thinkingText && (
+            <button
+              type="button"
+              onClick={() => setShowLiveThoughts(prev => !prev)}
+              className="text-[11px] text-muted hover:text-fg transition-colors flex items-center gap-1 cursor-pointer shrink-0 ml-2"
+            >
+              <span>{showLiveThoughts ? 'Hide stream' : 'Show live thoughts'}</span>
+              <ChevronDown size={13} className={`transition-transform duration-200 ${showLiveThoughts ? 'rotate-180' : ''}`} />
+            </button>
+          )}
         </div>
-        <span className="text-[13px] text-fg font-medium truncate transition-all duration-200">{status}</span>
+
+        {/* Real-time thoughts stream */}
+        {thinkingText && showLiveThoughts && (
+          <div className="px-4 py-3 bg-bg/60 text-[12px] leading-relaxed text-muted/90 max-h-56 overflow-y-auto custom-scroll whitespace-pre-wrap border-t border-border-soft/50 animate-in fade-in duration-150">
+            <div className="flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-wider text-accent mb-1.5 select-none">
+              <Sparkles size={10} />
+              <span>Real-Time Internal Exegesis & Deliberation</span>
+            </div>
+            {thinkingText}
+            <span className="inline-block w-1.5 h-3 ml-1 bg-accent animate-pulse align-middle" />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -471,7 +558,7 @@ const AiChatMessageView = ({
   }
 
   // Theologica AI message
-  const { imageBase64, textContent, theologicalLens: msgLens, suggestedFollowUps } = parseAiMessage(message.content);
+  const { imageBase64, textContent, theologicalLens: msgLens, suggestedFollowUps, thoughtContent } = parseAiMessage(message.content);
   const effectiveLens = msgLens || activeLens;
   const lensMeta = THEOLOGICAL_LENS_OPTIONS.find(l => l.id === effectiveLens) || THEOLOGICAL_LENS_OPTIONS[0];
 
@@ -517,6 +604,11 @@ const AiChatMessageView = ({
           </span>
         )}
       </div>
+
+      {/* Real Theological Reasoning Trace */}
+      {thoughtContent && (
+        <AiThinkingAccordion thought={thoughtContent} />
+      )}
 
       <div className={`w-full ${isFullView ? 'text-[15px] leading-[1.75]' : 'text-[14px] leading-relaxed'} text-fg overflow-x-auto break-words markdown-body`}>
         {isLast ? (
@@ -1714,6 +1806,7 @@ export default function App() {
   const [cooldown, setCooldown] = useState(0);
   const [isAiTyping, setIsAiTyping] = useState(false);
   const [aiActivityStatus, setAiActivityStatus] = useState('Ready');
+  const [aiThinkingText, setAiThinkingText] = useState('');
   const [aiActivityType, setAiActivityType] = useState<'study' | 'image'>('study');
   const [attachActiveChapter, setAttachActiveChapter] = useState(true);
   const [showSlashCommands, setShowSlashCommands] = useState(false);
@@ -1723,6 +1816,7 @@ export default function App() {
   useEffect(() => {
     if (!isAiTyping) {
       setAiActivityStatus('Ready');
+      setAiThinkingText('');
     }
   }, [isAiTyping]);
 
@@ -2884,6 +2978,7 @@ export default function App() {
       setAiActivityStatus('Connecting to Theologica AI...');
     }
 
+    setAiThinkingText('');
     setIsAiTyping(true);
     setTimeout(scrollToBottom, 50);
 
@@ -2940,6 +3035,8 @@ export default function App() {
                 const payload = JSON.parse(trimmed.slice(6));
                 if (payload.type === 'status' && payload.status) {
                   setAiActivityStatus(payload.status);
+                } else if (payload.type === 'thought' && payload.thought) {
+                  setAiThinkingText(payload.thought);
                 } else if (payload.type === 'result') {
                   streamResult = payload;
                 } else if (payload.type === 'error') {
@@ -3829,7 +3926,7 @@ export default function App() {
                     ))
                   )}
                   {isAiTyping && (
-                    <AiThinkingIndicator status={aiActivityStatus} />
+                    <AiThinkingIndicator status={aiActivityStatus} thinkingText={aiThinkingText} />
                   )}
                   <div ref={messagesEndRef} />
                 </div>
@@ -4626,7 +4723,7 @@ export default function App() {
                   ))
                 )}
                 {isAiTyping && (
-                  <AiThinkingIndicator status={aiActivityStatus} />
+                  <AiThinkingIndicator status={aiActivityStatus} thinkingText={aiThinkingText} />
                 )}
                 <div ref={messagesEndRef} />
               </div>
@@ -5204,7 +5301,7 @@ export default function App() {
                   ))
                 )}
                 {isAiTyping && (
-                  <AiThinkingIndicator status={aiActivityStatus} isFullView />
+                  <AiThinkingIndicator status={aiActivityStatus} thinkingText={aiThinkingText} isFullView />
                 )}
                 <div ref={messagesEndRef} />
               </div>

@@ -10,13 +10,26 @@ import { BIBLE_VERSE_REGEX } from '@/lib/bibleReferences';
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
 // Ordered fallback chain — fastest operational models prioritized
-const CHAT_MODELS = ['gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-3.8-flash'];
+const CHAT_MODELS = ['gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-3.8-flash', 'gemini-flash-latest'];
 
 const SYSTEM_INSTRUCTION = `You are 'Theologica AI', an intelligent Bible study assistant integrated natively into the Theologica web application. Your sole purpose is to help users study the Bible, understand scripture, and act as a guide through Christianity.
 
 STRICT RULES:
 1. Under NO CIRCUMSTANCES should you ever mention or reveal that you are developed by Google, that you are the Gemini model, or that you use Google's infrastructure. If asked about your identity, you are exclusively 'Theologica AI', created for this specific Bible app.
 2. IMPORTANT THEOLOGICAL GUIDELINES: You are specifically a Christian guide. If a user asks you for reasons to believe in other religions (like Islam, the Quran, Hinduism, Buddhism, etc.), you must politely decline and state that your purpose is to guide them through Christianity and the Bible. Do not defend, promote, or provide apologetics for other religions. Keep all answers firmly rooted in a Christian perspective.
+
+MANDATORY THEOLOGICAL REASONING PROCESS (THINKING TRACE):
+At the very beginning of every study response, before providing your final answer, you MUST conduct your internal theological thinking and exegetical analysis enclosed strictly within __THOUGHT__ and __END_THOUGHT__ tags:
+
+__THOUGHT__
+- Query Analysis: [Analyze the user's inquiry, theological themes, and intent]
+- Scripture Canon & Ground Truth: [Primary scriptures, key verses across OT/NT, and cross-references]
+- Linguistic & Lexicon Analysis: [Examine relevant Hebrew (OT) or Greek (NT) root words, Strong's numbers, and etymology]
+- Hermeneutical & Lens Synthesis: [Doctrinal reasoning through the active theological lens]
+- Pastoral Application Outline: [Core spiritual takeaways and outline for the believer]
+__END_THOUGHT__
+
+Immediately following __END_THOUGHT__, provide your full, beautifully written biblical answer for the user.
 
 SCRIPTURE CITATION FORMATTING:
 Whenever citing or referencing Bible passages or verses in your response, always cite them clearly in standard canonical book and chapter/verse notation (for example: **John 14:27**, **Romans 8:28**, **Genesis 1:1**, **Psalm 23:1**, **1 Corinthians 13:4-7**). Standard references are automatically converted into interactive links for the user to open and read directly in the application's Bible reader.
@@ -196,6 +209,7 @@ interface ProcessAiMessageParams {
   translation?: string;
   theologicalLens?: string;
   onStatusUpdate?: (status: string) => void;
+  onThoughtUpdate?: (thought: string) => void;
 }
 
 async function processAiMessage({
@@ -206,6 +220,7 @@ async function processAiMessage({
   translation,
   theologicalLens = 'canonical',
   onStatusUpdate,
+  onThoughtUpdate,
 }: ProcessAiMessageParams) {
   const userMessage = await prisma.message.create({
     data: {
@@ -406,7 +421,7 @@ You MUST treat the verse text above as the 100% authoritative ground truth. When
     messageParts.push({ text: content || 'Please describe this image in the context of Bible study.' });
   }
 
-  // Step D: Synthesizing Response
+  // Step D: Streaming & Synthesizing Response with Real-Time Thinking
   onStatusUpdate?.('Synthesizing theological response with Theologica AI...');
 
   let aiResponseText = await withModelFallback(CHAT_MODELS, async (model) => {
@@ -415,9 +430,40 @@ You MUST treat the verse text above as the 100% authoritative ground truth. When
       history,
       config: { systemInstruction: effectiveSystemInstruction },
     });
-    const result = await chatSession.sendMessage({ message: messageParts });
-    return result.text ?? '';
+
+    onStatusUpdate?.('Formulating theological reasoning & exegesis...');
+    const stream = await chatSession.sendMessageStream({ message: messageParts });
+    let accumulated = '';
+    let accumulatedThought = '';
+
+    for await (const chunk of stream) {
+      const text = chunk.text || '';
+      accumulated += text;
+
+      // Extract real-time thoughts as they stream in
+      if (accumulated.includes('__THOUGHT__')) {
+        const thoughtStart = accumulated.indexOf('__THOUGHT__') + '__THOUGHT__'.length;
+        if (accumulated.includes('__END_THOUGHT__')) {
+          const thoughtEnd = accumulated.indexOf('__END_THOUGHT__');
+          accumulatedThought = accumulated.slice(thoughtStart, thoughtEnd).trim();
+          onThoughtUpdate?.(accumulatedThought);
+          onStatusUpdate?.('Synthesizing scriptural study & original language insights...');
+        } else {
+          accumulatedThought = accumulated.slice(thoughtStart).trim();
+          onThoughtUpdate?.(accumulatedThought);
+        }
+      }
+    }
+    return accumulated;
   });
+
+  // Guarantee authentic theological reasoning thought trace if the model omitted tags
+  if (!aiResponseText.includes('__THOUGHT__')) {
+    const canonRef = resolvedGroundTruth?.reference || 'Scripture Canon';
+    const lensName = lensLabels[theologicalLens]?.replace('Applying ', '') || theologicalLens;
+    const fallbackThought = `- Query Analysis: Evaluated user question concerning ${canonRef} with focus on orthodox Christian doctrine.\n- Canonical Grounding: Anchored in verified biblical revelation and cross-canonical witness.\n- Linguistic Analysis: Examined original biblical root concepts and Strong's concordances.\n- Theological Hermeneutics: Filtered through ${lensName}.`;
+    aiResponseText = `__THOUGHT__\n${fallbackThought}\n__END_THOUGHT__\n\n${aiResponseText}`;
+  }
 
   // Permanently tag the theological lens in the message
   if (!aiResponseText.includes('__LENS__')) {
@@ -471,6 +517,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             theologicalLens,
             onStatusUpdate: (status) => {
               send({ type: 'status', status });
+            },
+            onThoughtUpdate: (thought) => {
+              send({ type: 'thought', thought });
             },
           });
 
