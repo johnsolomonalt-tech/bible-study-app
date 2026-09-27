@@ -5105,19 +5105,14 @@ export default function App() {
                 <button
                   type="button"
                   onClick={handleNewChat}
-                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl border text-[13px] font-medium transition-all cursor-pointer ${
+                  className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border text-[13px] font-medium transition-all cursor-pointer ${
                     !activeChatId 
                       ? 'bg-accent/15 border-accent/40 text-accent font-semibold shadow-xs' 
                       : 'bg-surface hover:bg-surface-hover border-border-soft text-fg hover:border-border'
                   }`}
                 >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <Plus size={15} className="shrink-0 text-accent" />
-                    <span className="truncate">New Conversation</span>
-                  </div>
-                  {!activeChatId && (
-                    <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-md bg-accent/20 text-accent shrink-0">Draft</span>
-                  )}
+                  <Plus size={15} className="shrink-0 text-accent" />
+                  <span className="truncate">New Conversation</span>
                 </button>
               </div>
 
