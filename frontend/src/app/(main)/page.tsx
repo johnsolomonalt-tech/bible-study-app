@@ -441,6 +441,26 @@ const AiThinkingAccordion = ({ thought }: { thought: string }) => {
   );
 };
 
+const AI_STUDY_STAGE_PRESETS = [
+  "Searching Scripture canon & verified manuscript database...",
+  "Examining original Hebrew Masoretic & Greek NT lemmas...",
+  "Parsing grammatical syntax & Strong's concordance roots...",
+  "Tracing cross-canonical covenantal themes & typology...",
+  "Consulting historic commentaries & church traditions...",
+  "Formulating theological reasoning & exegesis...",
+  "Synthesizing scriptural study & original language insights...",
+  "Structuring verse-by-verse breakdown & pastoral application...",
+  "Polishing study with verified biblical citations & cross-references...",
+];
+
+const AI_IMAGE_STAGE_PRESETS = [
+  "Translating biblical narrative into sacred visual iconography...",
+  "Harmonizing classical chiaroscuro lighting & sacred textures...",
+  "Connecting to Flux high-resolution sacred art engine...",
+  "Rendering reverent biblical scene with historic aesthetics...",
+  "Finalizing high-fidelity sacred artwork canvas...",
+];
+
 const AiThinkingIndicator = ({ 
   status, 
   thinkingText, 
@@ -451,6 +471,67 @@ const AiThinkingIndicator = ({
   isFullView?: boolean; 
 }) => {
   const [showLiveThoughts, setShowLiveThoughts] = useState(true);
+  const [displayStatus, setDisplayStatus] = useState<string>(() => status || "Grounding in verified Scripture...");
+  const [elapsedMs, setElapsedMs] = useState(0);
+
+  const queueRef = useRef<string[]>([]);
+  const lastProcessedRef = useRef<string>('');
+  const fallbackIndexRef = useRef<number>(0);
+  const isImageMode = Boolean(status?.toLowerCase().includes('art') || status?.toLowerCase().includes('image'));
+
+  // Elapsed real-time ticker (updates every 100ms)
+  useEffect(() => {
+    const startTime = Date.now();
+    const timer = setInterval(() => {
+      setElapsedMs(Date.now() - startTime);
+    }, 100);
+    return () => clearInterval(timer);
+  }, []);
+
+  // When parent passes a new status, queue it so it gets displayed smoothly
+  useEffect(() => {
+    if (status && status !== lastProcessedRef.current) {
+      if (!queueRef.current.includes(status)) {
+        queueRef.current.push(status);
+      }
+      // If currently showing default placeholder, transition immediately
+      if (!lastProcessedRef.current || displayStatus === 'Ready' || displayStatus === 'Connecting to Theologica AI...') {
+        const next = queueRef.current.shift();
+        if (next) {
+          lastProcessedRef.current = next;
+          setDisplayStatus(next);
+        }
+      }
+    }
+  }, [status, displayStatus]);
+
+  // Smooth cadence loop: cycle every 1400ms so no status is flashed instantaneously
+  // and so the indicator never stays statically stuck on a single message
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // 1. If we have queued real statuses from server, show next
+      if (queueRef.current.length > 0) {
+        const next = queueRef.current.shift();
+        if (next && next !== displayStatus) {
+          lastProcessedRef.current = next;
+          setDisplayStatus(next);
+          return;
+        }
+      }
+
+      // 2. Otherwise advance dynamically through rich exegetical study stages
+      const presets = isImageMode ? AI_IMAGE_STAGE_PRESETS : AI_STUDY_STAGE_PRESETS;
+      fallbackIndexRef.current = (fallbackIndexRef.current + 1) % presets.length;
+      const nextPreset = presets[fallbackIndexRef.current];
+      if (nextPreset !== displayStatus) {
+        setDisplayStatus(nextPreset);
+      }
+    }, 1400);
+
+    return () => clearInterval(interval);
+  }, [displayStatus, isImageMode]);
+
+  const elapsedSec = (elapsedMs / 1000).toFixed(1);
 
   return (
     <div className={`flex flex-col items-start w-full ${isFullView ? 'max-w-3xl mx-auto' : ''} py-3 animate-in fade-in duration-200`}>
@@ -459,26 +540,33 @@ const AiThinkingIndicator = ({
           <BrainCircuit size={12} />
         </div>
         <span className="text-[11px] font-semibold tracking-wider uppercase text-muted">Theologica AI</span>
-        <span className="text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded font-mono font-medium animate-pulse">Reasoning Active</span>
+        <span className="text-[10px] text-accent bg-accent/10 px-2 py-0.5 rounded-full font-mono font-medium animate-pulse">
+          Reasoning Active • {elapsedSec}s
+        </span>
       </div>
 
       <div className="w-full rounded-2xl bg-surface/70 border border-border-soft shadow-xs overflow-hidden transition-all">
         {/* Status Header */}
         <div className="flex items-center justify-between px-3.5 py-2.5">
-          <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
             <div className="flex gap-1 items-center shrink-0">
               <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '0ms' }} />
               <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '150ms' }} />
               <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '300ms' }} />
             </div>
-            <span className="text-[13px] text-fg font-medium truncate">{status}</span>
+            <span 
+              key={displayStatus} 
+              className="text-[12.5px] sm:text-[13px] text-fg font-medium truncate inline-block animate-in fade-in slide-in-from-bottom-1 duration-200"
+            >
+              {displayStatus}
+            </span>
           </div>
 
           {thinkingText && (
             <button
               type="button"
               onClick={() => setShowLiveThoughts(prev => !prev)}
-              className="text-[11px] text-muted hover:text-fg transition-colors flex items-center gap-1 cursor-pointer shrink-0 ml-2"
+              className="text-[11px] text-muted hover:text-fg transition-colors flex items-center gap-1 cursor-pointer shrink-0 ml-auto"
             >
               <span>{showLiveThoughts ? 'Hide stream' : 'Show live thoughts'}</span>
               <ChevronDown size={13} className={`transition-transform duration-200 ${showLiveThoughts ? 'rotate-180' : ''}`} />

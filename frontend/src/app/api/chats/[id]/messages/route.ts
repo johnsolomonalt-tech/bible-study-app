@@ -435,6 +435,10 @@ You MUST treat the verse text above as the 100% authoritative ground truth. When
     const stream = await chatSession.sendMessageStream({ message: messageParts });
     let accumulated = '';
     let accumulatedThought = '';
+    let sentThoughtStep1 = false;
+    let sentThoughtStep2 = false;
+    let sentThoughtStep3 = false;
+    let sentResponseStep = false;
 
     for await (const chunk of stream) {
       const text = chunk.text || '';
@@ -447,10 +451,29 @@ You MUST treat the verse text above as the 100% authoritative ground truth. When
           const thoughtEnd = accumulated.indexOf('__END_THOUGHT__');
           accumulatedThought = accumulated.slice(thoughtStart, thoughtEnd).trim();
           onThoughtUpdate?.(accumulatedThought);
-          onStatusUpdate?.('Synthesizing scriptural study & original language insights...');
+          onStatusUpdate?.('Synthesizing verified scriptural exegesis & original language insights...');
+
+          // Detect when actual response body starts streaming after thought deliberation
+          const postThought = accumulated.slice(thoughtEnd + '__END_THOUGHT__'.length).trim();
+          if (postThought.length > 40 && !sentResponseStep) {
+            sentResponseStep = true;
+            onStatusUpdate?.('Composing structured response with biblical cross-references...');
+          }
         } else {
           accumulatedThought = accumulated.slice(thoughtStart).trim();
           onThoughtUpdate?.(accumulatedThought);
+
+          // Granular thought milestones as the model reasons
+          if (accumulatedThought.length > 50 && !sentThoughtStep1) {
+            sentThoughtStep1 = true;
+            onStatusUpdate?.('Analyzing biblical context & original language roots...');
+          } else if (accumulatedThought.length > 180 && !sentThoughtStep2) {
+            sentThoughtStep2 = true;
+            onStatusUpdate?.('Cross-referencing canonical themes & theological covenants...');
+          } else if (accumulatedThought.length > 360 && !sentThoughtStep3) {
+            sentThoughtStep3 = true;
+            onStatusUpdate?.('Weighing historic church commentary & doctrinal synthesis...');
+          }
         }
       }
     }
