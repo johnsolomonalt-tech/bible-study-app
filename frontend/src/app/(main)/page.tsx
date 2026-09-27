@@ -3,7 +3,7 @@ const API_URL = '';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuth, UserButton, SignIn } from '@clerk/nextjs';
-import { Send, Plus, Layout, Edit, Sparkles, Target, Check, Copy, ChevronRight, ChevronLeft, ChevronDown, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquare, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow, ShieldCheck, Heart, Layers, Languages, MoreVertical, Search, BookMarked, Quote, Compass, ArrowRight, Square, BrainCircuit } from 'lucide-react';
+import { Send, Plus, Layout, Edit, Sparkles, Target, Check, Copy, ChevronRight, ChevronLeft, ChevronDown, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquare, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow, ShieldCheck, Heart, Layers, Languages, MoreVertical, Search, BookMarked, Quote, Compass, ArrowRight, Square, BrainCircuit, FileText, UploadCloud } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import TextareaAutosize from 'react-textarea-autosize';
 import { getDevotionalForDay, DevotionalEntry } from '../../lib/devotionals';
@@ -521,6 +521,13 @@ const AiThinkingIndicator = ({
   );
 };
 
+function formatFileSize(bytes?: number): string {
+  if (!bytes) return '0 B';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
 const AiChatMessageView = ({
   message,
   index,
@@ -535,7 +542,12 @@ const AiChatMessageView = ({
   translation = 'BSB',
   isFullView,
 }: {
-  message: { role: string; content: string; imagePreview?: string };
+  message: { 
+    role: string; 
+    content: string; 
+    imagePreview?: string; 
+    attachedFile?: { name: string; size: number; type: string };
+  };
   index: number;
   totalMessages: number;
   onVerseClick?: VerseClickHandler;
@@ -569,6 +581,17 @@ const AiChatMessageView = ({
               alt="attached" 
               className={`${isFullView ? 'max-h-52 mb-3' : 'max-h-40 mb-2'} rounded-xl object-contain`} 
             />
+          )}
+          {message.attachedFile && message.attachedFile.type !== 'image' && (
+            <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-surface-hover/70 border border-border-soft mb-2.5 max-w-sm">
+              <div className={`p-1.5 rounded-lg ${message.attachedFile.type === 'pdf' ? 'bg-red-500/10 text-red-400' : 'bg-accent/10 text-accent'}`}>
+                <FileText size={16} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[12px] font-medium text-fg truncate">{message.attachedFile.name}</p>
+                <p className="text-[10px] text-muted">{formatFileSize(message.attachedFile.size)}</p>
+              </div>
+            </div>
           )}
           <ReactMarkdown components={userMarkdownComponents}>{message.content}</ReactMarkdown>
         </div>
@@ -1820,8 +1843,147 @@ export default function App() {
   };
   const [chatInput, setChatInput] = useState('');
   const [chatQuotes, setChatQuotes] = useState<{id: string, text: string, reference: string}[]>([]);
-  const [chatImage, setChatImage] = useState<{base64: string, mimeType: string, preview: string} | null>(null);
+  const [chatImage, setChatImage] = useState<{base64: string, mimeType: string, preview: string, name?: string} | null>(null);
+  const [attachedFile, setAttachedFile] = useState<{
+    name: string;
+    size: number;
+    mimeType: string;
+    type: 'image' | 'pdf' | 'document';
+    base64?: string;
+    preview?: string;
+    textContent?: string;
+  } | null>(null);
+  const [fileUploadStatus, setFileUploadStatus] = useState<string | null>(null);
+  const [isDraggingOverChat, setIsDraggingOverChat] = useState(false);
   const imageFileRef = useRef<HTMLInputElement>(null);
+
+  const processSelectedFile = useCallback((file: File) => {
+    if (!file) return;
+
+    if (file.size > 20 * 1024 * 1024) {
+      alert('File is too large. Please select a file under 20MB.');
+      return;
+    }
+
+    setFileUploadStatus(`Adding "${file.name}" to conversation...`);
+
+    const isImage = file.type.startsWith('image/');
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+
+    if (isImage) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = ev.target?.result as string;
+        const base64 = dataUrl.split(',')[1];
+        setChatImage({ base64, mimeType: file.type || 'image/jpeg', preview: dataUrl, name: file.name });
+        setAttachedFile({
+          name: file.name,
+          size: file.size,
+          mimeType: file.type || 'image/jpeg',
+          preview: dataUrl,
+          base64,
+          type: 'image',
+        });
+        setFileUploadStatus(`Added "${file.name}" to conversation`);
+        setTimeout(() => setFileUploadStatus(null), 3500);
+      };
+      reader.onerror = () => {
+        setFileUploadStatus(`Failed to read "${file.name}"`);
+        setTimeout(() => setFileUploadStatus(null), 3500);
+      };
+      reader.readAsDataURL(file);
+    } else if (isPdf) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = ev.target?.result as string;
+        const base64 = dataUrl.split(',')[1];
+        setChatImage({ base64, mimeType: 'application/pdf', preview: '', name: file.name });
+        setAttachedFile({
+          name: file.name,
+          size: file.size,
+          mimeType: 'application/pdf',
+          base64,
+          type: 'pdf',
+        });
+        setFileUploadStatus(`Added "${file.name}" to conversation`);
+        setTimeout(() => setFileUploadStatus(null), 3500);
+      };
+      reader.onerror = () => {
+        setFileUploadStatus(`Failed to read "${file.name}"`);
+        setTimeout(() => setFileUploadStatus(null), 3500);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const text = ev.target?.result as string;
+        setAttachedFile({
+          name: file.name,
+          size: file.size,
+          mimeType: file.type || 'text/plain',
+          textContent: text,
+          type: 'document',
+        });
+        setFileUploadStatus(`Added "${file.name}" to conversation`);
+        setTimeout(() => setFileUploadStatus(null), 3500);
+      };
+      reader.onerror = () => {
+        setFileUploadStatus(`Failed to read "${file.name}"`);
+        setTimeout(() => setFileUploadStatus(null), 3500);
+      };
+      reader.readAsText(file);
+    }
+  }, []);
+
+  const removeAttachedFile = useCallback(() => {
+    setAttachedFile(null);
+    setChatImage(null);
+    setFileUploadStatus(null);
+    if (imageFileRef.current) {
+      imageFileRef.current.value = '';
+    }
+  }, []);
+
+  const dragCounterRef = useRef(0);
+
+  const handleChatDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types && Array.from(e.dataTransfer.types).includes('Files')) {
+      dragCounterRef.current += 1;
+      setIsDraggingOverChat(true);
+    }
+  }, []);
+
+  const handleChatDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types && Array.from(e.dataTransfer.types).includes('Files')) {
+      e.dataTransfer.dropEffect = 'copy';
+      setIsDraggingOverChat(true);
+    }
+  }, []);
+
+  const handleChatDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current -= 1;
+    if (dragCounterRef.current <= 0) {
+      dragCounterRef.current = 0;
+      setIsDraggingOverChat(false);
+    }
+  }, []);
+
+  const handleChatDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current = 0;
+    setIsDraggingOverChat(false);
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      processSelectedFile(files[0]);
+    }
+  }, [processSelectedFile]);
   const [cooldown, setCooldown] = useState(0);
   const [isAiTyping, setIsAiTyping] = useState(false);
   const [aiActivityStatus, setAiActivityStatus] = useState('Ready');
@@ -2925,14 +3087,29 @@ export default function App() {
     
     const currentChat = activeChatId ? chats.find(c => c.id === activeChatId) : null;
     const isFirstMessage = !activeChatId || (currentChat && currentChat.messages.length === 0);
-    if (!textToSend.trim() && !chatImage) return;
+    if (!textToSend.trim() && !chatImage && !attachedFile) return;
     if (cooldown > 0) return;
     
     setChatQuotes([]);
     const currentImage = chatImage;
+    const currentAttached = attachedFile;
     setChatImage(null);
+    setAttachedFile(null);
+    setFileUploadStatus(null);
+
+    // If attached document has textContent, prefix it into textToSend
+    if (currentAttached?.textContent) {
+      const docHeader = `[Attached Document: "${currentAttached.name}"]\n${currentAttached.textContent}\n[End of Attached Document]`;
+      textToSend = textToSend ? `${docHeader}\n\n${textToSend}` : docHeader;
+    }
 
     let targetChatId = activeChatId;
+
+    const optimisticAttached = currentAttached ? {
+      name: currentAttached.name,
+      size: currentAttached.size,
+      type: currentAttached.type,
+    } : undefined;
 
     // Create a new chat automatically if none exists
     if (!targetChatId) {
@@ -2950,7 +3127,12 @@ export default function App() {
         const newChat = await res.json();
         targetChatId = newChat.id;
         
-        const newMsg = { role: 'user', content: textToSend.trim(), imagePreview: currentImage?.preview };
+        const newMsg = { 
+          role: 'user', 
+          content: textToSend.trim(), 
+          imagePreview: currentAttached?.preview || currentImage?.preview,
+          attachedFile: optimisticAttached,
+        };
         const chatWithOptimisticMsg = { ...newChat, messages: [newMsg] };
         
         setChats(prev => [chatWithOptimisticMsg, ...prev]);
@@ -2961,7 +3143,12 @@ export default function App() {
         return;
       }
     } else {
-      const newMsg = { role: 'user', content: textToSend.trim(), imagePreview: currentImage?.preview };
+      const newMsg = { 
+        role: 'user', 
+        content: textToSend.trim(), 
+        imagePreview: currentAttached?.preview || currentImage?.preview,
+        attachedFile: optimisticAttached,
+      };
       setChats(prev => prev.map(c => {
         if (c.id === targetChatId) {
           return { ...c, messages: [...c.messages, newMsg] };
@@ -2980,7 +3167,7 @@ export default function App() {
       'generate a picture', 'make a picture', 'create a visual', 'depict',
       'render', 'generate art', 'create art', 'make art',
       'show me what', 'generate a photo', 'create a photo', 'make a photo'
-    ].some(kw => currentInput.toLowerCase().includes(kw)) && !currentImage;
+    ].some(kw => currentInput.toLowerCase().includes(kw)) && !currentImage && !currentAttached;
     setAiActivityType(isImageReq ? 'image' : 'study');
 
     const scriptureContextToSend = explicitScripture || (attachActiveChapter && activeBook && activeChapter ? {
@@ -2991,6 +3178,8 @@ export default function App() {
 
     if (isImageReq) {
       setAiActivityStatus('Initiating sacred artwork generation...');
+    } else if (currentAttached) {
+      setAiActivityStatus(`Analyzing attached ${currentAttached.type === 'pdf' ? 'PDF' : currentAttached.type === 'image' ? 'image' : 'document'} with Theologica AI...`);
     } else if (scriptureContextToSend) {
       setAiActivityStatus(`Connecting to Theologica AI with ${scriptureContextToSend.reference} context...`);
     } else {
@@ -3006,6 +3195,15 @@ export default function App() {
       mode: isImageReq ? 'image' : 'study',
     });
 
+    const filePayload = (currentAttached?.base64 && currentAttached?.mimeType) ? {
+      base64: currentAttached.base64,
+      mimeType: currentAttached.mimeType,
+      fileName: currentAttached.name,
+    } : (currentImage ? {
+      base64: currentImage.base64,
+      mimeType: currentImage.mimeType,
+    } : undefined);
+
     const messagePromise = fetchWithAuth(`${API_URL}/api/chats/${targetChatId}/messages?stream=true`, {
       method: 'POST',
       headers: { 
@@ -3014,7 +3212,7 @@ export default function App() {
       },
       body: JSON.stringify({ 
         content: currentInput,
-        image: currentImage ? { base64: currentImage.base64, mimeType: currentImage.mimeType } : undefined,
+        image: filePayload,
         scriptureContext: scriptureContextToSend,
         translation: translation.toUpperCase(),
         theologicalLens,
@@ -3900,7 +4098,22 @@ export default function App() {
             </section>
 
             {/* Mobile Right Sidebar: Study AI */}
-            <aside className={`w-full border-l border-border bg-bg flex-col ${mobileStudyView === 'ai' ? 'flex' : 'hidden'}`}>
+            <aside 
+              className={`relative w-full border-l border-border bg-bg flex-col ${mobileStudyView === 'ai' ? 'flex' : 'hidden'}`}
+              onDragEnter={handleChatDragEnter}
+              onDragOver={handleChatDragOver}
+              onDragLeave={handleChatDragLeave}
+              onDrop={handleChatDrop}
+            >
+              {isDraggingOverChat && (
+                <div className="absolute inset-0 z-50 bg-bg/85 backdrop-blur-sm border-2 border-dashed border-accent rounded-2xl flex flex-col items-center justify-center p-6 text-center pointer-events-none transition-all animate-in fade-in zoom-in-95 duration-150 m-2 shadow-2xl">
+                  <div className="w-14 h-14 rounded-2xl bg-accent/15 text-accent flex items-center justify-center mb-3 shadow-inner">
+                    <UploadCloud size={30} className="animate-bounce" />
+                  </div>
+                  <div className="text-[15px] font-semibold text-fg">Drop file to add to conversation</div>
+                  <div className="text-[12px] text-muted mt-1 max-w-xs">Supports images, study PDFs, and notes</div>
+                </div>
+              )}
               <header className="h-[60px] border-b border-border flex items-center justify-between px-3 sm:px-4 text-[15px] font-medium text-fg shrink-0 gap-2">
                 <div className="flex items-center gap-2 min-w-0">
                   <button onClick={() => setMobileStudyView('reader')} className="p-1.5 -ml-1 text-fg-2 hover:text-fg shrink-0 cursor-pointer" title="Back to reader">
@@ -4022,11 +4235,46 @@ export default function App() {
                         </div>
                       </div>
                     )}
-                    {chatImage && (
-                      <div className="mb-2 relative self-start">
-                        <img src={chatImage.preview} alt="preview" className="h-16 rounded-xl object-cover border border-border-soft" />
-                        <button type="button" onClick={() => setChatImage(null)} className="absolute -top-1.5 -right-1.5 bg-surface border border-border-soft rounded-full p-0.5">
-                          <X size={10} className="text-white" />
+                    {fileUploadStatus && (
+                      <div className="mb-2 flex items-center gap-2 px-3 py-1.5 rounded-xl bg-accent/10 border border-accent/20 text-accent text-[12px] font-medium animate-in fade-in slide-in-from-bottom-1 duration-150 shadow-2xs self-start">
+                        <div className="w-2 h-2 rounded-full bg-accent animate-pulse shrink-0" />
+                        <span className="truncate">{fileUploadStatus}</span>
+                      </div>
+                    )}
+
+                    {(attachedFile || chatImage) && (
+                      <div className="mb-2 flex items-center gap-2.5 p-2 pr-3 rounded-xl bg-surface border border-border-soft/90 shadow-2xs self-start max-w-full">
+                        {attachedFile?.type === 'image' || (!attachedFile && chatImage) ? (
+                          <div className="relative w-10 h-10 rounded-lg overflow-hidden border border-border-soft shrink-0 bg-surface-warm">
+                            <img 
+                              src={attachedFile?.preview || chatImage?.preview} 
+                              alt={attachedFile?.name || 'Attached image'} 
+                              className="w-full h-full object-cover" 
+                            />
+                          </div>
+                        ) : (
+                          <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                            attachedFile?.type === 'pdf' ? 'bg-red-500/10 text-red-400' : 'bg-accent/10 text-accent'
+                          }`}>
+                            <FileText size={18} />
+                          </div>
+                        )}
+                        <div className="flex flex-col min-w-0 pr-1">
+                          <span className="text-[12px] font-medium text-fg truncate max-w-[150px] sm:max-w-xs">
+                            {attachedFile?.name || chatImage?.name || 'Attached file'}
+                          </span>
+                          <span className="text-[10px] text-muted flex items-center gap-1">
+                            {attachedFile?.size ? formatFileSize(attachedFile.size) : 'Ready'}
+                            <span className="text-emerald-400 font-medium">· Added</span>
+                          </span>
+                        </div>
+                        <button 
+                          type="button" 
+                          onClick={removeAttachedFile} 
+                          className="p-1 text-muted hover:text-fg hover:bg-surface-hover rounded-lg transition-colors cursor-pointer shrink-0 ml-auto"
+                          title="Remove attached file"
+                        >
+                          <X size={13} />
                         </button>
                       </div>
                     )}
@@ -4051,7 +4299,7 @@ export default function App() {
                         onClick={() => imageFileRef.current?.click()} 
                         disabled={cooldown > 0 || !isOnline} 
                         className="flex-shrink-0 p-2 text-muted hover:text-fg disabled:opacity-40 transition-colors mr-1 cursor-pointer"
-                        title="Attach image"
+                        title="Attach file or image"
                       >
                         <Paperclip size={16} />
                       </button>
@@ -4075,7 +4323,7 @@ export default function App() {
                       />
                       <button 
                         type="submit" 
-                        disabled={isAiTyping || (!chatInput.trim() && !chatImage && chatQuotes.length === 0) || cooldown > 0 || !isOnline}
+                        disabled={isAiTyping || (!chatInput.trim() && !chatImage && !attachedFile && chatQuotes.length === 0) || cooldown > 0 || !isOnline}
                         className="absolute right-2 bottom-2 p-2 bg-accent hover:bg-[#b5583b] text-white rounded-xl disabled:opacity-30 disabled:hover:bg-accent transition-all shadow-sm shrink-0 cursor-pointer"
                         title="Send message"
                       >
@@ -4698,7 +4946,25 @@ export default function App() {
 
             {/* Right Sidebar: Study AI */}
             {showRightSidebar && (
-              <Panel panelRef={rightPanelRef} defaultSize="25" minSize="20" className={`w-full lg:w-auto border-l border-border bg-bg flex-col ${mobileStudyView === 'ai' ? 'flex' : 'hidden lg:flex'}`}>
+              <Panel 
+                panelRef={rightPanelRef} 
+                defaultSize="25" 
+                minSize="20" 
+                className={`relative w-full lg:w-auto border-l border-border bg-bg flex-col ${mobileStudyView === 'ai' ? 'flex' : 'hidden lg:flex'}`}
+                onDragEnter={handleChatDragEnter}
+                onDragOver={handleChatDragOver}
+                onDragLeave={handleChatDragLeave}
+                onDrop={handleChatDrop}
+              >
+              {isDraggingOverChat && (
+                <div className="absolute inset-0 z-50 bg-bg/85 backdrop-blur-sm border-2 border-dashed border-accent rounded-2xl flex flex-col items-center justify-center p-6 text-center pointer-events-none transition-all animate-in fade-in zoom-in-95 duration-150 m-2 shadow-2xl">
+                  <div className="w-14 h-14 rounded-2xl bg-accent/15 text-accent flex items-center justify-center mb-3 shadow-inner">
+                    <UploadCloud size={30} className="animate-bounce" />
+                  </div>
+                  <div className="text-[15px] font-semibold text-fg">Drop file to add to conversation</div>
+                  <div className="text-[12px] text-muted mt-1 max-w-xs">Supports images, study PDFs, and notes</div>
+                </div>
+              )}
               <header className="h-[60px] border-b border-border flex items-center justify-between px-2.5 sm:px-3 lg:px-4 text-[15px] font-medium text-fg shrink-0 gap-1.5">
                 <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                   <button onClick={() => setMobileStudyView('reader')} className="lg:hidden p-1.5 -ml-1 text-fg-2 hover:text-fg shrink-0 cursor-pointer" title="Back to reader">
@@ -4747,18 +5013,6 @@ export default function App() {
                 <div ref={messagesEndRef} />
               </div>
                 <form onSubmit={handleSendMessage} className="p-4 border-t border-border bg-bg shrink-0">
-                  <input ref={imageFileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = (ev) => {
-                      const dataUrl = ev.target?.result as string;
-                      const base64 = dataUrl.split(',')[1];
-                      setChatImage({ base64, mimeType: file.type, preview: dataUrl });
-                    };
-                    reader.readAsDataURL(file);
-                    e.target.value = '';
-                  }} />
                   <div className="flex flex-col relative">
                     {/* Scripture Context Pill */}
                     {attachActiveChapter && activeBook && (
@@ -4831,11 +5085,47 @@ export default function App() {
                         </div>
                       </div>
                     )}
-                    {chatImage && (
-                      <div className="mb-2 relative self-start">
-                        <img src={chatImage.preview} alt="preview" className="h-16 rounded-xl object-cover border border-border-soft" />
-                        <button type="button" onClick={() => setChatImage(null)} className="absolute -top-1.5 -right-1.5 bg-surface border border-border-soft rounded-full p-0.5">
-                          <X size={10} className="text-white" />
+
+                    {fileUploadStatus && (
+                      <div className="mb-2 flex items-center gap-2 px-3 py-1.5 rounded-xl bg-accent/10 border border-accent/20 text-accent text-[12px] font-medium animate-in fade-in slide-in-from-bottom-1 duration-150 shadow-2xs self-start">
+                        <div className="w-2 h-2 rounded-full bg-accent animate-pulse shrink-0" />
+                        <span className="truncate">{fileUploadStatus}</span>
+                      </div>
+                    )}
+
+                    {(attachedFile || chatImage) && (
+                      <div className="mb-2 flex items-center gap-2.5 p-2 pr-3 rounded-xl bg-surface border border-border-soft/90 shadow-2xs self-start max-w-full">
+                        {attachedFile?.type === 'image' || (!attachedFile && chatImage) ? (
+                          <div className="relative w-10 h-10 rounded-lg overflow-hidden border border-border-soft shrink-0 bg-surface-warm">
+                            <img 
+                              src={attachedFile?.preview || chatImage?.preview} 
+                              alt={attachedFile?.name || 'Attached image'} 
+                              className="w-full h-full object-cover" 
+                            />
+                          </div>
+                        ) : (
+                          <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                            attachedFile?.type === 'pdf' ? 'bg-red-500/10 text-red-400' : 'bg-accent/10 text-accent'
+                          }`}>
+                            <FileText size={18} />
+                          </div>
+                        )}
+                        <div className="flex flex-col min-w-0 pr-1">
+                          <span className="text-[12px] font-medium text-fg truncate max-w-[150px] sm:max-w-xs">
+                            {attachedFile?.name || chatImage?.name || 'Attached file'}
+                          </span>
+                          <span className="text-[10px] text-muted flex items-center gap-1">
+                            {attachedFile?.size ? formatFileSize(attachedFile.size) : 'Ready'}
+                            <span className="text-emerald-400 font-medium">· Added</span>
+                          </span>
+                        </div>
+                        <button 
+                          type="button" 
+                          onClick={removeAttachedFile} 
+                          className="p-1 text-muted hover:text-fg hover:bg-surface-hover rounded-lg transition-colors cursor-pointer shrink-0 ml-auto"
+                          title="Remove attached file"
+                        >
+                          <X size={13} />
                         </button>
                       </div>
                     )}
@@ -4860,7 +5150,7 @@ export default function App() {
                         onClick={() => imageFileRef.current?.click()} 
                         disabled={cooldown > 0 || !isOnline} 
                         className="flex-shrink-0 p-2 text-muted hover:text-fg disabled:opacity-40 transition-colors mr-1 cursor-pointer"
-                        title="Attach image"
+                        title="Attach file or image"
                       >
                         <Paperclip size={16} />
                       </button>
@@ -4884,7 +5174,7 @@ export default function App() {
                       />
                       <button 
                         type="submit" 
-                        disabled={isAiTyping || (!chatInput.trim() && !chatImage && chatQuotes.length === 0) || cooldown > 0 || !isOnline} 
+                        disabled={isAiTyping || (!chatInput.trim() && !chatImage && !attachedFile && chatQuotes.length === 0) || cooldown > 0 || !isOnline} 
                         className="absolute right-2 bottom-2 p-2 bg-accent hover:bg-[#b5583b] text-white rounded-xl disabled:opacity-40 disabled:hover:bg-accent transition-all shadow-sm cursor-pointer"
                         title="Send message"
                       >
@@ -5270,7 +5560,27 @@ export default function App() {
               </div>
             </aside>
             
-            <section className={`flex-1 flex-col bg-bg ${mobileChatView === 'chat' ? 'flex' : 'hidden lg:flex'}`}>
+            <section 
+              className={`relative flex-1 flex-col bg-bg ${mobileChatView === 'chat' ? 'flex' : 'hidden lg:flex'}`}
+              onDragEnter={handleChatDragEnter}
+              onDragOver={handleChatDragOver}
+              onDragLeave={handleChatDragLeave}
+              onDrop={handleChatDrop}
+            >
+              {isDraggingOverChat && (
+                <div className="absolute inset-0 z-50 bg-bg/85 backdrop-blur-sm border-2 border-dashed border-accent rounded-3xl flex flex-col items-center justify-center p-8 text-center pointer-events-none transition-all animate-in fade-in zoom-in-95 duration-150 m-3 shadow-2xl">
+                  <div className="w-16 h-16 rounded-2xl bg-accent/15 text-accent flex items-center justify-center mb-4 shadow-inner">
+                    <UploadCloud size={34} className="animate-bounce" />
+                  </div>
+                  <div className="text-[18px] font-semibold text-fg tracking-tight">Drop file to add to conversation</div>
+                  <div className="text-[13px] text-muted mt-1.5 max-w-sm leading-normal">
+                    Drag & drop images (PNG, JPG, WebP), study PDFs, and notes directly into your Bible study chat
+                  </div>
+                  <div className="mt-3.5 inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-surface border border-border-soft text-[12px] font-medium text-accent">
+                    <span>Release to attach</span>
+                  </div>
+                </div>
+              )}
               <header className="h-[60px] border-b border-border flex items-center justify-between px-3 sm:px-4 lg:px-8 shrink-0">
                 <div className="flex items-center min-w-0 mr-2">
                   <button 
@@ -5397,11 +5707,46 @@ export default function App() {
                       </div>
                     </div>
                   )}
-                  {chatImage && (
-                    <div className="mb-2 relative self-start">
-                      <img src={chatImage.preview} alt="preview" className="h-20 rounded-xl object-cover border border-border-soft" />
-                      <button type="button" onClick={() => setChatImage(null)} className="absolute -top-1.5 -right-1.5 bg-surface border border-border-soft rounded-full p-0.5">
-                        <X size={10} className="text-white" />
+                  {fileUploadStatus && (
+                    <div className="mb-2.5 flex items-center gap-2 px-3.5 py-2 rounded-xl bg-accent/10 border border-accent/20 text-accent text-[13px] font-medium animate-in fade-in slide-in-from-bottom-1 duration-150 shadow-2xs self-start">
+                      <div className="w-2 h-2 rounded-full bg-accent animate-pulse shrink-0" />
+                      <span className="truncate">{fileUploadStatus}</span>
+                    </div>
+                  )}
+
+                  {(attachedFile || chatImage) && (
+                    <div className="mb-3 flex items-center gap-3 p-2.5 pr-3.5 rounded-xl bg-surface border border-border-soft/90 shadow-2xs self-start max-w-full">
+                      {attachedFile?.type === 'image' || (!attachedFile && chatImage) ? (
+                        <div className="relative w-12 h-12 rounded-lg overflow-hidden border border-border-soft shrink-0 bg-surface-warm">
+                          <img 
+                            src={attachedFile?.preview || chatImage?.preview} 
+                            alt={attachedFile?.name || 'Attached image'} 
+                            className="w-full h-full object-cover" 
+                          />
+                        </div>
+                      ) : (
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+                          attachedFile?.type === 'pdf' ? 'bg-red-500/10 text-red-400' : 'bg-accent/10 text-accent'
+                        }`}>
+                          <FileText size={20} />
+                        </div>
+                      )}
+                      <div className="flex flex-col min-w-0 pr-2">
+                        <span className="text-[13px] font-medium text-fg truncate max-w-[200px] sm:max-w-xs">
+                          {attachedFile?.name || chatImage?.name || 'Attached file'}
+                        </span>
+                        <span className="text-[11px] text-muted flex items-center gap-1.5">
+                          {attachedFile?.size ? formatFileSize(attachedFile.size) : 'Ready'}
+                          <span className="text-emerald-400 font-medium">· Attached to conversation</span>
+                        </span>
+                      </div>
+                      <button 
+                        type="button" 
+                        onClick={removeAttachedFile} 
+                        className="p-1 text-muted hover:text-fg hover:bg-surface-hover rounded-lg transition-colors cursor-pointer shrink-0 ml-auto"
+                        title="Remove attached file"
+                      >
+                        <X size={14} />
                       </button>
                     </div>
                   )}
@@ -5426,7 +5771,7 @@ export default function App() {
                       onClick={() => imageFileRef.current?.click()} 
                       disabled={cooldown > 0} 
                       className="flex-shrink-0 p-2.5 text-muted hover:text-fg disabled:opacity-40 transition-colors mr-1 cursor-pointer"
-                      title="Attach image"
+                      title="Attach file or image"
                     >
                       <Paperclip size={18} />
                     </button>
@@ -5450,7 +5795,7 @@ export default function App() {
                     />
                     <button 
                       type="submit" 
-                      disabled={isAiTyping || (!chatInput.trim() && !chatImage && chatQuotes.length === 0) || cooldown > 0} 
+                      disabled={isAiTyping || (!chatInput.trim() && !chatImage && !attachedFile && chatQuotes.length === 0) || cooldown > 0} 
                       className="absolute right-2.5 bottom-2.5 p-2.5 bg-accent hover:bg-[#b5583b] text-white rounded-xl disabled:opacity-40 disabled:hover:bg-accent transition-all shadow-sm cursor-pointer"
                       title="Send message"
                     >
@@ -5776,6 +6121,21 @@ export default function App() {
             </div>
           </div>
         )}
+
+        {/* Global Chat File Attachment Input */}
+        <input
+          ref={imageFileRef}
+          type="file"
+          accept="image/*,application/pdf,text/*,.txt,.md,.json,.csv"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              processSelectedFile(file);
+            }
+            e.target.value = '';
+          }}
+        />
       </div>
     </>
   );

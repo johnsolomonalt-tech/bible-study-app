@@ -424,7 +424,10 @@ You MUST treat the verse text above as the 100% authoritative ground truth. When
       text: `[Context: Verified scripture text for ${resolvedGroundTruth.reference} (${resolvedGroundTruth.translation}): "${resolvedGroundTruth.text}"]\n\n${content || 'Please provide an in-depth biblical study on this passage.'}`,
     });
   } else {
-    messageParts.push({ text: content || 'Please describe this image in the context of Bible study.' });
+    const defaultPrompt = image?.mimeType === 'application/pdf'
+      ? 'Please analyze this attached document in the context of Christian Bible study and theology.'
+      : 'Please describe and analyze this attached image in the context of Bible study.';
+    messageParts.push({ text: content || defaultPrompt });
   }
 
   // Step D: Streaming & Synthesizing Response with Real-Time Thinking
