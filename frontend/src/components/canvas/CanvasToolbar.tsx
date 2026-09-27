@@ -46,6 +46,7 @@ interface CanvasToolbarProps {
   nodeCount: number;
   hasActiveBoard?: boolean;
   onCreateBoard?: () => void;
+  onNewCanvas?: () => void;
 }
 
 const CATEGORY_ICONS: Record<NodeCategory, React.ElementType> = {
@@ -80,6 +81,7 @@ export function CanvasToolbar({
   nodeCount,
   hasActiveBoard = true,
   onCreateBoard,
+  onNewCanvas,
 }: CanvasToolbarProps) {
   const mod = useModifierKey();
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
@@ -292,6 +294,19 @@ export function CanvasToolbar({
           )}
         </div>
 
+
+        {/* New Canvas Button (takes to Theologica AI creator start page) */}
+        {onNewCanvas && (
+          <button
+            type="button"
+            onClick={onNewCanvas}
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border border-border text-fg hover:border-accent hover:text-accent text-xs font-semibold shadow-xs active:scale-95 transition-all cursor-pointer"
+            title="Create a new canvas with Theologica AI"
+          >
+            <Plus size={14} className="text-accent shrink-0" />
+            <span className="hidden md:inline">New Canvas</span>
+          </button>
+        )}
 
         {/* Theologica AI Assistant Button */}
         <button

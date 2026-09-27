@@ -30,6 +30,8 @@ import { CanvasSidebar } from './CanvasSidebar';
 import { TheologicaAiCanvasModal } from './TheologicaAiCanvasModal';
 import { ExportStudyGuideModal } from './ExportStudyGuideModal';
 import { ShareCanvasModal } from './ShareCanvasModal';
+import { CanvasStartPage } from './CanvasStartPage';
+import { ImportCanvasModal } from './ImportCanvasModal';
 import { getVerseCrossReferences } from '@/lib/crossReferences';
 import { parseVerseReference } from '@/lib/bibleReferences';
 import { getPassage } from '@/lib/bibleProvider';
@@ -299,6 +301,14 @@ function InnerCanvasBoard({
   const [isExportGuideOpen, setIsExportGuideOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [aiToast, setAiToast] = useState<{ message: string; count: number } | null>(null);
+
+  // Start Page and Import Modal state
+  const [isCreatePageActive, setIsCreatePageActive] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isStartPageGenerating, setIsStartPageGenerating] = useState(false);
+  const [startPageGeneratingStep, setStartPageGeneratingStep] = useState(0);
+  const startPageAbortControllerRef = useRef<AbortController | null>(null);
+  const isInitialMountRef = useRef(true);
 
   // Keep references to latest nodes, edges, activeBoardId, boardTitle, boards, and state flags
   const nodesRef = useRef<Node<CanvasNodeData>[]>([]);
@@ -1559,6 +1569,7 @@ function InnerCanvasBoard({
   // Handle incoming node from Bible reader or AI chat
   useEffect(() => {
     if (!incomingNode) return;
+    setIsCreatePageActive(false);
 
     let targetBoardId: string | null = null;
     let baseNodes: Node<CanvasNodeData>[] = [];
@@ -1969,6 +1980,176 @@ function InnerCanvasBoard({
     };
   }, [nodes, edges, toSerializableNodes, toSerializableEdges]);
 
+  // Start Page: Generate new canvas from prompt
+  const handleGenerateFromStartPage = useCallback(async (
+    promptText: string,
+    mode: 'generate' | 'discourse' | 'synthesize',
+    lens: string
+  ) => {
+    setIsStartPageGenerating(true);
+    setStartPageGeneratingStep(0);
+
+    const controller = new AbortController();
+    startPageAbortControllerRef.current = controller;
+
+    const t1 = setTimeout(() => setStartPageGeneratingStep(1), 4000);
+    const t2 = setTimeout(() => setStartPageGeneratingStep(2), 9000);
+    const t3 = setTimeout(() => setStartPageGeneratingStep(3), 14000);
+
+    try {
+      const res = await fetch('/api/canvas/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          prompt: promptText,
+          currentGraph: { nodes: [], edges: [] },
+          mode,
+          theologicalLens: lens,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to architect canvas board.");
+      }
+
+      const cleanTitle = (data.boardTitle || '').trim() || (promptText.length > 35 ? promptText.slice(0, 35) + '...' : promptText);
+
+      // 1. Create a fresh canvas board
+      handleCreateBoard(cleanTitle);
+
+      // 2. Populate graph with generated cards
+      if (Array.isArray(data.nodes) && data.nodes.length > 0) {
+        handleApplyAiGraph(data.nodes, data.edges || [], data.explanation, cleanTitle, mode);
+      }
+
+      // 3. Close start page and display board
+      setIsCreatePageActive(false);
+      setAiToast({ message: `Architected canvas: "${cleanTitle}"`, count: data.nodes?.length || 0 });
+
+      setTimeout(() => {
+        spawnToCards(500);
+      }, 200);
+    } catch (err: any) {
+      if (err.name === 'AbortError') return;
+      console.error('Failed to generate canvas from start page:', err);
+      alert(err.message || 'Failed to architect canvas. Please try again.');
+    } finally {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      setIsStartPageGenerating(false);
+      startPageAbortControllerRef.current = null;
+    }
+  }, [handleCreateBoard, handleApplyAiGraph, spawnToCards]);
+
+  // Import shared canvas success handler
+  const handleImportSuccess = useCallback((imported: {
+    id: string;
+    title: string;
+    nodes: any[];
+    edges: any[];
+    viewport?: any;
+  }) => {
+    const pNodes = (imported.nodes || []).map(prepareNode);
+    const pEdges = (imported.edges || []).map(prepareEdge);
+
+    try {
+      localStorage.setItem(`${STORAGE_KEY_BOARD_PREFIX}${imported.id}`, JSON.stringify({
+        id: imported.id,
+        title: imported.title,
+        nodes: imported.nodes || [],
+        edges: imported.edges || [],
+        viewport: imported.viewport || undefined,
+        updatedAt: new Date().toISOString(),
+      }));
+
+      const existingList = JSON.parse(localStorage.getItem(STORAGE_KEY_BOARDS_LIST) || '[]');
+      const metaItem = {
+        id: imported.id,
+        title: imported.title,
+        updatedAt: new Date().toISOString(),
+        nodeCount: pNodes.length,
+      };
+      const updatedList = [metaItem, ...existingList.filter((b: any) => b.id !== imported.id)];
+      localStorage.setItem(STORAGE_KEY_BOARDS_LIST, JSON.stringify(updatedList));
+      localStorage.setItem(STORAGE_KEY_ACTIVE_BOARD, imported.id);
+    } catch (e) {
+      console.warn('Local storage write failed for imported canvas:', e);
+    }
+
+    setBoards((prev) => [
+      { id: imported.id, title: imported.title, updatedAt: new Date().toISOString(), nodeCount: pNodes.length },
+      ...prev.filter((b) => b.id !== imported.id)
+    ]);
+
+    setActiveBoardId(imported.id);
+    activeBoardIdRef.current = imported.id;
+    setBoardTitle(imported.title);
+    boardTitleRef.current = imported.title;
+    setNodes(pNodes);
+    setEdges(pEdges);
+    nodesRef.current = pNodes;
+    edgesRef.current = pEdges;
+
+    historyRef.current = [{ nodes: toSerializableNodes(pNodes), edges: toSerializableEdges(pEdges) }];
+    historyIndexRef.current = 0;
+    updateHistoryState();
+
+    setIsCreatePageActive(false);
+    setAiToast({ message: `Imported canvas: "${imported.title}"`, count: pNodes.length });
+
+    setTimeout(() => {
+      fitView({ padding: 0.25, duration: 600 });
+    }, 150);
+  }, [prepareEdge, prepareNode, toSerializableEdges, toSerializableNodes, updateHistoryState, fitView, setNodes, setEdges]);
+
+  // Open Create with Theologica AI start page whenever clicking the Canvas tab in navigation
+  useEffect(() => {
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      try {
+        const localList = localStorage.getItem(STORAGE_KEY_BOARDS_LIST);
+        if (!localList || localList === '[]') {
+          setIsCreatePageActive(true);
+        }
+      } catch {}
+      return;
+    }
+
+    if (isActiveTab) {
+      setIsCreatePageActive(true);
+    }
+  }, [focusTrigger]);
+
+  // Support ?importCanvas=... parameter and ?imported=1
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const importCode = params.get('importCanvas');
+      if (importCode) {
+        fetch('/api/canvas/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: importCode }),
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.board) {
+              handleImportSuccess(data.board);
+              window.history.replaceState({}, '', window.location.pathname + '?tab=canvas');
+            }
+          })
+          .catch((err) => console.warn('Auto-import from URL parameter failed:', err));
+      } else if (params.get('imported') === '1') {
+        setIsCreatePageActive(false);
+        window.history.replaceState({}, '', window.location.pathname + '?tab=canvas');
+      }
+    } catch {}
+  }, [handleImportSuccess]);
+
   // Node & Edge types
   const nodeTypes = useMemo(() => ({ customCard: CustomCanvasNode }), []);
   const edgeTypes = useMemo(() => ({ customEdge: CustomCanvasEdge }), []);
@@ -2015,41 +2196,89 @@ function InnerCanvasBoard({
         onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
         boards={boards}
         activeBoardId={activeBoardId}
-        onSelectBoard={handleSelectBoard}
-        onCreateBoard={handleCreateBoard}
+        onSelectBoard={(id) => {
+          handleSelectBoard(id);
+          setIsCreatePageActive(false);
+        }}
+        onCreateBoard={() => {
+          setIsCreatePageActive(true);
+          setIsSidebarOpen(false);
+        }}
         onRenameBoard={handleRenameBoard}
         onDeleteBoard={handleDeleteBoard}
+        onOpenImportModal={() => {
+          setIsImportModalOpen(true);
+          setIsSidebarOpen(false);
+        }}
         theme={theme}
       />
 
-      {/* Top Action Toolbar */}
-      <CanvasToolbar
-        boardTitle={boardTitle}
-        onTitleChange={(t) => handleRenameBoard(activeBoardId, t)}
-        onAddNode={handleAddNode}
-        onOpenAi={() => setIsAiModalOpen(true)}
-        onExportStudyGuide={() => setIsExportGuideOpen(true)}
-        onShareBoard={() => setIsShareModalOpen(true)}
-        onUndo={handleUndo}
-        onRedo={handleRedo}
-        canUndo={canUndo}
-        canRedo={canRedo}
-        onFitView={() => {
-          if (containerRef.current && containerRef.current.clientWidth > 100) {
-            fitView({ padding: 0.2, duration: 600, minZoom: 0.35, maxZoom: 1.1 });
+      {isCreatePageActive || (boards.length === 0 && !activeBoardId) ? (
+        <CanvasStartPage
+          onGenerateCanvas={handleGenerateFromStartPage}
+          onCreateBlankCanvas={() => {
+            handleCreateBoard();
+            setIsCreatePageActive(false);
+          }}
+          onOpenImportModal={() => setIsImportModalOpen(true)}
+          onSelectBoard={(id) => {
+            handleSelectBoard(id);
+            setIsCreatePageActive(false);
+          }}
+          onResumeActiveBoard={
+            activeBoardId && nodes.length > 0
+              ? () => setIsCreatePageActive(false)
+              : undefined
           }
-        }}
-        onAutoArrange={handleAutoArrange}
-        onClear={handleClear}
-        isSidebarOpen={isSidebarOpen}
-        onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
-        saveStatus={saveStatus}
-        onSave={handleManualSave}
-        theme={theme}
-        nodeCount={nodes.length}
-        hasActiveBoard={Boolean(activeBoardId && boards.length > 0)}
-        onCreateBoard={() => handleCreateBoard()}
-      />
+          activeBoard={
+            activeBoardId
+              ? { id: activeBoardId, title: boardTitle, nodeCount: nodes.length }
+              : null
+          }
+          recentBoards={boards}
+          onOpenSidebar={() => setIsSidebarOpen(true)}
+          isGenerating={isStartPageGenerating}
+          generatingStep={startPageGeneratingStep}
+          onCancelGeneration={() => {
+            if (startPageAbortControllerRef.current) {
+              startPageAbortControllerRef.current.abort();
+              startPageAbortControllerRef.current = null;
+            }
+            setIsStartPageGenerating(false);
+          }}
+          theme={theme}
+        />
+      ) : (
+        <>
+          {/* Top Action Toolbar */}
+          <CanvasToolbar
+            boardTitle={boardTitle}
+            onTitleChange={(t) => handleRenameBoard(activeBoardId, t)}
+            onAddNode={handleAddNode}
+            onOpenAi={() => setIsAiModalOpen(true)}
+            onNewCanvas={() => setIsCreatePageActive(true)}
+            onExportStudyGuide={() => setIsExportGuideOpen(true)}
+            onShareBoard={() => setIsShareModalOpen(true)}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+            canUndo={canUndo}
+            canRedo={canRedo}
+            onFitView={() => {
+              if (containerRef.current && containerRef.current.clientWidth > 100) {
+                fitView({ padding: 0.2, duration: 600, minZoom: 0.35, maxZoom: 1.1 });
+              }
+            }}
+            onAutoArrange={handleAutoArrange}
+            onClear={handleClear}
+            isSidebarOpen={isSidebarOpen}
+            onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+            saveStatus={saveStatus}
+            onSave={handleManualSave}
+            theme={theme}
+            nodeCount={nodes.length}
+            hasActiveBoard={Boolean(activeBoardId && boards.length > 0)}
+            onCreateBoard={() => setIsCreatePageActive(true)}
+          />
 
       {/* React Flow Canvas Engine */}
       <ReactFlow<Node<CanvasNodeData>, Edge>
@@ -2140,64 +2369,6 @@ function InnerCanvasBoard({
           />
         )}
       </ReactFlow>
-
-      {/* Empty State Overlay in the Board Space (When there are 0 boards) */}
-      {boards.length === 0 && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center p-6 pointer-events-none">
-          <div 
-            className={`pointer-events-auto max-w-md w-full p-8 rounded-3xl border shadow-2xl backdrop-blur-xl text-center space-y-6 animate-in fade-in-50 zoom-in-95 transition-all duration-300 ${
-              isDark 
-                ? 'bg-[#1c1c20]/90 border-zinc-800/80 text-zinc-100 shadow-black/50' 
-                : 'bg-white/95 border-zinc-200/80 text-zinc-900 shadow-zinc-200/60'
-            }`}
-          >
-            {/* Icon badge with glow */}
-            <div className="mx-auto w-16 h-16 rounded-2xl bg-accent/15 border border-accent/30 flex items-center justify-center text-accent shadow-inner relative group">
-              <Workflow size={32} className="transition-transform duration-300 group-hover:scale-110" />
-              <div className="absolute -inset-1 rounded-2xl bg-accent/20 blur-md -z-10 animate-pulse" />
-            </div>
-
-            {/* Header & Description */}
-            <div className="space-y-2">
-              <h2 className="text-xl sm:text-2xl font-bold tracking-tight">
-                No Canvas Boards
-              </h2>
-              <p className={`text-xs sm:text-sm leading-relaxed ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
-                Create a canvas to start organizing scripture passages, theological points, and study notes into an interactive visual graph.
-              </p>
-            </div>
-
-            {/* Actions */}
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-1">
-              <button
-                type="button"
-                onClick={() => handleCreateBoard()}
-                className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-accent hover:bg-accent/90 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-accent/25 active:scale-95 transition-all cursor-pointer"
-              >
-                <Plus size={16} />
-                <span>Create Canvas Board</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsAiModalOpen(true)}
-                className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-surface text-fg hover:border-accent hover:text-accent text-xs sm:text-sm font-medium active:scale-95 transition-all cursor-pointer shadow-xs"
-              >
-                <Sparkles size={15} className="text-accent" />
-                <span>Generate with AI</span>
-              </button>
-            </div>
-
-            {/* Helper Footer */}
-            <div className={`pt-3 border-t text-[11px] flex items-center justify-center gap-4 ${isDark ? 'border-zinc-800 text-zinc-500' : 'border-zinc-100 text-zinc-400'}`}>
-              <span className="hidden sm:inline">Right-click for options</span>
-              <span className="hidden sm:inline">•</span>
-              <span className="hidden sm:inline">Press &quot;Your Canvases&quot; to manage</span>
-              <span className="sm:hidden">Tap + Card to start creating</span>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Canvas Pane Right-Click Context Menu */}
       {paneContextMenu && (
@@ -2401,6 +2572,8 @@ function InnerCanvasBoard({
           </button>
         </div>
       )}
+        </>
+      )}
 
       {/* Theologica AI Canvas Architect Modal */}
       <TheologicaAiCanvasModal
@@ -2441,6 +2614,14 @@ function InnerCanvasBoard({
         boardId={activeBoardId}
         boardTitle={boardTitle}
         nodeCount={nodes.length}
+        theme={theme}
+      />
+
+      {/* Import Shared Canvas Modal */}
+      <ImportCanvasModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImportSuccess={handleImportSuccess}
         theme={theme}
       />
     </div>

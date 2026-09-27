@@ -33,6 +33,7 @@ export function ShareCanvasModal({
 }: ShareCanvasModalProps) {
   const isDark = theme === 'dark';
   const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
   const [copiedEmbed, setCopiedEmbed] = useState(false);
 
   if (!isOpen) return null;
@@ -45,6 +46,28 @@ export function ShareCanvasModal({
     navigator.clipboard.writeText(shareUrl);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
+  };
+
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(boardId);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
+  };
+
+  const handleNativeShare = async () => {
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({
+          title: `Theologica Canvas: ${boardTitle}`,
+          text: `Check out this visual scripture study board "${boardTitle}" on Theologica:`,
+          url: shareUrl,
+        });
+      } catch (err) {
+        // User dismissed share
+      }
+    } else {
+      handleCopyLink();
+    }
   };
 
   const handleCopyEmbed = () => {
@@ -99,11 +122,14 @@ export function ShareCanvasModal({
         </div>
 
         {/* Shareable Link Input */}
-        <div className="space-y-1.5 mb-4">
-          <label className="text-xs font-semibold text-zinc-400 flex items-center gap-1.5">
-            <Globe size={13} />
-            <span>Public Read-Only Link</span>
-          </label>
+        <div className="space-y-1.5 mb-3.5">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-semibold text-zinc-400 flex items-center gap-1.5">
+              <Globe size={13} className="text-accent" />
+              <span>Shareable Canvas Link</span>
+            </label>
+            <span className="text-[11px] text-zinc-500">Recipients can view & import</span>
+          </div>
           <div className="flex items-center gap-2">
             <input
               type="text"
@@ -118,20 +144,52 @@ export function ShareCanvasModal({
             <button
               type="button"
               onClick={handleCopyLink}
-              className={`px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ${
+              className={`px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm shrink-0 ${
                 copiedLink 
                   ? 'bg-emerald-600 text-white' 
                   : 'bg-accent text-white hover:bg-accent/90 active:scale-95'
               }`}
             >
               {copiedLink ? <Check size={14} /> : <Copy size={14} />}
-              <span>{copiedLink ? 'Copied!' : 'Copy'}</span>
+              <span>{copiedLink ? 'Copied Link!' : 'Copy Link'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleNativeShare}
+              className="p-2 rounded-xl text-xs font-semibold border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors flex items-center gap-1 cursor-pointer shrink-0"
+              title="Share via device options..."
+            >
+              <Share2 size={14} />
             </button>
           </div>
         </div>
 
+        {/* Share Code Section */}
+        <div className="space-y-1.5 mb-4 p-3 rounded-xl bg-zinc-100/70 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/50">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold text-zinc-400">Canvas Share Code:</span>
+            <span className="text-[11px] text-emerald-500 font-medium">Use in Canvas &gt; Import</span>
+          </div>
+          <div className="flex items-center justify-between gap-2 mt-1">
+            <code className="text-xs font-mono font-bold text-accent px-2 py-1 rounded-md bg-accent/10 border border-accent/20 truncate">
+              {boardId}
+            </code>
+            <button
+              type="button"
+              onClick={handleCopyCode}
+              className="px-2.5 py-1 rounded-lg text-xs font-medium border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors flex items-center gap-1 cursor-pointer shrink-0"
+            >
+              {copiedCode ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+              <span>{copiedCode ? 'Copied' : 'Copy Code'}</span>
+            </button>
+          </div>
+          <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
+            Other users can paste this code or link to save this canvas directly to their own account.
+          </p>
+        </div>
+
         {/* Embed Snippet */}
-        <div className="space-y-1.5 mb-5">
+        <div className="space-y-1.5 mb-4">
           <label className="text-xs font-semibold text-zinc-400 flex items-center gap-1.5">
             <Code2 size={13} />
             <span>Embed on Website or Blog (iFrame)</span>
@@ -150,7 +208,7 @@ export function ShareCanvasModal({
             <button
               type="button"
               onClick={handleCopyEmbed}
-              className="px-3 py-2 rounded-xl text-xs font-semibold border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors flex items-center gap-1.5 cursor-pointer"
+              className="px-3 py-2 rounded-xl text-xs font-semibold border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
             >
               {copiedEmbed ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
               <span>{copiedEmbed ? 'Copied!' : 'Copy'}</span>

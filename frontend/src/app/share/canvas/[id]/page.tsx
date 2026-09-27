@@ -28,7 +28,11 @@ import {
   Maximize2, 
   Loader2, 
   Sparkles,
-  Share2
+  Share2,
+  BookmarkPlus,
+  Check,
+  Copy,
+  ArrowRight
 } from 'lucide-react';
 
 const nodeTypes = {
@@ -40,16 +44,104 @@ const edgeTypes = {
 };
 
 function InnerSharedCanvasViewer({ boardId }: { boardId: string }) {
+  const router = useRouter();
   const { fitView } = useReactFlow();
   const [boardTitle, setBoardTitle] = useState('Shared Canvas Board');
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isSavingToMyCanvas, setIsSavingToMyCanvas] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<CanvasNodeData>>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
   const isDark = theme === 'dark';
+
+  const handleSaveToMyCanvas = async () => {
+    if (isSavingToMyCanvas || saveSuccess) return;
+    setIsSavingToMyCanvas(true);
+
+    try {
+      // 1. Call import API
+      const res = await fetch('/api/canvas/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: boardId }),
+      });
+
+      let targetId = `board-${Date.now()}`;
+      let targetTitle = boardTitle;
+      let targetNodes = nodes.map((n) => ({
+        id: n.id,
+        type: 'customCard',
+        position: n.position,
+        data: n.data,
+        style: n.style,
+      }));
+      let targetEdges = edges.map((e) => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        sourceHandle: e.sourceHandle,
+        targetHandle: e.targetHandle,
+        label: e.label,
+        animated: e.animated,
+      }));
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.board) {
+          targetId = data.board.id;
+          targetTitle = data.board.title;
+          if (Array.isArray(data.board.nodes) && data.board.nodes.length > 0) {
+            targetNodes = data.board.nodes;
+          }
+          if (Array.isArray(data.board.edges)) {
+            targetEdges = data.board.edges;
+          }
+        }
+      }
+
+      // 2. Also save directly to client localStorage for immediate access
+      try {
+        const STORAGE_KEY_ACTIVE_BOARD = 'theologica_active_canvas_board_id';
+        const STORAGE_KEY_BOARDS_LIST = 'theologica_canvas_boards_list_v1';
+        const STORAGE_KEY_BOARD_PREFIX = 'theologica_canvas_state_';
+
+        localStorage.setItem(`${STORAGE_KEY_BOARD_PREFIX}${targetId}`, JSON.stringify({
+          id: targetId,
+          title: targetTitle,
+          nodes: targetNodes,
+          edges: targetEdges,
+          updatedAt: new Date().toISOString(),
+        }));
+
+        const existingList = JSON.parse(localStorage.getItem(STORAGE_KEY_BOARDS_LIST) || '[]');
+        const metaItem = {
+          id: targetId,
+          title: targetTitle,
+          updatedAt: new Date().toISOString(),
+          nodeCount: targetNodes.length,
+        };
+        const updatedList = [metaItem, ...existingList.filter((b: any) => b.id !== targetId)];
+        localStorage.setItem(STORAGE_KEY_BOARDS_LIST, JSON.stringify(updatedList));
+        localStorage.setItem(STORAGE_KEY_ACTIVE_BOARD, targetId);
+      } catch (storageErr) {
+        console.warn('Local storage write failed during canvas save:', storageErr);
+      }
+
+      setSaveSuccess(true);
+      setTimeout(() => {
+        router.push(`/?tab=canvas&imported=1`);
+      }, 700);
+    } catch (err) {
+      console.error('Failed to save to my canvas:', err);
+      router.push(`/?tab=canvas&importCanvas=${encodeURIComponent(boardId)}`);
+    } finally {
+      setIsSavingToMyCanvas(false);
+    }
+  };
 
   useEffect(() => {
     async function loadBoard() {
@@ -170,7 +262,7 @@ function InnerSharedCanvasViewer({ boardId }: { boardId: string }) {
 
         {/* Right: Controls & CTA */}
         <div 
-          className={`pointer-events-auto flex items-center gap-1 sm:gap-2 p-1 sm:p-1.5 rounded-2xl shadow-xl border backdrop-blur-md shrink-0 ${
+          className={`pointer-events-auto flex items-center gap-1.5 sm:gap-2 p-1 sm:p-1.5 rounded-2xl shadow-xl border backdrop-blur-md shrink-0 ${
             isDark 
               ? 'bg-[#1e1e22]/90 border-zinc-700/70 text-zinc-200' 
               : 'bg-white/95 border-zinc-200/90 text-zinc-700'
@@ -188,19 +280,48 @@ function InnerSharedCanvasViewer({ boardId }: { boardId: string }) {
           <button
             type="button"
             onClick={() => fitView({ padding: 0.25, duration: 500 })}
-            className="p-1.5 sm:p-2 rounded-xl hover:bg-zinc-700/20 transition-colors cursor-pointer"
+            className="p-1.5 sm:p-2 rounded-xl hover:bg-zinc-700/20 transition-colors cursor-pointer hidden xs:flex"
             title="Fit Canvas View"
           >
             <Maximize2 size={15} />
           </button>
 
+          {/* Primary Action: Save to My Canvases */}
+          <button
+            type="button"
+            onClick={handleSaveToMyCanvas}
+            disabled={isSavingToMyCanvas || saveSuccess}
+            className={`flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-xl text-xs font-semibold shadow-md active:scale-95 transition-all cursor-pointer ${
+              saveSuccess
+                ? 'bg-emerald-600 text-white'
+                : 'bg-accent text-white hover:bg-accent/90'
+            }`}
+            title="Save a complete editable copy of this canvas into your own Theologica account"
+          >
+            {saveSuccess ? (
+              <>
+                <Check size={14} className="text-white" />
+                <span className="font-bold">Saved! Opening...</span>
+              </>
+            ) : isSavingToMyCanvas ? (
+              <>
+                <Loader2 size={14} className="animate-spin text-white" />
+                <span>Saving Canvas...</span>
+              </>
+            ) : (
+              <>
+                <BookmarkPlus size={14} />
+                <span>Save to My Canvases</span>
+              </>
+            )}
+          </button>
+
           <a
             href="/"
-            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-accent text-white text-xs font-semibold hover:bg-accent/90 transition-all shadow-sm"
+            className="hidden md:flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-zinc-300 dark:border-zinc-700 text-xs font-medium hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
           >
-            <span className="hidden sm:inline">Open in Theologica</span>
-            <span className="sm:hidden">App</span>
-            <ExternalLink size={13} />
+            <span>Theologica</span>
+            <ExternalLink size={12} />
           </a>
         </div>
       </header>

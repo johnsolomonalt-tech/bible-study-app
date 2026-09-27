@@ -12,7 +12,8 @@ import {
   PanelLeftClose, 
   Layers, 
   Clock, 
-  ChevronRight 
+  ChevronRight,
+  Download
 } from 'lucide-react';
 import { CanvasBoardMetadata } from '@/types/canvas';
 
@@ -25,6 +26,7 @@ interface CanvasSidebarProps {
   onCreateBoard: () => void;
   onRenameBoard: (id: string, newTitle: string) => void;
   onDeleteBoard: (id: string) => void;
+  onOpenImportModal?: () => void;
   theme: 'dark' | 'light';
 }
 
@@ -37,6 +39,7 @@ export function CanvasSidebar({
   onCreateBoard,
   onRenameBoard,
   onDeleteBoard,
+  onOpenImportModal,
   theme,
 }: CanvasSidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -120,16 +123,32 @@ export function CanvasSidebar({
         </button>
       </div>
 
-      {/* Action Bar: New Board & Search */}
+      {/* Action Bar: New Board, Import & Search */}
       <div className="p-3 space-y-2 shrink-0">
-        <button
-          type="button"
-          onClick={() => onCreateBoard()}
-          className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-accent text-white text-xs font-semibold hover:bg-accent/90 active:scale-[0.98] transition-all shadow-md cursor-pointer"
-        >
-          <Plus size={15} />
-          <span>New Canvas Board</span>
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => onCreateBoard()}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-accent text-white text-xs font-semibold hover:bg-accent/90 active:scale-[0.98] transition-all shadow-md cursor-pointer"
+          >
+            <Plus size={15} />
+            <span>New Canvas</span>
+          </button>
+          {onOpenImportModal && (
+            <button
+              type="button"
+              onClick={onOpenImportModal}
+              className={`p-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                isDark 
+                  ? 'border-zinc-700 bg-zinc-800/80 text-zinc-300 hover:bg-zinc-700' 
+                  : 'border-zinc-200 bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
+              }`}
+              title="Import Shared Canvas by Link or Code"
+            >
+              <Download size={15} />
+            </button>
+          )}
+        </div>
 
         {/* Search */}
         <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs ${
