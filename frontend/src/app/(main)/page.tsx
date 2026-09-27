@@ -3,7 +3,7 @@ const API_URL = '';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuth, UserButton, SignIn } from '@clerk/nextjs';
-import { Send, Plus, Layout, Edit, Sparkles, Target, Check, Copy, ChevronRight, ChevronLeft, ChevronDown, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow, ShieldCheck, Heart, Layers, Languages, MoreVertical } from 'lucide-react';
+import { Send, Plus, Layout, Edit, Sparkles, Target, Check, Copy, ChevronRight, ChevronLeft, ChevronDown, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow, ShieldCheck, Heart, Layers, Languages, MoreVertical, Search } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import TextareaAutosize from 'react-textarea-autosize';
 import { getDevotionalForDay, DevotionalEntry } from '../../lib/devotionals';
@@ -447,6 +447,19 @@ export default function App() {
   const [isOtExpanded, setIsOtExpanded] = useState<boolean>(true);
   const [isNtExpanded, setIsNtExpanded] = useState<boolean>(true);
   const [isDesktopMoreMenuOpen, setIsDesktopMoreMenuOpen] = useState(false);
+  const [bookSearchQuery, setBookSearchQuery] = useState<string>('');
+
+  const filteredOtBooks = useMemo(() => {
+    if (!bookSearchQuery.trim()) return OT_BOOKS;
+    const q = bookSearchQuery.toLowerCase().trim();
+    return OT_BOOKS.filter(b => b.name.toLowerCase().includes(q));
+  }, [bookSearchQuery]);
+
+  const filteredNtBooks = useMemo(() => {
+    if (!bookSearchQuery.trim()) return NT_BOOKS;
+    const q = bookSearchQuery.toLowerCase().trim();
+    return NT_BOOKS.filter(b => b.name.toLowerCase().includes(q));
+  }, [bookSearchQuery]);
   const [translation, setTranslation] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('theologica_bible_version') || 'bsb';
@@ -2920,172 +2933,229 @@ export default function App() {
                   {isOldTestament ? 'Old Testament' : 'New Testament'}
                 </div>
               </header>
-              <div className="flex-1 overflow-y-auto custom-scroll p-3 space-y-3">
-                {/* Old Testament Section */}
-                <div className="border border-border/60 rounded-2xl overflow-hidden bg-surface/30">
-                  <button
-                    type="button"
-                    onClick={() => setIsOtExpanded(!isOtExpanded)}
-                    className={`w-full flex items-center justify-between px-3.5 py-3 text-left transition-all cursor-pointer ${
-                      isOldTestament
-                        ? 'bg-accent/15 text-accent font-semibold'
-                        : 'hover:bg-surface text-muted hover:text-fg'
-                    }`}
-                    title={isOtExpanded ? "Collapse Old Testament" : "Expand Old Testament"}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-[12px] font-bold tracking-wider uppercase">Old Testament</span>
-                      {isOldTestament && (
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-accent text-accent-on tracking-wide">
-                          Current
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-muted">
-                      <span className="text-[11px] opacity-70">39 Books</span>
-                      <ChevronDown size={15} className={`transition-transform duration-200 ${isOtExpanded ? '' : '-rotate-90'}`} />
-                    </div>
-                  </button>
-
-                  {isOtExpanded && (
-                    <div className="p-2 space-y-1 border-t border-border/40">
-                      {OT_BOOKS.map(b => {
-                        const isCurrentBook = activeBook.name === b.name;
-                        return (
-                          <details
-                            key={b.name}
-                            name="mobile-bible-books"
-                            open={expandedBook === b.name}
-                            className="group mb-1"
-                          >
-                            <summary
-                              onClick={(e) => {
-                                e.preventDefault();
-                                setExpandedBook(prev => prev === b.name ? null : b.name);
-                              }}
-                              className={`w-full text-left px-3 py-2.5 rounded-xl text-[14px] font-medium cursor-pointer list-none flex justify-between items-center transition-all ${
-                                isCurrentBook
-                                  ? 'bg-accent/15 text-accent font-semibold ring-1 ring-accent/30 shadow-xs'
-                                  : 'text-fg-2 hover:bg-surface hover:text-fg'
-                              }`}
-                            >
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className="truncate">{b.name}</span>
-                                {isCurrentBook && (
-                                  <span className="text-[11px] font-normal opacity-80 shrink-0">
-                                    • Ch. {activeChapter}
-                                  </span>
-                                )}
-                              </div>
-                              <ChevronRight size={16} className={`transition-transform shrink-0 ${expandedBook === b.name ? 'rotate-90 text-accent' : 'opacity-40'}`} />
-                            </summary>
-                            <div className="grid grid-cols-5 gap-1.5 px-2 py-2 pb-3">
-                              {Array.from({ length: b.chapters }).map((_, i) => {
-                                const isCurrentChapter = isCurrentBook && activeChapter === i + 1;
-                                return (
-                                  <button 
-                                    key={i} 
-                                    onClick={() => { setActiveBook(b); setActiveChapter(i + 1); setExpandedBook(b.name); setMobileStudyView('reader'); }}
-                                    className={`text-xs min-h-[44px] py-2 rounded-lg transition-all font-medium cursor-pointer ${
-                                      isCurrentChapter 
-                                        ? 'bg-accent text-accent-on font-bold shadow-md ring-2 ring-accent/40 scale-105' 
-                                        : 'text-muted hover:bg-border-soft hover:text-fg bg-surface/50 border border-border/40'
-                                    }`}
-                                  >
-                                    {i + 1}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </details>
-                        );
-                      })}
-                    </div>
+              {/* Filter search bar */}
+              <div className="p-3 pb-2 border-b border-border/40 shrink-0">
+                <div className="relative flex items-center">
+                  <Search size={14} className="absolute left-3 text-muted pointer-events-none" />
+                  <input
+                    type="text"
+                    value={bookSearchQuery}
+                    onChange={(e) => setBookSearchQuery(e.target.value)}
+                    placeholder="Filter books..."
+                    className="w-full bg-surface border border-border/60 rounded-xl pl-8 pr-7 py-1.5 text-xs text-fg placeholder:text-muted focus:outline-none focus:border-accent/60 transition-colors"
+                  />
+                  {bookSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setBookSearchQuery('')}
+                      className="absolute right-2.5 p-0.5 text-muted hover:text-fg rounded-full cursor-pointer"
+                      title="Clear search"
+                    >
+                      <X size={12} />
+                    </button>
                   )}
                 </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto custom-scroll p-2 space-y-1">
+                {/* Old Testament Section */}
+                {filteredOtBooks.length > 0 && (
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setIsOtExpanded(!isOtExpanded)}
+                      className="w-full flex items-center justify-between px-2.5 py-2 text-left rounded-xl hover:bg-surface/50 transition-colors group cursor-pointer"
+                      title={isOtExpanded ? "Collapse Old Testament" : "Expand Old Testament"}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <ChevronDown
+                          size={13}
+                          className={`text-muted transition-transform duration-200 shrink-0 ${isOtExpanded ? '' : '-rotate-90'}`}
+                        />
+                        <span className={`text-[11px] font-bold tracking-wider uppercase truncate ${isOldTestament ? 'text-accent' : 'text-muted group-hover:text-fg'}`}>
+                          Old Testament
+                        </span>
+                        {isOldTestament && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-accent/15 text-accent border border-accent/25 tracking-wide shrink-0">
+                            Current
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[11px] text-muted tabular-nums opacity-60 shrink-0">
+                        {filteredOtBooks.length}
+                      </span>
+                    </button>
+
+                    {isOtExpanded && (
+                      <div className="mt-0.5 space-y-0.5 pl-1">
+                        {filteredOtBooks.map(b => {
+                          const isCurrentBook = activeBook.name === b.name;
+                          return (
+                            <details
+                              key={b.name}
+                              name="mobile-bible-books"
+                              open={expandedBook === b.name}
+                              className="group"
+                            >
+                              <summary
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setExpandedBook(prev => prev === b.name ? null : b.name);
+                                }}
+                                className={`w-full text-left px-3 py-2 rounded-xl text-[13.5px] cursor-pointer list-none flex justify-between items-center transition-colors ${
+                                  isCurrentBook
+                                    ? 'bg-accent/10 text-accent font-semibold'
+                                    : 'text-fg-2 hover:bg-surface hover:text-fg'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  {isCurrentBook && (
+                                    <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
+                                  )}
+                                  <span className="truncate">{b.name}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  {isCurrentBook && (
+                                    <span className="text-[10px] font-medium opacity-80">
+                                      Ch. {activeChapter}
+                                    </span>
+                                  )}
+                                  <ChevronRight size={13} className={`transition-transform duration-150 shrink-0 ${expandedBook === b.name ? 'rotate-90 text-accent' : 'opacity-40 text-muted'}`} />
+                                </div>
+                              </summary>
+                              <div className="grid grid-cols-5 gap-1.5 p-2 bg-surface/40 rounded-xl my-1 border border-border/30">
+                                {Array.from({ length: b.chapters }).map((_, i) => {
+                                  const isCurrentChapter = isCurrentBook && activeChapter === i + 1;
+                                  return (
+                                    <button 
+                                      key={i} 
+                                      onClick={() => { 
+                                        setActiveBook(b); 
+                                        setActiveChapter(i + 1); 
+                                        setExpandedBook(b.name); 
+                                        setMobileStudyView('reader'); 
+                                      }}
+                                      className={`h-8 rounded-lg text-xs font-medium transition-all flex items-center justify-center cursor-pointer ${
+                                        isCurrentChapter 
+                                          ? 'bg-accent text-accent-on font-bold shadow-xs' 
+                                          : 'text-fg-2 hover:bg-surface hover:text-fg bg-bg/50'
+                                      }`}
+                                    >
+                                      {i + 1}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </details>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* New Testament Section */}
-                <div className="border border-border/60 rounded-2xl overflow-hidden bg-surface/30">
-                  <button
-                    type="button"
-                    onClick={() => setIsNtExpanded(!isNtExpanded)}
-                    className={`w-full flex items-center justify-between px-3.5 py-3 text-left transition-all cursor-pointer ${
-                      !isOldTestament
-                        ? 'bg-accent/15 text-accent font-semibold'
-                        : 'hover:bg-surface text-muted hover:text-fg'
-                    }`}
-                    title={isNtExpanded ? "Collapse New Testament" : "Expand New Testament"}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-[12px] font-bold tracking-wider uppercase">New Testament</span>
-                      {!isOldTestament && (
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-accent text-accent-on tracking-wide">
-                          Current
+                {filteredNtBooks.length > 0 && (
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setIsNtExpanded(!isNtExpanded)}
+                      className="w-full flex items-center justify-between px-2.5 py-2 text-left rounded-xl hover:bg-surface/50 transition-colors group cursor-pointer"
+                      title={isNtExpanded ? "Collapse New Testament" : "Expand New Testament"}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <ChevronDown
+                          size={13}
+                          className={`text-muted transition-transform duration-200 shrink-0 ${isNtExpanded ? '' : '-rotate-90'}`}
+                        />
+                        <span className={`text-[11px] font-bold tracking-wider uppercase truncate ${!isOldTestament ? 'text-accent' : 'text-muted group-hover:text-fg'}`}>
+                          New Testament
                         </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-muted">
-                      <span className="text-[11px] opacity-70">27 Books</span>
-                      <ChevronDown size={15} className={`transition-transform duration-200 ${isNtExpanded ? '' : '-rotate-90'}`} />
-                    </div>
-                  </button>
+                        {!isOldTestament && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-accent/15 text-accent border border-accent/25 tracking-wide shrink-0">
+                            Current
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[11px] text-muted tabular-nums opacity-60 shrink-0">
+                        {filteredNtBooks.length}
+                      </span>
+                    </button>
 
-                  {isNtExpanded && (
-                    <div className="p-2 space-y-1 border-t border-border/40">
-                      {NT_BOOKS.map(b => {
-                        const isCurrentBook = activeBook.name === b.name;
-                        return (
-                          <details
-                            key={b.name}
-                            name="mobile-bible-books"
-                            open={expandedBook === b.name}
-                            className="group mb-1"
-                          >
-                            <summary
-                              onClick={(e) => {
-                                e.preventDefault();
-                                setExpandedBook(prev => prev === b.name ? null : b.name);
-                              }}
-                              className={`w-full text-left px-3 py-2.5 rounded-xl text-[14px] font-medium cursor-pointer list-none flex justify-between items-center transition-all ${
-                                isCurrentBook
-                                  ? 'bg-accent/15 text-accent font-semibold ring-1 ring-accent/30 shadow-xs'
-                                  : 'text-fg-2 hover:bg-surface hover:text-fg'
-                              }`}
+                    {isNtExpanded && (
+                      <div className="mt-0.5 space-y-0.5 pl-1">
+                        {filteredNtBooks.map(b => {
+                          const isCurrentBook = activeBook.name === b.name;
+                          return (
+                            <details
+                              key={b.name}
+                              name="mobile-bible-books"
+                              open={expandedBook === b.name}
+                              className="group"
                             >
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className="truncate">{b.name}</span>
-                                {isCurrentBook && (
-                                  <span className="text-[11px] font-normal opacity-80 shrink-0">
-                                    • Ch. {activeChapter}
-                                  </span>
-                                )}
+                              <summary
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setExpandedBook(prev => prev === b.name ? null : b.name);
+                                }}
+                                className={`w-full text-left px-3 py-2 rounded-xl text-[13.5px] cursor-pointer list-none flex justify-between items-center transition-colors ${
+                                  isCurrentBook
+                                    ? 'bg-accent/10 text-accent font-semibold'
+                                    : 'text-fg-2 hover:bg-surface hover:text-fg'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  {isCurrentBook && (
+                                    <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
+                                  )}
+                                  <span className="truncate">{b.name}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  {isCurrentBook && (
+                                    <span className="text-[10px] font-medium opacity-80">
+                                      Ch. {activeChapter}
+                                    </span>
+                                  )}
+                                  <ChevronRight size={13} className={`transition-transform duration-150 shrink-0 ${expandedBook === b.name ? 'rotate-90 text-accent' : 'opacity-40 text-muted'}`} />
+                                </div>
+                              </summary>
+                              <div className="grid grid-cols-5 gap-1.5 p-2 bg-surface/40 rounded-xl my-1 border border-border/30">
+                                {Array.from({ length: b.chapters }).map((_, i) => {
+                                  const isCurrentChapter = isCurrentBook && activeChapter === i + 1;
+                                  return (
+                                    <button 
+                                      key={i} 
+                                      onClick={() => { 
+                                        setActiveBook(b); 
+                                        setActiveChapter(i + 1); 
+                                        setExpandedBook(b.name); 
+                                        setMobileStudyView('reader'); 
+                                      }}
+                                      className={`h-8 rounded-lg text-xs font-medium transition-all flex items-center justify-center cursor-pointer ${
+                                        isCurrentChapter 
+                                          ? 'bg-accent text-accent-on font-bold shadow-xs' 
+                                          : 'text-fg-2 hover:bg-surface hover:text-fg bg-bg/50'
+                                      }`}
+                                    >
+                                      {i + 1}
+                                    </button>
+                                  );
+                                })}
                               </div>
-                              <ChevronRight size={16} className={`transition-transform shrink-0 ${expandedBook === b.name ? 'rotate-90 text-accent' : 'opacity-40'}`} />
-                            </summary>
-                            <div className="grid grid-cols-5 gap-1.5 px-2 py-2 pb-3">
-                              {Array.from({ length: b.chapters }).map((_, i) => {
-                                const isCurrentChapter = isCurrentBook && activeChapter === i + 1;
-                                return (
-                                  <button 
-                                    key={i} 
-                                    onClick={() => { setActiveBook(b); setActiveChapter(i + 1); setExpandedBook(b.name); setMobileStudyView('reader'); }}
-                                    className={`text-xs min-h-[44px] py-2 rounded-lg transition-all font-medium cursor-pointer ${
-                                      isCurrentChapter 
-                                        ? 'bg-accent text-accent-on font-bold shadow-md ring-2 ring-accent/40 scale-105' 
-                                        : 'text-muted hover:bg-border-soft hover:text-fg bg-surface/50 border border-border/40'
-                                    }`}
-                                  >
-                                    {i + 1}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </details>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                            </details>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Empty Search State */}
+                {filteredOtBooks.length === 0 && filteredNtBooks.length === 0 && (
+                  <div className="py-12 text-center text-muted text-xs">
+                    No books found matching &quot;{bookSearchQuery}&quot;
+                  </div>
+                )}
               </div>
             </aside>
 
@@ -3239,6 +3309,15 @@ export default function App() {
                           <Heart size={16} className="text-rose-400" />
                           <span>Lectio Divina (Prayer Mode)</span>
                         </button>
+
+                        {/* Theological Tradition Lens */}
+                        <div className="w-full flex items-center justify-between px-3 py-2 rounded-xl hover:bg-fg/5 text-xs font-medium transition-colors">
+                          <div className="flex items-center gap-2.5">
+                            <Sparkles size={16} className="text-accent" />
+                            <span className="text-fg">AI Perspective</span>
+                          </div>
+                          <TheologicalLensSelector currentLens={theologicalLens} onSelectLens={setTheologicalLens} compact />
+                        </div>
 
                         {/* Mark Completed */}
                         <button
@@ -3561,172 +3640,219 @@ export default function App() {
                 </button>
                 <span className="font-medium text-fg">Books</span>
               </header>
-              <div className="flex-1 overflow-y-auto custom-scroll p-3 space-y-3">
-                {/* Old Testament Section */}
-                <div className="border border-border/60 rounded-2xl overflow-hidden bg-surface/30">
-                  <button
-                    type="button"
-                    onClick={() => setIsOtExpanded(!isOtExpanded)}
-                    className={`w-full flex items-center justify-between px-3 py-2.5 text-left transition-all cursor-pointer ${
-                      isOldTestament
-                        ? 'bg-accent/15 text-accent font-semibold'
-                        : 'hover:bg-surface text-muted hover:text-fg'
-                    }`}
-                    title={isOtExpanded ? "Collapse Old Testament" : "Expand Old Testament"}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-bold tracking-wider uppercase">Old Testament</span>
-                      {isOldTestament && (
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-accent text-accent-on tracking-wide">
-                          Current
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-muted">
-                      <span className="text-[11px] opacity-70">39 Books</span>
-                      <ChevronDown size={14} className={`transition-transform duration-200 ${isOtExpanded ? '' : '-rotate-90'}`} />
-                    </div>
-                  </button>
-
-                  {isOtExpanded && (
-                    <div className="p-1.5 space-y-0.5 border-t border-border/40">
-                      {OT_BOOKS.map(b => {
-                        const isCurrentBook = activeBook.name === b.name;
-                        return (
-                          <details
-                            key={b.name}
-                            name="desktop-bible-books"
-                            open={expandedBook === b.name}
-                            className="group mb-1"
-                          >
-                            <summary
-                              onClick={(e) => {
-                                e.preventDefault();
-                                setExpandedBook(prev => prev === b.name ? null : b.name);
-                              }}
-                              className={`w-full text-left px-2.5 py-2 rounded-xl text-[13px] font-medium cursor-pointer list-none flex justify-between items-center transition-all ${
-                                isCurrentBook
-                                  ? 'bg-accent/15 text-accent font-semibold ring-1 ring-accent/30 shadow-xs'
-                                  : 'text-fg-2 hover:bg-surface hover:text-fg'
-                              }`}
-                            >
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                <span className="truncate">{b.name}</span>
-                                {isCurrentBook && (
-                                  <span className="text-[10px] font-normal opacity-80 shrink-0">
-                                    • Ch. {activeChapter}
-                                  </span>
-                                )}
-                              </div>
-                              <ChevronRight size={14} className={`transition-transform shrink-0 ${expandedBook === b.name ? 'rotate-90 text-accent' : 'opacity-40'}`} />
-                            </summary>
-                            <div className="grid grid-cols-5 gap-1 px-1.5 py-2 pb-2.5">
-                              {Array.from({ length: b.chapters }).map((_, i) => {
-                                const isCurrentChapter = isCurrentBook && activeChapter === i + 1;
-                                return (
-                                  <button 
-                                    key={i} 
-                                    onClick={() => { setActiveBook(b); setActiveChapter(i + 1); setExpandedBook(b.name); }}
-                                    className={`text-xs py-1.5 rounded-md transition-all font-medium cursor-pointer ${
-                                      isCurrentChapter
-                                        ? 'bg-accent text-accent-on font-bold shadow-md ring-2 ring-accent/40 scale-105'
-                                        : 'text-muted hover:bg-border-soft hover:text-fg bg-surface/50 border border-border/40'
-                                    }`}
-                                  >
-                                    {i + 1}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </details>
-                        );
-                      })}
-                    </div>
+              {/* Filter search bar */}
+              <div className="p-3 pb-2 border-b border-border/40 shrink-0">
+                <div className="relative flex items-center">
+                  <Search size={14} className="absolute left-3 text-muted pointer-events-none" />
+                  <input
+                    type="text"
+                    value={bookSearchQuery}
+                    onChange={(e) => setBookSearchQuery(e.target.value)}
+                    placeholder="Filter books..."
+                    className="w-full bg-surface border border-border/60 rounded-xl pl-8 pr-7 py-1.5 text-xs text-fg placeholder:text-muted focus:outline-none focus:border-accent/60 transition-colors"
+                  />
+                  {bookSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setBookSearchQuery('')}
+                      className="absolute right-2.5 p-0.5 text-muted hover:text-fg rounded-full cursor-pointer"
+                      title="Clear search"
+                    >
+                      <X size={12} />
+                    </button>
                   )}
                 </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto custom-scroll p-2 space-y-1">
+                {/* Old Testament Section */}
+                {filteredOtBooks.length > 0 && (
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setIsOtExpanded(!isOtExpanded)}
+                      className="w-full flex items-center justify-between px-2.5 py-2 text-left rounded-xl hover:bg-surface/50 transition-colors group cursor-pointer"
+                      title={isOtExpanded ? "Collapse Old Testament" : "Expand Old Testament"}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <ChevronDown
+                          size={13}
+                          className={`text-muted transition-transform duration-200 shrink-0 ${isOtExpanded ? '' : '-rotate-90'}`}
+                        />
+                        <span className={`text-[11px] font-bold tracking-wider uppercase truncate ${isOldTestament ? 'text-accent' : 'text-muted group-hover:text-fg'}`}>
+                          Old Testament
+                        </span>
+                        {isOldTestament && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-accent/15 text-accent border border-accent/25 tracking-wide shrink-0">
+                            Current
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[11px] text-muted tabular-nums opacity-60 shrink-0">
+                        {filteredOtBooks.length}
+                      </span>
+                    </button>
+
+                    {isOtExpanded && (
+                      <div className="mt-0.5 space-y-0.5 pl-1">
+                        {filteredOtBooks.map(b => {
+                          const isCurrentBook = activeBook.name === b.name;
+                          return (
+                            <details
+                              key={b.name}
+                              name="desktop-bible-books"
+                              open={expandedBook === b.name}
+                              className="group"
+                            >
+                              <summary
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setExpandedBook(prev => prev === b.name ? null : b.name);
+                                }}
+                                className={`w-full text-left px-3 py-2 rounded-xl text-[13px] cursor-pointer list-none flex justify-between items-center transition-colors ${
+                                  isCurrentBook
+                                    ? 'bg-accent/10 text-accent font-semibold'
+                                    : 'text-fg-2 hover:bg-surface hover:text-fg'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  {isCurrentBook && (
+                                    <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
+                                  )}
+                                  <span className="truncate">{b.name}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  {isCurrentBook && (
+                                    <span className="text-[10px] font-medium opacity-80">
+                                      Ch. {activeChapter}
+                                    </span>
+                                  )}
+                                  <ChevronRight size={13} className={`transition-transform duration-150 shrink-0 ${expandedBook === b.name ? 'rotate-90 text-accent' : 'opacity-40 text-muted'}`} />
+                                </div>
+                              </summary>
+                              <div className="grid grid-cols-5 gap-1.5 p-2 bg-surface/40 rounded-xl my-1 border border-border/30">
+                                {Array.from({ length: b.chapters }).map((_, i) => {
+                                  const isCurrentChapter = isCurrentBook && activeChapter === i + 1;
+                                  return (
+                                    <button 
+                                      key={i} 
+                                      onClick={() => { setActiveBook(b); setActiveChapter(i + 1); setExpandedBook(b.name); }}
+                                      className={`h-7.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center cursor-pointer ${
+                                        isCurrentChapter
+                                          ? 'bg-accent text-accent-on font-bold shadow-xs'
+                                          : 'text-fg-2 hover:bg-surface hover:text-fg bg-bg/50'
+                                      }`}
+                                    >
+                                      {i + 1}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </details>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* New Testament Section */}
-                <div className="border border-border/60 rounded-2xl overflow-hidden bg-surface/30">
-                  <button
-                    type="button"
-                    onClick={() => setIsNtExpanded(!isNtExpanded)}
-                    className={`w-full flex items-center justify-between px-3 py-2.5 text-left transition-all cursor-pointer ${
-                      !isOldTestament
-                        ? 'bg-accent/15 text-accent font-semibold'
-                        : 'hover:bg-surface text-muted hover:text-fg'
-                    }`}
-                    title={isNtExpanded ? "Collapse New Testament" : "Expand New Testament"}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-bold tracking-wider uppercase">New Testament</span>
-                      {!isOldTestament && (
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-accent text-accent-on tracking-wide">
-                          Current
+                {filteredNtBooks.length > 0 && (
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setIsNtExpanded(!isNtExpanded)}
+                      className="w-full flex items-center justify-between px-2.5 py-2 text-left rounded-xl hover:bg-surface/50 transition-colors group cursor-pointer"
+                      title={isNtExpanded ? "Collapse New Testament" : "Expand New Testament"}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <ChevronDown
+                          size={13}
+                          className={`text-muted transition-transform duration-200 shrink-0 ${isNtExpanded ? '' : '-rotate-90'}`}
+                        />
+                        <span className={`text-[11px] font-bold tracking-wider uppercase truncate ${!isOldTestament ? 'text-accent' : 'text-muted group-hover:text-fg'}`}>
+                          New Testament
                         </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-muted">
-                      <span className="text-[11px] opacity-70">27 Books</span>
-                      <ChevronDown size={14} className={`transition-transform duration-200 ${isNtExpanded ? '' : '-rotate-90'}`} />
-                    </div>
-                  </button>
+                        {!isOldTestament && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-accent/15 text-accent border border-accent/25 tracking-wide shrink-0">
+                            Current
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[11px] text-muted tabular-nums opacity-60 shrink-0">
+                        {filteredNtBooks.length}
+                      </span>
+                    </button>
 
-                  {isNtExpanded && (
-                    <div className="p-1.5 space-y-0.5 border-t border-border/40">
-                      {NT_BOOKS.map(b => {
-                        const isCurrentBook = activeBook.name === b.name;
-                        return (
-                          <details
-                            key={b.name}
-                            name="desktop-bible-books"
-                            open={expandedBook === b.name}
-                            className="group mb-1"
-                          >
-                            <summary
-                              onClick={(e) => {
-                                e.preventDefault();
-                                setExpandedBook(prev => prev === b.name ? null : b.name);
-                              }}
-                              className={`w-full text-left px-2.5 py-2 rounded-xl text-[13px] font-medium cursor-pointer list-none flex justify-between items-center transition-all ${
-                                isCurrentBook
-                                  ? 'bg-accent/15 text-accent font-semibold ring-1 ring-accent/30 shadow-xs'
-                                  : 'text-fg-2 hover:bg-surface hover:text-fg'
-                              }`}
+                    {isNtExpanded && (
+                      <div className="mt-0.5 space-y-0.5 pl-1">
+                        {filteredNtBooks.map(b => {
+                          const isCurrentBook = activeBook.name === b.name;
+                          return (
+                            <details
+                              key={b.name}
+                              name="desktop-bible-books"
+                              open={expandedBook === b.name}
+                              className="group"
                             >
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                <span className="truncate">{b.name}</span>
-                                {isCurrentBook && (
-                                  <span className="text-[10px] font-normal opacity-80 shrink-0">
-                                    • Ch. {activeChapter}
-                                  </span>
-                                )}
+                              <summary
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setExpandedBook(prev => prev === b.name ? null : b.name);
+                                }}
+                                className={`w-full text-left px-3 py-2 rounded-xl text-[13px] cursor-pointer list-none flex justify-between items-center transition-colors ${
+                                  isCurrentBook
+                                    ? 'bg-accent/10 text-accent font-semibold'
+                                    : 'text-fg-2 hover:bg-surface hover:text-fg'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  {isCurrentBook && (
+                                    <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
+                                  )}
+                                  <span className="truncate">{b.name}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  {isCurrentBook && (
+                                    <span className="text-[10px] font-medium opacity-80">
+                                      Ch. {activeChapter}
+                                    </span>
+                                  )}
+                                  <ChevronRight size={13} className={`transition-transform duration-150 shrink-0 ${expandedBook === b.name ? 'rotate-90 text-accent' : 'opacity-40 text-muted'}`} />
+                                </div>
+                              </summary>
+                              <div className="grid grid-cols-5 gap-1.5 p-2 bg-surface/40 rounded-xl my-1 border border-border/30">
+                                {Array.from({ length: b.chapters }).map((_, i) => {
+                                  const isCurrentChapter = isCurrentBook && activeChapter === i + 1;
+                                  return (
+                                    <button 
+                                      key={i} 
+                                      onClick={() => { setActiveBook(b); setActiveChapter(i + 1); setExpandedBook(b.name); }}
+                                      className={`h-7.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center cursor-pointer ${
+                                        isCurrentChapter
+                                          ? 'bg-accent text-accent-on font-bold shadow-xs'
+                                          : 'text-fg-2 hover:bg-surface hover:text-fg bg-bg/50'
+                                      }`}
+                                    >
+                                      {i + 1}
+                                    </button>
+                                  );
+                                })}
                               </div>
-                              <ChevronRight size={14} className={`transition-transform shrink-0 ${expandedBook === b.name ? 'rotate-90 text-accent' : 'opacity-40'}`} />
-                            </summary>
-                            <div className="grid grid-cols-5 gap-1 px-1.5 py-2 pb-2.5">
-                              {Array.from({ length: b.chapters }).map((_, i) => {
-                                const isCurrentChapter = isCurrentBook && activeChapter === i + 1;
-                                return (
-                                  <button 
-                                    key={i} 
-                                    onClick={() => { setActiveBook(b); setActiveChapter(i + 1); setExpandedBook(b.name); }}
-                                    className={`text-xs py-1.5 rounded-md transition-all font-medium cursor-pointer ${
-                                      isCurrentChapter
-                                        ? 'bg-accent text-accent-on font-bold shadow-md ring-2 ring-accent/40 scale-105'
-                                        : 'text-muted hover:bg-border-soft hover:text-fg bg-surface/50 border border-border/40'
-                                    }`}
-                                  >
-                                    {i + 1}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </details>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                            </details>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Empty Search State */}
+                {filteredOtBooks.length === 0 && filteredNtBooks.length === 0 && (
+                  <div className="py-12 text-center text-muted text-xs">
+                    No books found matching &quot;{bookSearchQuery}&quot;
+                  </div>
+                )}
               </div>
               </Panel>
             )}
@@ -3803,6 +3929,15 @@ export default function App() {
                         theme={theme as 'dark' | 'light'}
                       />
 
+                      {/* Desktop Theological Lens Selector on wide screens */}
+                      <div className="hidden xl:flex items-center">
+                        <TheologicalLensSelector 
+                          currentLens={theologicalLens} 
+                          onSelectLens={setTheologicalLens}
+                          compact
+                        />
+                      </div>
+
                       {/* Desktop 3-dots more menu when secondary tools collapse */}
                       <div className="relative 2xl:hidden desktop-more-menu-container">
                         <button
@@ -3873,6 +4008,15 @@ export default function App() {
                                 </span>
                               )}
                             </button>
+
+                            {/* Theological Tradition Lens */}
+                            <div className="w-full flex items-center justify-between px-3 py-2 rounded-xl hover:bg-fg/5 text-xs font-medium transition-colors">
+                              <div className="flex items-center gap-2.5">
+                                <Sparkles size={16} className="text-accent" />
+                                <span className="text-fg">AI Perspective</span>
+                              </div>
+                              <TheologicalLensSelector currentLens={theologicalLens} onSelectLens={setTheologicalLens} compact />
+                            </div>
 
                             {/* Mark Completed */}
                             <button
