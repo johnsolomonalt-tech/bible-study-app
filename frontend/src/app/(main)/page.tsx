@@ -2970,16 +2970,11 @@ export default function App() {
                       <div className="flex items-center gap-2 min-w-0">
                         <ChevronDown
                           size={13}
-                          className={`text-muted transition-transform duration-200 shrink-0 ${isOtExpanded ? '' : '-rotate-90'}`}
+                          className={`transition-transform duration-200 shrink-0 ${isOldTestament ? 'text-accent' : 'text-muted'} ${isOtExpanded ? '' : '-rotate-90'}`}
                         />
                         <span className={`text-[11px] font-bold tracking-wider uppercase truncate ${isOldTestament ? 'text-accent' : 'text-muted group-hover:text-fg'}`}>
                           Old Testament
                         </span>
-                        {isOldTestament && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-accent/15 text-accent border border-accent/25 tracking-wide shrink-0">
-                            Current
-                          </span>
-                        )}
                       </div>
                       <span className="text-[11px] text-muted tabular-nums opacity-60 shrink-0">
                         {filteredOtBooks.length}
@@ -3066,16 +3061,11 @@ export default function App() {
                       <div className="flex items-center gap-2 min-w-0">
                         <ChevronDown
                           size={13}
-                          className={`text-muted transition-transform duration-200 shrink-0 ${isNtExpanded ? '' : '-rotate-90'}`}
+                          className={`transition-transform duration-200 shrink-0 ${!isOldTestament ? 'text-accent' : 'text-muted'} ${isNtExpanded ? '' : '-rotate-90'}`}
                         />
                         <span className={`text-[11px] font-bold tracking-wider uppercase truncate ${!isOldTestament ? 'text-accent' : 'text-muted group-hover:text-fg'}`}>
                           New Testament
                         </span>
-                        {!isOldTestament && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-accent/15 text-accent border border-accent/25 tracking-wide shrink-0">
-                            Current
-                          </span>
-                        )}
                       </div>
                       <span className="text-[11px] text-muted tabular-nums opacity-60 shrink-0">
                         {filteredNtBooks.length}
@@ -3677,16 +3667,11 @@ export default function App() {
                       <div className="flex items-center gap-2 min-w-0">
                         <ChevronDown
                           size={13}
-                          className={`text-muted transition-transform duration-200 shrink-0 ${isOtExpanded ? '' : '-rotate-90'}`}
+                          className={`transition-transform duration-200 shrink-0 ${isOldTestament ? 'text-accent' : 'text-muted'} ${isOtExpanded ? '' : '-rotate-90'}`}
                         />
                         <span className={`text-[11px] font-bold tracking-wider uppercase truncate ${isOldTestament ? 'text-accent' : 'text-muted group-hover:text-fg'}`}>
                           Old Testament
                         </span>
-                        {isOldTestament && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-accent/15 text-accent border border-accent/25 tracking-wide shrink-0">
-                            Current
-                          </span>
-                        )}
                       </div>
                       <span className="text-[11px] text-muted tabular-nums opacity-60 shrink-0">
                         {filteredOtBooks.length}
@@ -3768,16 +3753,11 @@ export default function App() {
                       <div className="flex items-center gap-2 min-w-0">
                         <ChevronDown
                           size={13}
-                          className={`text-muted transition-transform duration-200 shrink-0 ${isNtExpanded ? '' : '-rotate-90'}`}
+                          className={`transition-transform duration-200 shrink-0 ${!isOldTestament ? 'text-accent' : 'text-muted'} ${isNtExpanded ? '' : '-rotate-90'}`}
                         />
                         <span className={`text-[11px] font-bold tracking-wider uppercase truncate ${!isOldTestament ? 'text-accent' : 'text-muted group-hover:text-fg'}`}>
                           New Testament
                         </span>
-                        {!isOldTestament && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-accent/15 text-accent border border-accent/25 tracking-wide shrink-0">
-                            Current
-                          </span>
-                        )}
                       </div>
                       <span className="text-[11px] text-muted tabular-nums opacity-60 shrink-0">
                         {filteredNtBooks.length}
