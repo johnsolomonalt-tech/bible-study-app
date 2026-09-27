@@ -374,7 +374,7 @@ export function NotesWorkspace({
               title="Add note from a Study Template (SOAP, Sermon, Inductive, etc.)"
             >
               <Sparkles size={13} className="text-accent group-hover:scale-110 transition-transform" />
-              <span>+ Template</span>
+              <span>Templates</span>
             </button>
             <button
               type="button"
