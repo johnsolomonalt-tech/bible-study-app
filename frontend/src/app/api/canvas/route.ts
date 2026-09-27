@@ -35,24 +35,8 @@ async function getSafeUserId(req?: Request): Promise<string | null> {
                 return verified.sub;
               }
             } catch {
-              // Fall through to JWT payload inspection
+              return null;
             }
-          }
-
-          // Fallback: extract user sub safely from the token payload
-          try {
-            const parts = token.split('.');
-            if (parts.length === 3) {
-              const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
-              if (payload && typeof payload.sub === 'string' && payload.sub.startsWith('user_')) {
-                const nowSeconds = Math.floor(Date.now() / 1000);
-                if (!payload.exp || payload.exp > nowSeconds - 600) {
-                  return payload.sub;
-                }
-              }
-            }
-          } catch {
-            // Ignore parse errors
           }
         }
       }
@@ -78,10 +62,7 @@ export async function GET(req: Request) {
         try {
           const dbRecords = await prisma.canvas.findMany({
             where: {
-              OR: [
-                { userId },
-                { userId: 'legacy' },
-              ],
+              userId,
             },
             select: {
               boardId: true,
@@ -121,7 +102,7 @@ export async function GET(req: Request) {
 
     if (userId) {
       try {
-        let record = await prisma.canvas.findUnique({
+        const record = await prisma.canvas.findUnique({
           where: {
             userId_boardId: {
               userId,
@@ -129,26 +110,6 @@ export async function GET(req: Request) {
             },
           },
         });
-
-        // Fallback: check if board exists under 'legacy' or 'anonymous_user' and claim it
-        if (!record) {
-          const unclaimed = await prisma.canvas.findFirst({
-            where: {
-              boardId,
-              userId: { in: ['legacy', 'anonymous_user'] },
-            },
-          });
-          if (unclaimed) {
-            try {
-              record = await prisma.canvas.update({
-                where: { id: unclaimed.id },
-                data: { userId },
-              });
-            } catch {
-              record = unclaimed;
-            }
-          }
-        }
 
         if (record) {
           const payload: CanvasStatePayload = {
@@ -171,30 +132,8 @@ export async function GET(req: Request) {
           });
         }
       } catch (dbErr) {
-        console.warn('Canvas: PostgreSQL query failed, falling back to memory/public:', dbErr);
+        console.warn('Canvas: PostgreSQL query failed, falling back to memory cache:', dbErr);
       }
-    }
-
-    // Public/Shared read fallback: check if board exists in Prisma by boardId
-    try {
-      const publicRecord = await prisma.canvas.findFirst({
-        where: { boardId },
-      });
-      if (publicRecord) {
-        const payload: CanvasStatePayload = {
-          nodes: (publicRecord.nodes as any) || [],
-          edges: (publicRecord.edges as any) || [],
-          viewport: (publicRecord.viewport as any) || undefined,
-        };
-        return NextResponse.json({
-          id: publicRecord.boardId,
-          title: publicRecord.title,
-          updatedAt: publicRecord.updatedAt.toISOString(),
-          ...payload,
-        });
-      }
-    } catch (pubErr) {
-      console.warn('Canvas: public board query fallback failed:', pubErr);
     }
 
     // Check memory cache

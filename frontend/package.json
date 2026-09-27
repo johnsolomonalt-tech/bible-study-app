@@ -4,9 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && (prisma db push --skip-generate --accept-data-loss || echo 'Prisma db push skipped') && next build",
+    "build": "prisma generate && next build",
     "start": "next start",
+    "test": "node scripts/verify-security.mjs",
     "lint": "eslint",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate deploy",
     "postinstall": "prisma generate"
   },
   "dependencies": {

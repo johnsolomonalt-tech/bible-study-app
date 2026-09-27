@@ -44,7 +44,8 @@ export async function verifyDevPassword(password: string): Promise<boolean> {
   const config = await getAdminConfig();
 
   if (!config) {
-    // No password record exists yet: compare against DEFAULT_DEV_PASSWORD ('1234')
+    // If no password record exists, fail if DEFAULT_DEV_PASSWORD is unset/empty
+    if (!DEFAULT_DEV_PASSWORD) return false;
     return password === DEFAULT_DEV_PASSWORD;
   }
 
@@ -146,7 +147,6 @@ export async function isAuthorizedAdmin(userId: string, userEmail?: string | nul
   }
 
   // 3. If neither env vars nor DB have any designated admin yet:
-  // Allow the authenticated user to reach the password challenge (where entering '1234' will claim and lock it to them)
   const hasAnyEnvConfig = envAdminIds.length > 0 || envAdminEmails.length > 0;
   const hasAnyDbConfig = Boolean(config?.adminUserId || config?.adminEmail || (config?.allowedEmails && config.allowedEmails.length > 0));
 

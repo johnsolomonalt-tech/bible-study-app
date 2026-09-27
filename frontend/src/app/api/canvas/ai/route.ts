@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { SerializableNode, SerializableEdge, NodeCategory } from '@/types/canvas';
 import { validateBiblePrompt } from '@/lib/bibleValidation';
+import { recordAnalyticsEvent } from '@/lib/analyticsService';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
@@ -102,10 +103,31 @@ function deriveFallbackBoardTitle(prompt: string): string {
   return cleaned || 'Scripture Study Canvas';
 }
 
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+
 export async function POST(req: Request) {
   try {
     const { userId } = await auth();
-    // Allow non-logged in or guest sessions to use canvas AI as well if API key is present
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Authentication required. Please sign in to use Theologica AI.' },
+        { status: 401 }
+      );
+    }
+
+    const ip = getClientIp(req);
+    const rateLimit = checkRateLimit(`canvas_ai:${userId || ip}`, {
+      windowMs: 60 * 1000,
+      maxRequests: 15,
+    });
+    if (!rateLimit.success) {
+      recordAnalyticsEvent('rate_limit_blocked', userId || ip, { feature: 'canvas_ai' }).catch(() => {});
+      return NextResponse.json(
+        { error: `Rate limit exceeded. Please wait ${rateLimit.resetSeconds} seconds before generating again.` },
+        { status: 429, headers: { 'Retry-After': String(rateLimit.resetSeconds) } }
+      );
+    }
+
     if (!process.env.GEMINI_API_KEY) {
       return NextResponse.json(
         { error: 'Theologica AI service is currently unavailable.' },
@@ -599,6 +621,8 @@ JSON Format:
 
     const rawAiBoardTitle = typeof parsed.boardTitle === 'string' ? parsed.boardTitle.trim() : '';
     const effectiveBoardTitle = rawAiBoardTitle || deriveFallbackBoardTitle(prompt);
+
+    recordAnalyticsEvent('canvas_ai_generate', userId, { feature: 'canvas', mode }).catch(() => {});
 
     return NextResponse.json({
       action: parsed.action || 'add_nodes',

@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { auth } from '@clerk/nextjs/server';
+import prisma from '@/lib/prisma';
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { userId } = await auth();
+  if (!userId) {
+    return new NextResponse('Unauthorized', { status: 401 });
+  }
+
   try {
     const { id: idStr } = await params;
     const id = parseInt(idStr, 10);
@@ -11,11 +15,21 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     if (isNaN(id)) {
       return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
     }
+
+    const existing = await prisma.highlight.findUnique({
+      where: { id },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ error: 'Highlight not found' }, { status: 404 });
+    }
+
+    if (existing.userId !== userId) {
+      return new NextResponse('Forbidden', { status: 403 });
+    }
     
     await prisma.highlight.delete({
-      where: {
-        id,
-      }
+      where: { id },
     });
     
     return NextResponse.json({ success: true });
@@ -26,12 +40,29 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
 }
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { userId } = await auth();
+  if (!userId) {
+    return new NextResponse('Unauthorized', { status: 401 });
+  }
+
   try {
     const { id: idStr } = await params;
     const id = parseInt(idStr, 10);
     
     if (isNaN(id)) {
       return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
+    }
+
+    const existing = await prisma.highlight.findUnique({
+      where: { id },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ error: 'Highlight not found' }, { status: 404 });
+    }
+
+    if (existing.userId !== userId) {
+      return new NextResponse('Forbidden', { status: 403 });
     }
     
     const body = await request.json();

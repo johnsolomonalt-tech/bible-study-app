@@ -509,14 +509,34 @@ You MUST treat the verse text above as the 100% authoritative ground truth. When
   return { userMessage, aiMessage };
 }
 
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { recordAnalyticsEvent } from '@/lib/analyticsService';
+
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { userId } = await auth();
   if (!userId) return new NextResponse('Unauthorized', { status: 401 });
 
+  const ip = getClientIp(req);
+  const rateLimit = checkRateLimit(`chat_msg:${userId || ip}`, {
+    windowMs: 60 * 1000,
+    maxRequests: 25,
+  });
+  if (!rateLimit.success) {
+    recordAnalyticsEvent('rate_limit_blocked', userId || ip, { feature: 'chat' }).catch(() => {});
+    return NextResponse.json(
+      { error: `Too many chat requests. Please wait ${rateLimit.resetSeconds} seconds before sending another message.` },
+      { status: 429, headers: { 'Retry-After': String(rateLimit.resetSeconds) } }
+    );
+  }
+
   const chatId = parseInt(id);
   const body = await req.json();
   const { content, image, scriptureContext, translation, theologicalLens } = body;
+
+  if (image) {
+    recordAnalyticsEvent('chat_file_upload', userId, { feature: 'chat' }).catch(() => {});
+  }
 
   const chat = await prisma.chat.findUnique({
     where: { id: chatId, userId }

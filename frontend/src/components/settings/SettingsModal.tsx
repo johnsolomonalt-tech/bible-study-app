@@ -158,9 +158,10 @@ export function SettingsModal(props: SettingsModalProps) {
 
   // Clean up audio on close
   useEffect(() => {
-    if (!isOpen && typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      setIsPreviewAudioPlaying(false);
+    if (!isOpen) {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
     }
   }, [isOpen]);
 

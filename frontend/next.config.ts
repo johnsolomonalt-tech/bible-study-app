@@ -40,7 +40,7 @@ const withPWA = withPWAInit({
         },
       },
       {
-        urlPattern: /^https:\/\/.*\.clerk\.accounts\.dev\/.*/i,
+        urlPattern: /^https:\/\/.*(clerk\.accounts\.dev|clerk\.accounts\.com|\.clerk\.).*/i,
         handler: "NetworkFirst",
         options: {
           cacheName: "clerk-api-cache",
@@ -58,8 +58,12 @@ const withPWA = withPWAInit({
   },
 });
 
+import path from "path";
+
 const nextConfig: NextConfig = {
-  turbopack: {},
+  turbopack: {
+    root: path.resolve(__dirname),
+  },
   async rewrites() {
     return [
       {

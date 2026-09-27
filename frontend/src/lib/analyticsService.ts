@@ -126,12 +126,20 @@ export async function getAnalyticsDashboardStats(rangeDays: number = 7) {
     page_view: 0,
     ai_chat_prompt: 0,
     ai_chat_opened: 0,
-    note_created: 0,
+    chat_file_upload: 0,
     canvas_opened: 0,
     canvas_created: 0,
+    canvas_ai_generate: 0,
+    canvas_shared: 0,
+    canvas_imported: 0,
+    note_created: 0,
+    notes_ai_generate: 0,
+    highlight_created: 0,
+    highlight_deleted: 0,
     lectio_started: 0,
     reading_tracker_updated: 0,
     interlinear_opened: 0,
+    rate_limit_blocked: 0,
   };
 
   // Daily map initialization

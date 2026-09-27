@@ -16,7 +16,7 @@ export default clerkMiddleware(async (auth, req) => {
       return NextResponse.redirect(homeUrl);
     }
 
-    // 2. Strict Admin Identity Gate via Environment Variables (if configured)
+    // 2. Strict Admin Identity Gate via Environment Variables
     const allowedUserIds = (process.env.ADMIN_USER_IDS || process.env.ADMIN_USER_ID || '')
       .split(',')
       .map((s) => s.trim())
@@ -26,6 +26,7 @@ export default clerkMiddleware(async (auth, req) => {
       .split(',')
       .map((s) => s.trim().toLowerCase())
       .filter(Boolean);
+
 
     if (allowedUserIds.length > 0 || allowedEmails.length > 0) {
       const email = ((sessionClaims?.email as string) || '').toLowerCase();

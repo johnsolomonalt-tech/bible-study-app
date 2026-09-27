@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { auth } from '@clerk/nextjs/server';
+import prisma from '@/lib/prisma';
+import { recordAnalyticsEvent } from '@/lib/analyticsService';
 
 export async function GET(request: Request) {
+  const { userId } = await auth();
+  if (!userId) {
+    return new NextResponse('Unauthorized', { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
   const book = searchParams.get('book');
   const chapter = searchParams.get('chapter');
@@ -15,7 +20,7 @@ export async function GET(request: Request) {
   try {
     const highlights = await prisma.highlight.findMany({
       where: {
-        userId: 'legacy',
+        userId,
         book,
         chapter: parseInt(chapter, 10),
       }
@@ -28,6 +33,11 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const { userId } = await auth();
+  if (!userId) {
+    return new NextResponse('Unauthorized', { status: 401 });
+  }
+
   try {
     const body = await request.json();
     const { book, chapter, verse, text, color } = body;
@@ -38,7 +48,7 @@ export async function POST(request: Request) {
     
     const highlight = await prisma.highlight.create({
       data: {
-        userId: 'legacy',
+        userId,
         book,
         chapter: parseInt(chapter, 10),
         verse: parseInt(verse, 10),
@@ -47,7 +57,9 @@ export async function POST(request: Request) {
       }
     });
     
-    return NextResponse.json(highlight);
+    recordAnalyticsEvent('highlight_created', userId, { feature: 'highlights', mode: color }).catch(() => {});
+
+    return NextResponse.json(highlight, { status: 201 });
   } catch (error) {
     console.error('Failed to create highlight:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

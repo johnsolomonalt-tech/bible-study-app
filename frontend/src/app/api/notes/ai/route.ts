@@ -62,9 +62,28 @@ interface RequestBody {
   theologicalLens?: string;
 }
 
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { recordAnalyticsEvent } from '@/lib/analyticsService';
+
 export async function POST(req: Request) {
   try {
-    await auth(); // Clerk auth check
+    const { userId } = await auth();
+    if (!userId) {
+      return new NextResponse('Unauthorized', { status: 401 });
+    }
+
+    const ip = getClientIp(req);
+    const rateLimit = checkRateLimit(`notes_ai:${userId || ip}`, {
+      windowMs: 60 * 1000,
+      maxRequests: 20,
+    });
+    if (!rateLimit.success) {
+      recordAnalyticsEvent('rate_limit_blocked', userId || ip, { feature: 'notes_ai' }).catch(() => {});
+      return NextResponse.json(
+        { error: `Rate limit exceeded. Please wait ${rateLimit.resetSeconds} seconds.` },
+        { status: 429, headers: { 'Retry-After': String(rateLimit.resetSeconds) } }
+      );
+    }
 
     if (!process.env.GEMINI_API_KEY) {
       return NextResponse.json(
@@ -174,6 +193,8 @@ FORMATTING INSTRUCTIONS:
         { status: 500 }
       );
     }
+
+    recordAnalyticsEvent('notes_ai_generate', userId, { feature: 'notes', action }).catch(() => {});
 
     return NextResponse.json({
       content: generatedText.trim(),
