@@ -1533,15 +1533,6 @@ export default function App() {
     initSessionTracking(userId);
     fetchWithAuth(`${API_URL}/api/notes`).then(r => r.json()).then(data => {
       setNotes(data);
-      if (Array.isArray(data) && data.length > 0) {
-        const savedNoteIdStr = getPreference(PREF_KEYS.ACTIVE_NOTE_ID);
-        const savedNoteId = savedNoteIdStr ? parseInt(savedNoteIdStr, 10) : null;
-        if (savedNoteId && data.some((n: { id: number }) => n.id === savedNoteId)) {
-          setActiveNoteId(savedNoteId);
-        } else {
-          setActiveNoteId(data[0].id);
-        }
-      }
     });
     fetchWithAuth(`${API_URL}/api/chats`).then(r => r.json()).then(data => {
       setChats(data);
@@ -2831,6 +2822,9 @@ export default function App() {
               key={tab} 
               onClick={() => {
                 setActiveTab(tab);
+                if (tab === 'notes') {
+                  setActiveNoteId(null);
+                }
                 if (tab === 'canvas') {
                   setCanvasFocusTrigger(prev => prev + 1);
                 }
@@ -5043,6 +5037,9 @@ export default function App() {
               key={tab} 
               onClick={() => {
                 setActiveTab(tab);
+                if (tab === 'notes') {
+                  setActiveNoteId(null);
+                }
                 if (tab === 'canvas') {
                   setCanvasFocusTrigger(prev => prev + 1);
                 }

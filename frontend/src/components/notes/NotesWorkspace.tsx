@@ -29,7 +29,7 @@ import { NoteTemplatesModal } from './NoteTemplatesModal';
 import { InsertVerseModal } from './InsertVerseModal';
 import { VersePreviewPopup } from './VersePreviewPopup';
 import { NoteAiAssistantModal } from './NoteAiAssistantModal';
-import { NoteTemplate } from './noteTemplates';
+import { NoteTemplate, NOTE_TEMPLATES } from './noteTemplates';
 import { BIBLE_VERSE_REGEX, CANONICAL_BOOKS } from '@/lib/bibleReferences';
 
 export interface NoteItem {
@@ -676,29 +676,67 @@ export function NotesWorkspace({
             </footer>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center p-6 text-meta text-center">
-            <div className="w-16 h-16 rounded-2xl bg-surface border border-border flex items-center justify-center text-muted mb-4 shadow-sm">
-              <FileText size={28} />
+          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center max-w-xl mx-auto my-auto overflow-y-auto custom-scroll">
+            <div className="w-16 h-16 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center text-accent mb-4 shadow-sm">
+              <BookOpen size={28} />
             </div>
-            <h3 className="text-[17px] font-semibold text-fg mb-1">Select a study note</h3>
-            <p className="text-[13px] max-w-sm leading-relaxed mb-6">
-              Choose an existing notebook entry from the sidebar, or create a structured Bible study note using our templates.
+            <h3 className="font-display font-serif text-2xl font-bold text-fg mb-2 tracking-tight">
+              Scripture Study Notebook
+            </h3>
+            <p className="text-[13.5px] text-meta max-w-md leading-relaxed mb-6">
+              Select an existing entry from the sidebar to continue studying, or start a new note using our structured frameworks.
             </p>
-            <div className="flex items-center gap-2.5">
+
+            <div className="flex items-center gap-3 mb-8">
               <button
                 onClick={() => setIsTemplatesOpen(true)}
-                className="flex items-center gap-1.5 px-4 py-2 bg-accent text-white font-semibold text-[13px] rounded-xl hover:opacity-90 shadow-sm transition-all cursor-pointer"
+                className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-accent to-accent/90 text-white font-semibold text-[13px] rounded-xl hover:opacity-95 shadow-md hover:shadow-lg transition-all cursor-pointer"
               >
-                <Sparkles size={15} />
-                <span>Study Templates</span>
+                <Sparkles size={16} />
+                <span>Explore All Templates</span>
               </button>
               <button
                 onClick={handleCreateBlankNote}
-                className="flex items-center gap-1.5 px-4 py-2 bg-surface hover:bg-surface/80 border border-border text-fg font-medium text-[13px] rounded-xl transition-all cursor-pointer"
+                className="flex items-center gap-2 px-5 py-2.5 bg-surface hover:bg-surface-hover border border-border text-fg font-medium text-[13px] rounded-xl transition-all cursor-pointer shadow-xs"
               >
-                <Plus size={15} />
-                <span>Blank Note</span>
+                <Plus size={16} />
+                <span>New Blank Note</span>
               </button>
+            </div>
+
+            {/* Quick Starters */}
+            <div className="w-full text-left">
+              <div className="text-[11px] font-bold text-muted uppercase tracking-wider mb-2.5 px-1 flex items-center justify-between">
+                <span>Quick Template Starters</span>
+                <button
+                  onClick={() => setIsTemplatesOpen(true)}
+                  className="text-accent hover:underline lowercase font-medium text-[12px] cursor-pointer"
+                >
+                  view all
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                {NOTE_TEMPLATES.slice(0, 3).map((tmpl) => (
+                  <div
+                    key={tmpl.id}
+                    onClick={() => handleApplyTemplate(tmpl, 'create')}
+                    className="p-3.5 rounded-xl border border-border/70 hover:border-accent/50 bg-surface/40 hover:bg-surface/80 transition-all cursor-pointer group shadow-2xs"
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[11px] font-semibold text-accent px-1.5 py-0.5 rounded bg-accent/10">
+                        {tmpl.badge}
+                      </span>
+                      <Sparkles size={12} className="text-muted group-hover:text-accent transition-colors" />
+                    </div>
+                    <div className="text-[13px] font-semibold text-fg group-hover:text-accent transition-colors mb-1 truncate">
+                      {tmpl.name}
+                    </div>
+                    <p className="text-[11px] text-meta line-clamp-2 leading-relaxed">
+                      {tmpl.description}
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
