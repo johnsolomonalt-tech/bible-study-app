@@ -373,7 +373,7 @@ export function TheologicaAiCanvasModal({
                   {isFinishingUp ? 'Finishing Up Your Canvas Board' : 'Architecting Your Canvas Board'}
                 </h3>
                 <p className="text-xs text-accent font-medium">
-                  {isFinishingUp ? 'Finalizing theological canvas layout...' : (MILESTONES[loadingStep] || 'Generating...')}
+                  {isFinishingUp ? 'Finalizing your canvas layout...' : (MILESTONES[loadingStep] || 'Generating...')}
                 </p>
               </div>
 

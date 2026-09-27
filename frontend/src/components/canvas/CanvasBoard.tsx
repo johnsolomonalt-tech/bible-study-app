@@ -66,6 +66,8 @@ interface CanvasBoardProps {
     title: string;
     content: string;
     category?: NodeCategory;
+    sourceChatId?: string;
+    chatTitle?: string;
   } | null;
   onIncomingNodeHandled?: () => void;
   isActiveTab?: boolean;
@@ -279,6 +281,7 @@ function InnerCanvasBoard({
   const STORAGE_KEY_ACTIVE_BOARD = 'theologica_active_canvas_board_id';
   const STORAGE_KEY_BOARDS_LIST = 'theologica_canvas_boards_list_v1';
   const STORAGE_KEY_BOARD_PREFIX = 'theologica_canvas_state_';
+  const STORAGE_KEY_CHAT_CANVAS_MAP = 'theologica_chat_to_canvas_board_map';
 
   // React Flow state
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<CanvasNodeData>>([]);
@@ -1352,7 +1355,7 @@ function InnerCanvasBoard({
     loadBoardData(newBoardId);
   }, [saveBoardImmediate, loadBoardData]);
 
-  const handleCreateBoard = useCallback((customTitle?: string) => {
+  const handleCreateBoard = useCallback((customTitle?: string, sourceChatId?: string) => {
     // 1. Flush current board if dirty
     if (isDirtyRef.current && activeBoardIdRef.current) {
       saveBoardImmediate(
@@ -1373,6 +1376,7 @@ function InnerCanvasBoard({
       title: newTitle,
       updatedAt: now,
       nodeCount: 0,
+      sourceChatId: sourceChatId || undefined,
     };
 
     // 2. Immediately write new board record to localStorage
@@ -1383,28 +1387,39 @@ function InnerCanvasBoard({
         nodes: [],
         edges: [],
         updatedAt: now,
+        sourceChatId: sourceChatId || undefined,
       }));
     } catch (e) {
       console.warn('Failed to initialize new board storage:', e);
     }
 
-    // 3. Update boards index list
+    // 3. Map chat to this board if sourceChatId is present
+    if (sourceChatId) {
+      try {
+        const map = JSON.parse(localStorage.getItem(STORAGE_KEY_CHAT_CANVAS_MAP) || '{}');
+        map[sourceChatId] = newId;
+        localStorage.setItem(STORAGE_KEY_CHAT_CANVAS_MAP, JSON.stringify(map));
+      } catch {}
+    }
+
+    // 4. Update boards index list
     setBoards((prev) => {
       const next = [newBoardMeta, ...prev];
+      boardsRef.current = next;
       try {
         localStorage.setItem(STORAGE_KEY_BOARDS_LIST, JSON.stringify(next));
       } catch {}
       return next;
     });
 
-    // 4. Update active board ID
+    // 5. Update active board ID
     try {
       localStorage.setItem(STORAGE_KEY_ACTIVE_BOARD, newId);
     } catch {}
     activeBoardIdRef.current = newId;
     setActiveBoardId(newId);
 
-    // 5. Update state
+    // 6. Update state
     setBoardTitle(newTitle);
     boardTitleRef.current = newTitle;
     setNodes([]);
@@ -1418,7 +1433,7 @@ function InnerCanvasBoard({
     isDirtyRef.current = false;
     setSaveStatus('saved');
 
-    // 6. Sync new board to API
+    // 7. Sync new board to API
     fetchWithAuth('/api/canvas', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1427,6 +1442,7 @@ function InnerCanvasBoard({
         title: newTitle,
         nodes: [],
         edges: [],
+        sourceChatId: sourceChatId || undefined,
       }),
     }).catch(() => {});
 
@@ -1493,6 +1509,21 @@ function InnerCanvasBoard({
     // Delete from API
     fetchWithAuth(`/api/canvas?id=${id}`, { method: 'DELETE' }).catch(() => {});
 
+    // Clean up chat-to-canvas map
+    try {
+      const map = JSON.parse(localStorage.getItem(STORAGE_KEY_CHAT_CANVAS_MAP) || '{}');
+      let changed = false;
+      for (const k in map) {
+        if (map[k] === id) {
+          delete map[k];
+          changed = true;
+        }
+      }
+      if (changed) {
+        localStorage.setItem(STORAGE_KEY_CHAT_CANVAS_MAP, JSON.stringify(map));
+      }
+    } catch {}
+
     // If active was deleted
     if (id === activeBoardIdRef.current) {
       if (nextBoardsList.length > 0) {
@@ -1529,8 +1560,56 @@ function InnerCanvasBoard({
   useEffect(() => {
     if (!incomingNode) return;
 
-    if (!activeBoardIdRef.current) {
-      handleCreateBoard(incomingNode.title || 'Scripture Reference');
+    let targetBoardId: string | null = null;
+    let baseNodes: Node<CanvasNodeData>[] = [];
+
+    if (incomingNode.sourceChatId) {
+      // 1. Check boardsRef for metadata match
+      const matched = boardsRef.current.find((b) => b.sourceChatId === incomingNode.sourceChatId);
+      if (matched) {
+        targetBoardId = matched.id;
+      } else {
+        // 2. Check localStorage map
+        try {
+          const map = JSON.parse(localStorage.getItem(STORAGE_KEY_CHAT_CANVAS_MAP) || '{}');
+          const mappedId = map[incomingNode.sourceChatId];
+          if (mappedId && (boardsRef.current.some((b) => b.id === mappedId) || localStorage.getItem(`${STORAGE_KEY_BOARD_PREFIX}${mappedId}`))) {
+            targetBoardId = mappedId;
+          }
+        } catch {}
+      }
+
+      if (targetBoardId) {
+        // Board already exists for this same AI Chat: reuse it!
+        if (activeBoardIdRef.current !== targetBoardId) {
+          handleSelectBoard(targetBoardId);
+          try {
+            const raw = localStorage.getItem(`${STORAGE_KEY_BOARD_PREFIX}${targetBoardId}`);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (Array.isArray(parsed.nodes)) {
+                baseNodes = parsed.nodes.map(prepareNode);
+              }
+            }
+          } catch {}
+        } else {
+          baseNodes = nodesRef.current;
+        }
+      } else {
+        // First time adding to canvas from this AI Chat: create a dedicated new canvas for this chat!
+        const titleToUse = incomingNode.chatTitle || incomingNode.title || 'Study Canvas';
+        targetBoardId = handleCreateBoard(titleToUse, incomingNode.sourceChatId);
+        baseNodes = [];
+      }
+    } else {
+      // Not from an AI chat (e.g. reader scripture selection or word study)
+      if (!activeBoardIdRef.current) {
+        targetBoardId = handleCreateBoard(incomingNode.title || 'Scripture Reference');
+        baseNodes = [];
+      } else {
+        targetBoardId = activeBoardIdRef.current;
+        baseNodes = nodesRef.current;
+      }
     }
 
     const timestamp = Date.now();
@@ -1538,12 +1617,12 @@ function InnerCanvasBoard({
 
     let posX = 140;
     let posY = 140;
-    if (nodes.length > 0) {
+    if (baseNodes.length > 0) {
       let maxX = -Infinity;
-      for (const n of nodes) {
+      for (const n of baseNodes) {
         if (n.position.x > maxX) maxX = n.position.x;
       }
-      posX = maxX + 700; // 380px card width + 320px open horizontal channel
+      posX = maxX + 440; // 380px card width + 60px open channel
       posY = 140;
     }
 
@@ -1554,9 +1633,9 @@ function InnerCanvasBoard({
       selected: true,
       style: { width: 380 },
       data: {
-        title: incomingNode.title || 'Scripture Reference',
+        title: incomingNode.title || 'Insight',
         content: incomingNode.content || '',
-        category: incomingNode.category || 'scripture',
+        category: incomingNode.category || 'theological_point',
         theme,
         onVerseClick: onNavigateToVerse,
         onUpdate: handleUpdateNode,
@@ -1565,14 +1644,24 @@ function InnerCanvasBoard({
       },
     };
 
-    setNodes((nds) => {
-      const next: Node<CanvasNodeData>[] = [
-        ...nds.map((n) => ({ ...n, selected: false })),
-        newNode,
-      ];
-      pushSnapshot(next, edgesRef.current);
-      return next;
-    });
+    const nextNodes: Node<CanvasNodeData>[] = [
+      ...baseNodes.map((n) => ({ ...n, selected: false })),
+      newNode,
+    ];
+
+    setNodes(nextNodes);
+    nodesRef.current = nextNodes;
+    pushSnapshot(nextNodes, edgesRef.current);
+    isDirtyRef.current = true;
+
+    if (targetBoardId) {
+      saveBoardImmediate(
+        targetBoardId,
+        boardTitleRef.current || incomingNode.chatTitle || 'Study Canvas',
+        nextNodes,
+        edgesRef.current
+      );
+    }
 
     if (onIncomingNodeHandled) {
       onIncomingNodeHandled();
@@ -1582,8 +1671,8 @@ function InnerCanvasBoard({
       if (containerRef.current && containerRef.current.clientWidth > 100) {
         fitView({ padding: 0.25, duration: 600, minZoom: 0.35, maxZoom: 1.1 });
       }
-    }, 120);
-  }, [incomingNode, handleCreateBoard, nodes, theme, onNavigateToVerse, handleUpdateNode, handleDuplicateNode, handleDeleteNode, onIncomingNodeHandled, pushSnapshot, fitView, setNodes]);
+    }, 150);
+  }, [incomingNode, handleCreateBoard, handleSelectBoard, prepareNode, saveBoardImmediate, theme, onNavigateToVerse, handleUpdateNode, handleDuplicateNode, handleDeleteNode, onIncomingNodeHandled, pushSnapshot, fitView, setNodes]);
 
   // Add card from toolbar or context menu
   const handleAddNode = useCallback((category: NodeCategory, customPos?: { x: number; y: number }) => {
@@ -2103,7 +2192,7 @@ function InnerCanvasBoard({
             <div className={`pt-3 border-t text-[11px] flex items-center justify-center gap-4 ${isDark ? 'border-zinc-800 text-zinc-500' : 'border-zinc-100 text-zinc-400'}`}>
               <span className="hidden sm:inline">Right-click for options</span>
               <span className="hidden sm:inline">•</span>
-              <span className="hidden sm:inline">Press &quot;Boards&quot; to manage</span>
+              <span className="hidden sm:inline">Press &quot;Your Canvases&quot; to manage</span>
               <span className="sm:hidden">Tap + Card to start creating</span>
             </div>
           </div>

@@ -139,10 +139,10 @@ export function CanvasToolbar({
                 ? 'hover:bg-zinc-700/40 text-zinc-300' 
                 : 'hover:bg-zinc-100 text-zinc-700'
           }`}
-          title={isSidebarOpen ? 'Close Canvases Sidebar' : 'View All Canvases'}
+          title={isSidebarOpen ? 'Close Your Canvases' : 'Your Canvases'}
         >
           <PanelLeft size={16} />
-          <span className="hidden md:inline">Boards</span>
+          <span className="hidden md:inline">Your Canvases</span>
         </button>
 
         <div className="h-4 w-[1px] bg-zinc-700/40" />

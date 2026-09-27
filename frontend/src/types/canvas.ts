@@ -46,6 +46,7 @@ export interface CanvasStatePayload {
   nodes: SerializableNode[];
   edges: SerializableEdge[];
   viewport?: { x: number; y: number; zoom: number };
+  sourceChatId?: string;
 }
 
 export interface CanvasBoardMetadata {
@@ -54,6 +55,7 @@ export interface CanvasBoardMetadata {
   updatedAt: string;
   nodeCount?: number;
   description?: string;
+  sourceChatId?: string;
 }
 
 export const CATEGORY_METADATA: Record<

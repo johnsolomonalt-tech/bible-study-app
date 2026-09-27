@@ -221,6 +221,7 @@ const TypewriterMessage = ({ content, onVerseClick }: { content: string; onVerse
 const AiMessageActions = ({
   content,
   chatTitle,
+  chatId,
   theologicalLens,
   translation,
   onSendToCanvas,
@@ -228,9 +229,10 @@ const AiMessageActions = ({
 }: {
   content: string;
   chatTitle?: string;
+  chatId?: string | number;
   theologicalLens?: TheologicalLensType;
   translation?: string;
-  onSendToCanvas?: (content: string, title?: string) => void;
+  onSendToCanvas?: (content: string, title?: string, sourceChatId?: string | number) => void;
   onSaveToNotes?: (content: string, title?: string) => Promise<boolean>;
 }) => {
   const [copied, setCopied] = useState(false);
@@ -388,7 +390,7 @@ const AiMessageActions = ({
       {onSendToCanvas && (
         <button
           type="button"
-          onClick={() => onSendToCanvas(content, chatTitle)}
+          onClick={() => onSendToCanvas(content, chatTitle, chatId)}
           className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted hover:text-accent px-2 py-1 rounded-md hover:bg-surface transition-all cursor-pointer"
           title="Send this insight to Canvas"
         >
@@ -538,6 +540,7 @@ const AiChatMessageView = ({
   onSelectPrompt,
   onSelectLensComparison,
   chatTitle,
+  chatId,
   activeLens = 'canonical',
   translation = 'BSB',
   isFullView,
@@ -551,11 +554,12 @@ const AiChatMessageView = ({
   index: number;
   totalMessages: number;
   onVerseClick?: VerseClickHandler;
-  onSendToCanvas?: (content: string, title?: string) => void;
+  onSendToCanvas?: (content: string, title?: string, sourceChatId?: string | number) => void;
   onSaveToNotes?: (content: string, title?: string) => Promise<boolean>;
   onSelectPrompt?: (prompt: string) => void;
   onSelectLensComparison?: (lens: TheologicalLensType, prompt: string) => void;
   chatTitle?: string;
+  chatId?: string | number;
   activeLens?: TheologicalLensType;
   translation?: string;
   isFullView?: boolean;
@@ -681,6 +685,7 @@ const AiChatMessageView = ({
       <AiMessageActions
         content={message.content}
         chatTitle={chatTitle}
+        chatId={chatId}
         theologicalLens={effectiveLens}
         translation={translation}
         onSendToCanvas={onSendToCanvas}
@@ -749,6 +754,8 @@ export default function App() {
     title: string;
     content: string;
     category?: NodeCategory;
+    sourceChatId?: string;
+    chatTitle?: string;
   } | null>(null);
 
   // Synchronize activeTab to URL query params & cookies/storage for reliable refresh & bookmarking
@@ -2400,13 +2407,28 @@ export default function App() {
     setActiveTab('canvas');
   };
 
-  const sendChatMessageToCanvas = (content: string, title?: string) => {
+  const sendChatMessageToCanvas = (content: string, title?: string, sourceChatId?: string | number) => {
     const { textContent } = parseAiMessage(content);
     if (!textContent) return;
+
+    const resolvedChatId = sourceChatId 
+      ? String(sourceChatId) 
+      : (activeChatId ? String(activeChatId) : (activeChat?.id ? String(activeChat.id) : undefined));
+
+    const resolvedChatTitle = (title && title !== 'New Conversation')
+      ? title
+      : ((activeChat?.title && activeChat.title !== 'New Conversation') ? activeChat.title : undefined);
+
+    const cardTitle = resolvedChatTitle 
+      ? `Insight: ${resolvedChatTitle}` 
+      : 'AI Theological Insight';
+
     setCanvasIncomingNode({
-      title: title ? `Insight: ${title}` : 'AI Theological Insight',
+      title: cardTitle,
       content: textContent,
       category: 'theological_point',
+      sourceChatId: resolvedChatId,
+      chatTitle: resolvedChatTitle || 'Theological Study Canvas',
     });
     setActiveTab('canvas');
   };
@@ -4152,6 +4174,7 @@ export default function App() {
                           handleSendMessage(undefined, prompt);
                         }}
                         chatTitle={activeChat?.title}
+                        chatId={activeChatId || activeChat?.id}
                         activeLens={theologicalLens}
                         translation={translation}
                       />
@@ -5002,6 +5025,7 @@ export default function App() {
                         handleSendMessage(undefined, prompt);
                       }}
                       chatTitle={activeChat?.title}
+                      chatId={activeChatId || activeChat?.id}
                       activeLens={theologicalLens}
                       translation={translation}
                     />
@@ -5623,6 +5647,7 @@ export default function App() {
                         handleSendMessage(undefined, prompt);
                       }}
                       chatTitle={activeChat?.title}
+                      chatId={activeChatId || activeChat?.id}
                       activeLens={theologicalLens}
                       translation={translation}
                       isFullView

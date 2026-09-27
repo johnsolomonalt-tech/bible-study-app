@@ -108,7 +108,7 @@ export function CanvasSidebar({
           <div className="w-7 h-7 rounded-lg bg-accent/15 text-accent flex items-center justify-center">
             <Workflow size={16} />
           </div>
-          <span className="text-sm font-bold tracking-tight">Theological Canvases</span>
+          <span className="text-sm font-bold tracking-tight">Your Canvases</span>
         </div>
         <button
           type="button"
