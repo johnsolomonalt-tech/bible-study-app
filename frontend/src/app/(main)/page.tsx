@@ -1210,6 +1210,7 @@ export default function App() {
 
   const preferencesRestoredRef = useRef(false);
   const isFirstBookMountRef = useRef(true);
+  const isFirstTabMountRef = useRef(true);
 
   // Restore all saved session preferences & temporary UI states on mount
   useEffect(() => {
@@ -1377,8 +1378,13 @@ export default function App() {
     }
     if (activeBook?.name) {
       setExpandedBook(activeBook.name);
+      trackClientEvent('scripture_read', {
+        book: activeBook.name,
+        chapter: activeChapter,
+        translation: translation.toUpperCase(),
+      });
     }
-  }, [activeBook.name, activeChapter]);
+  }, [activeBook.name, activeChapter, translation]);
 
   // Persist layout sidebars
   useEffect(() => {
@@ -2060,8 +2066,12 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Analytics: track major feature tab activations
+  // Analytics: track major feature tab activations (only on explicit user transitions, not initial mount/restore)
   useEffect(() => {
+    if (isFirstTabMountRef.current) {
+      isFirstTabMountRef.current = false;
+      return;
+    }
     if (activeTab === 'canvas') {
       trackClientEvent('canvas_opened');
     } else if (activeTab === 'chats') {

@@ -160,15 +160,14 @@ test('Rate Limiter: Correct thresholds for Chat, Canvas AI, and Notes AI', () =>
   assert.strictEqual(limits.notesAi.max, 20, 'Notes AI must limit to 20 req/min');
 });
 
-// 6. Test Dev Portal UI State and Top Feature Computation
-test('Dev UI: topFeature correctly identifies non-session top features', () => {
+// 6. Test Dev Portal UI State and Top Feature Computation (Excludes passive opens)
+test('Dev UI: topFeature strictly measures real active engagements and ignores passive drawer opens', () => {
   const map = {
+    scripture_read: 'Scripture Reading & Study',
     ai_chat_prompt: 'AI Theological Chat',
-    ai_chat_opened: 'AI Chat Panel',
     chat_file_upload: 'Chat File Uploads',
-    canvas_opened: 'Visual Canvas Boards',
-    canvas_created: 'Canvas Boards',
     canvas_ai_generate: 'AI Canvas Generator',
+    canvas_created: 'Visual Canvas Boards',
     canvas_shared: 'Canvas Sharing',
     canvas_imported: 'Canvas Imports',
     note_created: 'Scripture Notes',
@@ -178,31 +177,51 @@ test('Dev UI: topFeature correctly identifies non-session top features', () => {
     lectio_started: 'Lectio Divina',
     reading_tracker_updated: 'Reading Tracker',
     interlinear_opened: 'Greek/Hebrew Lexicon',
-    rate_limit_blocked: 'Rate Limiter Throttles',
   };
 
   function computeTopFeature(featureCounts) {
-    if (!featureCounts) return 'N/A';
+    if (!featureCounts) return 'Reading & Study';
+    const passiveEvents = new Set(['session_start', 'page_view', 'ai_chat_opened', 'canvas_opened', 'rate_limit_blocked']);
     const features = Object.entries(featureCounts)
-      .filter(([k]) => k !== 'session_start' && k !== 'page_view')
+      .filter(([k, count]) => !passiveEvents.has(k) && count > 0)
       .sort((a, b) => b[1] - a[1]);
-    if (!features.length || features[0][1] === 0) return 'Reading & Study';
+    if (!features.length) return 'Reading & Study';
     return map[features[0][0]] || features[0][0];
   }
 
-  // Case 1: Canvas AI is top
+  // Case 1: ai_chat_opened is 50, but user only read scripture 5 times -> Top must be Scripture Reading & Study, NOT chat panel!
+  assert.strictEqual(
+    computeTopFeature({ session_start: 100, ai_chat_opened: 50, scripture_read: 5 }),
+    'Scripture Reading & Study',
+    'Passive ai_chat_opened must NEVER be ranked as top feature'
+  );
+
+  // Case 2: ai_chat_opened is 10, but user sent 2 AI prompts -> Top must be AI Theological Chat, NOT chat panel!
+  assert.strictEqual(
+    computeTopFeature({ session_start: 20, ai_chat_opened: 10, ai_chat_prompt: 2 }),
+    'AI Theological Chat'
+  );
+
+  // Case 3: Canvas AI is top
   assert.strictEqual(
     computeTopFeature({ session_start: 100, canvas_ai_generate: 42, note_created: 10 }),
     'AI Canvas Generator'
   );
 
-  // Case 2: Notes AI is top
+  // Case 4: Notes AI is top
   assert.strictEqual(
     computeTopFeature({ session_start: 50, notes_ai_generate: 30, ai_chat_prompt: 12 }),
     'AI Notes Synthesis'
   );
 
-  // Case 3: Empty data fallback
+  // Case 5: Only passive drawer open exists, no active feature -> defaults cleanly to Reading & Study
+  assert.strictEqual(
+    computeTopFeature({ session_start: 10, ai_chat_opened: 5 }),
+    'Reading & Study',
+    'When only passive opens exist, fallback to Reading & Study'
+  );
+
+  // Case 6: Empty data fallback
   assert.strictEqual(computeTopFeature({}), 'Reading & Study');
-  assert.strictEqual(computeTopFeature(null), 'N/A');
+  assert.strictEqual(computeTopFeature(null), 'Reading & Study');
 });

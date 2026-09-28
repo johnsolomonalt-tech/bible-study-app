@@ -407,21 +407,26 @@ export default function DevDashboardPage() {
     return Math.max(max, 2);
   }, [stats]);
 
-  // Top Feature Calculation
-  const topFeature = useMemo(() => {
-    if (!stats?.featureCounts) return 'N/A';
+  // Top Feature Calculation - strictly measures active user engagement (not passive drawer opens)
+  const { topFeature, topFeatureCount } = useMemo(() => {
+    if (!stats?.featureCounts) return { topFeature: 'Reading & Study', topFeatureCount: 0 };
+
+    // Passive navigation / system events to exclude from top engaged feature ranking
+    const passiveEvents = new Set(['session_start', 'page_view', 'ai_chat_opened', 'canvas_opened', 'rate_limit_blocked']);
     const features = Object.entries(stats.featureCounts)
-      .filter(([k]) => k !== 'session_start' && k !== 'page_view')
+      .filter(([k, count]) => !passiveEvents.has(k) && count > 0)
       .sort((a, b) => b[1] - a[1]);
-    if (!features.length || features[0][1] === 0) return 'Reading & Study';
+
+    if (!features.length) {
+      return { topFeature: 'Reading & Study', topFeatureCount: 0 };
+    }
 
     const map: Record<string, string> = {
+      scripture_read: 'Scripture Reading & Study',
       ai_chat_prompt: 'AI Theological Chat',
-      ai_chat_opened: 'AI Chat Panel',
       chat_file_upload: 'Chat File Uploads',
-      canvas_opened: 'Visual Canvas Boards',
-      canvas_created: 'Canvas Boards',
       canvas_ai_generate: 'AI Canvas Generator',
+      canvas_created: 'Visual Canvas Boards',
       canvas_shared: 'Canvas Sharing',
       canvas_imported: 'Canvas Imports',
       note_created: 'Scripture Notes',
@@ -431,9 +436,14 @@ export default function DevDashboardPage() {
       lectio_started: 'Lectio Divina',
       reading_tracker_updated: 'Reading Tracker',
       interlinear_opened: 'Greek/Hebrew Lexicon',
-      rate_limit_blocked: 'Rate Limiter Throttles',
     };
-    return map[features[0][0]] || features[0][0];
+
+    const bestKey = features[0][0];
+    const bestCount = features[0][1];
+    return {
+      topFeature: map[bestKey] || bestKey.replace(/_/g, ' '),
+      topFeatureCount: bestCount,
+    };
   }, [stats]);
 
   // ==========================================
@@ -819,7 +829,11 @@ export default function DevDashboardPage() {
                 </div>
                 <p className="mt-2 text-[11px] text-[var(--muted)] flex items-center gap-1.5">
                   <Clock size={11} />
-                  High traffic day: {stats?.busiestDay?.date || 'N/A'}
+                  {topFeatureCount > 0 ? (
+                    <span>{topFeatureCount} action events in selected period</span>
+                  ) : (
+                    <span>Core scripture study mode active</span>
+                  )}
                 </p>
               </div>
             </div>
@@ -959,6 +973,38 @@ export default function DevDashboardPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Feature 0: Scripture Reading & Study */}
+              <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-amber-500/15 text-amber-400">
+                      <BookOpen size={18} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-[var(--fg)]">Scripture Reading</h3>
+                      <p className="text-[11px] text-[var(--muted)]">Bible chapters studied</p>
+                    </div>
+                  </div>
+                  <span className="font-mono text-2xl font-bold text-[var(--fg)]">
+                    {stats?.featureCounts?.scripture_read ?? 0}
+                  </span>
+                </div>
+                <div className="w-full bg-[var(--border-soft)] h-2 rounded-full overflow-hidden">
+                  <div
+                    className="bg-amber-500 h-full rounded-full transition-all"
+                    style={{
+                      width: `${Math.min(
+                        Math.round(((stats?.featureCounts?.scripture_read ?? 0) / Math.max(stats?.totalEvents ?? 1, 1)) * 100),
+                        100
+                      )}%`,
+                    }}
+                  />
+                </div>
+                <p className="text-[11px] text-[var(--muted)]">
+                  Active chapter navigations & reading sessions
+                </p>
+              </div>
+
               {/* Feature 1: AI Chat Prompts */}
               <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm space-y-3">
                 <div className="flex items-center justify-between">
@@ -1366,6 +1412,7 @@ export default function DevDashboardPage() {
                 {[
                   { id: 'all', label: 'All Events' },
                   { id: 'session_start', label: 'Sessions' },
+                  { id: 'scripture_read', label: 'Scripture Read' },
                   { id: 'ai_chat_prompt', label: 'AI Chat' },
                   { id: 'chat_file_upload', label: 'Chat Files' },
                   { id: 'canvas_opened', label: 'Canvas' },
@@ -1404,6 +1451,8 @@ export default function DevDashboardPage() {
                     switch (type) {
                       case 'session_start':
                         return 'App Session Started';
+                      case 'scripture_read':
+                        return 'Scripture Chapter Read';
                       case 'ai_chat_prompt':
                         return 'AI Theological Chat Initiated';
                       case 'ai_chat_opened':
@@ -1445,6 +1494,8 @@ export default function DevDashboardPage() {
                     switch (type) {
                       case 'session_start':
                         return <Activity size={14} className="text-emerald-400" />;
+                      case 'scripture_read':
+                        return <BookOpen size={14} className="text-amber-400" />;
                       case 'ai_chat_prompt':
                       case 'ai_chat_opened':
                         return <Sparkles size={14} className="text-accent" />;
@@ -1497,6 +1548,9 @@ export default function DevDashboardPage() {
                             <span className="font-mono px-1.5 py-0.5 rounded bg-[var(--bg)] border border-[var(--border)] text-[var(--fg-2)]">
                               {evt.anonymousId}
                             </span>
+                            {evt.metadata?.book && (
+                              <span>Passage: {evt.metadata.book} {evt.metadata.chapter}</span>
+                            )}
                             {evt.metadata?.platform && (
                               <span>Platform: {evt.metadata.platform}</span>
                             )}
