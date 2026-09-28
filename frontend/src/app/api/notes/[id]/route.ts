@@ -7,12 +7,17 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const { userId } = await auth();
   if (!userId) return new NextResponse('Unauthorized', { status: 401 });
 
-  const { title, content } = await req.json();
-  const note = await prisma.note.update({
-    where: { id: parseInt(id), userId },
-    data: { title, content },
-  });
-  return NextResponse.json(note);
+  try {
+    const { title, content } = await req.json();
+    const note = await prisma.note.update({
+      where: { id: parseInt(id), userId },
+      data: { title, content },
+    });
+    return NextResponse.json(note);
+  } catch (error) {
+    console.error('Failed to update note:', error);
+    return NextResponse.json({ error: 'Failed to update note' }, { status: 500 });
+  }
 }
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -20,8 +25,13 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const { userId } = await auth();
   if (!userId) return new NextResponse('Unauthorized', { status: 401 });
 
-  await prisma.note.delete({
-    where: { id: parseInt(id), userId },
-  });
-  return NextResponse.json({ success: true });
+  try {
+    await prisma.note.delete({
+      where: { id: parseInt(id), userId },
+    });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Failed to delete note:', error);
+    return NextResponse.json({ error: 'Failed to delete note' }, { status: 500 });
+  }
 }

@@ -1,8 +1,9 @@
 import crypto from 'crypto';
 import prisma from '@/lib/prisma';
 
-const DEFAULT_DEV_PASSWORD = process.env.DEV_ADMIN_PASSWORD || '1234';
-const DEV_SESSION_SECRET = process.env.DEV_SESSION_SECRET || process.env.CLERK_SECRET_KEY || 'theologica-dev-secret-key-2026';
+const isProd = process.env.NODE_ENV === 'production';
+const DEFAULT_DEV_PASSWORD = process.env.DEV_ADMIN_PASSWORD || (isProd ? '' : '1234');
+const DEV_SESSION_SECRET = process.env.DEV_SESSION_SECRET || process.env.CLERK_SECRET_KEY || (isProd ? crypto.randomBytes(32).toString('hex') : 'theologica-dev-secret-key-2026');
 export const DEV_COOKIE_NAME = 'theologica_dev_session';
 
 // In-memory fallback in case database is offline or during cold start
