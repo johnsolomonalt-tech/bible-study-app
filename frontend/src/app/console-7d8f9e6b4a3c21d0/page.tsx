@@ -45,6 +45,7 @@ import {
   Zap,
   ShieldCheck,
 } from 'lucide-react';
+import { DEV_API_BASE, DEV_PORTAL_PATH } from '@/lib/devConfig';
 
 interface SystemHealth {
   database: {
@@ -168,10 +169,10 @@ export default function DevDashboardPage() {
     setIsLoadingStats(true);
     try {
       const [statsRes, eventsRes, settingsRes, healthRes] = await Promise.all([
-        fetch(`/api/dev/stats?range=${range}`),
-        fetch(`/api/dev/events?limit=60`),
-        fetch(`/api/dev/settings`),
-        fetch(`/api/dev/health`),
+        fetch(`${DEV_API_BASE}/stats?range=${range}`),
+        fetch(`${DEV_API_BASE}/events?limit=60`),
+        fetch(`${DEV_API_BASE}/settings`),
+        fetch(`${DEV_API_BASE}/health`),
       ]);
 
       if (statsRes.status === 401) {
@@ -230,7 +231,7 @@ export default function DevDashboardPage() {
     setUnlockError(null);
 
     try {
-      const res = await fetch('/api/dev/auth/verify', {
+      const res = await fetch(`${DEV_API_BASE}/auth/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: passcode }),
@@ -256,7 +257,7 @@ export default function DevDashboardPage() {
   // Handle Session Lock (Logout from dev session)
   const handleLockSession = async () => {
     try {
-      await fetch('/api/dev/auth/logout', { method: 'POST' });
+      await fetch(`${DEV_API_BASE}/auth/logout`, { method: 'POST' });
       setIsUnlocked(false);
       setStats(null);
     } catch {
@@ -272,7 +273,7 @@ export default function DevDashboardPage() {
     setIsResettingTelemetry(true);
     setResetStatusMsg(null);
     try {
-      const res = await fetch('/api/dev/events', { method: 'DELETE' });
+      const res = await fetch(`${DEV_API_BASE}/events`, { method: 'DELETE' });
       if (res.ok) {
         setResetStatusMsg('Telemetry data reset successfully.');
         await loadDashboardData();
@@ -303,7 +304,7 @@ export default function DevDashboardPage() {
     setPasswordChangeStatus(null);
 
     try {
-      const res = await fetch('/api/dev/auth/change-password', {
+      const res = await fetch(`${DEV_API_BASE}/auth/change-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -341,7 +342,7 @@ export default function DevDashboardPage() {
     setEmailStatusMsg(null);
 
     try {
-      const res = await fetch('/api/dev/settings', {
+      const res = await fetch(`${DEV_API_BASE}/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'add_email', email: newEmailInput }),
@@ -365,7 +366,7 @@ export default function DevDashboardPage() {
   // Handle Remove Allowed Email
   const handleRemoveEmail = async (emailToRemove: string) => {
     try {
-      const res = await fetch('/api/dev/settings', {
+      const res = await fetch(`${DEV_API_BASE}/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'remove_email', email: emailToRemove }),
@@ -1685,7 +1686,7 @@ export default function DevDashboardPage() {
                 </div>
                 <div className="pt-2 flex items-baseline justify-between border-t border-[var(--border)] text-xs">
                   <span className="text-[var(--muted)]">Middleware Guard</span>
-                  <span className="font-mono text-[var(--fg)]">Strict /dev Boundary</span>
+                  <span className="font-mono text-[var(--fg)]">Strict Obfuscated Boundary</span>
                 </div>
               </div>
 
@@ -1926,7 +1927,7 @@ export default function DevDashboardPage() {
               <div>
                 <h3 className="text-sm font-bold text-[var(--fg)]">Allowed Admin Emails</h3>
                 <p className="text-xs text-[var(--muted)] mt-0.5">
-                  Accounts that are permitted through Clerk authentication to access /dev
+                  Accounts that are permitted through Clerk authentication to access the Developer Console
                 </p>
               </div>
 
@@ -2028,7 +2029,7 @@ export default function DevDashboardPage() {
             </div>
 
             <p className="text-xs text-[var(--muted)]">
-              Update the secondary passcode required to unlock the /dev portal.
+              Update the secondary passcode required to unlock the Developer Console.
             </p>
 
             <form onSubmit={handleChangePassword} className="space-y-3 pt-2">

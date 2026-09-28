@@ -90,6 +90,20 @@ const nextConfig: NextConfig = {
         source: '/boards/:path*',
         destination: '/?tab=canvas',
       },
+      ...(process.env.DEV_PORTAL_SLUG && process.env.DEV_PORTAL_SLUG !== 'console-7d8f9e6b4a3c21d0' ? [
+        {
+          source: `/${process.env.DEV_PORTAL_SLUG}`,
+          destination: '/console-7d8f9e6b4a3c21d0',
+        },
+        {
+          source: `/${process.env.DEV_PORTAL_SLUG}/:path*`,
+          destination: '/console-7d8f9e6b4a3c21d0/:path*',
+        },
+        {
+          source: `/api/${process.env.DEV_PORTAL_SLUG}/:path*`,
+          destination: '/api/console-7d8f9e6b4a3c21d0/:path*',
+        },
+      ] : []),
     ];
   },
   async headers() {

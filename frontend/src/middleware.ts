@@ -1,15 +1,27 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
-const isDevRoute = createRouteMatcher(['/dev(.*)', '/api/dev(.*)']);
+import { DEV_PORTAL_SLUG } from "@/lib/devConfig";
+
+const isDevRoute = createRouteMatcher([
+  `/${DEV_PORTAL_SLUG}(.*)`,
+  `/api/${DEV_PORTAL_SLUG}(.*)`,
+  '/dev(.*)',
+  '/api/dev(.*)',
+]);
 
 export default clerkMiddleware(async (auth, req) => {
   if (isDevRoute(req)) {
+    // Probing legacy /dev routes returns 404 without redirect or information disclosure
+    if (req.nextUrl.pathname.startsWith('/dev') || req.nextUrl.pathname.startsWith('/api/dev')) {
+      return new NextResponse(null, { status: 404 });
+    }
+
     const { userId, sessionClaims } = await auth();
 
     // 1. Gate: Must be an authenticated Clerk session
     if (!userId) {
-      if (req.nextUrl.pathname.startsWith('/api/dev')) {
+      if (req.nextUrl.pathname.startsWith(`/api/${DEV_PORTAL_SLUG}`)) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
       const homeUrl = new URL('/', req.url);
@@ -27,7 +39,6 @@ export default clerkMiddleware(async (auth, req) => {
       .map((s) => s.trim().toLowerCase())
       .filter(Boolean);
 
-
     if (allowedUserIds.length > 0 || allowedEmails.length > 0) {
       const email = ((sessionClaims?.email as string) || '').toLowerCase();
       const isAllowedId = allowedUserIds.includes(userId);
@@ -35,7 +46,7 @@ export default clerkMiddleware(async (auth, req) => {
 
       if (!isAllowedId && !isAllowedEmail) {
         // Reject non-admin logged-in users cleanly
-        if (req.nextUrl.pathname.startsWith('/api/dev')) {
+        if (req.nextUrl.pathname.startsWith(`/api/${DEV_PORTAL_SLUG}`)) {
           return NextResponse.json({ error: 'Forbidden. Admin access only.' }, { status: 403 });
         }
         const homeUrl = new URL('/', req.url);
