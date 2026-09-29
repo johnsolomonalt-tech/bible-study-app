@@ -3,6 +3,10 @@ export default function MainLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return <>{children}</>;
+  return (
+    <div className="h-dvh w-screen max-w-full overflow-hidden flex flex-col overscroll-none">
+      {children}
+    </div>
+  );
 }
 
