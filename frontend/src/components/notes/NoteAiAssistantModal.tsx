@@ -145,7 +145,7 @@ export function NoteAiAssistantModal({
   function handleAppend() {
     if (!generatedResult) return;
     const headerTitle = AI_ACTIONS.find(a => a.id === selectedAction)?.title || 'AI Study Insight';
-    const textToAppend = `\n\n---\n\n### ✨ ${headerTitle}\n\n${generatedResult}\n`;
+    const textToAppend = `\n\n---\n\n### ✨ ${headerTitle}\n\n${generatedResult}\n\n#aichat #studyai #${theologicalLens}\n`;
     onAppendToNote(textToAppend);
     setInserted(true);
     setTimeout(() => {

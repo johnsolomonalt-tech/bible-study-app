@@ -16,6 +16,7 @@ import {
   Code, 
   BookOpen, 
   FileText, 
+  LayoutTemplate,
   Sparkles, 
   Eye, 
   Edit3, 
@@ -279,7 +280,7 @@ export function NoteFormattingToolbar({
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-medium text-fg hover:bg-surface border border-border transition-colors cursor-pointer"
           title="Choose a Bible Study Template"
         >
-          <FileText size={14} />
+          <LayoutTemplate size={14} />
           <span className="hidden md:inline">Templates</span>
         </button>
 

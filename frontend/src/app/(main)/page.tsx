@@ -2021,12 +2021,13 @@ export default function App() {
       const effectiveLens = msgLens || theologicalLens;
       const lensMeta = THEOLOGICAL_LENS_OPTIONS.find(l => l.id === effectiveLens);
       const noteTitle = title ? `Study AI: ${title}` : `Study AI: ${activeBook?.name || 'Scripture'} ${activeChapter} (${lensMeta?.name || 'Study'})`;
+      const contentWithTags = `${textContent}\n\n#aichat #studyai #${effectiveLens}`;
       const res = await fetchWithAuth(`${API_URL}/api/notes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: noteTitle,
-          content: textContent,
+          content: contentWithTags,
         }),
       });
       if (res.ok) {

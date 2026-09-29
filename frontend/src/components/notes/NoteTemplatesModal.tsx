@@ -11,7 +11,7 @@ import {
   Scroll, 
   Heart, 
   FileEdit, 
-  Sparkles,
+  LayoutTemplate,
   Check,
   ChevronRight,
   Eye,
@@ -84,7 +84,7 @@ export function NoteTemplatesModal({
         <header className="px-6 py-4 border-b border-border flex items-center justify-between shrink-0 bg-surface/30">
           <div className="flex items-center gap-3.5">
             <div className="w-10 h-10 rounded-xl bg-accent/15 border border-accent/30 flex items-center justify-center text-accent shadow-xs">
-              <Sparkles size={20} />
+              <LayoutTemplate size={20} />
             </div>
             <div>
               <h2 className="text-[18px] font-semibold text-fg tracking-tight flex items-center gap-2">

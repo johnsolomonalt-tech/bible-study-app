@@ -10,7 +10,10 @@ import {
   ChevronLeft, 
   BookOpen, 
   FileText, 
-  Sparkles, 
+  LayoutTemplate,
+  Link2,
+  Hash,
+  ExternalLink,
   MoreVertical, 
   Download, 
   Copy, 
@@ -39,6 +42,40 @@ export interface NoteItem {
   createdAt?: string;
   updatedAt?: string;
 }
+
+export interface ScriptureBacklinkGroup {
+  reference: string;
+  book: string;
+  chapter: number;
+  verse: number;
+  notes: {
+    note: NoteItem;
+    snippet: string;
+  }[];
+}
+
+export const DIVERSE_SUGGESTED_TAGS: { category: string; tags: string[] }[] = [
+  {
+    category: 'Theology & Doctrine',
+    tags: ['theology', 'christology', 'pneumatology', 'soteriology', 'covenant', 'grace', 'justification', 'sanctification', 'trinity', 'eschatology']
+  },
+  {
+    category: 'Bible Study & Exegesis',
+    tags: ['exegesis', 'hermeneutics', 'inductive', 'soap', 'crossreference', 'greek', 'hebrew', 'prophecy', 'parables', 'wisdom']
+  },
+  {
+    category: 'Devotional & Spiritual Life',
+    tags: ['devotional', 'prayer', 'worship', 'fasting', 'journal', 'reflection', 'application', 'gratitude']
+  },
+  {
+    category: 'Ministry & Teaching',
+    tags: ['sermon', 'teaching', 'discipleship', 'leadership', 'evangelism', 'apologetics', 'counseling']
+  },
+  {
+    category: 'Sources & AI Insights',
+    tags: ['aichat', 'studyai', 'commentary', 'readingplan', 'patristic', 'reformation']
+  }
+];
 
 interface NotesWorkspaceProps {
   notes: NoteItem[];
@@ -87,6 +124,78 @@ function extractScriptureReferences(text: string): { book: string; chapter: numb
   return results.slice(0, 10);
 }
 
+function extractAllScriptureReferences(text: string): { book: string; chapter: number; verse: number; raw: string }[] {
+  if (!text) return [];
+  const results: { book: string; chapter: number; verse: number; raw: string }[] = [];
+  const seen = new Set<string>();
+
+  BIBLE_VERSE_REGEX.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = BIBLE_VERSE_REGEX.exec(text)) !== null) {
+    const raw = match[0];
+    const rawBook = match[1].toLowerCase().replace(/\s+/g, ' ').trim();
+    const chapter = parseInt(match[2], 10);
+    const verse = parseInt(match[3], 10);
+    const canonical = CANONICAL_BOOKS[rawBook];
+    if (canonical && !isNaN(chapter) && !isNaN(verse)) {
+      const key = `${canonical.name} ${chapter}:${verse}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        results.push({ book: canonical.name, chapter, verse, raw });
+      }
+    }
+  }
+  return results;
+}
+
+function extractSnippet(content: string, term: string, maxLength = 110): string {
+  if (!content) return '';
+  const clean = content.replace(/[#*`_>\[\]]/g, ' ').replace(/\s+/g, ' ').trim();
+  const lower = clean.toLowerCase();
+  const termLower = term.toLowerCase();
+  const idx = lower.indexOf(termLower);
+  if (idx === -1) {
+    return clean.slice(0, maxLength) + (clean.length > maxLength ? '...' : '');
+  }
+  const start = Math.max(0, idx - 30);
+  const end = Math.min(clean.length, idx + term.length + 70);
+  const snippet = clean.slice(start, end);
+  return (start > 0 ? '...' : '') + snippet.trim() + (end < clean.length ? '...' : '');
+}
+
+function getAllScriptureBacklinkGroups(notes: NoteItem[]): ScriptureBacklinkGroup[] {
+  const groupsMap = new Map<string, ScriptureBacklinkGroup>();
+
+  for (const note of notes) {
+    const fullText = `${note.title || ''}\n${note.content || ''}`;
+    const refs = extractAllScriptureReferences(fullText);
+
+    for (const ref of refs) {
+      const key = `${ref.book} ${ref.chapter}:${ref.verse}`;
+      if (!groupsMap.has(key)) {
+        groupsMap.set(key, {
+          reference: key,
+          book: ref.book,
+          chapter: ref.chapter,
+          verse: ref.verse,
+          notes: []
+        });
+      }
+      const group = groupsMap.get(key)!;
+      if (!group.notes.some(n => n.note.id === note.id)) {
+        group.notes.push({
+          note,
+          snippet: extractSnippet(note.content || note.title || '', key)
+        });
+      }
+    }
+  }
+
+  return Array.from(groupsMap.values()).sort((a, b) => {
+    return a.reference.localeCompare(b.reference);
+  });
+}
+
 function formatRelativeTime(dateStr?: string | Date): string {
   if (!dateStr) return '';
   const date = new Date(dateStr);
@@ -112,7 +221,9 @@ export function NotesWorkspace({
   currentTranslation = 'bsb',
 }: NotesWorkspaceProps) {
   // Sidebar UI state
+  const [sidebarTab, setSidebarTab] = useState<'notes' | 'backlinks'>('notes');
   const [searchQuery, setSearchQuery] = useState('');
+  const [backlinksSearchQuery, setBacklinksSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'updated' | 'title' | 'created'>('updated');
   const [pinnedIds, setPinnedIds] = useState<number[]>([]);
@@ -121,6 +232,8 @@ export function NotesWorkspace({
   const [viewMode, setViewMode] = useState<NoteViewMode>('edit');
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
   const [copiedStatus, setCopiedStatus] = useState(false);
+  const [isTagPickerOpen, setIsTagPickerOpen] = useState(false);
+  const [newTagInput, setNewTagInput] = useState('');
 
   // Modals state
   const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
@@ -243,6 +356,56 @@ export function NotesWorkspace({
     return extractTags(`${activeNote.title} ${activeNote.content}`);
   }, [activeNote]);
 
+  // All backlinks grouped by scripture passage across all notes
+  const allBacklinksGroups = useMemo(() => {
+    return getAllScriptureBacklinkGroups(notes);
+  }, [notes]);
+
+  // Filtered backlinks based on search
+  const filteredBacklinksGroups = useMemo(() => {
+    if (!backlinksSearchQuery.trim()) return allBacklinksGroups;
+    const q = backlinksSearchQuery.toLowerCase().trim();
+    return allBacklinksGroups.filter(group => {
+      const matchRef = group.reference.toLowerCase().includes(q) || group.book.toLowerCase().includes(q);
+      const matchNote = group.notes.some(n => 
+        (n.note.title || '').toLowerCase().includes(q) || 
+        n.snippet.toLowerCase().includes(q)
+      );
+      return matchRef || matchNote;
+    });
+  }, [allBacklinksGroups, backlinksSearchQuery]);
+
+  // References in the current active note for contextual backlink connections
+  const activeNoteBacklinks = useMemo(() => {
+    if (!activeNote) return [];
+    const activeRefs = extractAllScriptureReferences(`${activeNote.title || ''}\n${activeNote.content || ''}`);
+    const activeKeys = new Set(activeRefs.map(r => `${r.book} ${r.chapter}:${r.verse}`));
+    return allBacklinksGroups.filter(g => activeKeys.has(g.reference));
+  }, [activeNote, allBacklinksGroups]);
+
+  // Tag Management Handlers
+  const handleAddTag = (tagToAdd: string) => {
+    if (!activeNote) return;
+    const cleanTag = tagToAdd.trim().replace(/^#+/, '').toLowerCase();
+    if (!cleanTag) return;
+    const currentTags = extractTags(`${activeNote.title} ${activeNote.content}`);
+    if (currentTags.includes(cleanTag)) return;
+
+    const newContent = activeNote.content.trim()
+      ? `${activeNote.content.trim()}\n\n#${cleanTag}`
+      : `#${cleanTag}`;
+    onUpdateNote(activeNote.id, activeNote.title, newContent);
+  };
+
+  const handleRemoveTag = (tagToRemove: string) => {
+    if (!activeNote) return;
+    const cleanTag = tagToRemove.trim().replace(/^#+/, '').toLowerCase();
+    const tagRegex = new RegExp(`(?:^|\\s)#${cleanTag}\\b`, 'gi');
+    const updatedContent = activeNote.content.replace(tagRegex, '').replace(/\n{3,}/g, '\n\n').trim();
+    const updatedTitle = activeNote.title.replace(tagRegex, '').trim();
+    onUpdateNote(activeNote.id, updatedTitle || 'Untitled Note', updatedContent);
+  };
+
   // Handlers
   const handleCreateBlankNote = async () => {
     const created = await onCreateNote({
@@ -357,24 +520,54 @@ export function NotesWorkspace({
           activeNoteId ? 'hidden lg:flex' : 'flex'
         }`}
       >
-        {/* Sidebar Header */}
-        <header className="h-[60px] border-b border-border flex items-center justify-between px-4 shrink-0 bg-surface/20">
-          <div className="flex items-center gap-2">
-            <span className="text-[16px] font-semibold text-fg">Notebooks</span>
-            <span className="text-[11px] px-2 py-0.5 rounded-full bg-surface border border-border/60 text-muted font-medium">
-              {notes.length}
-            </span>
+        {/* Sidebar Header with Notes vs Backlinks Tab Switcher */}
+        <header className="h-[60px] border-b border-border flex items-center justify-between px-3 shrink-0 bg-surface/20 gap-2">
+          {/* Tab Switcher */}
+          <div className="flex items-center gap-1 bg-surface p-1 rounded-xl border border-border/60">
+            <button
+              type="button"
+              onClick={() => setSidebarTab('notes')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-all cursor-pointer ${
+                sidebarTab === 'notes'
+                  ? 'bg-bg text-fg shadow-2xs'
+                  : 'text-muted hover:text-fg'
+              }`}
+            >
+              <FileText size={13} className={sidebarTab === 'notes' ? 'text-accent' : ''} />
+              <span>Notes</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-surface-hover text-muted font-normal">
+                {notes.length}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSidebarTab('backlinks')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-all cursor-pointer ${
+                sidebarTab === 'backlinks'
+                  ? 'bg-bg text-accent shadow-2xs'
+                  : 'text-muted hover:text-fg'
+              }`}
+            >
+              <Link2 size={13} />
+              <span>Backlinks</span>
+              {allBacklinksGroups.length > 0 && (
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-accent/15 text-accent font-medium">
+                  {allBacklinksGroups.length}
+                </span>
+              )}
+            </button>
           </div>
 
-          <div className="flex items-center gap-2">
+          {/* Quick Actions */}
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={() => setIsTemplatesOpen(true)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-semibold text-accent bg-accent/10 hover:bg-accent/20 border border-accent/25 hover:border-accent/40 transition-all cursor-pointer shadow-2xs group"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-semibold text-fg hover:text-accent bg-surface hover:bg-surface-hover border border-border/70 hover:border-border transition-all cursor-pointer shadow-2xs group"
               title="Add note from a Study Template (SOAP, Sermon, Inductive, etc.)"
             >
-              <Sparkles size={13} className="text-accent group-hover:scale-110 transition-transform" />
-              <span>Templates</span>
+              <LayoutTemplate size={13} className="text-muted group-hover:text-accent transition-colors" />
+              <span className="hidden sm:inline">Templates</span>
             </button>
             <button
               type="button"
@@ -385,112 +578,186 @@ export function NotesWorkspace({
               <Plus size={16} />
             </button>
           </div>
-
         </header>
 
-        {/* Search Bar */}
-        <div className="p-3 border-b border-border/60 bg-surface/10 space-y-2.5 shrink-0">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={14} />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search notes, scripture, tags..."
-              className="w-full bg-surface border border-border/80 pl-9 pr-8 py-1.5 rounded-lg text-[13px] text-fg placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-fg cursor-pointer"
-              >
-                <X size={13} />
-              </button>
-            )}
-          </div>
-
-          {/* Tags Filter Ribbon */}
-          {allAvailableTags.length > 0 && (
-            <div className="flex items-center gap-1.5 overflow-x-auto custom-scroll no-scrollbar py-0.5">
-              <button
-                onClick={() => setSelectedTag(null)}
-                className={`text-[11px] px-2.5 py-0.5 rounded-full font-medium transition-all shrink-0 cursor-pointer ${
-                  selectedTag === null
-                    ? 'bg-accent text-white shadow-2xs'
-                    : 'bg-surface hover:bg-surface/80 text-muted border border-border/60'
-                }`}
-              >
-                All
-              </button>
-              {allAvailableTags.map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setSelectedTag(selectedTag === t ? null : t)}
-                  className={`text-[11px] px-2.5 py-0.5 rounded-full font-medium transition-all shrink-0 cursor-pointer ${
-                    selectedTag === t
-                      ? 'bg-accent text-white shadow-2xs'
-                      : 'bg-surface hover:bg-surface/80 text-muted border border-border/60'
-                  }`}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Sorting Row */}
-          <div className="flex items-center justify-between text-[11px] text-meta pt-0.5">
-            <span>{filteredNotes.length} {filteredNotes.length === 1 ? 'note' : 'notes'}</span>
-            <div className="flex items-center gap-1">
-              <ArrowUpDown size={11} className="text-muted" />
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
-                className="bg-transparent text-meta hover:text-fg focus:outline-none cursor-pointer"
-              >
-                <option value="updated">Recently Updated</option>
-                <option value="created">Date Created</option>
-                <option value="title">Title (A-Z)</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Notes Items List */}
-        <div className="flex-1 overflow-y-auto custom-scroll p-2.5 space-y-1 pb-24 lg:pb-3">
-          {filteredNotes.length === 0 && (
-            <div className="py-12 px-4 text-center text-meta">
-              <FileText size={24} className="mx-auto mb-2 text-muted" />
-              <p className="text-[13px] font-medium text-fg">No notes found</p>
-              <p className="text-[11px] mt-1">
-                {searchQuery || selectedTag ? 'Try adjusting your search or filters.' : 'Click + or Templates above to create your first note.'}
-              </p>
-            </div>
-          )}
-
-          {/* Pinned Notes Group */}
-          {pinnedNotes.length > 0 && (
-            <div className="mb-3 space-y-1">
-              <div className="px-2 py-1 text-[10px] font-bold text-muted uppercase tracking-wider flex items-center gap-1">
-                <Pin size={11} className="text-accent rotate-45" />
-                <span>Pinned</span>
+        {/* TAB 1: NOTES LIST */}
+        {sidebarTab === 'notes' && (
+          <div className="flex-1 flex flex-col min-h-0">
+            {/* Search Bar */}
+            <div className="p-3 border-b border-border/60 bg-surface/10 space-y-2.5 shrink-0">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={14} />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search notes, scripture, tags..."
+                  className="w-full bg-surface border border-border/80 pl-9 pr-8 py-1.5 rounded-lg text-[13px] text-fg placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-fg cursor-pointer"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
               </div>
-              {pinnedNotes.map((note) => renderNoteCard(note))}
-            </div>
-          )}
 
-          {/* Regular Notes Group */}
-          {regularNotes.length > 0 && (
-            <div className="space-y-1">
-              {pinnedNotes.length > 0 && (
-                <div className="px-2 py-1 text-[10px] font-bold text-muted uppercase tracking-wider">
-                  Notes
+              {/* Tags Filter Ribbon */}
+              {allAvailableTags.length > 0 && (
+                <div className="flex items-center gap-1.5 overflow-x-auto custom-scroll no-scrollbar py-0.5">
+                  <button
+                    onClick={() => setSelectedTag(null)}
+                    className={`text-[11px] px-2.5 py-0.5 rounded-full font-medium transition-all shrink-0 cursor-pointer ${
+                      selectedTag === null
+                        ? 'bg-accent text-white shadow-2xs'
+                        : 'bg-surface hover:bg-surface/80 text-muted border border-border/60'
+                    }`}
+                  >
+                    All
+                  </button>
+                  {allAvailableTags.map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setSelectedTag(selectedTag === t ? null : t)}
+                      className={`text-[11px] px-2.5 py-0.5 rounded-full font-medium transition-all shrink-0 cursor-pointer ${
+                        selectedTag === t
+                          ? 'bg-accent text-white shadow-2xs'
+                          : 'bg-surface hover:bg-surface/80 text-muted border border-border/60'
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
                 </div>
               )}
-              {regularNotes.map((note) => renderNoteCard(note))}
+
+              {/* Sorting Row */}
+              <div className="flex items-center justify-between text-[11px] text-meta pt-0.5">
+                <span>{filteredNotes.length} {filteredNotes.length === 1 ? 'note' : 'notes'}</span>
+                <div className="flex items-center gap-1">
+                  <ArrowUpDown size={11} className="text-muted" />
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as any)}
+                    className="bg-transparent text-meta hover:text-fg focus:outline-none cursor-pointer"
+                  >
+                    <option value="updated">Recently Updated</option>
+                    <option value="created">Date Created</option>
+                    <option value="title">Title (A-Z)</option>
+                  </select>
+                </div>
+              </div>
             </div>
-          )}
-        </div>
+
+            {/* Notes Items List */}
+            <div className="flex-1 overflow-y-auto custom-scroll p-2.5 space-y-1 pb-24 lg:pb-3">
+              {filteredNotes.length === 0 && (
+                <div className="py-12 px-4 text-center text-meta">
+                  <FileText size={24} className="mx-auto mb-2 text-muted" />
+                  <p className="text-[13px] font-medium text-fg">No notes found</p>
+                  <p className="text-[11px] mt-1">
+                    {searchQuery || selectedTag ? 'Try adjusting your search or filters.' : 'Click + or Templates above to create your first note.'}
+                  </p>
+                </div>
+              )}
+
+              {/* Pinned Notes Group */}
+              {pinnedNotes.length > 0 && (
+                <div className="mb-3 space-y-1">
+                  <div className="px-2 py-1 text-[10px] font-bold text-muted uppercase tracking-wider flex items-center gap-1">
+                    <Pin size={11} className="text-accent rotate-45" />
+                    <span>Pinned</span>
+                  </div>
+                  {pinnedNotes.map((note) => renderNoteCard(note))}
+                </div>
+              )}
+
+              {/* Regular Notes Group */}
+              {regularNotes.length > 0 && (
+                <div className="space-y-1">
+                  {pinnedNotes.length > 0 && (
+                    <div className="px-2 py-1 text-[10px] font-bold text-muted uppercase tracking-wider">
+                      Notes
+                    </div>
+                  )}
+                  {regularNotes.map((note) => renderNoteCard(note))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 2: BACKLINKS LIST */}
+        {sidebarTab === 'backlinks' && (
+          <div className="flex-1 flex flex-col min-h-0">
+            {/* Backlinks Search Bar */}
+            <div className="p-3 border-b border-border/60 bg-surface/10 space-y-2 shrink-0">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={14} />
+                <input
+                  type="text"
+                  value={backlinksSearchQuery}
+                  onChange={(e) => setBacklinksSearchQuery(e.target.value)}
+                  placeholder="Filter backlinks or scriptures..."
+                  className="w-full bg-surface border border-border/80 pl-9 pr-8 py-1.5 rounded-lg text-[13px] text-fg placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                />
+                {backlinksSearchQuery && (
+                  <button
+                    onClick={() => setBacklinksSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-fg cursor-pointer"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center justify-between text-[11px] text-meta">
+                <span>{filteredBacklinksGroups.length} linked {filteredBacklinksGroups.length === 1 ? 'passage' : 'passages'}</span>
+                <span>{allBacklinksGroups.reduce((acc, g) => acc + g.notes.length, 0)} total references</span>
+              </div>
+            </div>
+
+            {/* Backlinks List */}
+            <div className="flex-1 overflow-y-auto custom-scroll p-2.5 space-y-3 pb-24 lg:pb-3">
+              {filteredBacklinksGroups.length === 0 ? (
+                <div className="py-12 px-4 text-center text-meta">
+                  <Link2 size={24} className="mx-auto mb-2 text-muted" />
+                  <p className="text-[13px] font-medium text-fg">No Scripture backlinks found</p>
+                  <p className="text-[11px] mt-1 leading-relaxed">
+                    {backlinksSearchQuery 
+                      ? 'No passages match your search.' 
+                      : 'Type any Bible citation (like John 3:16 or Romans 8:28) in your notes to automatically link and organize your study.'}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* Contextual Active Note Links */}
+                  {activeNote && activeNoteBacklinks.length > 0 && !backlinksSearchQuery && (
+                    <div className="mb-3 space-y-2">
+                      <div className="px-2 py-0.5 text-[10px] font-bold text-accent uppercase tracking-wider flex items-center gap-1">
+                        <BookOpen size={11} />
+                        <span>Connected to Active Note</span>
+                      </div>
+                      {activeNoteBacklinks.map((group) => renderBacklinkGroup(group, true))}
+                      <div className="w-full h-px bg-border/60 my-2" />
+                    </div>
+                  )}
+
+                  {/* All Scripture Backlinks */}
+                  <div className="space-y-2">
+                    {activeNote && activeNoteBacklinks.length > 0 && !backlinksSearchQuery && (
+                      <div className="px-2 py-0.5 text-[10px] font-bold text-muted uppercase tracking-wider">
+                        All Scripture Passages
+                      </div>
+                    )}
+                    {filteredBacklinksGroups.map((group) => renderBacklinkGroup(group, false))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </aside>
 
       {/* MAIN SECTION: Active Note Workspace */}
@@ -600,6 +867,135 @@ export function NotesWorkspace({
               </div>
             </header>
 
+            {/* Interactive Note Tag Ribbon & Manager */}
+            <div className="px-4 lg:px-8 py-2 border-b border-border/50 bg-surface/10 flex items-center gap-2 flex-wrap shrink-0">
+              <div className="flex items-center gap-1.5 text-muted text-[11px] font-medium shrink-0">
+                <Tag size={12} className="text-muted/80" />
+                <span>Tags:</span>
+              </div>
+
+              {/* Active tags on this note */}
+              {activeNoteTags.length === 0 && (
+                <span className="text-[11px] text-muted italic">No tags</span>
+              )}
+              {activeNoteTags.map((tag) => (
+                <span
+                  key={tag}
+                  className="group/tag inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-accent/10 text-accent border border-accent/25 hover:border-accent/40 transition-colors shadow-2xs"
+                >
+                  <span>#{tag.replace(/^#/, '')}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveTag(tag)}
+                    className="opacity-60 hover:opacity-100 hover:text-rose-500 rounded-full transition-opacity cursor-pointer p-0.5"
+                    title={`Remove #${tag.replace(/^#/, '')}`}
+                  >
+                    <X size={10} />
+                  </button>
+                </span>
+              ))}
+
+              {/* Add Tag Button & Popover */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsTagPickerOpen(!isTagPickerOpen)}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium text-muted hover:text-fg bg-surface hover:bg-surface-hover border border-border/70 hover:border-border transition-colors cursor-pointer"
+                  title="Add or create a tag for this note"
+                >
+                  <Plus size={11} />
+                  <span>Tag</span>
+                </button>
+
+                {isTagPickerOpen && (
+                  <div className="absolute left-0 top-full mt-1.5 w-72 sm:w-80 bg-bg border border-border rounded-xl shadow-xl z-40 p-3 space-y-3 animate-in fade-in max-h-96 overflow-y-auto custom-scroll">
+                    <div className="flex items-center justify-between pb-1.5 border-b border-border/60">
+                      <span className="text-[12px] font-semibold text-fg flex items-center gap-1.5">
+                        <Hash size={13} className="text-accent" />
+                        <span>Manage Note Tags</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsTagPickerOpen(false)}
+                        className="text-muted hover:text-fg cursor-pointer p-0.5"
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
+
+                    {/* Custom Tag Input */}
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (newTagInput.trim()) {
+                          handleAddTag(newTagInput);
+                          setNewTagInput('');
+                        }
+                      }}
+                      className="flex items-center gap-1.5"
+                    >
+                      <div className="relative flex-1">
+                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted text-[12px]">#</span>
+                        <input
+                          type="text"
+                          value={newTagInput}
+                          onChange={(e) => setNewTagInput(e.target.value)}
+                          placeholder="Create tag (e.g. grace, covenant)"
+                          className="w-full bg-surface border border-border/80 pl-6 pr-2 py-1 rounded-lg text-[12px] text-fg placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                          autoFocus
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={!newTagInput.trim()}
+                        className="px-2.5 py-1 bg-accent text-white font-medium text-[12px] rounded-lg disabled:opacity-40 hover:opacity-90 transition-opacity cursor-pointer shrink-0"
+                      >
+                        Add
+                      </button>
+                    </form>
+
+                    {/* Diverse Curated Tags by Category */}
+                    <div className="space-y-2.5 pt-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted block">
+                        Suggested Theological & Study Tags
+                      </span>
+                      {DIVERSE_SUGGESTED_TAGS.map((group) => (
+                        <div key={group.category} className="space-y-1">
+                          <span className="text-[10.5px] font-medium text-meta block">{group.category}</span>
+                          <div className="flex flex-wrap gap-1">
+                            {group.tags.map((tag) => {
+                              const isActive = activeNoteTags.some(t => t.replace(/^#/, '').toLowerCase() === tag.toLowerCase());
+                              return (
+                                <button
+                                  key={tag}
+                                  type="button"
+                                  onClick={() => {
+                                    if (isActive) {
+                                      handleRemoveTag(tag);
+                                    } else {
+                                      handleAddTag(tag);
+                                    }
+                                  }}
+                                  className={`text-[10.5px] px-2 py-0.5 rounded-md font-medium transition-all cursor-pointer flex items-center gap-1 ${
+                                    isActive
+                                      ? 'bg-accent text-white shadow-2xs'
+                                      : 'bg-surface hover:bg-surface-hover text-muted hover:text-fg border border-border/60'
+                                  }`}
+                                >
+                                  <span>#{tag}</span>
+                                  {isActive && <Check size={10} />}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Linked Scripture References Bar (Option 2) */}
             {detectedReferences.length > 0 && (
               <div className="px-4 lg:px-8 py-2 bg-accent/5 border-b border-border/60 flex items-center gap-2 overflow-x-auto custom-scroll no-scrollbar shrink-0">
@@ -690,10 +1086,10 @@ export function NotesWorkspace({
             <div className="flex items-center gap-3 mb-8">
               <button
                 onClick={() => setIsTemplatesOpen(true)}
-                className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-accent to-accent/90 text-white font-semibold text-[13px] rounded-xl hover:opacity-95 shadow-md hover:shadow-lg transition-all cursor-pointer"
+                className="flex items-center gap-2 px-5 py-2.5 bg-accent text-white font-semibold text-[13px] rounded-xl hover:opacity-95 shadow-md hover:shadow-lg transition-all cursor-pointer"
               >
-                <Sparkles size={16} />
-                <span>Explore All Templates</span>
+                <LayoutTemplate size={16} />
+                <span>Explore Study Templates</span>
               </button>
               <button
                 onClick={handleCreateBlankNote}
@@ -726,7 +1122,7 @@ export function NotesWorkspace({
                       <span className="text-[11px] font-semibold text-accent px-1.5 py-0.5 rounded bg-accent/10">
                         {tmpl.badge}
                       </span>
-                      <Sparkles size={12} className="text-muted group-hover:text-accent transition-colors" />
+                      <LayoutTemplate size={13} className="text-muted group-hover:text-accent transition-colors" />
                     </div>
                     <div className="text-[13px] font-semibold text-fg group-hover:text-accent transition-colors mb-1 truncate">
                       {tmpl.name}
@@ -845,6 +1241,63 @@ export function NotesWorkspace({
             <Clock size={10} className="text-muted/70" />
             <span>{timeStr}</span>
           </span>
+        </div>
+      </div>
+    );
+  }
+
+  // Helper to render individual backlink group in the sidebar
+  function renderBacklinkGroup(group: ScriptureBacklinkGroup, isContextual: boolean) {
+    return (
+      <div 
+        key={`${group.reference}-${isContextual ? 'ctx' : 'all'}`} 
+        className="rounded-xl border border-border/70 bg-surface/30 p-2.5 space-y-2 shadow-2xs hover:border-accent/40 transition-all"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => setPreviewVerse({ book: group.book, chapter: group.chapter, verse: group.verse })}
+            className="flex items-center gap-1.5 text-[12px] font-semibold text-accent hover:underline cursor-pointer group/link"
+            title={`Preview ${group.reference} in Scripture`}
+          >
+            <BookOpen size={12} className="text-accent group-hover/link:scale-110 transition-transform" />
+            <span>{group.reference}</span>
+          </button>
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface border border-border/60 text-muted font-medium">
+            {group.notes.length} {group.notes.length === 1 ? 'note' : 'notes'}
+          </span>
+        </div>
+
+        {/* Note references under this passage */}
+        <div className="space-y-1">
+          {group.notes.map(({ note, snippet }) => {
+            const isCurrentNote = activeNoteId === note.id;
+            return (
+              <div
+                key={note.id}
+                onClick={() => onSelectNote(note.id)}
+                className={`p-2 rounded-lg text-left cursor-pointer transition-all border ${
+                  isCurrentNote
+                    ? 'bg-accent/10 border-accent/30 text-fg shadow-2xs'
+                    : 'bg-surface/50 hover:bg-surface border-transparent hover:border-border/60 text-muted hover:text-fg'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-1 mb-0.5">
+                  <span className={`text-[12px] font-medium truncate ${isCurrentNote ? 'text-fg font-semibold' : 'text-fg/90'}`}>
+                    {note.title || 'Untitled Note'}
+                  </span>
+                  <span className="text-[9.5px] text-meta shrink-0">
+                    {formatRelativeTime(note.updatedAt || note.createdAt)}
+                  </span>
+                </div>
+                {snippet && (
+                  <p className="text-[11px] text-meta line-clamp-2 leading-relaxed">
+                    {snippet}
+                  </p>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     );
