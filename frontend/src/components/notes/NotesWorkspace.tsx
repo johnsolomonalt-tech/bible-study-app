@@ -6,7 +6,6 @@ import {
   Search, 
   Pin, 
   Trash2, 
-  Edit, 
   ChevronLeft, 
   ChevronRight,
   BookOpen, 
@@ -23,10 +22,8 @@ import {
   Check, 
   Tag, 
   ArrowUpDown, 
-  Calendar, 
   FilePlus,
   X,
-  Share2,
   Clock
 } from 'lucide-react';
 import { NoteFormattingToolbar, NoteViewMode } from './NoteFormattingToolbar';
@@ -225,13 +222,32 @@ export function NotesWorkspace({
 }: NotesWorkspaceProps) {
   // Sidebar UI state
   const [sidebarTab, setSidebarTab] = useState<'notes' | 'backlinks' | 'templates'>('notes');
-  const [scrollOrientation, setScrollOrientation] = useState<'vertical' | 'horizontal'>('vertical');
+  const [scrollOrientation, setScrollOrientation] = useState<'vertical' | 'horizontal'>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('theologica_notes_scroll_mode');
+        if (saved === 'horizontal' || saved === 'vertical') return saved;
+      } catch {}
+    }
+    return 'vertical';
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [backlinksSearchQuery, setBacklinksSearchQuery] = useState('');
   const [templatesSearchQuery, setTemplatesSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'updated' | 'title' | 'created'>('updated');
-  const [pinnedIds, setPinnedIds] = useState<number[]>([]);
+  const [pinnedIds, setPinnedIds] = useState<number[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem(PINNED_STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) return parsed;
+        }
+      } catch {}
+    }
+    return [];
+  });
   
   // Refs for scrolling containers & sections
   const carouselRef = useRef<HTMLDivElement | null>(null);
@@ -254,25 +270,6 @@ export function NotesWorkspace({
   const [previewVerse, setPreviewVerse] = useState<{ book: string; chapter: number; verse: number; raw?: string } | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-
-  // Load pinned notes and scroll mode from localStorage
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const rawPinned = localStorage.getItem(PINNED_STORAGE_KEY);
-        if (rawPinned) {
-          const parsed = JSON.parse(rawPinned);
-          if (Array.isArray(parsed)) setPinnedIds(parsed);
-        }
-        const savedScrollMode = localStorage.getItem('theologica_notes_scroll_mode');
-        if (savedScrollMode === 'horizontal' || savedScrollMode === 'vertical') {
-          setScrollOrientation(savedScrollMode);
-        }
-      } catch (e) {
-        console.warn('Failed to load pinned notes or scroll mode', e);
-      }
-    }
-  }, []);
 
   const toggleScrollOrientation = (newMode: 'vertical' | 'horizontal') => {
     setScrollOrientation(newMode);
@@ -297,9 +294,13 @@ export function NotesWorkspace({
   // Set of note IDs that were newly created as blank notes in this session and haven't had content typed
   const newlyCreatedBlankNoteIdsRef = useRef<Set<number>>(new Set());
   const activeNoteRef = useRef<NoteItem | undefined>(activeNote);
-  activeNoteRef.current = activeNote;
   const notesRef = useRef<NoteItem[]>(notes);
-  notesRef.current = notes;
+
+  // Keep refs up-to-date in an effect, avoiding render-phase ref mutations
+  useEffect(() => {
+    activeNoteRef.current = activeNote;
+    notesRef.current = notes;
+  });
 
   // Helper: check if a note has nothing typed on it (empty content and empty/placeholder title)
   const isUntouchedBlankNote = useCallback((note: NoteItem | undefined): boolean => {
@@ -340,9 +341,10 @@ export function NotesWorkspace({
 
   // Auto-delete untouched blank note on unmount (e.g. user switched away from Notes tab)
   useEffect(() => {
+    const blankIds = newlyCreatedBlankNoteIdsRef.current;
     return () => {
       const activeId = activeNoteRef.current?.id;
-      if (activeId && newlyCreatedBlankNoteIdsRef.current.has(activeId)) {
+      if (activeId && blankIds.has(activeId)) {
         const target = notesRef.current.find(n => n.id === activeId);
         if (target && isUntouchedBlankNote(target)) {
           onDeleteNote(activeId);
@@ -353,9 +355,10 @@ export function NotesWorkspace({
 
   // Also handle window/tab unload (refresh, close tab)
   useEffect(() => {
+    const blankIds = newlyCreatedBlankNoteIdsRef.current;
     const handleBeforeUnload = () => {
       const activeId = activeNoteRef.current?.id;
-      if (activeId && newlyCreatedBlankNoteIdsRef.current.has(activeId)) {
+      if (activeId && blankIds.has(activeId)) {
         const target = notesRef.current.find(n => n.id === activeId);
         if (target && isUntouchedBlankNote(target)) {
           fetch(`/api/notes/${activeId}`, {
@@ -1576,7 +1579,7 @@ export function NotesWorkspace({
               <ArrowUpDown size={11} className="text-muted" />
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
+                onChange={(e) => setSortBy(e.target.value as 'updated' | 'title' | 'created')}
                 className="bg-transparent text-meta hover:text-fg focus:outline-none cursor-pointer"
               >
                 <option value="updated">Recently Updated</option>
