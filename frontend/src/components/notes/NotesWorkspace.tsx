@@ -15,6 +15,8 @@ import {
   Link2,
   Hash,
   ExternalLink,
+  MoveVertical,
+  MoveHorizontal,
   MoreVertical, 
   Download, 
   Copy, 
@@ -223,13 +225,20 @@ export function NotesWorkspace({
 }: NotesWorkspaceProps) {
   // Sidebar UI state
   const [sidebarTab, setSidebarTab] = useState<'notes' | 'backlinks' | 'templates'>('notes');
+  const [scrollOrientation, setScrollOrientation] = useState<'vertical' | 'horizontal'>('vertical');
   const [searchQuery, setSearchQuery] = useState('');
   const [backlinksSearchQuery, setBacklinksSearchQuery] = useState('');
   const [templatesSearchQuery, setTemplatesSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'updated' | 'title' | 'created'>('updated');
   const [pinnedIds, setPinnedIds] = useState<number[]>([]);
+  
+  // Refs for scrolling containers & sections
   const carouselRef = useRef<HTMLDivElement | null>(null);
+  const verticalScrollRef = useRef<HTMLDivElement | null>(null);
+  const notesSectionRef = useRef<HTMLDivElement | null>(null);
+  const backlinksSectionRef = useRef<HTMLDivElement | null>(null);
+  const templatesSectionRef = useRef<HTMLDivElement | null>(null);
 
   // Editor UI state
   const [viewMode, setViewMode] = useState<NoteViewMode>('edit');
@@ -246,20 +255,31 @@ export function NotesWorkspace({
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-  // Load pinned notes from localStorage
+  // Load pinned notes and scroll mode from localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
-        const raw = localStorage.getItem(PINNED_STORAGE_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw);
+        const rawPinned = localStorage.getItem(PINNED_STORAGE_KEY);
+        if (rawPinned) {
+          const parsed = JSON.parse(rawPinned);
           if (Array.isArray(parsed)) setPinnedIds(parsed);
         }
+        const savedScrollMode = localStorage.getItem('theologica_notes_scroll_mode');
+        if (savedScrollMode === 'horizontal' || savedScrollMode === 'vertical') {
+          setScrollOrientation(savedScrollMode);
+        }
       } catch (e) {
-        console.warn('Failed to load pinned notes', e);
+        console.warn('Failed to load pinned notes or scroll mode', e);
       }
     }
   }, []);
+
+  const toggleScrollOrientation = (newMode: 'vertical' | 'horizontal') => {
+    setScrollOrientation(newMode);
+    try {
+      localStorage.setItem('theologica_notes_scroll_mode', newMode);
+    } catch {}
+  };
 
   const togglePin = (id: number) => {
     const updated = pinnedIds.includes(id)
@@ -397,17 +417,65 @@ export function NotesWorkspace({
     );
   }, [templatesSearchQuery]);
 
-  // Carousel side-to-side navigation and scroll-sync
+  // Switch tab with dual mode support (vertical smooth scroll vs horizontal carousel)
   const handleSwitchTab = useCallback((tab: 'notes' | 'backlinks' | 'templates') => {
     setSidebarTab(tab);
-    if (!carouselRef.current) return;
-    const index = tab === 'notes' ? 0 : tab === 'backlinks' ? 1 : 2;
-    const width = carouselRef.current.clientWidth;
-    carouselRef.current.scrollTo({
-      left: index * width,
-      behavior: 'smooth'
-    });
-  }, []);
+    if (scrollOrientation === 'vertical') {
+      let targetEl: HTMLElement | null = null;
+      if (tab === 'notes') targetEl = notesSectionRef.current;
+      else if (tab === 'backlinks') targetEl = backlinksSectionRef.current;
+      else if (tab === 'templates') targetEl = templatesSectionRef.current;
+
+      if (targetEl && verticalScrollRef.current) {
+        const topOffset = targetEl.offsetTop;
+        verticalScrollRef.current.scrollTo({
+          top: Math.max(0, topOffset - 10),
+          behavior: 'smooth'
+        });
+      }
+    } else {
+      if (!carouselRef.current) return;
+      const index = tab === 'notes' ? 0 : tab === 'backlinks' ? 1 : 2;
+      const width = carouselRef.current.clientWidth;
+      carouselRef.current.scrollTo({
+        left: index * width,
+        behavior: 'smooth'
+      });
+    }
+  }, [scrollOrientation]);
+
+  // Track vertical scroll position to sync active tab in sticky header
+  const handleVerticalScroll = useCallback(() => {
+    if (!verticalScrollRef.current) return;
+    const scrollTop = verticalScrollRef.current.scrollTop;
+    const backlinksTop = backlinksSectionRef.current?.offsetTop || 99999;
+    const templatesTop = templatesSectionRef.current?.offsetTop || 99999;
+
+    let active: 'notes' | 'backlinks' | 'templates' = 'notes';
+    if (scrollTop >= templatesTop - 120) {
+      active = 'templates';
+    } else if (scrollTop >= backlinksTop - 120) {
+      active = 'backlinks';
+    } else {
+      active = 'notes';
+    }
+
+    if (active !== sidebarTab) {
+      setSidebarTab(active);
+    }
+  }, [sidebarTab]);
+
+  // Mouse wheel over header or subheader advances tabs seamlessly for standard mice
+  const handleHeaderWheel = useCallback((e: React.WheelEvent) => {
+    if (Math.abs(e.deltaY) < 15) return;
+    const order: ('notes' | 'backlinks' | 'templates')[] = ['notes', 'backlinks', 'templates'];
+    const currentIdx = order.indexOf(sidebarTab);
+    if (e.deltaY > 0 && currentIdx < order.length - 1) {
+      handleSwitchTab(order[currentIdx + 1]);
+    } else if (e.deltaY < 0 && currentIdx > 0) {
+      handleSwitchTab(order[currentIdx - 1]);
+    }
+  }, [sidebarTab, handleSwitchTab]);
 
   const handleCarouselScroll = useCallback(() => {
     if (!carouselRef.current) return;
@@ -422,6 +490,7 @@ export function NotesWorkspace({
   }, [sidebarTab]);
 
   useEffect(() => {
+    if (scrollOrientation !== 'horizontal') return;
     const handleResize = () => {
       if (!carouselRef.current) return;
       const index = sidebarTab === 'notes' ? 0 : sidebarTab === 'backlinks' ? 1 : 2;
@@ -429,7 +498,7 @@ export function NotesWorkspace({
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [sidebarTab]);
+  }, [sidebarTab, scrollOrientation]);
 
   // Tag Management Handlers
   const handleAddTag = (tagToAdd: string) => {
@@ -569,7 +638,10 @@ export function NotesWorkspace({
         }`}
       >
         {/* Sidebar Header with Notes vs Backlinks vs Templates Scrollable Switcher */}
-        <header className="h-[58px] border-b border-border flex items-center justify-between px-2.5 shrink-0 bg-surface/20 gap-1.5">
+        <header 
+          onWheel={handleHeaderWheel}
+          className="h-[58px] border-b border-border flex items-center justify-between px-2.5 shrink-0 bg-surface/20 gap-1.5"
+        >
           {/* Scrollable Tabs Segmented Control */}
           <div className="flex-1 overflow-x-auto no-scrollbar py-1 flex items-center min-w-0">
             <div className="flex items-center gap-1 bg-surface p-1 rounded-xl border border-border/60 shrink-0">
@@ -581,7 +653,7 @@ export function NotesWorkspace({
                     ? 'bg-bg text-fg shadow-2xs ring-1 ring-border/80'
                     : 'text-muted hover:text-fg'
                 }`}
-                title="Personal Notes (Scroll / Swipe ↔)"
+                title="Personal Notes (Scroll / Wheel)"
               >
                 <FileText size={13} className={sidebarTab === 'notes' ? 'text-accent' : ''} />
                 <span>Notes</span>
@@ -597,7 +669,7 @@ export function NotesWorkspace({
                     ? 'bg-bg text-accent shadow-2xs ring-1 ring-border/80'
                     : 'text-muted hover:text-fg'
                 }`}
-                title="Scripture Backlinks (Scroll / Swipe ↔)"
+                title="Scripture Backlinks (Scroll / Wheel)"
               >
                 <Link2 size={13} />
                 <span>Backlinks</span>
@@ -615,7 +687,7 @@ export function NotesWorkspace({
                     ? 'bg-bg text-accent shadow-2xs ring-1 ring-border/80'
                     : 'text-muted hover:text-fg'
                 }`}
-                title="Study Templates (Scroll / Swipe ↔)"
+                title="Study Templates (Scroll / Wheel)"
               >
                 <LayoutTemplate size={13} className={sidebarTab === 'templates' ? 'text-accent' : ''} />
                 <span>Templates</span>
@@ -639,8 +711,11 @@ export function NotesWorkspace({
           </div>
         </header>
 
-        {/* Carousel Slide Indicators & Quick Navigation Bar */}
-        <div className="px-3 py-1 bg-surface/15 border-b border-border/40 flex items-center justify-between text-[11px] text-meta shrink-0 select-none">
+        {/* Carousel Slide Indicators & Scroll Mode Switcher */}
+        <div 
+          onWheel={handleHeaderWheel}
+          className="px-2.5 py-1 bg-surface/15 border-b border-border/40 flex items-center justify-between text-[11px] text-meta shrink-0 select-none gap-1"
+        >
           <div className="flex items-center gap-1.5">
             <button
               type="button"
@@ -650,7 +725,7 @@ export function NotesWorkspace({
                 handleSwitchTab(order[prevIdx]);
               }}
               className="p-0.5 rounded hover:bg-surface text-muted hover:text-fg cursor-pointer transition-colors"
-              title="Previous panel (or swipe right)"
+              title="Previous panel (or scroll mouse wheel up)"
             >
               <ChevronLeft size={13} />
             </button>
@@ -675,306 +750,118 @@ export function NotesWorkspace({
                 handleSwitchTab(order[nextIdx]);
               }}
               className="p-0.5 rounded hover:bg-surface text-muted hover:text-fg cursor-pointer transition-colors"
-              title="Next panel (or swipe left)"
+              title="Next panel (or scroll mouse wheel down)"
             >
               <ChevronRight size={13} />
             </button>
           </div>
-          <span className="capitalize font-medium text-[10.5px] text-muted flex items-center gap-1">
-            <span>{sidebarTab === 'notes' ? `${filteredNotes.length} Notes` : sidebarTab === 'backlinks' ? `${filteredBacklinksGroups.length} Passages` : `${filteredTemplates.length} Templates`}</span>
-            <span>•</span>
-            <span className="text-[10px] opacity-80">Swipe ↔</span>
-          </span>
+
+          {/* Scroll Orientation Toggle: Up/Down vs Side/Side */}
+          <div className="flex items-center gap-1 bg-surface/80 p-0.5 rounded-lg border border-border/60">
+            <button
+              type="button"
+              onClick={() => toggleScrollOrientation('vertical')}
+              className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-all cursor-pointer ${
+                scrollOrientation === 'vertical'
+                  ? 'bg-accent text-white shadow-2xs font-semibold'
+                  : 'text-muted hover:text-fg'
+              }`}
+              title="Vertical Scroll: Ideal for standard mice! Scroll up and down continuously through Notes, Backlinks, and Templates"
+            >
+              <MoveVertical size={11} />
+              <span>↕ Up/Down</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => toggleScrollOrientation('horizontal')}
+              className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-all cursor-pointer ${
+                scrollOrientation === 'horizontal'
+                  ? 'bg-accent text-white shadow-2xs font-semibold'
+                  : 'text-muted hover:text-fg'
+              }`}
+              title="Horizontal Swipe: Side-to-side panels for trackpad, Magic Mouse, or touch screens"
+            >
+              <MoveHorizontal size={11} />
+              <span>↔ Side/Side</span>
+            </button>
+          </div>
         </div>
 
-        {/* HORIZONTAL SWIPE / SCROLL CONTAINER: NOTES ↔ BACKLINKS ↔ TEMPLATES */}
-        <div
-          ref={carouselRef}
-          onScroll={handleCarouselScroll}
-          className="flex-1 w-full min-h-0 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory scroll-smooth no-scrollbar touch-pan-x"
-          style={{ WebkitOverflowScrolling: 'touch' }}
-        >
-          {/* PANEL 1: NOTES */}
-          <div className="w-full min-w-full h-full max-h-full min-h-0 flex flex-col snap-start shrink-0 overflow-hidden">
-            {/* Search Bar */}
-            <div className="p-3 border-b border-border/60 bg-surface/10 space-y-2.5 shrink-0">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={14} />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search notes, scripture, tags..."
-                  className="w-full bg-surface border border-border/80 pl-9 pr-8 py-1.5 rounded-lg text-[13px] text-fg placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent"
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-fg cursor-pointer"
-                  >
-                    <X size={13} />
-                  </button>
-                )}
+        {/* 1. VERTICAL UP-AND-DOWN SCROLL VIEW (Standard Mouse Support) */}
+        {scrollOrientation === 'vertical' && (
+          <div
+            ref={verticalScrollRef}
+            onScroll={handleVerticalScroll}
+            className="flex-1 min-h-0 w-full overflow-y-auto custom-scroll p-2.5 space-y-5 pb-24 lg:pb-8 touch-pan-y"
+            style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}
+          >
+            {/* 1. NOTES SECTION */}
+            <div ref={notesSectionRef} className="space-y-2">
+              <div className="flex items-center justify-between pb-1 border-b border-border/50 text-meta">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-muted flex items-center gap-1.5">
+                  <FileText size={12} className="text-accent" />
+                  <span>Notes ({filteredNotes.length})</span>
+                </span>
+                <span className="text-[10px] text-muted">Scroll down for Backlinks & Templates ↓</span>
               </div>
-
-              {/* Tags Filter Ribbon */}
-              {allAvailableTags.length > 0 && (
-                <div className="flex items-center gap-1.5 overflow-x-auto custom-scroll no-scrollbar py-0.5">
-                  <button
-                    onClick={() => setSelectedTag(null)}
-                    className={`text-[11px] px-2.5 py-0.5 rounded-full font-medium transition-all shrink-0 cursor-pointer ${
-                      selectedTag === null
-                        ? 'bg-accent text-white shadow-2xs'
-                        : 'bg-surface hover:bg-surface/80 text-muted border border-border/60'
-                    }`}
-                  >
-                    All
-                  </button>
-                  {allAvailableTags.map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => setSelectedTag(selectedTag === t ? null : t)}
-                      className={`text-[11px] px-2.5 py-0.5 rounded-full font-medium transition-all shrink-0 cursor-pointer ${
-                        selectedTag === t
-                          ? 'bg-accent text-white shadow-2xs'
-                          : 'bg-surface hover:bg-surface/80 text-muted border border-border/60'
-                      }`}
-                    >
-                      {t}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Sorting Row */}
-              <div className="flex items-center justify-between text-[11px] text-meta pt-0.5">
-                <span>{filteredNotes.length} {filteredNotes.length === 1 ? 'note' : 'notes'}</span>
-                <div className="flex items-center gap-1">
-                  <ArrowUpDown size={11} className="text-muted" />
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as any)}
-                    className="bg-transparent text-meta hover:text-fg focus:outline-none cursor-pointer"
-                  >
-                    <option value="updated">Recently Updated</option>
-                    <option value="created">Date Created</option>
-                    <option value="title">Title (A-Z)</option>
-                  </select>
-                </div>
-              </div>
+              {renderNotesPanelContent(true)}
             </div>
 
-            {/* Notes Items List (Vertical Scroll) */}
-            <div 
-              className="flex-1 min-h-0 overflow-y-auto custom-scroll p-2.5 space-y-1 pb-24 lg:pb-4 touch-pan-y"
-              style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}
-            >
-              {filteredNotes.length === 0 && (
-                <div className="py-12 px-4 text-center text-meta">
-                  <FileText size={24} className="mx-auto mb-2 text-muted" />
-                  <p className="text-[13px] font-medium text-fg">No notes found</p>
-                  <p className="text-[11px] mt-1">
-                    {searchQuery || selectedTag ? 'Try adjusting your search or filters.' : 'Click + or swipe to Templates to create your first note.'}
-                  </p>
-                </div>
-              )}
+            <div className="w-full h-px bg-border/60" />
 
-              {/* Pinned Notes Group */}
-              {pinnedNotes.length > 0 && (
-                <div className="mb-3 space-y-1">
-                  <div className="px-2 py-1 text-[10px] font-bold text-muted uppercase tracking-wider flex items-center gap-1">
-                    <Pin size={11} className="text-accent rotate-45" />
-                    <span>Pinned</span>
-                  </div>
-                  {pinnedNotes.map((note) => renderNoteCard(note))}
-                </div>
-              )}
-
-              {/* Regular Notes Group */}
-              {regularNotes.length > 0 && (
-                <div className="space-y-1">
-                  {pinnedNotes.length > 0 && (
-                    <div className="px-2 py-1 text-[10px] font-bold text-muted uppercase tracking-wider">
-                      Notes
-                    </div>
-                  )}
-                  {regularNotes.map((note) => renderNoteCard(note))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* PANEL 2: BACKLINKS */}
-          <div className="w-full min-w-full h-full max-h-full min-h-0 flex flex-col snap-start shrink-0 overflow-hidden">
-            {/* Backlinks Search Bar */}
-            <div className="p-3 border-b border-border/60 bg-surface/10 space-y-2 shrink-0">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={14} />
-                <input
-                  type="text"
-                  value={backlinksSearchQuery}
-                  onChange={(e) => setBacklinksSearchQuery(e.target.value)}
-                  placeholder="Filter backlinks or scriptures..."
-                  className="w-full bg-surface border border-border/80 pl-9 pr-8 py-1.5 rounded-lg text-[13px] text-fg placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent"
-                />
-                {backlinksSearchQuery && (
-                  <button
-                    onClick={() => setBacklinksSearchQuery('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-fg cursor-pointer"
-                  >
-                    <X size={13} />
-                  </button>
-                )}
+            {/* 2. BACKLINKS SECTION */}
+            <div ref={backlinksSectionRef} className="space-y-2">
+              <div className="flex items-center justify-between pb-1 border-b border-border/50 text-meta">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-muted flex items-center gap-1.5">
+                  <Link2 size={12} className="text-accent" />
+                  <span>Scripture Backlinks ({filteredBacklinksGroups.length})</span>
+                </span>
+                <span className="text-[10px] text-muted">{allBacklinksGroups.reduce((acc, g) => acc + g.notes.length, 0)} references</span>
               </div>
-              <div className="flex items-center justify-between text-[11px] text-meta">
-                <span>{filteredBacklinksGroups.length} linked {filteredBacklinksGroups.length === 1 ? 'passage' : 'passages'}</span>
-                <span>{allBacklinksGroups.reduce((acc, g) => acc + g.notes.length, 0)} total references</span>
-              </div>
+              {renderBacklinksPanelContent(true)}
             </div>
 
-            {/* Backlinks List (Vertical Scroll) */}
-            <div 
-              className="flex-1 min-h-0 overflow-y-auto custom-scroll p-2.5 space-y-3 pb-24 lg:pb-4 touch-pan-y"
-              style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}
-            >
-              {filteredBacklinksGroups.length === 0 ? (
-                <div className="py-12 px-4 text-center text-meta">
-                  <Link2 size={24} className="mx-auto mb-2 text-muted" />
-                  <p className="text-[13px] font-medium text-fg">No Scripture backlinks found</p>
-                  <p className="text-[11px] mt-1 leading-relaxed">
-                    {backlinksSearchQuery 
-                      ? 'No passages match your search.' 
-                      : 'Type any Bible citation (like John 3:16 or Romans 8:28) in your notes to automatically link and organize your study.'}
-                  </p>
-                </div>
-              ) : (
-                <>
-                  {/* Contextual Active Note Links */}
-                  {activeNote && activeNoteBacklinks.length > 0 && !backlinksSearchQuery && (
-                    <div className="mb-3 space-y-2">
-                      <div className="px-2 py-0.5 text-[10px] font-bold text-accent uppercase tracking-wider flex items-center gap-1">
-                        <BookOpen size={11} />
-                        <span>Connected to Active Note</span>
-                      </div>
-                      {activeNoteBacklinks.map((group) => renderBacklinkGroup(group, true))}
-                      <div className="w-full h-px bg-border/60 my-2" />
-                    </div>
-                  )}
+            <div className="w-full h-px bg-border/60" />
 
-                  {/* All Scripture Backlinks */}
-                  <div className="space-y-2">
-                    {activeNote && activeNoteBacklinks.length > 0 && !backlinksSearchQuery && (
-                      <div className="px-2 py-0.5 text-[10px] font-bold text-muted uppercase tracking-wider">
-                        All Scripture Passages
-                      </div>
-                    )}
-                    {filteredBacklinksGroups.map((group) => renderBacklinkGroup(group, false))}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* PANEL 3: TEMPLATES */}
-          <div className="w-full min-w-full h-full max-h-full min-h-0 flex flex-col snap-start shrink-0 overflow-hidden">
-            {/* Templates Search & Header */}
-            <div className="p-3 border-b border-border/60 bg-surface/10 space-y-2 shrink-0">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={14} />
-                <input
-                  type="text"
-                  value={templatesSearchQuery}
-                  onChange={(e) => setTemplatesSearchQuery(e.target.value)}
-                  placeholder="Search study frameworks..."
-                  className="w-full bg-surface border border-border/80 pl-9 pr-8 py-1.5 rounded-lg text-[13px] text-fg placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent"
-                />
-                {templatesSearchQuery && (
-                  <button
-                    onClick={() => setTemplatesSearchQuery('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-fg cursor-pointer"
-                  >
-                    <X size={13} />
-                  </button>
-                )}
-              </div>
-              <div className="flex items-center justify-between text-[11px] text-meta">
-                <span>{filteredTemplates.length} study {filteredTemplates.length === 1 ? 'framework' : 'frameworks'}</span>
+            {/* 3. TEMPLATES SECTION */}
+            <div ref={templatesSectionRef} className="space-y-2">
+              <div className="flex items-center justify-between pb-1 border-b border-border/50 text-meta">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-muted flex items-center gap-1.5">
+                  <LayoutTemplate size={12} className="text-accent" />
+                  <span>Study Templates ({filteredTemplates.length})</span>
+                </span>
                 <button
                   type="button"
                   onClick={() => setIsTemplatesOpen(true)}
-                  className="text-accent hover:underline font-medium text-[11px] cursor-pointer"
+                  className="text-accent hover:underline text-[10.5px] cursor-pointer"
                 >
-                  Open Full Library
+                  Full Modal
                 </button>
               </div>
-            </div>
-
-            {/* Templates List (Vertical Scroll) */}
-            <div 
-              className="flex-1 min-h-0 overflow-y-auto custom-scroll p-2.5 space-y-2.5 pb-24 lg:pb-4 touch-pan-y"
-              style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}
-            >
-              {filteredTemplates.length === 0 ? (
-                <div className="py-12 px-4 text-center text-meta">
-                  <LayoutTemplate size={24} className="mx-auto mb-2 text-muted" />
-                  <p className="text-[13px] font-medium text-fg">No templates match your search</p>
-                </div>
-              ) : (
-                filteredTemplates.map((tmpl) => (
-                  <div
-                    key={tmpl.id}
-                    className="p-3 rounded-xl border border-border/70 hover:border-accent/50 bg-surface/40 hover:bg-surface/70 transition-all shadow-2xs group flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between mb-1.5 gap-2">
-                        <span className="text-[11px] font-semibold text-accent px-1.5 py-0.5 rounded bg-accent/10 border border-accent/20">
-                          {tmpl.badge}
-                        </span>
-                        <LayoutTemplate size={13} className="text-muted group-hover:text-accent transition-colors" />
-                      </div>
-                      <h4 className="text-[13px] font-semibold text-fg group-hover:text-accent transition-colors mb-1">
-                        {tmpl.name}
-                      </h4>
-                      <p className="text-[11px] text-meta leading-relaxed line-clamp-2 mb-3">
-                        {tmpl.description}
-                      </p>
-                    </div>
-
-                    {/* Template Card Action Buttons */}
-                    <div className="flex items-center gap-1.5 pt-2 border-t border-border/40">
-                      <button
-                        type="button"
-                        onClick={() => handleApplyTemplate(tmpl, 'create')}
-                        className="flex-1 py-1.5 px-2 bg-accent/15 hover:bg-accent/25 text-accent border border-accent/30 rounded-lg text-[11px] font-semibold transition-all cursor-pointer text-center"
-                        title="Create a new note with this template"
-                      >
-                        + New Note
-                      </button>
-                      {activeNote && (
-                        <button
-                          type="button"
-                          onClick={() => handleApplyTemplate(tmpl, 'append')}
-                          className="py-1.5 px-2 bg-surface hover:bg-surface-hover text-fg border border-border/70 rounded-lg text-[11px] font-medium transition-all cursor-pointer"
-                          title="Append this template into the currently open note"
-                        >
-                          Append
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setIsTemplatesOpen(true)}
-                        className="p-1.5 bg-surface hover:bg-surface-hover text-muted hover:text-fg border border-border/70 rounded-lg transition-colors cursor-pointer"
-                        title="Preview template content"
-                      >
-                        <ExternalLink size={12} />
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
+              {renderTemplatesPanelContent(true)}
             </div>
           </div>
-        </div>
+        )}
+
+        {/* 2. HORIZONTAL SIDE-TO-SIDE SWIPE VIEW (Trackpad / Magic Mouse / Touch) */}
+        {scrollOrientation === 'horizontal' && (
+          <div
+            ref={carouselRef}
+            onScroll={handleCarouselScroll}
+            className="flex-1 w-full min-h-0 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory scroll-smooth no-scrollbar touch-pan-x"
+            style={{ WebkitOverflowScrolling: 'touch' }}
+          >
+            <div className="w-full min-w-full h-full max-h-full min-h-0 flex flex-col snap-start shrink-0 overflow-hidden">
+              {renderNotesPanelContent(false)}
+            </div>
+            <div className="w-full min-w-full h-full max-h-full min-h-0 flex flex-col snap-start shrink-0 overflow-hidden">
+              {renderBacklinksPanelContent(false)}
+            </div>
+            <div className="w-full min-w-full h-full max-h-full min-h-0 flex flex-col snap-start shrink-0 overflow-hidden">
+              {renderTemplatesPanelContent(false)}
+            </div>
+          </div>
+        )}
       </aside>
 
       {/* MAIN SECTION: Active Note Workspace */}
@@ -1521,6 +1408,311 @@ export function NotesWorkspace({
               </div>
             );
           })}
+        </div>
+      </div>
+    );
+  }
+
+  // 1. Render Notes Panel Content (supports both continuous vertical scroll and horizontal paged mode)
+  function renderNotesPanelContent(isFullScroll: boolean) {
+    return (
+      <div className={isFullScroll ? "space-y-2.5" : "flex-1 flex flex-col min-h-0"}>
+        {/* Search Bar */}
+        <div className={`p-3 border-b border-border/60 bg-surface/10 space-y-2.5 shrink-0 ${isFullScroll ? 'rounded-xl border' : ''}`}>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={14} />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search notes, scripture, tags..."
+              className="w-full bg-surface border border-border/80 pl-9 pr-8 py-1.5 rounded-lg text-[13px] text-fg placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-fg cursor-pointer"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+
+          {/* Tags Filter Ribbon */}
+          {allAvailableTags.length > 0 && (
+            <div className="flex items-center gap-1.5 overflow-x-auto custom-scroll no-scrollbar py-0.5">
+              <button
+                onClick={() => setSelectedTag(null)}
+                className={`text-[11px] px-2.5 py-0.5 rounded-full font-medium transition-all shrink-0 cursor-pointer ${
+                  selectedTag === null
+                    ? 'bg-accent text-white shadow-2xs'
+                    : 'bg-surface hover:bg-surface/80 text-muted border border-border/60'
+                }`}
+              >
+                All
+              </button>
+              {allAvailableTags.map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setSelectedTag(selectedTag === t ? null : t)}
+                  className={`text-[11px] px-2.5 py-0.5 rounded-full font-medium transition-all shrink-0 cursor-pointer ${
+                    selectedTag === t
+                      ? 'bg-accent text-white shadow-2xs'
+                      : 'bg-surface hover:bg-surface/80 text-muted border border-border/60'
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Sorting Row */}
+          <div className="flex items-center justify-between text-[11px] text-meta pt-0.5">
+            <span>{filteredNotes.length} {filteredNotes.length === 1 ? 'note' : 'notes'}</span>
+            <div className="flex items-center gap-1">
+              <ArrowUpDown size={11} className="text-muted" />
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="bg-transparent text-meta hover:text-fg focus:outline-none cursor-pointer"
+              >
+                <option value="updated">Recently Updated</option>
+                <option value="created">Date Created</option>
+                <option value="title">Title (A-Z)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Notes Items List */}
+        <div 
+          className={
+            isFullScroll 
+              ? "space-y-1 pt-1" 
+              : "flex-1 min-h-0 overflow-y-auto custom-scroll p-2.5 space-y-1 pb-24 lg:pb-4 touch-pan-y"
+          }
+          style={isFullScroll ? undefined : { WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}
+        >
+          {filteredNotes.length === 0 && (
+            <div className="py-8 px-4 text-center text-meta">
+              <FileText size={22} className="mx-auto mb-2 text-muted" />
+              <p className="text-[12.5px] font-medium text-fg">No notes found</p>
+              <p className="text-[11px] mt-1">
+                {searchQuery || selectedTag ? 'Try adjusting your search or filters.' : 'Click + New Note to start.'}
+              </p>
+            </div>
+          )}
+
+          {/* Pinned Notes Group */}
+          {pinnedNotes.length > 0 && (
+            <div className="mb-2 space-y-1">
+              <div className="px-2 py-0.5 text-[10px] font-bold text-muted uppercase tracking-wider flex items-center gap-1">
+                <Pin size={11} className="text-accent rotate-45" />
+                <span>Pinned</span>
+              </div>
+              {pinnedNotes.map((note) => renderNoteCard(note))}
+            </div>
+          )}
+
+          {/* Regular Notes Group */}
+          {regularNotes.length > 0 && (
+            <div className="space-y-1">
+              {pinnedNotes.length > 0 && (
+                <div className="px-2 py-0.5 text-[10px] font-bold text-muted uppercase tracking-wider">
+                  Notes
+                </div>
+              )}
+              {regularNotes.map((note) => renderNoteCard(note))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Render Backlinks Panel Content (supports both continuous vertical scroll and horizontal paged mode)
+  function renderBacklinksPanelContent(isFullScroll: boolean) {
+    return (
+      <div className={isFullScroll ? "space-y-2.5" : "flex-1 flex flex-col min-h-0"}>
+        {/* Backlinks Search Bar */}
+        <div className={`p-3 border-b border-border/60 bg-surface/10 space-y-2 shrink-0 ${isFullScroll ? 'rounded-xl border' : ''}`}>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={14} />
+            <input
+              type="text"
+              value={backlinksSearchQuery}
+              onChange={(e) => setBacklinksSearchQuery(e.target.value)}
+              placeholder="Filter backlinks or scriptures..."
+              className="w-full bg-surface border border-border/80 pl-9 pr-8 py-1.5 rounded-lg text-[13px] text-fg placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+            {backlinksSearchQuery && (
+              <button
+                onClick={() => setBacklinksSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-fg cursor-pointer"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-meta">
+            <span>{filteredBacklinksGroups.length} linked {filteredBacklinksGroups.length === 1 ? 'passage' : 'passages'}</span>
+            <span>{allBacklinksGroups.reduce((acc, g) => acc + g.notes.length, 0)} total references</span>
+          </div>
+        </div>
+
+        {/* Backlinks List */}
+        <div 
+          className={
+            isFullScroll 
+              ? "space-y-2.5 pt-1" 
+              : "flex-1 min-h-0 overflow-y-auto custom-scroll p-2.5 space-y-3 pb-24 lg:pb-4 touch-pan-y"
+          }
+          style={isFullScroll ? undefined : { WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}
+        >
+          {filteredBacklinksGroups.length === 0 ? (
+            <div className="py-8 px-4 text-center text-meta">
+              <Link2 size={22} className="mx-auto mb-2 text-muted" />
+              <p className="text-[12.5px] font-medium text-fg">No Scripture backlinks found</p>
+              <p className="text-[11px] mt-1 leading-relaxed">
+                {backlinksSearchQuery 
+                  ? 'No passages match your search.' 
+                  : 'Type any Bible citation (like John 3:16) in your notes to automatically link related thoughts.'}
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Contextual Active Note Links */}
+              {activeNote && activeNoteBacklinks.length > 0 && !backlinksSearchQuery && (
+                <div className="mb-2 space-y-1.5">
+                  <div className="px-2 py-0.5 text-[10px] font-bold text-accent uppercase tracking-wider flex items-center gap-1">
+                    <BookOpen size={11} />
+                    <span>Connected to Active Note</span>
+                  </div>
+                  {activeNoteBacklinks.map((group) => renderBacklinkGroup(group, true))}
+                  <div className="w-full h-px bg-border/60 my-2" />
+                </div>
+              )}
+
+              {/* All Scripture Backlinks */}
+              <div className="space-y-2">
+                {activeNote && activeNoteBacklinks.length > 0 && !backlinksSearchQuery && (
+                  <div className="px-2 py-0.5 text-[10px] font-bold text-muted uppercase tracking-wider">
+                    All Scripture Passages
+                  </div>
+                )}
+                {filteredBacklinksGroups.map((group) => renderBacklinkGroup(group, false))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // 3. Render Templates Panel Content (supports both continuous vertical scroll and horizontal paged mode)
+  function renderTemplatesPanelContent(isFullScroll: boolean) {
+    return (
+      <div className={isFullScroll ? "space-y-2.5" : "flex-1 flex flex-col min-h-0"}>
+        {/* Templates Search & Header */}
+        <div className={`p-3 border-b border-border/60 bg-surface/10 space-y-2 shrink-0 ${isFullScroll ? 'rounded-xl border' : ''}`}>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={14} />
+            <input
+              type="text"
+              value={templatesSearchQuery}
+              onChange={(e) => setTemplatesSearchQuery(e.target.value)}
+              placeholder="Search study frameworks..."
+              className="w-full bg-surface border border-border/80 pl-9 pr-8 py-1.5 rounded-lg text-[13px] text-fg placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+            {templatesSearchQuery && (
+              <button
+                onClick={() => setTemplatesSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-fg cursor-pointer"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-meta">
+            <span>{filteredTemplates.length} study {filteredTemplates.length === 1 ? 'framework' : 'frameworks'}</span>
+            <button
+              type="button"
+              onClick={() => setIsTemplatesOpen(true)}
+              className="text-accent hover:underline font-medium text-[11px] cursor-pointer"
+            >
+              Open Full Library
+            </button>
+          </div>
+        </div>
+
+        {/* Templates List */}
+        <div 
+          className={
+            isFullScroll 
+              ? "space-y-2 pt-1" 
+              : "flex-1 min-h-0 overflow-y-auto custom-scroll p-2.5 space-y-2.5 pb-24 lg:pb-4 touch-pan-y"
+          }
+          style={isFullScroll ? undefined : { WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}
+        >
+          {filteredTemplates.length === 0 ? (
+            <div className="py-8 px-4 text-center text-meta">
+              <LayoutTemplate size={22} className="mx-auto mb-2 text-muted" />
+              <p className="text-[12.5px] font-medium text-fg">No templates match your search</p>
+            </div>
+          ) : (
+            filteredTemplates.map((tmpl) => (
+              <div
+                key={tmpl.id}
+                className="p-3 rounded-xl border border-border/70 hover:border-accent/50 bg-surface/40 hover:bg-surface/70 transition-all shadow-2xs group flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-1.5 gap-2">
+                    <span className="text-[11px] font-semibold text-accent px-1.5 py-0.5 rounded bg-accent/10 border border-accent/20">
+                      {tmpl.badge}
+                    </span>
+                    <LayoutTemplate size={13} className="text-muted group-hover:text-accent transition-colors" />
+                  </div>
+                  <h4 className="text-[13px] font-semibold text-fg group-hover:text-accent transition-colors mb-1">
+                    {tmpl.name}
+                  </h4>
+                  <p className="text-[11px] text-meta leading-relaxed line-clamp-2 mb-3">
+                    {tmpl.description}
+                  </p>
+                </div>
+
+                {/* Template Card Action Buttons */}
+                <div className="flex items-center gap-1.5 pt-2 border-t border-border/40">
+                  <button
+                    type="button"
+                    onClick={() => handleApplyTemplate(tmpl, 'create')}
+                    className="flex-1 py-1.5 px-2 bg-accent/15 hover:bg-accent/25 text-accent border border-accent/30 rounded-lg text-[11px] font-semibold transition-all cursor-pointer text-center"
+                    title="Create a new note with this template"
+                  >
+                    + New Note
+                  </button>
+                  {activeNote && (
+                    <button
+                      type="button"
+                      onClick={() => handleApplyTemplate(tmpl, 'append')}
+                      className="py-1.5 px-2 bg-surface hover:bg-surface-hover text-fg border border-border/70 rounded-lg text-[11px] font-medium transition-all cursor-pointer"
+                      title="Append this template into the currently open note"
+                    >
+                      Append
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setIsTemplatesOpen(true)}
+                    className="p-1.5 bg-surface hover:bg-surface-hover text-muted hover:text-fg border border-border/70 rounded-lg transition-colors cursor-pointer"
+                    title="Preview template content"
+                  >
+                    <ExternalLink size={12} />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     );
