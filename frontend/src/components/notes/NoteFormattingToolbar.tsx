@@ -15,7 +15,6 @@ import {
   Minus, 
   Code, 
   BookOpen, 
-  FileText, 
   LayoutTemplate,
   Sparkles, 
   Eye, 

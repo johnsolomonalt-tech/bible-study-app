@@ -13,7 +13,6 @@ import {
   FileEdit, 
   LayoutTemplate,
   Check,
-  ChevronRight,
   Eye,
   Code,
   FilePlus,

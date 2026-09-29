@@ -6,7 +6,6 @@ import remarkGfm from 'remark-gfm';
 import { 
   X, 
   Sparkles, 
-  BookOpen, 
   HelpCircle, 
   Link2, 
   Flame, 
@@ -127,9 +126,10 @@ export function NoteAiAssistantModal({
       }
 
       setGeneratedResult(data.content);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Note AI Assistant error:', err);
-      setError(err?.message || 'Could not connect to Theologica AI. Please try again.');
+      const message = err instanceof Error ? err.message : 'Could not connect to Theologica AI. Please try again.';
+      setError(message);
     } finally {
       setLoading(false);
     }
