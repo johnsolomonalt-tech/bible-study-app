@@ -44,6 +44,10 @@ import {
   Server,
   Zap,
   ShieldCheck,
+  Mail,
+  Phone,
+  UserCheck,
+  Search,
 } from 'lucide-react';
 import { DEV_API_BASE, DEV_PORTAL_PATH } from '@/lib/devConfig';
 
@@ -116,6 +120,19 @@ interface ActivityEvent {
   timestamp: string;
 }
 
+interface DevUserAccount {
+  id: string;
+  username: string | null;
+  fullName: string | null;
+  email: string | null;
+  phoneNumber: string | null;
+  imageUrl: string | null;
+  createdAt: string;
+  lastSignInAt: string | null;
+  lastActiveAt: string | null;
+  lastUsedAt: string | null;
+}
+
 interface AdminSettings {
   adminUserId: string;
   adminEmail: string | null;
@@ -143,8 +160,18 @@ export default function DevDashboardPage() {
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [isAutoRefresh, setIsAutoRefresh] = useState(true);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date>(new Date());
-  const [activeTab, setActiveTab] = useState<'overview' | 'features' | 'activity' | 'health' | 'security'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'features' | 'activity' | 'health' | 'security'>('overview');
   const [feedFilter, setFeedFilter] = useState<string>('all');
+
+  // Registered Users Directory State
+  const [usersList, setUsersList] = useState<DevUserAccount[]>([]);
+  const [totalUsersCount, setTotalUsersCount] = useState<number>(0);
+  const [isLoadingUsers, setIsLoadingUsers] = useState<boolean>(false);
+  const [usersError, setUsersError] = useState<string | null>(null);
+  const [userSearchQuery, setUserSearchQuery] = useState<string>('');
+  const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
+  const [copiedPhone, setCopiedPhone] = useState<string | null>(null);
+  const [copiedUserId, setCopiedUserId] = useState<string | null>(null);
 
   // Change Password Modal / Form
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
@@ -168,11 +195,12 @@ export default function DevDashboardPage() {
   const loadDashboardData = useCallback(async (range: '24h' | '7d' | '30d' = timeRange) => {
     setIsLoadingStats(true);
     try {
-      const [statsRes, eventsRes, settingsRes, healthRes] = await Promise.all([
+      const [statsRes, eventsRes, settingsRes, healthRes, usersRes] = await Promise.all([
         fetch(`${DEV_API_BASE}/stats?range=${range}`),
         fetch(`${DEV_API_BASE}/events?limit=60`),
         fetch(`${DEV_API_BASE}/settings`),
         fetch(`${DEV_API_BASE}/health`),
+        fetch(`${DEV_API_BASE}/users`),
       ]);
 
       if (statsRes.status === 401) {
@@ -199,6 +227,29 @@ export default function DevDashboardPage() {
         const healthData = await healthRes.json();
         setSystemHealth(healthData.system || null);
       }
+
+      if (usersRes.ok) {
+        try {
+          const usersData = await usersRes.json();
+          if (usersData.success && Array.isArray(usersData.users)) {
+            setUsersList(usersData.users);
+            setTotalUsersCount(usersData.totalCount ?? usersData.users.length);
+            setUsersError(null);
+          } else if (usersData.error) {
+            setUsersError(usersData.error);
+          }
+        } catch {
+          // ignore parsing error
+        }
+      } else {
+        try {
+          const errData = await usersRes.json();
+          setUsersError(errData.error || `HTTP ${usersRes.status}: Failed to load registered users`);
+        } catch {
+          setUsersError(`HTTP ${usersRes.status}: Failed to load registered users`);
+        }
+      }
+
       setIsUnlocked(true);
       setLastRefreshedAt(new Date());
     } catch (err: any) {
@@ -386,6 +437,120 @@ export default function DevDashboardPage() {
     setCopiedId(true);
     setTimeout(() => setCopiedId(false), 2000);
   };
+
+  // Helper to format relative time
+  const formatRelativeTime = (dateString: string | null | undefined): string => {
+    if (!dateString) return 'Never';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    if (isNaN(diffMs)) return 'Unknown';
+    if (diffMs < 0) return 'Just now';
+
+    const diffSec = Math.floor(diffMs / 1000);
+    if (diffSec < 60) return `${diffSec}s ago`;
+
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+
+    const diffHour = Math.floor(diffMin / 60);
+    if (diffHour < 24) return `${diffHour}h ago`;
+
+    const diffDay = Math.floor(diffHour / 24);
+    if (diffDay < 30) return `${diffDay}d ago`;
+
+    const diffMonth = Math.floor(diffDay / 30);
+    if (diffMonth < 12) return `${diffMonth}mo ago`;
+
+    return `${Math.floor(diffDay / 365)}y ago`;
+  };
+
+  // Helper to format full date time
+  const formatFullDateTime = (dateString: string | null | undefined): string => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Invalid date';
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  };
+
+  // User Field Copy helper
+  const handleCopyUserField = (text: string, type: 'email' | 'phone' | 'userId') => {
+    navigator.clipboard.writeText(text);
+    if (type === 'email') {
+      setCopiedEmail(text);
+      setTimeout(() => setCopiedEmail(null), 2000);
+    } else if (type === 'phone') {
+      setCopiedPhone(text);
+      setTimeout(() => setCopiedPhone(null), 2000);
+    } else if (type === 'userId') {
+      setCopiedUserId(text);
+      setTimeout(() => setCopiedUserId(null), 2000);
+    }
+  };
+
+  // Filtered Users
+  const filteredUsers = useMemo(() => {
+    if (!userSearchQuery.trim()) return usersList;
+    const q = userSearchQuery.toLowerCase().trim();
+    return usersList.filter((u) => {
+      const email = (u.email || '').toLowerCase();
+      const username = (u.username || '').toLowerCase();
+      const fullName = (u.fullName || '').toLowerCase();
+      const phone = (u.phoneNumber || '').toLowerCase();
+      const id = (u.id || '').toLowerCase();
+      return (
+        email.includes(q) ||
+        username.includes(q) ||
+        fullName.includes(q) ||
+        phone.includes(q) ||
+        id.includes(q)
+      );
+    });
+  }, [usersList, userSearchQuery]);
+
+  // Aggregate User Directory Metrics
+  const userMetrics = useMemo(() => {
+    const now = Date.now();
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+
+    const total = totalUsersCount || usersList.length;
+    let activePast7Days = 0;
+    let withPhone = 0;
+    let signedUpPast30Days = 0;
+
+    for (const u of usersList) {
+      if (u.phoneNumber && u.phoneNumber.trim()) {
+        withPhone++;
+      }
+      if (u.lastUsedAt) {
+        const time = new Date(u.lastUsedAt).getTime();
+        if (!isNaN(time) && now - time <= sevenDaysMs) {
+          activePast7Days++;
+        }
+      }
+      if (u.createdAt) {
+        const createTime = new Date(u.createdAt).getTime();
+        if (!isNaN(createTime) && now - createTime <= thirtyDaysMs) {
+          signedUpPast30Days++;
+        }
+      }
+    }
+
+    return {
+      total,
+      activePast7Days,
+      withPhone,
+      signedUpPast30Days,
+    };
+  }, [usersList, totalUsersCount]);
 
   // Filtered Events
   const filteredEvents = useMemo(() => {
@@ -676,10 +841,10 @@ export default function DevDashboardPage() {
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6 sm:space-y-8">
         {/* Navigation Tabs */}
-        <div className="flex border-b border-[var(--border)] gap-2 sm:gap-6 text-sm font-medium">
+        <div className="flex border-b border-[var(--border)] gap-2 sm:gap-6 text-sm font-medium overflow-x-auto no-scrollbar">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`pb-3 border-b-2 flex items-center gap-2 cursor-pointer transition-colors ${
+            className={`pb-3 border-b-2 flex items-center gap-2 cursor-pointer transition-colors whitespace-nowrap ${
               activeTab === 'overview'
                 ? 'border-accent text-accent font-semibold'
                 : 'border-transparent text-[var(--muted)] hover:text-[var(--fg)]'
@@ -689,8 +854,24 @@ export default function DevDashboardPage() {
             <span>Usage & Retention</span>
           </button>
           <button
+            onClick={() => setActiveTab('users')}
+            className={`pb-3 border-b-2 flex items-center gap-2 cursor-pointer transition-colors whitespace-nowrap ${
+              activeTab === 'users'
+                ? 'border-accent text-accent font-semibold'
+                : 'border-transparent text-[var(--muted)] hover:text-[var(--fg)]'
+            }`}
+          >
+            <Users size={16} />
+            <span>Registered Users</span>
+            {userMetrics.total > 0 && (
+              <span className="ml-0.5 px-1.5 py-0.5 text-[10px] rounded-full bg-[var(--surface-raised)] border border-[var(--border)] font-mono text-[var(--muted)]">
+                {userMetrics.total}
+              </span>
+            )}
+          </button>
+          <button
             onClick={() => setActiveTab('features')}
-            className={`pb-3 border-b-2 flex items-center gap-2 cursor-pointer transition-colors ${
+            className={`pb-3 border-b-2 flex items-center gap-2 cursor-pointer transition-colors whitespace-nowrap ${
               activeTab === 'features'
                 ? 'border-accent text-accent font-semibold'
                 : 'border-transparent text-[var(--muted)] hover:text-[var(--fg)]'
@@ -954,6 +1135,381 @@ export default function DevDashboardPage() {
                   })}
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ============================================================== */}
+        {/* TAB: REGISTERED USERS DIRECTORY                                */}
+        {/* ============================================================== */}
+        {activeTab === 'users' && (
+          <div className="space-y-6 sm:space-y-8">
+            {/* Header with Title & Refresh */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--fg)]">
+                    Registered Users Directory
+                  </h2>
+                  <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-accent/10 text-accent border border-accent/20">
+                    {userMetrics.total} Accounts
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm text-[var(--muted)] mt-1">
+                  Live user directory synced from Clerk. Tracks signup date, email, username, phone number, and last app activity.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2.5">
+                <button
+                  onClick={() => loadDashboardData()}
+                  disabled={isLoadingStats}
+                  className="px-3.5 py-2 text-xs font-medium rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--fg)] hover:bg-[var(--surface-raised)] transition-all flex items-center gap-2 cursor-pointer shadow-sm disabled:opacity-50"
+                >
+                  <RefreshCw size={13} className={isLoadingStats ? 'animate-spin text-accent' : ''} />
+                  <span>Refresh Users</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Strict Privacy Guardrail Banner */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 text-emerald-300 shadow-sm">
+              <div className="flex items-start gap-3.5">
+                <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 shrink-0 mt-0.5">
+                  <ShieldCheck size={20} />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-sm font-semibold text-emerald-400 flex items-center gap-2">
+                    Strict Privacy Guardrail Active & Enforced
+                  </h4>
+                  <p className="text-xs sm:text-[13px] text-emerald-300/90 leading-relaxed">
+                    Account identity profiles (email, phone, username, signup date) are <strong>strictly decoupled</strong> from reading and content history. Developer tools cannot view which specific scriptures a user reads, what notes they compose, what prompts they send to AI, or what canvas diagrams they build. Operational events in the Anonymous Event Feed remain pseudonymized (<code className="px-1.5 py-0.5 rounded bg-emerald-950/50 text-emerald-300 text-[11px] font-mono">usr_...</code>) with zero link to these user records.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Metric Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Card 1: Total Registered */}
+              <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm relative overflow-hidden">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-[var(--muted)]">Total Registered</span>
+                  <div className="p-2 rounded-xl bg-accent/10 text-accent">
+                    <Users size={16} />
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <span className="text-2xl sm:text-3xl font-bold font-mono tracking-tight text-[var(--fg)]">
+                    {userMetrics.total}
+                  </span>
+                </div>
+                <p className="text-[11px] text-[var(--muted)] mt-1">Clerk authenticated accounts</p>
+              </div>
+
+              {/* Card 2: Active Past 7 Days */}
+              <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm relative overflow-hidden">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-[var(--muted)]">Active Past 7 Days</span>
+                  <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
+                    <Activity size={16} />
+                  </div>
+                </div>
+                <div className="mt-3 flex items-baseline gap-2">
+                  <span className="text-2xl sm:text-3xl font-bold font-mono tracking-tight text-emerald-400">
+                    {userMetrics.activePast7Days}
+                  </span>
+                  {userMetrics.total > 0 && (
+                    <span className="text-xs text-[var(--muted)] font-mono">
+                      ({Math.round((userMetrics.activePast7Days / userMetrics.total) * 100)}%)
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-[var(--muted)] mt-1">Signed in or active this week</p>
+              </div>
+
+              {/* Card 3: Phone Numbers Provided */}
+              <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm relative overflow-hidden">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-[var(--muted)]">Phone Numbers</span>
+                  <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400">
+                    <Phone size={16} />
+                  </div>
+                </div>
+                <div className="mt-3 flex items-baseline gap-2">
+                  <span className="text-2xl sm:text-3xl font-bold font-mono tracking-tight text-blue-400">
+                    {userMetrics.withPhone}
+                  </span>
+                  {userMetrics.total > 0 && (
+                    <span className="text-xs text-[var(--muted)] font-mono">
+                      ({Math.round((userMetrics.withPhone / userMetrics.total) * 100)}%)
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-[var(--muted)] mt-1">Provided mobile contact</p>
+              </div>
+
+              {/* Card 4: New Signups (Past 30 Days) */}
+              <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm relative overflow-hidden">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-[var(--muted)]">Joined Past 30 Days</span>
+                  <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400">
+                    <Calendar size={16} />
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <span className="text-2xl sm:text-3xl font-bold font-mono tracking-tight text-purple-400">
+                    {userMetrics.signedUpPast30Days}
+                  </span>
+                </div>
+                <p className="text-[11px] text-[var(--muted)] mt-1">New users this month</p>
+              </div>
+            </div>
+
+            {/* Search Toolbar */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm">
+              <div className="relative flex-1">
+                <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
+                <input
+                  type="text"
+                  value={userSearchQuery}
+                  onChange={(e) => setUserSearchQuery(e.target.value)}
+                  placeholder="Filter users by email, username, name, phone, or Clerk ID..."
+                  className="w-full pl-9 pr-8 py-2 text-xs sm:text-sm bg-[var(--surface-raised)] border border-[var(--border)] rounded-xl text-[var(--fg)] placeholder-[var(--muted)] focus:outline-none focus:border-accent transition-colors"
+                />
+                {userSearchQuery && (
+                  <button
+                    onClick={() => setUserSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--fg)] p-0.5 cursor-pointer"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+              <div className="text-xs text-[var(--muted)] px-2 shrink-0 flex items-center justify-between sm:justify-end gap-2">
+                <span>
+                  Showing <strong className="text-[var(--fg)]">{filteredUsers.length}</strong> of {userMetrics.total} users
+                </span>
+                {userSearchQuery && (
+                  <button
+                    onClick={() => setUserSearchQuery('')}
+                    className="text-xs text-accent hover:underline cursor-pointer"
+                  >
+                    Reset filter
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Error Message if fetch failed */}
+            {usersError && (
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300">
+                <div className="flex items-start gap-3">
+                  <AlertCircle size={18} className="text-amber-400 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-semibold text-amber-400">Could not retrieve Clerk user directory</h4>
+                    <p className="text-xs text-amber-300/80">{usersError}</p>
+                    <p className="text-xs text-amber-300/60">
+                      Ensure <code className="font-mono text-amber-200">CLERK_SECRET_KEY</code> is correctly set in your Vercel / environment configuration.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Users Directory Table */}
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden shadow-sm">
+              {filteredUsers.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs sm:text-sm border-collapse">
+                    <thead>
+                      <tr className="border-b border-[var(--border)] bg-[var(--surface-raised)]/50 text-[var(--muted)] text-[11px] font-semibold uppercase tracking-wider">
+                        <th className="py-3.5 px-4 sm:px-6">User Account</th>
+                        <th className="py-3.5 px-4 sm:px-6">Email Address</th>
+                        <th className="py-3.5 px-4 sm:px-6">Phone Number</th>
+                        <th className="py-3.5 px-4 sm:px-6">Signed Up</th>
+                        <th className="py-3.5 px-4 sm:px-6">Last Active</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--border)]">
+                      {filteredUsers.map((account) => {
+                        const now = Date.now();
+                        const lastUsedTime = account.lastUsedAt ? new Date(account.lastUsedAt).getTime() : 0;
+                        const isRecentlyActive = lastUsedTime > 0 && now - lastUsedTime < 24 * 60 * 60 * 1000;
+                        const isActiveThisWeek = lastUsedTime > 0 && now - lastUsedTime < 7 * 24 * 60 * 60 * 1000;
+
+                        return (
+                          <tr
+                            key={account.id}
+                            className="hover:bg-[var(--surface-raised)]/40 transition-colors"
+                          >
+                            {/* User Account / Profile */}
+                            <td className="py-4 px-4 sm:px-6">
+                              <div className="flex items-center gap-3">
+                                {account.imageUrl ? (
+                                  <img
+                                    src={account.imageUrl}
+                                    alt={account.fullName || account.username || 'User'}
+                                    className="w-9 h-9 rounded-full object-cover border border-[var(--border)] shrink-0"
+                                  />
+                                ) : (
+                                  <div className="w-9 h-9 rounded-full bg-accent/15 text-accent flex items-center justify-center font-bold text-xs shrink-0 border border-accent/20">
+                                    {(account.fullName?.[0] || account.username?.[0] || account.email?.[0] || 'U').toUpperCase()}
+                                  </div>
+                                )}
+                                <div className="min-w-0">
+                                  <div className="font-semibold text-[var(--fg)] truncate flex items-center gap-1.5">
+                                    <span>{account.fullName || account.username || 'Anonymous User'}</span>
+                                    {account.username && account.fullName && (
+                                      <span className="text-[11px] font-normal text-[var(--muted)]">
+                                        @{account.username}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-1.5 mt-0.5">
+                                    <span className="font-mono text-[10px] text-[var(--muted)] truncate max-w-[120px] sm:max-w-[160px]">
+                                      {account.id}
+                                    </span>
+                                    <button
+                                      onClick={() => handleCopyUserField(account.id, 'userId')}
+                                      className="text-[var(--muted)] hover:text-accent p-0.5 cursor-pointer transition-colors"
+                                      title="Copy Clerk User ID"
+                                    >
+                                      {copiedUserId === account.id ? (
+                                        <Check size={11} className="text-emerald-400" />
+                                      ) : (
+                                        <Copy size={11} />
+                                      )}
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* Email Address */}
+                            <td className="py-4 px-4 sm:px-6">
+                              {account.email ? (
+                                <div className="flex items-center gap-1.5">
+                                  <Mail size={13} className="text-[var(--muted)] shrink-0" />
+                                  <span className="text-xs text-[var(--fg)] truncate max-w-[180px] sm:max-w-[220px]">
+                                    {account.email}
+                                  </span>
+                                  <button
+                                    onClick={() => handleCopyUserField(account.email!, 'email')}
+                                    className="text-[var(--muted)] hover:text-accent p-0.5 cursor-pointer transition-colors shrink-0"
+                                    title="Copy email"
+                                  >
+                                    {copiedEmail === account.email ? (
+                                      <Check size={11} className="text-emerald-400" />
+                                    ) : (
+                                      <Copy size={11} />
+                                    )}
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-[var(--muted)] italic">No email</span>
+                              )}
+                            </td>
+
+                            {/* Phone Number */}
+                            <td className="py-4 px-4 sm:px-6">
+                              {account.phoneNumber ? (
+                                <div className="flex items-center gap-1.5">
+                                  <Phone size={13} className="text-accent shrink-0" />
+                                  <span className="font-mono text-xs text-[var(--fg)]">
+                                    {account.phoneNumber}
+                                  </span>
+                                  <button
+                                    onClick={() => handleCopyUserField(account.phoneNumber!, 'phone')}
+                                    className="text-[var(--muted)] hover:text-accent p-0.5 cursor-pointer transition-colors shrink-0"
+                                    title="Copy phone number"
+                                  >
+                                    {copiedPhone === account.phoneNumber ? (
+                                      <Check size={11} className="text-emerald-400" />
+                                    ) : (
+                                      <Copy size={11} />
+                                    )}
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] bg-[var(--surface-raised)] border border-[var(--border)] text-[var(--muted)] italic">
+                                  None provided
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Signed Up */}
+                            <td className="py-4 px-4 sm:px-6">
+                              <div>
+                                <span className="text-xs font-medium text-[var(--fg)] block">
+                                  {formatRelativeTime(account.createdAt)}
+                                </span>
+                                <span className="text-[11px] text-[var(--muted)] font-mono block mt-0.5">
+                                  {formatFullDateTime(account.createdAt)}
+                                </span>
+                              </div>
+                            </td>
+
+                            {/* Last Active */}
+                            <td className="py-4 px-4 sm:px-6">
+                              <div className="flex items-start gap-2">
+                                <span
+                                  className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${
+                                    isRecentlyActive
+                                      ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)] animate-pulse'
+                                      : isActiveThisWeek
+                                      ? 'bg-amber-400'
+                                      : 'bg-[var(--border)]'
+                                  }`}
+                                  title={
+                                    isRecentlyActive
+                                      ? 'Active within last 24 hours'
+                                      : isActiveThisWeek
+                                      ? 'Active within last 7 days'
+                                      : 'Inactive'
+                                  }
+                                />
+                                <div>
+                                  <span
+                                    className={`text-xs font-medium block ${
+                                      isRecentlyActive ? 'text-emerald-400' : 'text-[var(--fg)]'
+                                    }`}
+                                  >
+                                    {account.lastUsedAt ? formatRelativeTime(account.lastUsedAt) : 'Never'}
+                                  </span>
+                                  <span className="text-[11px] text-[var(--muted)] font-mono block mt-0.5">
+                                    {account.lastUsedAt ? formatFullDateTime(account.lastUsedAt) : 'No activity recorded'}
+                                  </span>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="p-12 text-center text-xs text-[var(--muted)] space-y-2">
+                  <Users size={28} className="mx-auto text-[var(--muted)]/50 mb-2" />
+                  <p className="font-semibold text-sm text-[var(--fg)]">
+                    {userSearchQuery ? 'No matching users found' : 'No registered users found'}
+                  </p>
+                  <p className="text-xs text-[var(--muted)]">
+                    {userSearchQuery
+                      ? `No registered accounts match "${userSearchQuery}". Try a different email, username, or phone number.`
+                      : 'When new users register via Clerk, their account credentials and last active timestamps will appear here.'}
+                  </p>
+                  {userSearchQuery && (
+                    <button
+                      onClick={() => setUserSearchQuery('')}
+                      className="mt-3 px-3 py-1.5 text-xs rounded-xl bg-accent text-white font-medium cursor-pointer"
+                    >
+                      Clear search filter
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}

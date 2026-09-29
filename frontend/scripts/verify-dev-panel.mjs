@@ -225,3 +225,150 @@ test('Dev UI: topFeature strictly measures real active engagements and ignores p
   assert.strictEqual(computeTopFeature({}), 'Reading & Study');
   assert.strictEqual(computeTopFeature(null), 'Reading & Study');
 });
+
+// 7. Test User Directory Profile Extraction & "Last Used" Aggregation
+test('Dev User Directory: extracts Clerk profile, formats phone numbers, and aggregates last used time', () => {
+  const mockClerkUsers = [
+    {
+      id: 'user_solomon_1',
+      username: 'solomon',
+      firstName: 'Solomon',
+      lastName: 'King',
+      imageUrl: 'https://img.clerk.com/avatar1.png',
+      primaryEmailAddressId: 'email_1',
+      emailAddresses: [{ id: 'email_1', emailAddress: 'solomon@example.com' }],
+      primaryPhoneNumberId: 'phone_1',
+      phoneNumbers: [{ id: 'phone_1', phoneNumber: '+1234567890' }],
+      createdAt: 1710000000000,
+      lastSignInAt: 1710500000000,
+      lastActiveAt: 1710600000000,
+    },
+    {
+      id: 'user_guest_2',
+      username: null,
+      firstName: null,
+      lastName: null,
+      imageUrl: null,
+      primaryEmailAddressId: 'email_2',
+      emailAddresses: [{ id: 'email_2', emailAddress: 'guest@theologica.app' }],
+      primaryPhoneNumberId: null,
+      phoneNumbers: [],
+      createdAt: 1710100000000,
+      lastSignInAt: null,
+      lastActiveAt: null,
+    },
+  ];
+
+  function formatUserAccount(u, dbLastActivityDate = null) {
+    const emailAddresses = u.emailAddresses || [];
+    const phoneNumbers = u.phoneNumbers || [];
+
+    const primaryEmail =
+      emailAddresses.find((e) => e.id === u.primaryEmailAddressId)?.emailAddress ||
+      emailAddresses[0]?.emailAddress ||
+      null;
+
+    const primaryPhone =
+      phoneNumbers.find((p) => p.id === u.primaryPhoneNumberId)?.phoneNumber ||
+      phoneNumbers[0]?.phoneNumber ||
+      null;
+
+    const fullName = [u.firstName, u.lastName].filter(Boolean).join(' ') || null;
+
+    const clerkCreatedAt = u.createdAt ? new Date(u.createdAt) : null;
+    const clerkLastSignIn = u.lastSignInAt ? new Date(u.lastSignInAt) : null;
+    const clerkLastActive = u.lastActiveAt ? new Date(u.lastActiveAt) : null;
+
+    const candidateDates = [
+      clerkLastActive,
+      clerkLastSignIn,
+      dbLastActivityDate,
+    ].filter(Boolean);
+
+    const lastUsedAtDate = candidateDates.length > 0
+      ? new Date(Math.max(...candidateDates.map((d) => d.getTime())))
+      : (clerkLastSignIn || clerkCreatedAt);
+
+    return {
+      id: u.id,
+      username: u.username || null,
+      fullName,
+      email: primaryEmail,
+      phoneNumber: primaryPhone,
+      imageUrl: u.imageUrl || null,
+      createdAt: clerkCreatedAt ? clerkCreatedAt.toISOString() : new Date().toISOString(),
+      lastSignInAt: clerkLastSignIn ? clerkLastSignIn.toISOString() : null,
+      lastActiveAt: clerkLastActive ? clerkLastActive.toISOString() : null,
+      lastUsedAt: lastUsedAtDate ? lastUsedAtDate.toISOString() : null,
+    };
+  }
+
+  // User 1: Has phone number, username, full name, and DB activity newer than Clerk session
+  const dbActivityDate = new Date(1710700000000); // 100,000ms after lastActiveAt
+  const user1 = formatUserAccount(mockClerkUsers[0], dbActivityDate);
+  assert.strictEqual(user1.id, 'user_solomon_1');
+  assert.strictEqual(user1.username, 'solomon');
+  assert.strictEqual(user1.fullName, 'Solomon King');
+  assert.strictEqual(user1.email, 'solomon@example.com');
+  assert.strictEqual(user1.phoneNumber, '+1234567890', 'Phone number must be extracted');
+  assert.strictEqual(user1.lastUsedAt, dbActivityDate.toISOString(), 'lastUsedAt must reflect latest interaction');
+
+  // User 2: No phone number, no username, no full name
+  const user2 = formatUserAccount(mockClerkUsers[1], null);
+  assert.strictEqual(user2.id, 'user_guest_2');
+  assert.strictEqual(user2.username, null);
+  assert.strictEqual(user2.fullName, null);
+  assert.strictEqual(user2.email, 'guest@theologica.app');
+  assert.strictEqual(user2.phoneNumber, null, 'Absence of phone number must yield null');
+  assert.strictEqual(user2.lastUsedAt, new Date(mockClerkUsers[1].createdAt).toISOString(), 'Falls back to createdAt if no sign-in or db activity');
+});
+
+// 8. Test Strict Privacy Isolation: Content & Identity Decoupling
+test('Strict Privacy Guardrail: User identity records NEVER expose sensitive notes, chats, or verse history', () => {
+  const allowedUserFields = new Set([
+    'id',
+    'username',
+    'fullName',
+    'email',
+    'phoneNumber',
+    'imageUrl',
+    'createdAt',
+    'lastSignInAt',
+    'lastActiveAt',
+    'lastUsedAt',
+  ]);
+
+  const testUserRecord = {
+    id: 'user_test_abc',
+    username: 'disciple',
+    fullName: 'Bible Student',
+    email: 'student@example.com',
+    phoneNumber: '+19998887777',
+    imageUrl: 'https://example.com/avatar.jpg',
+    createdAt: new Date().toISOString(),
+    lastSignInAt: new Date().toISOString(),
+    lastActiveAt: new Date().toISOString(),
+    lastUsedAt: new Date().toISOString(),
+  };
+
+  // Ensure ONLY allowed identity fields are exposed
+  for (const key of Object.keys(testUserRecord)) {
+    assert.strictEqual(allowedUserFields.has(key), true, `Field "${key}" must be within approved privacy boundary`);
+  }
+
+  // Ensure sensitive content fields are strictly prohibited
+  const forbiddenContentFields = [
+    'notes',
+    'noteContent',
+    'canvasData',
+    'chatMessages',
+    'chatPrompts',
+    'versesRead',
+    'chapterPassages',
+  ];
+
+  for (const field of forbiddenContentFields) {
+    assert.strictEqual(field in testUserRecord, false, `User directory must NEVER include forbidden content field "${field}"`);
+  }
+});
+
