@@ -8,6 +8,7 @@ import {
   Trash2, 
   Edit, 
   ChevronLeft, 
+  ChevronRight,
   BookOpen, 
   FileText, 
   LayoutTemplate,
@@ -221,12 +222,14 @@ export function NotesWorkspace({
   currentTranslation = 'bsb',
 }: NotesWorkspaceProps) {
   // Sidebar UI state
-  const [sidebarTab, setSidebarTab] = useState<'notes' | 'backlinks'>('notes');
+  const [sidebarTab, setSidebarTab] = useState<'notes' | 'backlinks' | 'templates'>('notes');
   const [searchQuery, setSearchQuery] = useState('');
   const [backlinksSearchQuery, setBacklinksSearchQuery] = useState('');
+  const [templatesSearchQuery, setTemplatesSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'updated' | 'title' | 'created'>('updated');
   const [pinnedIds, setPinnedIds] = useState<number[]>([]);
+  const carouselRef = useRef<HTMLDivElement | null>(null);
 
   // Editor UI state
   const [viewMode, setViewMode] = useState<NoteViewMode>('edit');
@@ -383,6 +386,51 @@ export function NotesWorkspace({
     return allBacklinksGroups.filter(g => activeKeys.has(g.reference));
   }, [activeNote, allBacklinksGroups]);
 
+  // Filtered Templates based on templates search query
+  const filteredTemplates = useMemo(() => {
+    if (!templatesSearchQuery.trim()) return NOTE_TEMPLATES;
+    const q = templatesSearchQuery.toLowerCase().trim();
+    return NOTE_TEMPLATES.filter(t => 
+      t.name.toLowerCase().includes(q) || 
+      t.description.toLowerCase().includes(q) || 
+      t.badge.toLowerCase().includes(q)
+    );
+  }, [templatesSearchQuery]);
+
+  // Carousel side-to-side navigation and scroll-sync
+  const handleSwitchTab = useCallback((tab: 'notes' | 'backlinks' | 'templates') => {
+    setSidebarTab(tab);
+    if (!carouselRef.current) return;
+    const index = tab === 'notes' ? 0 : tab === 'backlinks' ? 1 : 2;
+    const width = carouselRef.current.clientWidth;
+    carouselRef.current.scrollTo({
+      left: index * width,
+      behavior: 'smooth'
+    });
+  }, []);
+
+  const handleCarouselScroll = useCallback(() => {
+    if (!carouselRef.current) return;
+    const { scrollLeft, clientWidth } = carouselRef.current;
+    if (clientWidth <= 0) return;
+    const index = Math.round(scrollLeft / clientWidth);
+    const tabOrder: ('notes' | 'backlinks' | 'templates')[] = ['notes', 'backlinks', 'templates'];
+    const targetTab = tabOrder[index];
+    if (targetTab && targetTab !== sidebarTab) {
+      setSidebarTab(targetTab);
+    }
+  }, [sidebarTab]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (!carouselRef.current) return;
+      const index = sidebarTab === 'notes' ? 0 : sidebarTab === 'backlinks' ? 1 : 2;
+      carouselRef.current.scrollLeft = index * carouselRef.current.clientWidth;
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [sidebarTab]);
+
   // Tag Management Handlers
   const handleAddTag = (tagToAdd: string) => {
     if (!activeNote) return;
@@ -516,59 +564,70 @@ export function NotesWorkspace({
     <div className="flex w-full h-full bg-bg relative overflow-hidden select-text">
       {/* SIDEBAR: Notebooks & Notes List (Option 5) */}
       <aside 
-        className={`w-full lg:w-[320px] border-r border-border bg-bg flex flex-col shrink-0 transition-all ${
+        className={`w-full lg:w-[320px] border-r border-border bg-bg flex flex-col shrink-0 h-full min-h-0 overflow-hidden transition-all ${
           activeNoteId ? 'hidden lg:flex' : 'flex'
         }`}
       >
-        {/* Sidebar Header with Notes vs Backlinks Tab Switcher */}
-        <header className="h-[60px] border-b border-border flex items-center justify-between px-3 shrink-0 bg-surface/20 gap-2">
-          {/* Tab Switcher */}
-          <div className="flex items-center gap-1 bg-surface p-1 rounded-xl border border-border/60">
-            <button
-              type="button"
-              onClick={() => setSidebarTab('notes')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-all cursor-pointer ${
-                sidebarTab === 'notes'
-                  ? 'bg-bg text-fg shadow-2xs'
-                  : 'text-muted hover:text-fg'
-              }`}
-            >
-              <FileText size={13} className={sidebarTab === 'notes' ? 'text-accent' : ''} />
-              <span>Notes</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-surface-hover text-muted font-normal">
-                {notes.length}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setSidebarTab('backlinks')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-all cursor-pointer ${
-                sidebarTab === 'backlinks'
-                  ? 'bg-bg text-accent shadow-2xs'
-                  : 'text-muted hover:text-fg'
-              }`}
-            >
-              <Link2 size={13} />
-              <span>Backlinks</span>
-              {allBacklinksGroups.length > 0 && (
-                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-accent/15 text-accent font-medium">
-                  {allBacklinksGroups.length}
+        {/* Sidebar Header with Notes vs Backlinks vs Templates Scrollable Switcher */}
+        <header className="h-[58px] border-b border-border flex items-center justify-between px-2.5 shrink-0 bg-surface/20 gap-1.5">
+          {/* Scrollable Tabs Segmented Control */}
+          <div className="flex-1 overflow-x-auto no-scrollbar py-1 flex items-center min-w-0">
+            <div className="flex items-center gap-1 bg-surface p-1 rounded-xl border border-border/60 shrink-0">
+              <button
+                type="button"
+                onClick={() => handleSwitchTab('notes')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-all cursor-pointer shrink-0 ${
+                  sidebarTab === 'notes'
+                    ? 'bg-bg text-fg shadow-2xs ring-1 ring-border/80'
+                    : 'text-muted hover:text-fg'
+                }`}
+                title="Personal Notes (Scroll / Swipe ↔)"
+              >
+                <FileText size={13} className={sidebarTab === 'notes' ? 'text-accent' : ''} />
+                <span>Notes</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-surface-hover text-muted font-normal">
+                  {notes.length}
                 </span>
-              )}
-            </button>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSwitchTab('backlinks')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-all cursor-pointer shrink-0 ${
+                  sidebarTab === 'backlinks'
+                    ? 'bg-bg text-accent shadow-2xs ring-1 ring-border/80'
+                    : 'text-muted hover:text-fg'
+                }`}
+                title="Scripture Backlinks (Scroll / Swipe ↔)"
+              >
+                <Link2 size={13} />
+                <span>Backlinks</span>
+                {allBacklinksGroups.length > 0 && (
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-accent/15 text-accent font-medium">
+                    {allBacklinksGroups.length}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSwitchTab('templates')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-all cursor-pointer shrink-0 ${
+                  sidebarTab === 'templates'
+                    ? 'bg-bg text-accent shadow-2xs ring-1 ring-border/80'
+                    : 'text-muted hover:text-fg'
+                }`}
+                title="Study Templates (Scroll / Swipe ↔)"
+              >
+                <LayoutTemplate size={13} className={sidebarTab === 'templates' ? 'text-accent' : ''} />
+                <span>Templates</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-accent/15 text-accent font-medium">
+                  {NOTE_TEMPLATES.length}
+                </span>
+              </button>
+            </div>
           </div>
 
-          {/* Quick Actions */}
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setIsTemplatesOpen(true)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-semibold text-fg hover:text-accent bg-surface hover:bg-surface-hover border border-border/70 hover:border-border transition-all cursor-pointer shadow-2xs group"
-              title="Add note from a Study Template (SOAP, Sermon, Inductive, etc.)"
-            >
-              <LayoutTemplate size={13} className="text-muted group-hover:text-accent transition-colors" />
-              <span className="hidden sm:inline">Templates</span>
-            </button>
+          {/* Quick Action: New Blank Note */}
+          <div className="flex items-center gap-1 shrink-0">
             <button
               type="button"
               onClick={handleCreateBlankNote}
@@ -580,9 +639,63 @@ export function NotesWorkspace({
           </div>
         </header>
 
-        {/* TAB 1: NOTES LIST */}
-        {sidebarTab === 'notes' && (
-          <div className="flex-1 flex flex-col min-h-0">
+        {/* Carousel Slide Indicators & Quick Navigation Bar */}
+        <div className="px-3 py-1 bg-surface/15 border-b border-border/40 flex items-center justify-between text-[11px] text-meta shrink-0 select-none">
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                const order: ('notes' | 'backlinks' | 'templates')[] = ['notes', 'backlinks', 'templates'];
+                const prevIdx = (order.indexOf(sidebarTab) - 1 + order.length) % order.length;
+                handleSwitchTab(order[prevIdx]);
+              }}
+              className="p-0.5 rounded hover:bg-surface text-muted hover:text-fg cursor-pointer transition-colors"
+              title="Previous panel (or swipe right)"
+            >
+              <ChevronLeft size={13} />
+            </button>
+            <div className="flex items-center gap-1">
+              {(['notes', 'backlinks', 'templates'] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => handleSwitchTab(t)}
+                  className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                    sidebarTab === t ? 'w-4 bg-accent' : 'w-1.5 bg-muted/40 hover:bg-muted'
+                  }`}
+                  title={`Switch to ${t}`}
+                />
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const order: ('notes' | 'backlinks' | 'templates')[] = ['notes', 'backlinks', 'templates'];
+                const nextIdx = (order.indexOf(sidebarTab) + 1) % order.length;
+                handleSwitchTab(order[nextIdx]);
+              }}
+              className="p-0.5 rounded hover:bg-surface text-muted hover:text-fg cursor-pointer transition-colors"
+              title="Next panel (or swipe left)"
+            >
+              <ChevronRight size={13} />
+            </button>
+          </div>
+          <span className="capitalize font-medium text-[10.5px] text-muted flex items-center gap-1">
+            <span>{sidebarTab === 'notes' ? `${filteredNotes.length} Notes` : sidebarTab === 'backlinks' ? `${filteredBacklinksGroups.length} Passages` : `${filteredTemplates.length} Templates`}</span>
+            <span>•</span>
+            <span className="text-[10px] opacity-80">Swipe ↔</span>
+          </span>
+        </div>
+
+        {/* HORIZONTAL SWIPE / SCROLL CONTAINER: NOTES ↔ BACKLINKS ↔ TEMPLATES */}
+        <div
+          ref={carouselRef}
+          onScroll={handleCarouselScroll}
+          className="flex-1 w-full min-h-0 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory scroll-smooth no-scrollbar touch-pan-x"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
+          {/* PANEL 1: NOTES */}
+          <div className="w-full min-w-full h-full max-h-full min-h-0 flex flex-col snap-start shrink-0 overflow-hidden">
             {/* Search Bar */}
             <div className="p-3 border-b border-border/60 bg-surface/10 space-y-2.5 shrink-0">
               <div className="relative">
@@ -651,14 +764,17 @@ export function NotesWorkspace({
               </div>
             </div>
 
-            {/* Notes Items List */}
-            <div className="flex-1 overflow-y-auto custom-scroll p-2.5 space-y-1 pb-24 lg:pb-3">
+            {/* Notes Items List (Vertical Scroll) */}
+            <div 
+              className="flex-1 min-h-0 overflow-y-auto custom-scroll p-2.5 space-y-1 pb-24 lg:pb-4 touch-pan-y"
+              style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}
+            >
               {filteredNotes.length === 0 && (
                 <div className="py-12 px-4 text-center text-meta">
                   <FileText size={24} className="mx-auto mb-2 text-muted" />
                   <p className="text-[13px] font-medium text-fg">No notes found</p>
                   <p className="text-[11px] mt-1">
-                    {searchQuery || selectedTag ? 'Try adjusting your search or filters.' : 'Click + or Templates above to create your first note.'}
+                    {searchQuery || selectedTag ? 'Try adjusting your search or filters.' : 'Click + or swipe to Templates to create your first note.'}
                   </p>
                 </div>
               )}
@@ -687,11 +803,9 @@ export function NotesWorkspace({
               )}
             </div>
           </div>
-        )}
 
-        {/* TAB 2: BACKLINKS LIST */}
-        {sidebarTab === 'backlinks' && (
-          <div className="flex-1 flex flex-col min-h-0">
+          {/* PANEL 2: BACKLINKS */}
+          <div className="w-full min-w-full h-full max-h-full min-h-0 flex flex-col snap-start shrink-0 overflow-hidden">
             {/* Backlinks Search Bar */}
             <div className="p-3 border-b border-border/60 bg-surface/10 space-y-2 shrink-0">
               <div className="relative">
@@ -718,8 +832,11 @@ export function NotesWorkspace({
               </div>
             </div>
 
-            {/* Backlinks List */}
-            <div className="flex-1 overflow-y-auto custom-scroll p-2.5 space-y-3 pb-24 lg:pb-3">
+            {/* Backlinks List (Vertical Scroll) */}
+            <div 
+              className="flex-1 min-h-0 overflow-y-auto custom-scroll p-2.5 space-y-3 pb-24 lg:pb-4 touch-pan-y"
+              style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}
+            >
               {filteredBacklinksGroups.length === 0 ? (
                 <div className="py-12 px-4 text-center text-meta">
                   <Link2 size={24} className="mx-auto mb-2 text-muted" />
@@ -757,7 +874,107 @@ export function NotesWorkspace({
               )}
             </div>
           </div>
-        )}
+
+          {/* PANEL 3: TEMPLATES */}
+          <div className="w-full min-w-full h-full max-h-full min-h-0 flex flex-col snap-start shrink-0 overflow-hidden">
+            {/* Templates Search & Header */}
+            <div className="p-3 border-b border-border/60 bg-surface/10 space-y-2 shrink-0">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={14} />
+                <input
+                  type="text"
+                  value={templatesSearchQuery}
+                  onChange={(e) => setTemplatesSearchQuery(e.target.value)}
+                  placeholder="Search study frameworks..."
+                  className="w-full bg-surface border border-border/80 pl-9 pr-8 py-1.5 rounded-lg text-[13px] text-fg placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                />
+                {templatesSearchQuery && (
+                  <button
+                    onClick={() => setTemplatesSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-fg cursor-pointer"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center justify-between text-[11px] text-meta">
+                <span>{filteredTemplates.length} study {filteredTemplates.length === 1 ? 'framework' : 'frameworks'}</span>
+                <button
+                  type="button"
+                  onClick={() => setIsTemplatesOpen(true)}
+                  className="text-accent hover:underline font-medium text-[11px] cursor-pointer"
+                >
+                  Open Full Library
+                </button>
+              </div>
+            </div>
+
+            {/* Templates List (Vertical Scroll) */}
+            <div 
+              className="flex-1 min-h-0 overflow-y-auto custom-scroll p-2.5 space-y-2.5 pb-24 lg:pb-4 touch-pan-y"
+              style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}
+            >
+              {filteredTemplates.length === 0 ? (
+                <div className="py-12 px-4 text-center text-meta">
+                  <LayoutTemplate size={24} className="mx-auto mb-2 text-muted" />
+                  <p className="text-[13px] font-medium text-fg">No templates match your search</p>
+                </div>
+              ) : (
+                filteredTemplates.map((tmpl) => (
+                  <div
+                    key={tmpl.id}
+                    className="p-3 rounded-xl border border-border/70 hover:border-accent/50 bg-surface/40 hover:bg-surface/70 transition-all shadow-2xs group flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5 gap-2">
+                        <span className="text-[11px] font-semibold text-accent px-1.5 py-0.5 rounded bg-accent/10 border border-accent/20">
+                          {tmpl.badge}
+                        </span>
+                        <LayoutTemplate size={13} className="text-muted group-hover:text-accent transition-colors" />
+                      </div>
+                      <h4 className="text-[13px] font-semibold text-fg group-hover:text-accent transition-colors mb-1">
+                        {tmpl.name}
+                      </h4>
+                      <p className="text-[11px] text-meta leading-relaxed line-clamp-2 mb-3">
+                        {tmpl.description}
+                      </p>
+                    </div>
+
+                    {/* Template Card Action Buttons */}
+                    <div className="flex items-center gap-1.5 pt-2 border-t border-border/40">
+                      <button
+                        type="button"
+                        onClick={() => handleApplyTemplate(tmpl, 'create')}
+                        className="flex-1 py-1.5 px-2 bg-accent/15 hover:bg-accent/25 text-accent border border-accent/30 rounded-lg text-[11px] font-semibold transition-all cursor-pointer text-center"
+                        title="Create a new note with this template"
+                      >
+                        + New Note
+                      </button>
+                      {activeNote && (
+                        <button
+                          type="button"
+                          onClick={() => handleApplyTemplate(tmpl, 'append')}
+                          className="py-1.5 px-2 bg-surface hover:bg-surface-hover text-fg border border-border/70 rounded-lg text-[11px] font-medium transition-all cursor-pointer"
+                          title="Append this template into the currently open note"
+                        >
+                          Append
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setIsTemplatesOpen(true)}
+                        className="p-1.5 bg-surface hover:bg-surface-hover text-muted hover:text-fg border border-border/70 rounded-lg transition-colors cursor-pointer"
+                        title="Preview template content"
+                      >
+                        <ExternalLink size={12} />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
       </aside>
 
       {/* MAIN SECTION: Active Note Workspace */}
@@ -1032,7 +1249,10 @@ export function NotesWorkspace({
             <div className="flex-1 overflow-hidden relative flex">
               {/* EDIT MODE: Raw Markdown Textarea */}
               {(viewMode === 'edit' || viewMode === 'split') && (
-                <div className={`h-full overflow-y-auto custom-scroll flex-1 p-4 sm:p-8 lg:p-12 pb-28 lg:pb-16 ${viewMode === 'split' ? 'border-r border-border' : ''}`}>
+                <div 
+                  className={`h-full overflow-y-auto custom-scroll flex-1 p-4 sm:p-8 lg:p-12 pb-28 lg:pb-16 touch-pan-y ${viewMode === 'split' ? 'border-r border-border' : ''}`}
+                  style={{ WebkitOverflowScrolling: 'touch' }}
+                >
                   <textarea 
                     ref={textareaRef}
                     className="w-full h-full bg-transparent focus:outline-none resize-none text-[16px] leading-[1.8] text-fg font-sans placeholder:text-muted" 
@@ -1045,7 +1265,10 @@ export function NotesWorkspace({
 
               {/* PREVIEW MODE: Live Rendered Markdown */}
               {(viewMode === 'preview' || viewMode === 'split') && (
-                <div className="h-full overflow-y-auto custom-scroll flex-1 p-4 sm:p-8 lg:p-12 pb-28 lg:pb-16 bg-surface/5">
+                <div 
+                  className="h-full overflow-y-auto custom-scroll flex-1 p-4 sm:p-8 lg:p-12 pb-28 lg:pb-16 bg-surface/5 touch-pan-y"
+                  style={{ WebkitOverflowScrolling: 'touch' }}
+                >
                   <NoteMarkdownRenderer
                     content={activeNote.content}
                     onVerseClick={(book, chapter, verse) => setPreviewVerse({ book, chapter, verse })}
