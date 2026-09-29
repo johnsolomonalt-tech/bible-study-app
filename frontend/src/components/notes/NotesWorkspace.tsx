@@ -294,6 +294,86 @@ export function NotesWorkspace({
   // Find active note
   const activeNote = notes.find(n => n.id === activeNoteId);
 
+  // Set of note IDs that were newly created as blank notes in this session and haven't had content typed
+  const newlyCreatedBlankNoteIdsRef = useRef<Set<number>>(new Set());
+  const activeNoteRef = useRef<NoteItem | undefined>(activeNote);
+  activeNoteRef.current = activeNote;
+  const notesRef = useRef<NoteItem[]>(notes);
+  notesRef.current = notes;
+
+  // Helper: check if a note has nothing typed on it (empty content and empty/placeholder title)
+  const isUntouchedBlankNote = useCallback((note: NoteItem | undefined): boolean => {
+    if (!note) return false;
+    const isContentEmpty = !note.content || note.content.trim() === '';
+    const trimmedTitle = (note.title || '').trim().toLowerCase();
+    const isTitleDefaultOrEmpty = 
+      !trimmedTitle || 
+      trimmedTitle === 'new study note' || 
+      trimmedTitle === 'new note' || 
+      trimmedTitle === 'untitled note' ||
+      trimmedTitle === 'untitled';
+    return isContentEmpty && isTitleDefaultOrEmpty;
+  }, []);
+
+  // Check and auto-delete if a note is newly created and nothing was typed on it
+  const checkAndAutoDeleteBlankNote = useCallback((noteIdToCheck?: number | null) => {
+    const id = noteIdToCheck !== undefined ? noteIdToCheck : activeNoteRef.current?.id;
+    if (!id) return;
+
+    if (newlyCreatedBlankNoteIdsRef.current.has(id)) {
+      const targetNote = notesRef.current.find(n => n.id === id);
+      if (targetNote && isUntouchedBlankNote(targetNote)) {
+        newlyCreatedBlankNoteIdsRef.current.delete(id);
+        onDeleteNote(id);
+      }
+    }
+  }, [isUntouchedBlankNote, onDeleteNote]);
+
+  // Wrapper for selecting a note: cleans up any untouched newly created blank note when switching away
+  const handleSelectNote = useCallback((newId: number | null) => {
+    const currentActiveId = activeNoteRef.current?.id;
+    if (currentActiveId && currentActiveId !== newId) {
+      checkAndAutoDeleteBlankNote(currentActiveId);
+    }
+    onSelectNote(newId);
+  }, [checkAndAutoDeleteBlankNote, onSelectNote]);
+
+  // Auto-delete untouched blank note on unmount (e.g. user switched away from Notes tab)
+  useEffect(() => {
+    return () => {
+      const activeId = activeNoteRef.current?.id;
+      if (activeId && newlyCreatedBlankNoteIdsRef.current.has(activeId)) {
+        const target = notesRef.current.find(n => n.id === activeId);
+        if (target && isUntouchedBlankNote(target)) {
+          onDeleteNote(activeId);
+        }
+      }
+    };
+  }, [isUntouchedBlankNote, onDeleteNote]);
+
+  // Also handle window/tab unload (refresh, close tab)
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const activeId = activeNoteRef.current?.id;
+      if (activeId && newlyCreatedBlankNoteIdsRef.current.has(activeId)) {
+        const target = notesRef.current.find(n => n.id === activeId);
+        if (target && isUntouchedBlankNote(target)) {
+          fetch(`/api/notes/${activeId}`, {
+            method: 'DELETE',
+            keepalive: true,
+          }).catch(() => {});
+        }
+      }
+    };
+
+    window.addEventListener('pagehide', handleBeforeUnload);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('pagehide', handleBeforeUnload);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isUntouchedBlankNote]);
+
   // Extract all unique tags across all notes
   const allAvailableTags = useMemo(() => {
     const tagSet = new Set<string>();
@@ -525,12 +605,17 @@ export function NotesWorkspace({
 
   // Handlers
   const handleCreateBlankNote = async () => {
+    // If the currently open note was newly created and nothing was typed on it, delete it first
+    if (activeNoteRef.current?.id) {
+      checkAndAutoDeleteBlankNote(activeNoteRef.current.id);
+    }
     const created = await onCreateNote({
       title: 'New Study Note',
       content: '',
     });
     if (created) {
-      onSelectNote(created.id);
+      newlyCreatedBlankNoteIdsRef.current.add(created.id);
+      handleSelectNote(created.id);
     }
   };
 
@@ -539,11 +624,14 @@ export function NotesWorkspace({
     const templatedContent = template.content(todayStr);
 
     if (mode === 'create' || !activeNote) {
+      if (activeNoteRef.current?.id) {
+        checkAndAutoDeleteBlankNote(activeNoteRef.current.id);
+      }
       const created = await onCreateNote({
         title: template.name,
         content: templatedContent,
       });
-      if (created) onSelectNote(created.id);
+      if (created) handleSelectNote(created.id);
     } else if (mode === 'replace') {
       onUpdateNote(activeNote.id, template.name, templatedContent);
     } else {
@@ -621,11 +709,14 @@ export function NotesWorkspace({
 
   const handleDuplicateNote = async () => {
     if (!activeNote) return;
+    if (activeNoteRef.current?.id) {
+      checkAndAutoDeleteBlankNote(activeNoteRef.current.id);
+    }
     const duplicated = await onCreateNote({
       title: `${activeNote.title} (Copy)`,
       content: activeNote.content,
     });
-    if (duplicated) onSelectNote(duplicated.id);
+    if (duplicated) handleSelectNote(duplicated.id);
     setIsActionsMenuOpen(false);
   };
 
@@ -883,7 +974,7 @@ export function NotesWorkspace({
             <header className="h-[60px] border-b border-border flex items-center justify-between px-4 lg:px-8 shrink-0 bg-surface/10">
               <div className="flex items-center gap-2 flex-1 min-w-0 mr-4">
                 <button 
-                  onClick={() => onSelectNote(null)} 
+                  onClick={() => handleSelectNote(null)} 
                   className="lg:hidden p-1.5 -ml-1 text-fg-2 hover:text-fg rounded-lg hover:bg-surface cursor-pointer"
                   title="Back to Notes List"
                 >
@@ -1306,7 +1397,7 @@ export function NotesWorkspace({
     return (
       <div 
         key={n.id} 
-        onClick={() => onSelectNote(n.id)} 
+        onClick={() => handleSelectNote(n.id)} 
         className={`group p-3 rounded-xl text-[13px] transition-all cursor-pointer border select-none ${
           isSelected 
             ? 'bg-surface border-border text-fg ring-1 ring-border/80 shadow-xs' 
@@ -1396,7 +1487,7 @@ export function NotesWorkspace({
             return (
               <div
                 key={note.id}
-                onClick={() => onSelectNote(note.id)}
+                onClick={() => handleSelectNote(note.id)}
                 className={`p-2 rounded-lg text-left cursor-pointer transition-all border ${
                   isCurrentNote
                     ? 'bg-accent/10 border-accent/30 text-fg shadow-2xs'

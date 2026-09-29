@@ -3082,6 +3082,9 @@ export default function App() {
 
 
   const handleDeleteNote = async (id: number) => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
     setNotes(prev => prev.filter(n => n.id !== id));
     if (activeNoteId === id) {
       setActiveNoteId(null);
