@@ -630,17 +630,17 @@ export function NotesWorkspace({
   };
 
   return (
-    <div className="flex w-full h-full bg-bg relative overflow-hidden select-text">
+    <div className="flex w-full h-full bg-bg relative overflow-hidden select-text p-2 sm:p-2.5 gap-2 sm:gap-2.5">
       {/* SIDEBAR: Notebooks & Notes List (Option 5) */}
       <aside 
-        className={`w-full lg:w-[320px] border-r border-border bg-bg flex flex-col shrink-0 h-full min-h-0 overflow-hidden transition-all ${
+        className={`w-full lg:w-[320px] rounded-2xl border border-border/80 bg-surface/15 flex flex-col shrink-0 h-full min-h-0 overflow-hidden shadow-xs transition-all ${
           activeNoteId ? 'hidden lg:flex' : 'flex'
         }`}
       >
         {/* Sidebar Header with Notes vs Backlinks vs Templates Scrollable Switcher */}
         <header 
           onWheel={handleHeaderWheel}
-          className="h-[58px] border-b border-border flex items-center justify-between px-2.5 shrink-0 bg-surface/20 gap-1.5"
+          className="h-[58px] border-b border-border/70 flex items-center justify-between px-3 shrink-0 bg-surface/20 gap-1.5"
         >
           {/* Scrollable Tabs Segmented Control */}
           <div className="flex-1 overflow-x-auto no-scrollbar py-1 flex items-center min-w-0">
@@ -714,7 +714,7 @@ export function NotesWorkspace({
         {/* Carousel Slide Indicators & Scroll Mode Switcher */}
         <div 
           onWheel={handleHeaderWheel}
-          className="px-2.5 py-1 bg-surface/15 border-b border-border/40 flex items-center justify-between text-[11px] text-meta shrink-0 select-none gap-1"
+          className="px-3 py-1.5 bg-surface/15 border-b border-border/40 flex items-center justify-between text-[11px] text-meta shrink-0 select-none gap-1"
         >
           <div className="flex items-center gap-1.5">
             <button
@@ -792,12 +792,15 @@ export function NotesWorkspace({
           <div
             ref={verticalScrollRef}
             onScroll={handleVerticalScroll}
-            className="flex-1 min-h-0 w-full overflow-y-auto custom-scroll p-2.5 space-y-5 pb-24 lg:pb-8 touch-pan-y"
+            className="flex-1 min-h-0 w-full overflow-y-auto custom-scroll p-2.5 space-y-3.5 pb-24 lg:pb-8 touch-pan-y"
             style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}
           >
             {/* 1. NOTES SECTION */}
-            <div ref={notesSectionRef} className="space-y-2">
-              <div className="flex items-center justify-between pb-1 border-b border-border/50 text-meta">
+            <div 
+              ref={notesSectionRef} 
+              className="rounded-2xl border border-border/70 bg-surface/30 p-2.5 space-y-2.5 shadow-2xs overflow-hidden transition-all"
+            >
+              <div className="flex items-center justify-between pb-1.5 border-b border-border/40 text-meta">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-muted flex items-center gap-1.5">
                   <FileText size={12} className="text-accent" />
                   <span>Notes ({filteredNotes.length})</span>
@@ -807,11 +810,12 @@ export function NotesWorkspace({
               {renderNotesPanelContent(true)}
             </div>
 
-            <div className="w-full h-px bg-border/60" />
-
             {/* 2. BACKLINKS SECTION */}
-            <div ref={backlinksSectionRef} className="space-y-2">
-              <div className="flex items-center justify-between pb-1 border-b border-border/50 text-meta">
+            <div 
+              ref={backlinksSectionRef} 
+              className="rounded-2xl border border-border/70 bg-surface/30 p-2.5 space-y-2.5 shadow-2xs overflow-hidden transition-all"
+            >
+              <div className="flex items-center justify-between pb-1.5 border-b border-border/40 text-meta">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-muted flex items-center gap-1.5">
                   <Link2 size={12} className="text-accent" />
                   <span>Scripture Backlinks ({filteredBacklinksGroups.length})</span>
@@ -821,11 +825,12 @@ export function NotesWorkspace({
               {renderBacklinksPanelContent(true)}
             </div>
 
-            <div className="w-full h-px bg-border/60" />
-
             {/* 3. TEMPLATES SECTION */}
-            <div ref={templatesSectionRef} className="space-y-2">
-              <div className="flex items-center justify-between pb-1 border-b border-border/50 text-meta">
+            <div 
+              ref={templatesSectionRef} 
+              className="rounded-2xl border border-border/70 bg-surface/30 p-2.5 space-y-2.5 shadow-2xs overflow-hidden transition-all"
+            >
+              <div className="flex items-center justify-between pb-1.5 border-b border-border/40 text-meta">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-muted flex items-center gap-1.5">
                   <LayoutTemplate size={12} className="text-accent" />
                   <span>Study Templates ({filteredTemplates.length})</span>
@@ -851,21 +856,27 @@ export function NotesWorkspace({
             className="flex-1 w-full min-h-0 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory scroll-smooth no-scrollbar touch-pan-x"
             style={{ WebkitOverflowScrolling: 'touch' }}
           >
-            <div className="w-full min-w-full h-full max-h-full min-h-0 flex flex-col snap-start shrink-0 overflow-hidden">
-              {renderNotesPanelContent(false)}
+            <div className="w-full min-w-full h-full max-h-full min-h-0 flex flex-col snap-start shrink-0 p-2 overflow-hidden">
+              <div className="flex-1 flex flex-col min-h-0 rounded-2xl border border-border/70 bg-surface/20 overflow-hidden shadow-2xs">
+                {renderNotesPanelContent(false)}
+              </div>
             </div>
-            <div className="w-full min-w-full h-full max-h-full min-h-0 flex flex-col snap-start shrink-0 overflow-hidden">
-              {renderBacklinksPanelContent(false)}
+            <div className="w-full min-w-full h-full max-h-full min-h-0 flex flex-col snap-start shrink-0 p-2 overflow-hidden">
+              <div className="flex-1 flex flex-col min-h-0 rounded-2xl border border-border/70 bg-surface/20 overflow-hidden shadow-2xs">
+                {renderBacklinksPanelContent(false)}
+              </div>
             </div>
-            <div className="w-full min-w-full h-full max-h-full min-h-0 flex flex-col snap-start shrink-0 overflow-hidden">
-              {renderTemplatesPanelContent(false)}
+            <div className="w-full min-w-full h-full max-h-full min-h-0 flex flex-col snap-start shrink-0 p-2 overflow-hidden">
+              <div className="flex-1 flex flex-col min-h-0 rounded-2xl border border-border/70 bg-surface/20 overflow-hidden shadow-2xs">
+                {renderTemplatesPanelContent(false)}
+              </div>
             </div>
           </div>
         )}
       </aside>
 
       {/* MAIN SECTION: Active Note Workspace */}
-      <section className={`flex-1 flex-col bg-bg ${activeNoteId ? 'flex' : 'hidden lg:flex'}`}>
+      <section className={`flex-1 flex-col bg-surface/10 rounded-2xl border border-border/80 overflow-hidden shadow-xs ${activeNoteId ? 'flex' : 'hidden lg:flex'}`}>
         {activeNote ? (
           <>
             {/* Note Top Header */}
@@ -1418,7 +1429,7 @@ export function NotesWorkspace({
     return (
       <div className={isFullScroll ? "space-y-2.5" : "flex-1 flex flex-col min-h-0"}>
         {/* Search Bar */}
-        <div className={`p-3 border-b border-border/60 bg-surface/10 space-y-2.5 shrink-0 ${isFullScroll ? 'rounded-xl border' : ''}`}>
+        <div className="p-2.5 rounded-xl border border-border/70 bg-surface/40 space-y-2 shrink-0">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={14} />
             <input
@@ -1536,7 +1547,7 @@ export function NotesWorkspace({
     return (
       <div className={isFullScroll ? "space-y-2.5" : "flex-1 flex flex-col min-h-0"}>
         {/* Backlinks Search Bar */}
-        <div className={`p-3 border-b border-border/60 bg-surface/10 space-y-2 shrink-0 ${isFullScroll ? 'rounded-xl border' : ''}`}>
+        <div className="p-2.5 rounded-xl border border-border/70 bg-surface/40 space-y-2 shrink-0">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={14} />
             <input
@@ -1590,7 +1601,7 @@ export function NotesWorkspace({
                     <span>Connected to Active Note</span>
                   </div>
                   {activeNoteBacklinks.map((group) => renderBacklinkGroup(group, true))}
-                  <div className="w-full h-px bg-border/60 my-2" />
+                  <div className="w-full h-px bg-border/40 my-2 rounded-full" />
                 </div>
               )}
 
@@ -1615,7 +1626,7 @@ export function NotesWorkspace({
     return (
       <div className={isFullScroll ? "space-y-2.5" : "flex-1 flex flex-col min-h-0"}>
         {/* Templates Search & Header */}
-        <div className={`p-3 border-b border-border/60 bg-surface/10 space-y-2 shrink-0 ${isFullScroll ? 'rounded-xl border' : ''}`}>
+        <div className="p-2.5 rounded-xl border border-border/70 bg-surface/40 space-y-2 shrink-0">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={14} />
             <input
