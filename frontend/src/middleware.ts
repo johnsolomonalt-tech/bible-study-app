@@ -39,6 +39,16 @@ export default clerkMiddleware(async (auth, req) => {
       .map((s) => s.trim().toLowerCase())
       .filter(Boolean);
 
+    // In production, require explicit admin config; block all dev console access if none configured
+    const isProduction = process.env.NODE_ENV === 'production';
+    if (isProduction && allowedUserIds.length === 0 && allowedEmails.length === 0) {
+      if (req.nextUrl.pathname.startsWith(`/api/${DEV_PORTAL_SLUG}`)) {
+        return NextResponse.json({ error: 'Developer portal is disabled in production.' }, { status: 403 });
+      }
+      const homeUrl = new URL('/', req.url);
+      return NextResponse.redirect(homeUrl);
+    }
+
     if (allowedUserIds.length > 0 || allowedEmails.length > 0) {
       const email = ((sessionClaims?.email as string) || '').toLowerCase();
       const isAllowedId = allowedUserIds.includes(userId);

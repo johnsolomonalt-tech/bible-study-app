@@ -3,8 +3,22 @@ import { recordAnalyticsEvent } from '@/lib/analyticsService';
 import { auth } from '@clerk/nextjs/server';
 import crypto from 'crypto';
 
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+
 export async function POST(req: NextRequest) {
   try {
+    const ip = getClientIp(req);
+    const rateLimit = checkRateLimit(`analytics:${ip}`, {
+      windowMs: 60 * 1000,
+      maxRequests: 60,
+    });
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded' },
+        { status: 429, headers: { 'Retry-After': String(rateLimit.resetSeconds) } }
+      );
+    }
+
     let body: any = {};
     const contentType = req.headers.get('content-type') || '';
     if (contentType.includes('application/json')) {

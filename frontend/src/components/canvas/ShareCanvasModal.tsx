@@ -36,6 +36,16 @@ export function ShareCanvasModal({
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedEmbed, setCopiedEmbed] = useState(false);
 
+  React.useEffect(() => {
+    if (isOpen && boardId) {
+      fetch('/api/canvas', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: boardId, isPublic: true }),
+      }).catch(() => {});
+    }
+  }, [isOpen, boardId]);
+
   if (!isOpen) return null;
 
   const origin = typeof window !== 'undefined' ? window.location.origin : '';

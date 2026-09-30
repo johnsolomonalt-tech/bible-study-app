@@ -116,11 +116,14 @@ export async function GET(req: Request) {
       }
     }
 
-    // If not found in current user's scope, allow public retrieval for shared links
+    // If not found in current user's scope, allow public retrieval for shared links only if marked public
     if (!dbRecord) {
       try {
         dbRecord = await prisma.canvas.findFirst({
-          where: { boardId },
+          where: {
+            boardId,
+            isPublic: true,
+          },
         });
       } catch (dbErr) {
         console.warn('Canvas: PostgreSQL global board lookup failed:', dbErr);
@@ -181,7 +184,7 @@ export async function POST(req: Request) {
     const activeUserId = userId || 'anonymous_user';
 
     const body = await req.json();
-    const { id = 'default', title = 'Untitled Canvas', nodes = [], edges = [], viewport } = body;
+    const { id = 'default', title = 'Untitled Canvas', nodes = [], edges = [], viewport, isPublic } = body;
 
     const cacheKey = `${activeUserId}_${id}`;
     const nowIso = new Date().toISOString();
@@ -227,6 +230,7 @@ export async function POST(req: Request) {
           nodes: cleanNodes,
           edges: cleanEdges,
           viewport: viewport || undefined,
+          ...(typeof isPublic === 'boolean' ? { isPublic } : {}),
         },
         create: {
           userId: dbUserId,
@@ -235,6 +239,7 @@ export async function POST(req: Request) {
           nodes: cleanNodes,
           edges: cleanEdges,
           viewport: viewport || undefined,
+          isPublic: Boolean(isPublic),
         },
       });
 
@@ -295,6 +300,35 @@ export async function DELETE(req: Request) {
     console.error('Error in DELETE /api/canvas:', error);
     return NextResponse.json(
       { error: 'Failed to delete canvas board.' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(req: Request) {
+  try {
+    const userId = await getSafeUserId(req);
+    const body = await req.json();
+    const { id, isPublic } = body;
+    if (!id) return NextResponse.json({ error: 'Board ID is required.' }, { status: 400 });
+
+    if (userId) {
+      await prisma.canvas.updateMany({
+        where: { userId, boardId: id },
+        data: { isPublic: Boolean(isPublic) },
+      });
+    } else {
+      await prisma.canvas.updateMany({
+        where: { boardId: id },
+        data: { isPublic: Boolean(isPublic) },
+      });
+    }
+
+    return NextResponse.json({ success: true, id, isPublic: Boolean(isPublic) });
+  } catch (error: any) {
+    console.error('Error in PATCH /api/canvas:', error);
+    return NextResponse.json(
+      { error: 'Failed to update canvas sharing.' },
       { status: 500 }
     );
   }

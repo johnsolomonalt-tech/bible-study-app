@@ -13,13 +13,36 @@ const merriweather = Merriweather({
   weight: ["400", "700"],
 });
 
+const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://theologica.app';
+
 export const metadata: Metadata = {
-  title: "Theologica Study Workspace",
-  description: "Bible app with AI chat and notes",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "Theologica Study Workspace",
+    template: "%s | Theologica",
+  },
+  description: "An advanced, reverent visual Scripture study workspace featuring interactive interlinear lexicons, theological AI assistance, and inductive mind-mapping.",
+  keywords: ["Bible study", "Scripture", "Theology", "Interlinear", "Hebrew Greek Lexicon", "Christian", "Study notes", "Mind map"],
+  authors: [{ name: "Theologica" }],
   manifest: "/manifest.json",
   icons: {
     icon: "/logo-dark.png",
     apple: "/logo-dark.png",
+  },
+  openGraph: {
+    title: "Theologica Study Workspace",
+    description: "Visual Scripture study workspace with inductive canvas, Greek/Hebrew interlinear, and theological AI.",
+    url: siteUrl,
+    siteName: "Theologica",
+    locale: "en_US",
+    type: "website",
+    images: [{ url: "/logo-dark.png", width: 512, height: 512, alt: "Theologica Logo" }],
+  },
+  twitter: {
+    card: "summary",
+    title: "Theologica Study Workspace",
+    description: "Visual Scripture study workspace with inductive canvas, Greek/Hebrew interlinear, and theological AI.",
+    images: ["/logo-dark.png"],
   },
   appleWebApp: {
     capable: true,

@@ -64,11 +64,13 @@ model Canvas {
   nodes     Json     @default("[]")
   edges     Json     @default("[]")
   viewport  Json?
+  isPublic  Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([userId, boardId])
   @@index([userId])
+  @@index([boardId])
 }
 
 model AnalyticsEvent {

@@ -1382,7 +1382,10 @@ function InnerCanvasBoard({
     }
 
     const timestamp = Date.now();
-    const newId = `board-${timestamp}`;
+    const entropy = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID().replace(/-/g, '').substring(0, 12)
+      : Math.random().toString(36).substring(2, 10);
+    const newId = `board-${timestamp}-${entropy}`;
     const newTitle = (typeof customTitle === 'string' && customTitle.trim()) ? customTitle.trim() : 'New Canvas';
     const now = new Date().toISOString();
 
