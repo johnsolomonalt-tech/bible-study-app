@@ -7,15 +7,12 @@ import {
   Pin, 
   Trash2, 
   ChevronLeft, 
-  ChevronRight,
   BookOpen, 
   FileText, 
-  LayoutTemplate,
+  LayoutTemplate, 
   Link2,
   Hash,
   ExternalLink,
-  MoveVertical,
-  MoveHorizontal,
   MoreVertical, 
   Download, 
   Copy, 
@@ -222,15 +219,6 @@ export function NotesWorkspace({
 }: NotesWorkspaceProps) {
   // Sidebar UI state
   const [sidebarTab, setSidebarTab] = useState<'notes' | 'backlinks' | 'templates'>('notes');
-  const [scrollOrientation, setScrollOrientation] = useState<'vertical' | 'horizontal'>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('theologica_notes_scroll_mode');
-        if (saved === 'horizontal' || saved === 'vertical') return saved;
-      } catch {}
-    }
-    return 'vertical';
-  });
   const [searchQuery, setSearchQuery] = useState('');
   const [backlinksSearchQuery, setBacklinksSearchQuery] = useState('');
   const [templatesSearchQuery, setTemplatesSearchQuery] = useState('');
@@ -249,12 +237,11 @@ export function NotesWorkspace({
     return [];
   });
   
-  // Refs for scrolling containers & sections
+  // Refs for scrolling containers
+  const sidebarRef = useRef<HTMLElement | null>(null);
   const carouselRef = useRef<HTMLDivElement | null>(null);
-  const verticalScrollRef = useRef<HTMLDivElement | null>(null);
-  const notesSectionRef = useRef<HTMLDivElement | null>(null);
-  const backlinksSectionRef = useRef<HTMLDivElement | null>(null);
-  const templatesSectionRef = useRef<HTMLDivElement | null>(null);
+  const sidebarTabRef = useRef<'notes' | 'backlinks' | 'templates'>(sidebarTab);
+  const lastWheelTimeRef = useRef(0);
 
   // Editor UI state
   const [viewMode, setViewMode] = useState<NoteViewMode>('edit');
@@ -270,13 +257,6 @@ export function NotesWorkspace({
   const [previewVerse, setPreviewVerse] = useState<{ book: string; chapter: number; verse: number; raw?: string } | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-
-  const toggleScrollOrientation = (newMode: 'vertical' | 'horizontal') => {
-    setScrollOrientation(newMode);
-    try {
-      localStorage.setItem('theologica_notes_scroll_mode', newMode);
-    } catch {}
-  };
 
   const togglePin = (id: number) => {
     const updated = pinnedIds.includes(id)
@@ -300,6 +280,7 @@ export function NotesWorkspace({
   useEffect(() => {
     activeNoteRef.current = activeNote;
     notesRef.current = notes;
+    sidebarTabRef.current = sidebarTab;
   });
 
   // Helper: check if a note has nothing typed on it (empty content and empty/placeholder title)
@@ -500,65 +481,18 @@ export function NotesWorkspace({
     );
   }, [templatesSearchQuery]);
 
-  // Switch tab with dual mode support (vertical smooth scroll vs horizontal carousel)
+  // Switch tab by smoothly scrolling horizontal carousel
   const handleSwitchTab = useCallback((tab: 'notes' | 'backlinks' | 'templates') => {
     setSidebarTab(tab);
-    if (scrollOrientation === 'vertical') {
-      let targetEl: HTMLElement | null = null;
-      if (tab === 'notes') targetEl = notesSectionRef.current;
-      else if (tab === 'backlinks') targetEl = backlinksSectionRef.current;
-      else if (tab === 'templates') targetEl = templatesSectionRef.current;
-
-      if (targetEl && verticalScrollRef.current) {
-        const topOffset = targetEl.offsetTop;
-        verticalScrollRef.current.scrollTo({
-          top: Math.max(0, topOffset - 10),
-          behavior: 'smooth'
-        });
-      }
-    } else {
-      if (!carouselRef.current) return;
-      const index = tab === 'notes' ? 0 : tab === 'backlinks' ? 1 : 2;
-      const width = carouselRef.current.clientWidth;
-      carouselRef.current.scrollTo({
-        left: index * width,
-        behavior: 'smooth'
-      });
-    }
-  }, [scrollOrientation]);
-
-  // Track vertical scroll position to sync active tab in sticky header
-  const handleVerticalScroll = useCallback(() => {
-    if (!verticalScrollRef.current) return;
-    const scrollTop = verticalScrollRef.current.scrollTop;
-    const backlinksTop = backlinksSectionRef.current?.offsetTop || 99999;
-    const templatesTop = templatesSectionRef.current?.offsetTop || 99999;
-
-    let active: 'notes' | 'backlinks' | 'templates' = 'notes';
-    if (scrollTop >= templatesTop - 120) {
-      active = 'templates';
-    } else if (scrollTop >= backlinksTop - 120) {
-      active = 'backlinks';
-    } else {
-      active = 'notes';
-    }
-
-    if (active !== sidebarTab) {
-      setSidebarTab(active);
-    }
-  }, [sidebarTab]);
-
-  // Mouse wheel over header or subheader advances tabs seamlessly for standard mice
-  const handleHeaderWheel = useCallback((e: React.WheelEvent) => {
-    if (Math.abs(e.deltaY) < 15) return;
-    const order: ('notes' | 'backlinks' | 'templates')[] = ['notes', 'backlinks', 'templates'];
-    const currentIdx = order.indexOf(sidebarTab);
-    if (e.deltaY > 0 && currentIdx < order.length - 1) {
-      handleSwitchTab(order[currentIdx + 1]);
-    } else if (e.deltaY < 0 && currentIdx > 0) {
-      handleSwitchTab(order[currentIdx - 1]);
-    }
-  }, [sidebarTab, handleSwitchTab]);
+    sidebarTabRef.current = tab;
+    if (!carouselRef.current) return;
+    const index = tab === 'notes' ? 0 : tab === 'backlinks' ? 1 : 2;
+    const width = carouselRef.current.clientWidth;
+    carouselRef.current.scrollTo({
+      left: index * width,
+      behavior: 'smooth'
+    });
+  }, []);
 
   const handleCarouselScroll = useCallback(() => {
     if (!carouselRef.current) return;
@@ -567,13 +501,74 @@ export function NotesWorkspace({
     const index = Math.round(scrollLeft / clientWidth);
     const tabOrder: ('notes' | 'backlinks' | 'templates')[] = ['notes', 'backlinks', 'templates'];
     const targetTab = tabOrder[index];
-    if (targetTab && targetTab !== sidebarTab) {
+    if (targetTab && targetTab !== sidebarTabRef.current) {
       setSidebarTab(targetTab);
+      sidebarTabRef.current = targetTab;
     }
-  }, [sidebarTab]);
+  }, []);
+
+  // Multi-platform wheel support:
+  // - Trackpad / Magic Mouse / side swipe: native horizontal scroll (intuitive)
+  // - Standard mouse wheel: scroll down goes right, scroll up goes left (while preserving inner list scrolling)
+  useEffect(() => {
+    const el = sidebarRef.current;
+    if (!el) return;
+
+    const onWheel = (e: WheelEvent) => {
+      // 1. If horizontal scrolling is predominant (trackpad side-swipe, Magic Mouse side scroll):
+      // let native browser horizontal scroll work smoothly!
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        return;
+      }
+
+      // 2. Ignore negligible wheel jitters
+      if (Math.abs(e.deltaY) < 14) return;
+
+      // 3. Check if mouse is over an inner vertically scrollable list
+      const target = e.target as HTMLElement | null;
+      const scrollableList = target?.closest('.notes-panel-scroll') as HTMLElement | null;
+
+      if (scrollableList) {
+        const { scrollTop, scrollHeight, clientHeight } = scrollableList;
+        const canScrollDown = e.deltaY > 0 && scrollTop + clientHeight < scrollHeight - 3;
+        const canScrollUp = e.deltaY < 0 && scrollTop > 3;
+
+        // If inner list can still scroll vertically in this direction, let it scroll
+        if (canScrollDown || canScrollUp) {
+          return;
+        }
+      }
+
+      // 4. Over headers, search bars, tags ribbon, or when list boundary reached:
+      // Translate wheel down (deltaY > 0) -> go right
+      // Translate wheel up (deltaY < 0) -> go left
+      const now = Date.now();
+      if (now - lastWheelTimeRef.current < 220) {
+        e.preventDefault();
+        return;
+      }
+
+      const order: ('notes' | 'backlinks' | 'templates')[] = ['notes', 'backlinks', 'templates'];
+      const currentIdx = order.indexOf(sidebarTabRef.current);
+
+      if (e.deltaY > 0 && currentIdx < order.length - 1) {
+        e.preventDefault();
+        lastWheelTimeRef.current = now;
+        handleSwitchTab(order[currentIdx + 1]);
+      } else if (e.deltaY < 0 && currentIdx > 0) {
+        e.preventDefault();
+        lastWheelTimeRef.current = now;
+        handleSwitchTab(order[currentIdx - 1]);
+      }
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+    };
+  }, [handleSwitchTab]);
 
   useEffect(() => {
-    if (scrollOrientation !== 'horizontal') return;
     const handleResize = () => {
       if (!carouselRef.current) return;
       const index = sidebarTab === 'notes' ? 0 : sidebarTab === 'backlinks' ? 1 : 2;
@@ -581,7 +576,7 @@ export function NotesWorkspace({
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [sidebarTab, scrollOrientation]);
+  }, [sidebarTab]);
 
   // Tag Management Handlers
   const handleAddTag = (tagToAdd: string) => {
@@ -727,45 +722,43 @@ export function NotesWorkspace({
     <div className="flex w-full h-full bg-bg relative overflow-hidden select-text p-2 sm:p-2.5 gap-2 sm:gap-2.5">
       {/* SIDEBAR: Notebooks & Notes List (Option 5) */}
       <aside 
+        ref={sidebarRef}
         className={`w-full lg:w-[320px] rounded-2xl border border-border/80 bg-surface/15 flex flex-col shrink-0 h-full min-h-0 overflow-hidden shadow-xs transition-all ${
           activeNoteId ? 'hidden lg:flex' : 'flex'
         }`}
       >
-        {/* Sidebar Header with Notes vs Backlinks vs Templates Scrollable Switcher */}
-        <header 
-          onWheel={handleHeaderWheel}
-          className="h-[58px] border-b border-border/70 flex items-center justify-between px-3 shrink-0 bg-surface/20 gap-1.5"
-        >
-          {/* Scrollable Tabs Segmented Control */}
-          <div className="flex-1 overflow-x-auto no-scrollbar py-1 flex items-center min-w-0">
-            <div className="flex items-center gap-1 bg-surface p-1 rounded-xl border border-border/60 shrink-0">
+        {/* Sidebar Header with Notes vs Backlinks vs Templates Tabs */}
+        <header className="h-[52px] border-b border-border/70 flex items-center justify-between px-2.5 shrink-0 bg-surface/25 backdrop-blur-sm gap-1.5">
+          {/* Tabs Segmented Control */}
+          <div className="flex-1 overflow-x-auto no-scrollbar flex items-center min-w-0">
+            <div className="flex items-center gap-0.5 bg-surface/80 p-0.5 rounded-xl border border-border/60 shrink-0">
               <button
                 type="button"
                 onClick={() => handleSwitchTab('notes')}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-all cursor-pointer shrink-0 ${
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11.5px] font-semibold transition-all cursor-pointer shrink-0 ${
                   sidebarTab === 'notes'
                     ? 'bg-bg text-fg shadow-2xs ring-1 ring-border/80'
-                    : 'text-muted hover:text-fg'
+                    : 'text-muted hover:text-fg hover:bg-surface/50'
                 }`}
-                title="Personal Notes (Scroll / Wheel)"
+                title="Personal Notes"
               >
-                <FileText size={13} className={sidebarTab === 'notes' ? 'text-accent' : ''} />
+                <FileText size={12.5} className={sidebarTab === 'notes' ? 'text-accent' : ''} />
                 <span>Notes</span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-surface-hover text-muted font-normal">
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-surface text-muted font-normal">
                   {notes.length}
                 </span>
               </button>
               <button
                 type="button"
                 onClick={() => handleSwitchTab('backlinks')}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-all cursor-pointer shrink-0 ${
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11.5px] font-semibold transition-all cursor-pointer shrink-0 ${
                   sidebarTab === 'backlinks'
                     ? 'bg-bg text-accent shadow-2xs ring-1 ring-border/80'
-                    : 'text-muted hover:text-fg'
+                    : 'text-muted hover:text-fg hover:bg-surface/50'
                 }`}
-                title="Scripture Backlinks (Scroll / Wheel)"
+                title="Scripture Backlinks"
               >
-                <Link2 size={13} />
+                <Link2 size={12.5} />
                 <span>Backlinks</span>
                 {allBacklinksGroups.length > 0 && (
                   <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-accent/15 text-accent font-medium">
@@ -776,14 +769,14 @@ export function NotesWorkspace({
               <button
                 type="button"
                 onClick={() => handleSwitchTab('templates')}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-all cursor-pointer shrink-0 ${
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11.5px] font-semibold transition-all cursor-pointer shrink-0 ${
                   sidebarTab === 'templates'
                     ? 'bg-bg text-accent shadow-2xs ring-1 ring-border/80'
-                    : 'text-muted hover:text-fg'
+                    : 'text-muted hover:text-fg hover:bg-surface/50'
                 }`}
-                title="Study Templates (Scroll / Wheel)"
+                title="Study Templates"
               >
-                <LayoutTemplate size={13} className={sidebarTab === 'templates' ? 'text-accent' : ''} />
+                <LayoutTemplate size={12.5} className={sidebarTab === 'templates' ? 'text-accent' : ''} />
                 <span>Templates</span>
                 <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-accent/15 text-accent font-medium">
                   {NOTE_TEMPLATES.length}
@@ -797,176 +790,37 @@ export function NotesWorkspace({
             <button
               type="button"
               onClick={handleCreateBlankNote}
-              className="p-1.5 text-muted hover:text-fg hover:bg-surface border border-border/60 hover:border-border rounded-lg transition-colors cursor-pointer"
+              className="p-1.5 text-muted hover:text-fg hover:bg-surface border border-border/60 hover:border-border rounded-xl transition-colors cursor-pointer shadow-2xs"
               title="New Blank Note"
             >
-              <Plus size={16} />
+              <Plus size={15} />
             </button>
           </div>
         </header>
 
-        {/* Carousel Slide Indicators & Scroll Mode Switcher */}
-        <div 
-          onWheel={handleHeaderWheel}
-          className="px-3 py-1.5 bg-surface/15 border-b border-border/40 flex items-center justify-between text-[11px] text-meta shrink-0 select-none gap-1"
+        {/* Unified Horizontal Carousel: intuitive side-swipe and mouse wheel up/down navigation */}
+        <div
+          ref={carouselRef}
+          onScroll={handleCarouselScroll}
+          className="flex-1 w-full min-h-0 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory scroll-smooth no-scrollbar touch-pan-x"
+          style={{ WebkitOverflowScrolling: 'touch' }}
         >
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => {
-                const order: ('notes' | 'backlinks' | 'templates')[] = ['notes', 'backlinks', 'templates'];
-                const prevIdx = (order.indexOf(sidebarTab) - 1 + order.length) % order.length;
-                handleSwitchTab(order[prevIdx]);
-              }}
-              className="p-0.5 rounded hover:bg-surface text-muted hover:text-fg cursor-pointer transition-colors"
-              title="Previous panel (or scroll mouse wheel up)"
-            >
-              <ChevronLeft size={13} />
-            </button>
-            <div className="flex items-center gap-1">
-              {(['notes', 'backlinks', 'templates'] as const).map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => handleSwitchTab(t)}
-                  className={`h-1.5 rounded-full transition-all cursor-pointer ${
-                    sidebarTab === t ? 'w-4 bg-accent' : 'w-1.5 bg-muted/40 hover:bg-muted'
-                  }`}
-                  title={`Switch to ${t}`}
-                />
-              ))}
+          <div className="w-full min-w-full h-full max-h-full min-h-0 flex flex-col snap-start shrink-0 p-2 overflow-hidden">
+            <div className="flex-1 flex flex-col min-h-0 rounded-2xl border border-border/70 bg-surface/20 overflow-hidden shadow-2xs">
+              {renderNotesPanelContent()}
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                const order: ('notes' | 'backlinks' | 'templates')[] = ['notes', 'backlinks', 'templates'];
-                const nextIdx = (order.indexOf(sidebarTab) + 1) % order.length;
-                handleSwitchTab(order[nextIdx]);
-              }}
-              className="p-0.5 rounded hover:bg-surface text-muted hover:text-fg cursor-pointer transition-colors"
-              title="Next panel (or scroll mouse wheel down)"
-            >
-              <ChevronRight size={13} />
-            </button>
           </div>
-
-          {/* Scroll Orientation Toggle: Up/Down vs Side/Side */}
-          <div className="flex items-center gap-1 bg-surface/80 p-0.5 rounded-lg border border-border/60">
-            <button
-              type="button"
-              onClick={() => toggleScrollOrientation('vertical')}
-              className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-all cursor-pointer ${
-                scrollOrientation === 'vertical'
-                  ? 'bg-accent text-white shadow-2xs font-semibold'
-                  : 'text-muted hover:text-fg'
-              }`}
-              title="Vertical Scroll: Ideal for standard mice! Scroll up and down continuously through Notes, Backlinks, and Templates"
-            >
-              <MoveVertical size={11} />
-              <span>↕ Up/Down</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => toggleScrollOrientation('horizontal')}
-              className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-all cursor-pointer ${
-                scrollOrientation === 'horizontal'
-                  ? 'bg-accent text-white shadow-2xs font-semibold'
-                  : 'text-muted hover:text-fg'
-              }`}
-              title="Horizontal Swipe: Side-to-side panels for trackpad, Magic Mouse, or touch screens"
-            >
-              <MoveHorizontal size={11} />
-              <span>↔ Side/Side</span>
-            </button>
+          <div className="w-full min-w-full h-full max-h-full min-h-0 flex flex-col snap-start shrink-0 p-2 overflow-hidden">
+            <div className="flex-1 flex flex-col min-h-0 rounded-2xl border border-border/70 bg-surface/20 overflow-hidden shadow-2xs">
+              {renderBacklinksPanelContent()}
+            </div>
+          </div>
+          <div className="w-full min-w-full h-full max-h-full min-h-0 flex flex-col snap-start shrink-0 p-2 overflow-hidden">
+            <div className="flex-1 flex flex-col min-h-0 rounded-2xl border border-border/70 bg-surface/20 overflow-hidden shadow-2xs">
+              {renderTemplatesPanelContent()}
+            </div>
           </div>
         </div>
-
-        {/* 1. VERTICAL UP-AND-DOWN SCROLL VIEW (Standard Mouse Support) */}
-        {scrollOrientation === 'vertical' && (
-          <div
-            ref={verticalScrollRef}
-            onScroll={handleVerticalScroll}
-            className="flex-1 min-h-0 w-full overflow-y-auto custom-scroll p-2.5 space-y-3.5 pb-24 lg:pb-8 touch-pan-y"
-            style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}
-          >
-            {/* 1. NOTES SECTION */}
-            <div 
-              ref={notesSectionRef} 
-              className="rounded-2xl border border-border/70 bg-surface/30 p-2.5 space-y-2.5 shadow-2xs overflow-hidden transition-all"
-            >
-              <div className="flex items-center justify-between pb-1.5 border-b border-border/40 text-meta">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-muted flex items-center gap-1.5">
-                  <FileText size={12} className="text-accent" />
-                  <span>Notes ({filteredNotes.length})</span>
-                </span>
-                <span className="text-[10px] text-muted">Scroll down for Backlinks & Templates ↓</span>
-              </div>
-              {renderNotesPanelContent(true)}
-            </div>
-
-            {/* 2. BACKLINKS SECTION */}
-            <div 
-              ref={backlinksSectionRef} 
-              className="rounded-2xl border border-border/70 bg-surface/30 p-2.5 space-y-2.5 shadow-2xs overflow-hidden transition-all"
-            >
-              <div className="flex items-center justify-between pb-1.5 border-b border-border/40 text-meta">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-muted flex items-center gap-1.5">
-                  <Link2 size={12} className="text-accent" />
-                  <span>Scripture Backlinks ({filteredBacklinksGroups.length})</span>
-                </span>
-                <span className="text-[10px] text-muted">{allBacklinksGroups.reduce((acc, g) => acc + g.notes.length, 0)} references</span>
-              </div>
-              {renderBacklinksPanelContent(true)}
-            </div>
-
-            {/* 3. TEMPLATES SECTION */}
-            <div 
-              ref={templatesSectionRef} 
-              className="rounded-2xl border border-border/70 bg-surface/30 p-2.5 space-y-2.5 shadow-2xs overflow-hidden transition-all"
-            >
-              <div className="flex items-center justify-between pb-1.5 border-b border-border/40 text-meta">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-muted flex items-center gap-1.5">
-                  <LayoutTemplate size={12} className="text-accent" />
-                  <span>Study Templates ({filteredTemplates.length})</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setIsTemplatesOpen(true)}
-                  className="text-accent hover:underline text-[10.5px] cursor-pointer"
-                >
-                  Full Modal
-                </button>
-              </div>
-              {renderTemplatesPanelContent(true)}
-            </div>
-          </div>
-        )}
-
-        {/* 2. HORIZONTAL SIDE-TO-SIDE SWIPE VIEW (Trackpad / Magic Mouse / Touch) */}
-        {scrollOrientation === 'horizontal' && (
-          <div
-            ref={carouselRef}
-            onScroll={handleCarouselScroll}
-            className="flex-1 w-full min-h-0 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory scroll-smooth no-scrollbar touch-pan-x"
-            style={{ WebkitOverflowScrolling: 'touch' }}
-          >
-            <div className="w-full min-w-full h-full max-h-full min-h-0 flex flex-col snap-start shrink-0 p-2 overflow-hidden">
-              <div className="flex-1 flex flex-col min-h-0 rounded-2xl border border-border/70 bg-surface/20 overflow-hidden shadow-2xs">
-                {renderNotesPanelContent(false)}
-              </div>
-            </div>
-            <div className="w-full min-w-full h-full max-h-full min-h-0 flex flex-col snap-start shrink-0 p-2 overflow-hidden">
-              <div className="flex-1 flex flex-col min-h-0 rounded-2xl border border-border/70 bg-surface/20 overflow-hidden shadow-2xs">
-                {renderBacklinksPanelContent(false)}
-              </div>
-            </div>
-            <div className="w-full min-w-full h-full max-h-full min-h-0 flex flex-col snap-start shrink-0 p-2 overflow-hidden">
-              <div className="flex-1 flex flex-col min-h-0 rounded-2xl border border-border/70 bg-surface/20 overflow-hidden shadow-2xs">
-                {renderTemplatesPanelContent(false)}
-              </div>
-            </div>
-          </div>
-        )}
       </aside>
 
       {/* MAIN SECTION: Active Note Workspace */}
@@ -1518,10 +1372,10 @@ export function NotesWorkspace({
     );
   }
 
-  // 1. Render Notes Panel Content (supports both continuous vertical scroll and horizontal paged mode)
-  function renderNotesPanelContent(isFullScroll: boolean) {
+  // 1. Render Notes Panel Content
+  function renderNotesPanelContent() {
     return (
-      <div className={isFullScroll ? "space-y-2.5" : "flex-1 flex flex-col min-h-0"}>
+      <div className="flex-1 flex flex-col min-h-0">
         {/* Search Bar */}
         <div className="p-2.5 rounded-xl border border-border/70 bg-surface/40 space-y-2 shrink-0">
           <div className="relative">
@@ -1592,12 +1446,8 @@ export function NotesWorkspace({
 
         {/* Notes Items List */}
         <div 
-          className={
-            isFullScroll 
-              ? "space-y-1 pt-1" 
-              : "flex-1 min-h-0 overflow-y-auto custom-scroll p-2.5 space-y-1 pb-24 lg:pb-4 touch-pan-y"
-          }
-          style={isFullScroll ? undefined : { WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}
+          className="notes-panel-scroll flex-1 min-h-0 overflow-y-auto custom-scroll p-2.5 space-y-1 pb-24 lg:pb-4 touch-pan-y"
+          style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}
         >
           {filteredNotes.length === 0 && (
             <div className="py-8 px-4 text-center text-meta">
@@ -1636,10 +1486,10 @@ export function NotesWorkspace({
     );
   }
 
-  // 2. Render Backlinks Panel Content (supports both continuous vertical scroll and horizontal paged mode)
-  function renderBacklinksPanelContent(isFullScroll: boolean) {
+  // 2. Render Backlinks Panel Content
+  function renderBacklinksPanelContent() {
     return (
-      <div className={isFullScroll ? "space-y-2.5" : "flex-1 flex flex-col min-h-0"}>
+      <div className="flex-1 flex flex-col min-h-0">
         {/* Backlinks Search Bar */}
         <div className="p-2.5 rounded-xl border border-border/70 bg-surface/40 space-y-2 shrink-0">
           <div className="relative">
@@ -1668,12 +1518,8 @@ export function NotesWorkspace({
 
         {/* Backlinks List */}
         <div 
-          className={
-            isFullScroll 
-              ? "space-y-2.5 pt-1" 
-              : "flex-1 min-h-0 overflow-y-auto custom-scroll p-2.5 space-y-3 pb-24 lg:pb-4 touch-pan-y"
-          }
-          style={isFullScroll ? undefined : { WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}
+          className="notes-panel-scroll flex-1 min-h-0 overflow-y-auto custom-scroll p-2.5 space-y-3 pb-24 lg:pb-4 touch-pan-y"
+          style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}
         >
           {filteredBacklinksGroups.length === 0 ? (
             <div className="py-8 px-4 text-center text-meta">
@@ -1715,10 +1561,10 @@ export function NotesWorkspace({
     );
   }
 
-  // 3. Render Templates Panel Content (supports both continuous vertical scroll and horizontal paged mode)
-  function renderTemplatesPanelContent(isFullScroll: boolean) {
+  // 3. Render Templates Panel Content
+  function renderTemplatesPanelContent() {
     return (
-      <div className={isFullScroll ? "space-y-2.5" : "flex-1 flex flex-col min-h-0"}>
+      <div className="flex-1 flex flex-col min-h-0">
         {/* Templates Search & Header */}
         <div className="p-2.5 rounded-xl border border-border/70 bg-surface/40 space-y-2 shrink-0">
           <div className="relative">
@@ -1753,12 +1599,8 @@ export function NotesWorkspace({
 
         {/* Templates List */}
         <div 
-          className={
-            isFullScroll 
-              ? "space-y-2 pt-1" 
-              : "flex-1 min-h-0 overflow-y-auto custom-scroll p-2.5 space-y-2.5 pb-24 lg:pb-4 touch-pan-y"
-          }
-          style={isFullScroll ? undefined : { WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}
+          className="notes-panel-scroll flex-1 min-h-0 overflow-y-auto custom-scroll p-2.5 space-y-2.5 pb-24 lg:pb-4 touch-pan-y"
+          style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}
         >
           {filteredTemplates.length === 0 ? (
             <div className="py-8 px-4 text-center text-meta">
