@@ -223,6 +223,7 @@ export function NotesWorkspace({
   const [backlinksSearchQuery, setBacklinksSearchQuery] = useState('');
   const [templatesSearchQuery, setTemplatesSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [selectedTemplateBadge, setSelectedTemplateBadge] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'updated' | 'title' | 'created'>('updated');
   const [pinnedIds, setPinnedIds] = useState<number[]>(() => {
     if (typeof window !== 'undefined') {
@@ -236,12 +237,6 @@ export function NotesWorkspace({
     }
     return [];
   });
-  
-  // Refs for scrolling containers
-  const sidebarRef = useRef<HTMLElement | null>(null);
-  const carouselRef = useRef<HTMLDivElement | null>(null);
-  const sidebarTabRef = useRef<'notes' | 'backlinks' | 'templates'>(sidebarTab);
-  const lastWheelTimeRef = useRef(0);
 
   // Editor UI state
   const [viewMode, setViewMode] = useState<NoteViewMode>('edit');
@@ -280,7 +275,6 @@ export function NotesWorkspace({
   useEffect(() => {
     activeNoteRef.current = activeNote;
     notesRef.current = notes;
-    sidebarTabRef.current = sidebarTab;
   });
 
   // Helper: check if a note has nothing typed on it (empty content and empty/placeholder title)
@@ -470,113 +464,37 @@ export function NotesWorkspace({
     return allBacklinksGroups.filter(g => activeKeys.has(g.reference));
   }, [activeNote, allBacklinksGroups]);
 
-  // Filtered Templates based on templates search query
-  const filteredTemplates = useMemo(() => {
-    if (!templatesSearchQuery.trim()) return NOTE_TEMPLATES;
-    const q = templatesSearchQuery.toLowerCase().trim();
-    return NOTE_TEMPLATES.filter(t => 
-      t.name.toLowerCase().includes(q) || 
-      t.description.toLowerCase().includes(q) || 
-      t.badge.toLowerCase().includes(q)
-    );
-  }, [templatesSearchQuery]);
-
-  // Switch tab by smoothly scrolling horizontal carousel
-  const handleSwitchTab = useCallback((tab: 'notes' | 'backlinks' | 'templates') => {
-    setSidebarTab(tab);
-    sidebarTabRef.current = tab;
-    if (!carouselRef.current) return;
-    const index = tab === 'notes' ? 0 : tab === 'backlinks' ? 1 : 2;
-    const width = carouselRef.current.clientWidth;
-    carouselRef.current.scrollTo({
-      left: index * width,
-      behavior: 'smooth'
-    });
+  // Unique template category badges
+  const allTemplateBadges = useMemo(() => {
+    return Array.from(new Set(NOTE_TEMPLATES.map(t => t.badge)));
   }, []);
 
-  const handleCarouselScroll = useCallback(() => {
-    if (!carouselRef.current) return;
-    const { scrollLeft, clientWidth } = carouselRef.current;
-    if (clientWidth <= 0) return;
-    const index = Math.round(scrollLeft / clientWidth);
-    const tabOrder: ('notes' | 'backlinks' | 'templates')[] = ['notes', 'backlinks', 'templates'];
-    const targetTab = tabOrder[index];
-    if (targetTab && targetTab !== sidebarTabRef.current) {
-      setSidebarTab(targetTab);
-      sidebarTabRef.current = targetTab;
+  // Filtered Templates based on templates search query & selected category
+  const filteredTemplates = useMemo(() => {
+    return NOTE_TEMPLATES.filter(t => {
+      if (selectedTemplateBadge && t.badge.toLowerCase() !== selectedTemplateBadge.toLowerCase()) {
+        return false;
+      }
+      if (!templatesSearchQuery.trim()) return true;
+      const q = templatesSearchQuery.toLowerCase().trim();
+      return (
+        t.name.toLowerCase().includes(q) || 
+        t.description.toLowerCase().includes(q) || 
+        t.badge.toLowerCase().includes(q)
+      );
+    });
+  }, [templatesSearchQuery, selectedTemplateBadge]);
+
+  // Horizontal slider wheel handler:
+  // - Trackpad / Magic Mouse / side swipe: native horizontal scroll (intuitive)
+  // - Standard mouse wheel: scroll down goes right, scroll up goes left
+  // Scrolling strictly scrolls the slider container and NEVER swaps tabs.
+  const handleHorizontalWheel = useCallback((e: React.WheelEvent<HTMLElement>) => {
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+    if (Math.abs(e.deltaY) > 0) {
+      e.currentTarget.scrollLeft += e.deltaY;
     }
   }, []);
-
-  // Multi-platform wheel support:
-  // - Trackpad / Magic Mouse / side swipe: native horizontal scroll (intuitive)
-  // - Standard mouse wheel: scroll down goes right, scroll up goes left (while preserving inner list scrolling)
-  useEffect(() => {
-    const el = sidebarRef.current;
-    if (!el) return;
-
-    const onWheel = (e: WheelEvent) => {
-      // 1. If horizontal scrolling is predominant (trackpad side-swipe, Magic Mouse side scroll):
-      // let native browser horizontal scroll work smoothly!
-      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
-        return;
-      }
-
-      // 2. Ignore negligible wheel jitters
-      if (Math.abs(e.deltaY) < 14) return;
-
-      // 3. Check if mouse is over an inner vertically scrollable list
-      const target = e.target as HTMLElement | null;
-      const scrollableList = target?.closest('.notes-panel-scroll') as HTMLElement | null;
-
-      if (scrollableList) {
-        const { scrollTop, scrollHeight, clientHeight } = scrollableList;
-        const canScrollDown = e.deltaY > 0 && scrollTop + clientHeight < scrollHeight - 3;
-        const canScrollUp = e.deltaY < 0 && scrollTop > 3;
-
-        // If inner list can still scroll vertically in this direction, let it scroll
-        if (canScrollDown || canScrollUp) {
-          return;
-        }
-      }
-
-      // 4. Over headers, search bars, tags ribbon, or when list boundary reached:
-      // Translate wheel down (deltaY > 0) -> go right
-      // Translate wheel up (deltaY < 0) -> go left
-      const now = Date.now();
-      if (now - lastWheelTimeRef.current < 220) {
-        e.preventDefault();
-        return;
-      }
-
-      const order: ('notes' | 'backlinks' | 'templates')[] = ['notes', 'backlinks', 'templates'];
-      const currentIdx = order.indexOf(sidebarTabRef.current);
-
-      if (e.deltaY > 0 && currentIdx < order.length - 1) {
-        e.preventDefault();
-        lastWheelTimeRef.current = now;
-        handleSwitchTab(order[currentIdx + 1]);
-      } else if (e.deltaY < 0 && currentIdx > 0) {
-        e.preventDefault();
-        lastWheelTimeRef.current = now;
-        handleSwitchTab(order[currentIdx - 1]);
-      }
-    };
-
-    el.addEventListener('wheel', onWheel, { passive: false });
-    return () => {
-      el.removeEventListener('wheel', onWheel);
-    };
-  }, [handleSwitchTab]);
-
-  useEffect(() => {
-    const handleResize = () => {
-      if (!carouselRef.current) return;
-      const index = sidebarTab === 'notes' ? 0 : sidebarTab === 'backlinks' ? 1 : 2;
-      carouselRef.current.scrollLeft = index * carouselRef.current.clientWidth;
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [sidebarTab]);
 
   // Tag Management Handlers
   const handleAddTag = (tagToAdd: string) => {
@@ -722,19 +640,18 @@ export function NotesWorkspace({
     <div className="flex w-full h-full bg-bg relative overflow-hidden select-text p-2 sm:p-2.5 gap-2 sm:gap-2.5">
       {/* SIDEBAR: Notebooks & Notes List (Option 5) */}
       <aside 
-        ref={sidebarRef}
         className={`w-full lg:w-[320px] rounded-2xl border border-border/80 bg-surface/15 flex flex-col shrink-0 h-full min-h-0 overflow-hidden shadow-xs transition-all ${
           activeNoteId ? 'hidden lg:flex' : 'flex'
         }`}
       >
         {/* Sidebar Header with Notes vs Backlinks vs Templates Tabs */}
         <header className="h-[52px] border-b border-border/70 flex items-center justify-between px-2.5 shrink-0 bg-surface/25 backdrop-blur-sm gap-1.5">
-          {/* Tabs Segmented Control */}
-          <div className="flex-1 overflow-x-auto no-scrollbar flex items-center min-w-0">
+          {/* Tabs Segmented Control Slider */}
+          <div onWheel={handleHorizontalWheel} className="flex-1 overflow-x-auto no-scrollbar flex items-center min-w-0">
             <div className="flex items-center gap-0.5 bg-surface/80 p-0.5 rounded-xl border border-border/60 shrink-0">
               <button
                 type="button"
-                onClick={() => handleSwitchTab('notes')}
+                onClick={() => setSidebarTab('notes')}
                 className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11.5px] font-semibold transition-all cursor-pointer shrink-0 ${
                   sidebarTab === 'notes'
                     ? 'bg-bg text-fg shadow-2xs ring-1 ring-border/80'
@@ -750,7 +667,7 @@ export function NotesWorkspace({
               </button>
               <button
                 type="button"
-                onClick={() => handleSwitchTab('backlinks')}
+                onClick={() => setSidebarTab('backlinks')}
                 className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11.5px] font-semibold transition-all cursor-pointer shrink-0 ${
                   sidebarTab === 'backlinks'
                     ? 'bg-bg text-accent shadow-2xs ring-1 ring-border/80'
@@ -768,7 +685,7 @@ export function NotesWorkspace({
               </button>
               <button
                 type="button"
-                onClick={() => handleSwitchTab('templates')}
+                onClick={() => setSidebarTab('templates')}
                 className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11.5px] font-semibold transition-all cursor-pointer shrink-0 ${
                   sidebarTab === 'templates'
                     ? 'bg-bg text-accent shadow-2xs ring-1 ring-border/80'
@@ -798,27 +715,12 @@ export function NotesWorkspace({
           </div>
         </header>
 
-        {/* Unified Horizontal Carousel: intuitive side-swipe and mouse wheel up/down navigation */}
-        <div
-          ref={carouselRef}
-          onScroll={handleCarouselScroll}
-          className="flex-1 w-full min-h-0 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory scroll-smooth no-scrollbar touch-pan-x"
-          style={{ WebkitOverflowScrolling: 'touch' }}
-        >
-          <div className="w-full min-w-full h-full max-h-full min-h-0 flex flex-col snap-start shrink-0 p-2 overflow-hidden">
-            <div className="flex-1 flex flex-col min-h-0 rounded-2xl border border-border/70 bg-surface/20 overflow-hidden shadow-2xs">
-              {renderNotesPanelContent()}
-            </div>
-          </div>
-          <div className="w-full min-w-full h-full max-h-full min-h-0 flex flex-col snap-start shrink-0 p-2 overflow-hidden">
-            <div className="flex-1 flex flex-col min-h-0 rounded-2xl border border-border/70 bg-surface/20 overflow-hidden shadow-2xs">
-              {renderBacklinksPanelContent()}
-            </div>
-          </div>
-          <div className="w-full min-w-full h-full max-h-full min-h-0 flex flex-col snap-start shrink-0 p-2 overflow-hidden">
-            <div className="flex-1 flex flex-col min-h-0 rounded-2xl border border-border/70 bg-surface/20 overflow-hidden shadow-2xs">
-              {renderTemplatesPanelContent()}
-            </div>
+        {/* Active Tab Content Panel */}
+        <div className="flex-1 min-h-0 flex flex-col p-2 overflow-hidden">
+          <div className="flex-1 flex flex-col min-h-0 rounded-2xl border border-border/70 bg-surface/20 overflow-hidden shadow-2xs">
+            {sidebarTab === 'notes' && renderNotesPanelContent()}
+            {sidebarTab === 'backlinks' && renderBacklinksPanelContent()}
+            {sidebarTab === 'templates' && renderTemplatesPanelContent()}
           </div>
         </div>
       </aside>
@@ -1399,7 +1301,7 @@ export function NotesWorkspace({
 
           {/* Tags Filter Ribbon */}
           {allAvailableTags.length > 0 && (
-            <div className="flex items-center gap-1.5 overflow-x-auto custom-scroll no-scrollbar py-0.5">
+            <div onWheel={handleHorizontalWheel} className="flex items-center gap-1.5 overflow-x-auto custom-scroll no-scrollbar py-0.5">
               <button
                 onClick={() => setSelectedTag(null)}
                 className={`text-[11px] px-2.5 py-0.5 rounded-full font-medium transition-all shrink-0 cursor-pointer ${
@@ -1585,7 +1487,38 @@ export function NotesWorkspace({
               </button>
             )}
           </div>
-          <div className="flex items-center justify-between text-[11px] text-meta">
+          {/* Template Categories Slider */}
+          {allTemplateBadges.length > 0 && (
+            <div onWheel={handleHorizontalWheel} className="flex items-center gap-1.5 overflow-x-auto custom-scroll no-scrollbar py-0.5">
+              <button
+                type="button"
+                onClick={() => setSelectedTemplateBadge(null)}
+                className={`text-[11px] px-2.5 py-0.5 rounded-full font-medium transition-all shrink-0 cursor-pointer ${
+                  selectedTemplateBadge === null
+                    ? 'bg-accent text-white shadow-2xs'
+                    : 'bg-surface hover:bg-surface/80 text-muted border border-border/60'
+                }`}
+              >
+                All
+              </button>
+              {allTemplateBadges.map((badge) => (
+                <button
+                  key={badge}
+                  type="button"
+                  onClick={() => setSelectedTemplateBadge(selectedTemplateBadge === badge ? null : badge)}
+                  className={`text-[11px] px-2.5 py-0.5 rounded-full font-medium transition-all shrink-0 cursor-pointer ${
+                    selectedTemplateBadge === badge
+                      ? 'bg-accent text-white shadow-2xs'
+                      : 'bg-surface hover:bg-surface/80 text-muted border border-border/60'
+                  }`}
+                >
+                  {badge}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between text-[11px] text-meta pt-0.5">
             <span>{filteredTemplates.length} study {filteredTemplates.length === 1 ? 'framework' : 'frameworks'}</span>
             <button
               type="button"
