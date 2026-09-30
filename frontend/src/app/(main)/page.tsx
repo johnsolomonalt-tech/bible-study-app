@@ -5522,8 +5522,8 @@ export default function App() {
 
         {/* AI CHATS TAB */}
         {activeTab === 'chats' && (
-          <div className="flex w-full h-full">
-            <aside className={`w-full lg:w-[280px] border-r border-border bg-bg flex-col shrink-0 ${mobileChatView === 'list' ? 'flex' : 'hidden lg:flex'}`}>
+          <div className="flex w-full h-full min-h-0 overflow-hidden">
+            <aside className={`w-full lg:w-[280px] h-full min-h-0 border-r border-border bg-bg flex flex-col shrink-0 overflow-hidden ${mobileChatView === 'list' ? 'flex' : 'hidden lg:flex'}`}>
               <header className="h-[60px] border-b border-border flex items-center justify-between px-4 sm:px-5 shrink-0">
                 <span className="text-[15px] font-medium text-fg">Conversations</span>
                 <div className="flex items-center gap-1">
@@ -5560,7 +5560,7 @@ export default function App() {
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto custom-scroll p-3 pb-24 lg:pb-3 space-y-1">
+              <div className="flex-1 min-h-0 overflow-y-auto custom-scroll p-3 pb-24 lg:pb-3 space-y-1">
                 {chats.map(c => (
                   <div 
                     key={c.id} 
@@ -5599,7 +5599,7 @@ export default function App() {
             </aside>
             
             <section 
-              className={`relative flex-1 flex-col bg-bg ${mobileChatView === 'chat' ? 'flex' : 'hidden lg:flex'}`}
+              className={`relative flex-1 h-full min-h-0 flex flex-col bg-bg overflow-hidden ${mobileChatView === 'chat' ? 'flex' : 'hidden lg:flex'}`}
               onDragEnter={handleChatDragEnter}
               onDragOver={handleChatDragOver}
               onDragLeave={handleChatDragLeave}
