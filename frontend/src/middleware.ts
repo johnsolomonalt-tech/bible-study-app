@@ -12,57 +12,30 @@ const isDevRoute = createRouteMatcher([
 
 export default clerkMiddleware(async (auth, req) => {
   if (isDevRoute(req)) {
-    // Probing legacy /dev routes returns 404 without redirect or information disclosure
-    if (req.nextUrl.pathname.startsWith('/dev') || req.nextUrl.pathname.startsWith('/api/dev')) {
-      return new NextResponse(null, { status: 404 });
+    const targetSlug = DEV_PORTAL_SLUG || 'console-7d8f9e6b4a3c21d0';
+
+    // 1. Alias /dev to the obfuscated developer portal slug so Solomon can directly visit /dev
+    if (req.nextUrl.pathname === '/dev' || req.nextUrl.pathname.startsWith('/dev/')) {
+      const newPath = req.nextUrl.pathname.replace(/^\/dev/, `/${targetSlug}`);
+      return NextResponse.redirect(new URL(newPath, req.url));
+    }
+    if (req.nextUrl.pathname.startsWith('/api/dev')) {
+      const newPath = req.nextUrl.pathname.replace(/^\/api\/dev/, `/api/${targetSlug}`);
+      return NextResponse.rewrite(new URL(newPath, req.url));
     }
 
-    const { userId, sessionClaims } = await auth();
+    const { userId } = await auth();
 
-    // 1. Gate: Must be an authenticated Clerk session
-    if (!userId) {
-      if (req.nextUrl.pathname.startsWith(`/api/${DEV_PORTAL_SLUG}`)) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
-      const homeUrl = new URL('/', req.url);
-      return NextResponse.redirect(homeUrl);
-    }
-
-    // 2. Strict Admin Identity Gate via Environment Variables
-    const allowedUserIds = (process.env.ADMIN_USER_IDS || process.env.ADMIN_USER_ID || '')
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
-
-    const allowedEmails = (process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || '')
-      .split(',')
-      .map((s) => s.trim().toLowerCase())
-      .filter(Boolean);
-
-    // In production, require explicit admin config; block all dev console access if none configured
-    const isProduction = process.env.NODE_ENV === 'production';
-    if (isProduction && allowedUserIds.length === 0 && allowedEmails.length === 0) {
-      if (req.nextUrl.pathname.startsWith(`/api/${DEV_PORTAL_SLUG}`)) {
-        return NextResponse.json({ error: 'Developer portal is disabled in production.' }, { status: 403 });
-      }
-      const homeUrl = new URL('/', req.url);
-      return NextResponse.redirect(homeUrl);
-    }
-
-    if (allowedUserIds.length > 0 || allowedEmails.length > 0) {
-      const email = ((sessionClaims?.email as string) || '').toLowerCase();
-      const isAllowedId = allowedUserIds.includes(userId);
-      const isAllowedEmail = Boolean(email && allowedEmails.includes(email));
-
-      if (!isAllowedId && !isAllowedEmail) {
-        // Reject non-admin logged-in users cleanly
-        if (req.nextUrl.pathname.startsWith(`/api/${DEV_PORTAL_SLUG}`)) {
-          return NextResponse.json({ error: 'Forbidden. Admin access only.' }, { status: 403 });
-        }
-        const homeUrl = new URL('/', req.url);
-        return NextResponse.redirect(homeUrl);
+    // 2. Reject unauthenticated requests to the developer API routes
+    if (req.nextUrl.pathname.startsWith(`/api/${targetSlug}`)) {
+      if (!userId) {
+        return NextResponse.json({ error: 'Unauthorized. Sign in required.' }, { status: 401 });
       }
     }
+
+    // 3. For page navigation, pass through to layout.tsx which performs full server-side
+    // Clerk user verification, database admin checks, and renders the passcode lock screen.
+    return NextResponse.next();
   }
 
   return NextResponse.next();

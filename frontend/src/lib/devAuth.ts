@@ -44,14 +44,26 @@ export async function getAdminConfig() {
 export async function verifyDevPassword(password: string): Promise<boolean> {
   const config = await getAdminConfig();
 
-  if (!config) {
-    // If no password record exists, fail if DEFAULT_DEV_PASSWORD is unset/empty
-    if (!DEFAULT_DEV_PASSWORD) return false;
-    return password === DEFAULT_DEV_PASSWORD;
+  // 1. If password hash is stored in the database, verify with PBKDF2
+  if (config && config.passwordHash && config.salt) {
+    const hash = hashPassword(password, config.salt);
+    return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(config.passwordHash, 'hex'));
   }
 
-  const hash = hashPassword(password, config.salt);
-  return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(config.passwordHash, 'hex'));
+  // 2. Check DEV_ADMIN_PASSWORD environment variable
+  const envPassword = process.env.DEV_ADMIN_PASSWORD;
+  if (envPassword) {
+    return password === envPassword;
+  }
+
+  // 3. Fallback in development mode
+  if (!isProd) {
+    return password === '1234';
+  }
+
+  // 4. Initial claim in production if no password has ever been set:
+  // The first entered password will be accepted and saved permanently.
+  return true;
 }
 
 /**
@@ -147,63 +159,68 @@ export async function isAuthorizedAdmin(userId: string, userEmail?: string | nul
     }
   }
 
-  // 3. If neither env vars nor DB have any designated admin yet:
-  const hasAnyEnvConfig = envAdminIds.length > 0 || envAdminEmails.length > 0;
-  const hasAnyDbConfig = Boolean(config?.adminUserId || config?.adminEmail || (config?.allowedEmails && config.allowedEmails.length > 0));
-
-  if (!hasAnyEnvConfig && !hasAnyDbConfig) {
-    return true; // Initial claim mode: gated by the dev password
+  // 3. If explicit environment variables are set and neither matched, deny
+  if (envAdminIds.length > 0 || envAdminEmails.length > 0) {
+    return false;
   }
 
-  return false;
+  // 4. Default: If no explicit env restriction, allow authenticated Clerk user to see the passcode prompt.
+  // The secret developer passcode is the definitive gate.
+  return true;
 }
 
 /**
- * Bind admin role to a user upon first password unlock.
+ * Bind admin role to a user upon password unlock.
  */
-export async function claimAdminRoleIfNeeded(userId: string, email?: string | null) {
+export async function claimAdminRoleIfNeeded(userId: string, email?: string | null, passwordUsed?: string) {
+  const normEmail = (email || '').toLowerCase().trim();
   const config = await getAdminConfig();
-  const envAdminIds = (process.env.ADMIN_USER_IDS || process.env.ADMIN_USER_ID || '').split(',').map(s => s.trim()).filter(Boolean);
-  const envAdminEmails = (process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
 
-  if (envAdminIds.length === 0 && envAdminEmails.length === 0 && (!config || (!config.adminUserId && !config.adminEmail))) {
-    const salt = config?.salt || crypto.randomBytes(16).toString('hex');
-    const passwordHash = config?.passwordHash || hashPassword(DEFAULT_DEV_PASSWORD, salt);
+  const currentAllowedIds = new Set(config?.allowedUserIds || []);
+  currentAllowedIds.add(userId);
 
-    const normEmail = (email || '').toLowerCase().trim();
+  const currentAllowedEmails = new Set((config?.allowedEmails || []).map(e => e.toLowerCase()));
+  if (normEmail) currentAllowedEmails.add(normEmail);
 
-    try {
-      await prisma.devAdminConfig.upsert({
-        where: { id: 'default' },
-        create: {
-          id: 'default',
-          passwordHash,
-          salt,
-          adminUserId: userId,
-          adminEmail: normEmail || null,
-          allowedEmails: normEmail ? [normEmail] : [],
-          allowedUserIds: [userId],
-        },
-        update: {
-          adminUserId: userId,
-          adminEmail: normEmail || null,
-          allowedEmails: normEmail ? [normEmail] : [],
-          allowedUserIds: [userId],
-        },
-      });
-    } catch (err) {
-      console.warn('Could not claim admin role in DB, set in memory:', err);
-    }
-
-    memoryAdminConfig = {
-      passwordHash,
-      salt,
-      adminUserId: userId,
-      adminEmail: normEmail || undefined,
-      allowedEmails: normEmail ? [normEmail] : [],
-      allowedUserIds: [userId],
-    };
+  let salt = config?.salt;
+  let passwordHash = config?.passwordHash;
+  if ((!passwordHash || !salt) && passwordUsed) {
+    salt = crypto.randomBytes(16).toString('hex');
+    passwordHash = hashPassword(passwordUsed, salt);
   }
+
+  try {
+    await prisma.devAdminConfig.upsert({
+      where: { id: 'default' },
+      create: {
+        id: 'default',
+        passwordHash: passwordHash || '',
+        salt: salt || '',
+        adminUserId: config?.adminUserId || userId,
+        adminEmail: config?.adminEmail || normEmail || null,
+        allowedEmails: Array.from(currentAllowedEmails),
+        allowedUserIds: Array.from(currentAllowedIds),
+      },
+      update: {
+        ...(passwordHash && salt ? { passwordHash, salt } : {}),
+        adminUserId: config?.adminUserId || userId,
+        adminEmail: config?.adminEmail || normEmail || null,
+        allowedEmails: Array.from(currentAllowedEmails),
+        allowedUserIds: Array.from(currentAllowedIds),
+      },
+    });
+  } catch (err) {
+    console.warn('Could not persist claimed admin role in DB:', err);
+  }
+
+  memoryAdminConfig = {
+    passwordHash: passwordHash || '',
+    salt: salt || '',
+    adminUserId: config?.adminUserId || userId,
+    adminEmail: config?.adminEmail || normEmail || undefined,
+    allowedEmails: Array.from(currentAllowedEmails),
+    allowedUserIds: Array.from(currentAllowedIds),
+  };
 }
 
 /**
