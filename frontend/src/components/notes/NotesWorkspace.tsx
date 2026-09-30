@@ -251,6 +251,14 @@ export function NotesWorkspace({
   const [isAiAssistantOpen, setIsAiAssistantOpen] = useState(false);
   const [previewVerse, setPreviewVerse] = useState<{ book: string; chapter: number; verse: number; raw?: string } | null>(null);
 
+  // Tab Bar scroll, button refs, and cutoff states
+  const tabsScrollRef = useRef<HTMLDivElement | null>(null);
+  const notesTabBtnRef = useRef<HTMLButtonElement | null>(null);
+  const backlinksTabBtnRef = useRef<HTMLButtonElement | null>(null);
+  const templatesTabBtnRef = useRef<HTMLButtonElement | null>(null);
+  const [tabsCanScrollLeft, setTabsCanScrollLeft] = useState(false);
+  const [tabsCanScrollRight, setTabsCanScrollRight] = useState(false);
+
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const togglePin = (id: number) => {
@@ -496,6 +504,92 @@ export function NotesWorkspace({
     }
   }, []);
 
+  // Check overflow bounds to toggle left/right smooth fade edges
+  const checkTabsScroll = useCallback(() => {
+    const el = tabsScrollRef.current;
+    if (!el) return;
+    const canLeft = el.scrollLeft > 2;
+    const canRight = el.scrollLeft < el.scrollWidth - el.clientWidth - 2;
+    setTabsCanScrollLeft(canLeft);
+    setTabsCanScrollRight(canRight);
+  }, []);
+
+  // Smoothly center or bring the given tab button into view within the pill container
+  const scrollTabIntoView = useCallback((btn: HTMLElement | null) => {
+    const container = tabsScrollRef.current;
+    if (!container || !btn) return;
+    const containerRect = container.getBoundingClientRect();
+    const btnRect = btn.getBoundingClientRect();
+
+    if (btnRect.left < containerRect.left) {
+      const diff = containerRect.left - btnRect.left + 4;
+      container.scrollTo({ left: Math.max(0, container.scrollLeft - diff), behavior: 'smooth' });
+    } else if (btnRect.right > containerRect.right) {
+      const diff = btnRect.right - containerRect.right + 4;
+      container.scrollTo({ left: container.scrollLeft + diff, behavior: 'smooth' });
+    }
+  }, []);
+
+  // Attach non-passive wheel event listener and resize observer to the tab bar
+  useEffect(() => {
+    const el = tabsScrollRef.current;
+    if (!el) return;
+
+    checkTabsScroll();
+
+    const onWheel = (e: WheelEvent) => {
+      // Magic Mouse / Trackpad horizontal swipe: allow native horizontal scrolling
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        return;
+      }
+      // Standard mouse wheel up/down:
+      // Wheel DOWN -> scroll right (reveals Backlinks / Templates)
+      // Wheel UP -> scroll left (reveals Notes)
+      if (Math.abs(e.deltaY) > 0) {
+        e.preventDefault();
+        el.scrollLeft += e.deltaY;
+        checkTabsScroll();
+      }
+    };
+
+    const onScroll = () => {
+      checkTabsScroll();
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    el.addEventListener('scroll', onScroll, { passive: true });
+
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => {
+        checkTabsScroll();
+      });
+      resizeObserver.observe(el);
+    }
+
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      el.removeEventListener('scroll', onScroll);
+      if (resizeObserver) resizeObserver.disconnect();
+    };
+  }, [checkTabsScroll]);
+
+  // Center active tab when sidebarTab changes
+  useEffect(() => {
+    let targetBtn: HTMLButtonElement | null = null;
+    if (sidebarTab === 'notes') targetBtn = notesTabBtnRef.current;
+    else if (sidebarTab === 'backlinks') targetBtn = backlinksTabBtnRef.current;
+    else if (sidebarTab === 'templates') targetBtn = templatesTabBtnRef.current;
+
+    if (targetBtn) {
+      scrollTabIntoView(targetBtn);
+    }
+    const timeout = setTimeout(() => {
+      checkTabsScroll();
+    }, 250);
+    return () => clearTimeout(timeout);
+  }, [sidebarTab, scrollTabIntoView, checkTabsScroll]);
+
   // Tag Management Handlers
   const handleAddTag = (tagToAdd: string) => {
     if (!activeNote) return;
@@ -646,13 +740,27 @@ export function NotesWorkspace({
       >
         {/* Sidebar Header with Notes vs Backlinks vs Templates Tabs */}
         <header className="h-[52px] border-b border-border/70 flex items-center justify-between px-2.5 shrink-0 bg-surface/25 backdrop-blur-sm gap-1.5">
-          {/* Tabs Segmented Control Slider */}
-          <div onWheel={handleHorizontalWheel} className="flex-1 overflow-x-auto no-scrollbar flex items-center min-w-0">
-            <div className="flex items-center gap-0.5 bg-surface/80 p-0.5 rounded-xl border border-border/60 shrink-0">
+          {/* Tabs Segmented Control Pill Container (Always intact rounded corners, smooth edge fade) */}
+          <div className="relative flex-1 min-w-0 flex items-center bg-surface/80 rounded-xl border border-border/60 p-0.5 overflow-hidden shadow-2xs">
+            {/* Left fade gradient for smooth cutoff */}
+            {tabsCanScrollLeft && (
+              <div 
+                className="pointer-events-none absolute left-0 top-0 bottom-0 w-7 bg-gradient-to-r from-surface via-surface/70 to-transparent rounded-l-xl z-10 transition-opacity duration-200" 
+                aria-hidden="true"
+              />
+            )}
+
+            {/* Inner scrollable tabs track */}
+            <div
+              ref={tabsScrollRef}
+              onWheel={handleHorizontalWheel}
+              className="w-full flex items-center gap-0.5 overflow-x-auto no-scrollbar scroll-smooth touch-pan-x"
+            >
               <button
+                ref={notesTabBtnRef}
                 type="button"
                 onClick={() => setSidebarTab('notes')}
-                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11.5px] font-semibold transition-all cursor-pointer shrink-0 ${
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11.5px] font-semibold transition-all cursor-pointer shrink-0 whitespace-nowrap ${
                   sidebarTab === 'notes'
                     ? 'bg-bg text-fg shadow-2xs ring-1 ring-border/80'
                     : 'text-muted hover:text-fg hover:bg-surface/50'
@@ -666,9 +774,10 @@ export function NotesWorkspace({
                 </span>
               </button>
               <button
+                ref={backlinksTabBtnRef}
                 type="button"
                 onClick={() => setSidebarTab('backlinks')}
-                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11.5px] font-semibold transition-all cursor-pointer shrink-0 ${
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11.5px] font-semibold transition-all cursor-pointer shrink-0 whitespace-nowrap ${
                   sidebarTab === 'backlinks'
                     ? 'bg-bg text-accent shadow-2xs ring-1 ring-border/80'
                     : 'text-muted hover:text-fg hover:bg-surface/50'
@@ -684,9 +793,10 @@ export function NotesWorkspace({
                 )}
               </button>
               <button
+                ref={templatesTabBtnRef}
                 type="button"
                 onClick={() => setSidebarTab('templates')}
-                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11.5px] font-semibold transition-all cursor-pointer shrink-0 ${
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11.5px] font-semibold transition-all cursor-pointer shrink-0 whitespace-nowrap ${
                   sidebarTab === 'templates'
                     ? 'bg-bg text-accent shadow-2xs ring-1 ring-border/80'
                     : 'text-muted hover:text-fg hover:bg-surface/50'
@@ -700,6 +810,14 @@ export function NotesWorkspace({
                 </span>
               </button>
             </div>
+
+            {/* Right fade gradient for smooth cutoff */}
+            {tabsCanScrollRight && (
+              <div 
+                className="pointer-events-none absolute right-0 top-0 bottom-0 w-7 bg-gradient-to-l from-surface via-surface/70 to-transparent rounded-r-xl z-10 transition-opacity duration-200" 
+                aria-hidden="true"
+              />
+            )}
           </div>
 
           {/* Quick Action: New Blank Note */}
