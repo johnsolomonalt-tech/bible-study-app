@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 
 export interface LexiconWordPayload {
   id: string;
@@ -48,6 +49,18 @@ function loadLexiconData() {
 }
 
 export async function GET(req: NextRequest) {
+  const ip = getClientIp(req);
+  const rateLimit = checkRateLimit(`bible_lexicon:${ip}`, {
+    windowMs: 60 * 1000,
+    maxRequests: 180,
+  });
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded. Please wait a moment before requesting more lexicon entries.' },
+      { status: 429, headers: { 'Retry-After': String(rateLimit.resetSeconds) } }
+    );
+  }
+
   loadLexiconData();
 
   const { searchParams } = new URL(req.url);

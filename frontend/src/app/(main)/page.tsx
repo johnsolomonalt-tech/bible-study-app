@@ -1428,6 +1428,7 @@ export default function App() {
     }
   }, [activeNoteId]);
 
+
   // Persist active chat ID
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -3033,6 +3034,90 @@ export default function App() {
     window.speechSynthesis.speak(utterance);
   };
 
+  // Desktop Global Keyboard Shortcuts (Cmd+K, Arrows, Escape, Space/Alt+P)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      const activeElement = document.activeElement;
+      const isInputFocused = activeElement instanceof HTMLInputElement || 
+                             activeElement instanceof HTMLTextAreaElement || 
+                             (activeElement as HTMLElement)?.isContentEditable;
+
+      // 1. Escape: Close modals, drawers, and floating menus
+      if (e.key === 'Escape') {
+        if (isSettingsOpen) { setIsSettingsOpen(false); return; }
+        if (isLectioModalOpen) { setIsLectioModalOpen(false); return; }
+        if (backlinksDrawerState.isOpen) { setBacklinksDrawerState(prev => ({ ...prev, isOpen: false })); return; }
+        if (activeInterlinearWord) { setActiveInterlinearWord(null); return; }
+        if (isDesktopMoreMenuOpen) { setIsDesktopMoreMenuOpen(false); return; }
+        if (isMobileMoreMenuOpen) { setIsMobileMoreMenuOpen(false); return; }
+      }
+
+      // 2. Cmd+K / Ctrl+K: Focus book search or switch to study tab
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        if (activeTab !== 'study') {
+          setActiveTab('study');
+        }
+        setShowLeftSidebar(true);
+        setTimeout(() => {
+          const searchInput = document.querySelector('input[placeholder*="Filter books"]') as HTMLInputElement;
+          searchInput?.focus();
+          searchInput?.select();
+        }, 50);
+        return;
+      }
+
+      // If user is currently typing in an input or textarea, don't trigger navigation shortcuts
+      if (isInputFocused) return;
+
+      // 3. ArrowLeft / ArrowRight: Previous / Next chapter when on study tab
+      if (activeTab === 'study' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          if (activeChapter > 1) {
+            setActiveChapter(prev => prev - 1);
+          } else {
+            const currentIndex = ALL_BOOKS.findIndex(b => b.name === activeBook.name);
+            if (currentIndex > 0) {
+              const prevBook = ALL_BOOKS[currentIndex - 1];
+              setActiveBook(prevBook);
+              setActiveChapter(prevBook.chapters);
+            }
+          }
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          if (activeChapter < activeBook.chapters) {
+            setActiveChapter(prev => prev + 1);
+          } else {
+            const currentIndex = ALL_BOOKS.findIndex(b => b.name === activeBook.name);
+            if (currentIndex < ALL_BOOKS.length - 1) {
+              const nextBook = ALL_BOOKS[currentIndex + 1];
+              setActiveBook(nextBook);
+              setActiveChapter(1);
+            }
+          }
+        } else if (e.key === ' ' || (e.altKey && e.key.toLowerCase() === 'p')) {
+          e.preventDefault();
+          toggleSpeech();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [
+    activeTab, 
+    activeBook, 
+    activeChapter, 
+    isSettingsOpen, 
+    isLectioModalOpen, 
+    backlinksDrawerState.isOpen, 
+    activeInterlinearWord, 
+    isDesktopMoreMenuOpen, 
+    isMobileMoreMenuOpen
+  ]);
+
+
   const updateNote = async (id: number, title: string, content: string) => {
     setNotes(prev => prev.map(n => n.id === id ? { ...n, title, content } : n));
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
@@ -3436,7 +3521,7 @@ export default function App() {
   
   if (!userId) {
     return (
-      <div className="h-screen w-full flex items-center justify-center bg-bg">
+      <div className="min-h-screen w-full flex items-center justify-center bg-bg p-4 overflow-y-auto">
         <SignIn routing="hash" />
       </div>
     );
@@ -3446,7 +3531,7 @@ export default function App() {
     <>
         <div className="h-full flex flex-col bg-bg text-fg">
       {/* Top Navbar */}
-      <header className="relative h-14 border-b border-border flex items-center justify-between px-6 bg-bg z-10 shrink-0">
+      <header className="relative min-h-14 h-[calc(3.5rem+env(safe-area-inset-top,0px))] border-b border-border flex items-center justify-between px-4 sm:px-6 bg-bg z-10 shrink-0" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         
         {/* Left: Logo */}
         <div className="flex-1 flex items-center min-w-0">
@@ -3679,7 +3764,7 @@ export default function App() {
                                         setExpandedBook(b.name); 
                                         setMobileStudyView('reader'); 
                                       }}
-                                      className={`h-8 rounded-lg text-xs font-medium transition-all flex items-center justify-center cursor-pointer ${
+                                      className={`min-h-[44px] h-11 rounded-xl text-sm font-medium transition-all flex items-center justify-center cursor-pointer touch-manipulation ${
                                         isCurrentChapter 
                                           ? 'bg-accent text-accent-on font-bold shadow-xs' 
                                           : 'text-fg-2 hover:bg-surface hover:text-fg bg-bg/50'
@@ -3770,7 +3855,7 @@ export default function App() {
                                         setExpandedBook(b.name); 
                                         setMobileStudyView('reader'); 
                                       }}
-                                      className={`h-8 rounded-lg text-xs font-medium transition-all flex items-center justify-center cursor-pointer ${
+                                      className={`min-h-[44px] h-11 rounded-xl text-sm font-medium transition-all flex items-center justify-center cursor-pointer touch-manipulation ${
                                         isCurrentChapter 
                                           ? 'bg-accent text-accent-on font-bold shadow-xs' 
                                           : 'text-fg-2 hover:bg-surface hover:text-fg bg-bg/50'
@@ -4654,7 +4739,7 @@ export default function App() {
                         <Check size={16} className={isCompleted ? "text-accent" : "text-meta"} /> 
                         {isCompleted ? "Completed" : "Mark Complete"}
                       </button>
-                      <button onClick={toggleSpeech} className="flex items-center justify-center p-2 rounded-lg text-fg-2 hover:text-fg hover:bg-surface transition-colors cursor-pointer" title="Read chapter aloud">
+                      <button onClick={toggleSpeech} className="flex items-center justify-center p-2 min-w-[44px] min-h-[44px] rounded-lg text-fg-2 hover:text-fg hover:bg-surface transition-colors cursor-pointer touch-manipulation" title="Read chapter aloud">
                         {isSpeaking ? <VolumeX size={20} className="text-accent" /> : <Volume2 size={20} />}
                       </button>
                       

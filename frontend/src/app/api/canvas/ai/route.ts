@@ -280,11 +280,19 @@ JSON Format:
 
     let parsed: AiResponsePayload;
     try {
-      // Strip any accidental markdown formatting if present
-      const cleaned = aiResponseText
-        .replace(/^```json\s*/i, '')
-        .replace(/\s*```$/i, '')
-        .trim();
+      let cleaned = aiResponseText.trim();
+      // Match markdown json code block if present anywhere in the output
+      const jsonMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+      if (jsonMatch) {
+        cleaned = jsonMatch[1].trim();
+      } else {
+        // Fallback: extract between the first opening brace/bracket and last closing brace/bracket
+        const firstBrace = cleaned.search(/[{\[]/);
+        const lastBrace = Math.max(cleaned.lastIndexOf('}'), cleaned.lastIndexOf(']'));
+        if (firstBrace !== -1 && lastBrace > firstBrace) {
+          cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+        }
+      }
       parsed = JSON.parse(cleaned);
     } catch (parseErr) {
       console.error('Failed to parse Theologica Canvas JSON:', parseErr, aiResponseText);

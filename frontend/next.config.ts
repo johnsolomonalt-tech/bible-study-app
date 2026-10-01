@@ -8,8 +8,25 @@ const withPWA = withPWAInit({
   cacheStartUrl: true,
   dynamicStartUrl: false,
   extendDefaultRuntimeCaching: true,
+  fallbacks: {
+    document: "/~offline",
+  },
   workboxOptions: {
     runtimeCaching: [
+      {
+        urlPattern: /\/api\/bible\/.*/i,
+        handler: "StaleWhileRevalidate",
+        options: {
+          cacheName: "theologica-bible-passages",
+          expiration: {
+            maxEntries: 1500,
+            maxAgeSeconds: 60 * 60 * 24 * 365,
+          },
+          cacheableResponse: {
+            statuses: [0, 200],
+          },
+        },
+      },
       {
         urlPattern: /^https:\/\/bible-api\.com\/.*/i,
         handler: "CacheFirst",

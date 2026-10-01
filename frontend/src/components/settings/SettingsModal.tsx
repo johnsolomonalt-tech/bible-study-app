@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, Palette, BookOpen, Volume2, Sparkles, Target, Database,
-  Check, RotateCcw, Download, Upload, Play, Square, Info, Eye
+  Check, RotateCcw, Download, Upload, Play, Square, Info, Eye, ShieldCheck
 } from 'lucide-react';
 import { 
   ReaderFontFamily, 
@@ -88,7 +88,7 @@ export interface SettingsModalProps {
   onResetPreferences: () => void;
 }
 
-type SettingsTab = 'appearance' | 'reader' | 'audio' | 'study' | 'tracker' | 'storage';
+type SettingsTab = 'appearance' | 'reader' | 'audio' | 'study' | 'tracker' | 'storage' | 'about';
 
 export function SettingsModal(props: SettingsModalProps) {
   const {
@@ -216,6 +216,7 @@ export function SettingsModal(props: SettingsModalProps) {
     { id: 'study' as SettingsTab, label: 'Study & AI', icon: <Sparkles size={16} /> },
     { id: 'tracker' as SettingsTab, label: 'Goals', icon: <Target size={16} /> },
     { id: 'storage' as SettingsTab, label: 'Data', icon: <Database size={16} /> },
+    { id: 'about' as SettingsTab, label: 'Privacy & Legal', icon: <ShieldCheck size={16} /> },
   ];
 
   return (
@@ -888,12 +889,75 @@ export function SettingsModal(props: SettingsModalProps) {
               </div>
             )}
 
+            {/* 7. PRIVACY & LEGAL TAB */}
+            {activeTab === 'about' && (
+              <div className="space-y-6">
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <ShieldCheck className="text-accent" size={20} />
+                    <h3 className="text-sm font-semibold uppercase tracking-wider text-fg">Privacy &amp; Data Sovereignty</h3>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-surface border border-border space-y-3 text-xs text-muted leading-relaxed">
+                    <p>
+                      <strong className="text-fg font-medium">Your Data Belongs to You:</strong> All personal reflections, private notes, sermon study materials, reading logs, and highlights are treated with strict confidentiality.
+                    </p>
+                    <p>
+                      <strong className="text-fg font-medium">No Public AI Model Training:</strong> Your private notes, journal entries, and personal prayers are <span className="text-accent font-semibold">never sold, rented, or used to train public machine learning models</span>.
+                    </p>
+                    <p>
+                      <strong className="text-fg font-medium">Local First &amp; Portable:</strong> You can export a complete, unencrypted JSON archive of all your personal notes, boards, and reading progress at any time from the <span className="text-fg font-medium">Data tab</span>.
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="text-accent" size={20} />
+                    <h3 className="text-sm font-semibold uppercase tracking-wider text-fg">AI Theological Assistant Disclosures</h3>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-surface border border-border space-y-2.5 text-xs text-muted leading-relaxed">
+                    <p>
+                      Theologica AI provides assistive theological insights, historical/cultural context, original language definitions, and inductive study questions to enhance your personal study of Holy Scripture.
+                    </p>
+                    <p>
+                      AI responses are generated to assist reflection and study. Users are encouraged to prayerfully examine all scriptures, test insights against the canonical Word of God, and rely on the Holy Spirit and sound pastoral community.
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <BookOpen className="text-accent" size={20} />
+                    <h3 className="text-sm font-semibold uppercase tracking-wider text-fg">Scripture Translations &amp; Public Domain</h3>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-surface border border-border space-y-2 text-xs text-muted leading-relaxed">
+                    <p>
+                      <strong className="text-fg">Berean Standard Bible (BSB)</strong> &bull; Public Domain dedication. The BSB text is dedicated to the public domain to ensure open access to the Word of God worldwide.
+                    </p>
+                    <p>
+                      <strong className="text-fg">World English Bible (WEB) &amp; King James Version (KJV)</strong> &bull; 100% Public Domain and royalty-free.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
           </div>
         </div>
 
         {/* Footer */}
         <footer className="px-5 sm:px-6 py-3 border-t border-border flex items-center justify-between shrink-0 bg-surface/30">
-          <span className="text-[11px] text-muted">Theologica Study Workspace</span>
+          <div className="flex items-center gap-2 text-[11px] text-muted">
+            <span>Theologica Study Workspace</span>
+            <span>&bull;</span>
+            <button 
+              type="button" 
+              onClick={() => setActiveTab('about')}
+              className="text-muted hover:text-accent underline transition-colors cursor-pointer"
+            >
+              Privacy &amp; Disclosures
+            </button>
+          </div>
           <button
             onClick={onClose}
             className="px-4 py-1.5 rounded-xl bg-accent text-white text-xs font-semibold hover:opacity-90 transition-opacity shadow-xs"

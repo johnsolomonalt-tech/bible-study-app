@@ -49,12 +49,25 @@ test('Dev Auth Security: fail-closed in production', () => {
   assert.strictEqual(canUnlock('', defaultPassword), false, 'Empty password must not unlock');
 });
 
-test('Middleware: fail-closed admin gate in production', () => {
+test('Developer Console Security: middleware and layout auth gates', () => {
   const middlewarePath = path.resolve('src/middleware.ts');
-  const code = fs.readFileSync(middlewarePath, 'utf8');
+  const middlewareCode = fs.readFileSync(middlewarePath, 'utf8');
 
-  assert.ok(code.includes("isProduction && allowedUserIds.length === 0 && allowedEmails.length === 0"), 'Middleware must block dev console if no admin configured in production');
+  // Verify middleware rejects unauthenticated requests to the developer API routes
+  assert.ok(
+    middlewareCode.includes("!userId") && middlewareCode.includes("status: 401"),
+    'Middleware must reject unauthenticated requests to dev portal API routes'
+  );
+
+  // Verify dev layout enforces strict server-side Clerk auth and admin identity verification
+  const layoutPath = path.resolve('src/app/console-7d8f9e6b4a3c21d0/layout.tsx');
+  const layoutCode = fs.readFileSync(layoutPath, 'utf8');
+  assert.ok(
+    layoutCode.includes("await auth()") && layoutCode.includes("isAuthorizedAdmin"),
+    'Dev console layout must enforce strict Clerk authentication and isAuthorizedAdmin check'
+  );
 });
+
 
 test('JWT Security: reject forged unsigned token payloads', () => {
   const fakeToken = 'header.' + Buffer.from(JSON.stringify({ sub: 'user_victim_123', exp: 9999999999 })).toString('base64url') + '.fakesig';

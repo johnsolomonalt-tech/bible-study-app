@@ -8,6 +8,7 @@ import {
   OPEN_TRANSLATIONS,
   COPYRIGHTED_TRANSLATIONS,
 } from '@/types/bible';
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 
 const ALL_TRANSLATION_META = [...OPEN_TRANSLATIONS, ...COPYRIGHTED_TRANSLATIONS];
 
@@ -47,6 +48,18 @@ export async function GET(
   { params }: { params: Promise<{ version: string; book: string; chapter: string }> }
 ) {
   try {
+    const ip = getClientIp(req);
+    const rateLimit = checkRateLimit(`bible_passage:${ip}`, {
+      windowMs: 60 * 1000,
+      maxRequests: 120,
+    });
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Please wait a moment before requesting another chapter.' },
+        { status: 429, headers: { 'Retry-After': String(rateLimit.resetSeconds) } }
+      );
+    }
+
     const { version, book, chapter } = await params;
     const versionKey = (version || 'bsb').toLowerCase().trim();
     const chapterNum = parseInt(chapter, 10);

@@ -215,3 +215,25 @@ html, body {
   scrollbar-width: none;
 }
 
+/* Prevent iOS Safari automatic zoom on inputs while keeping natural desktop typography */
+@media screen and (max-width: 768px) {
+  input[type="text"],
+  input[type="search"],
+  input[type="password"],
+  input[type="email"],
+  input[type="number"],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* iOS Safe Area Helper Classes */
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+

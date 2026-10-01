@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useSyncExternalStore } from 'react';
 
 export interface ModifierKeyInfo {
   symbol: string; // '⌘' or 'Ctrl'
@@ -9,6 +9,20 @@ export interface ModifierKeyInfo {
   isMac: boolean;
 }
 
+const MAC_INFO: ModifierKeyInfo = {
+  symbol: '⌘',
+  text: 'Cmd',
+  shift: '⇧',
+  isMac: true,
+};
+
+const NON_MAC_INFO: ModifierKeyInfo = {
+  symbol: 'Ctrl',
+  text: 'Ctrl',
+  shift: 'Shift+',
+  isMac: false,
+};
+
 export function isMacOS(): boolean {
   if (typeof window === 'undefined') return true;
   const nav = window.navigator as { userAgentData?: { platform?: string }; platform?: string; userAgent?: string };
@@ -16,22 +30,18 @@ export function isMacOS(): boolean {
   return /Mac|iPhone|iPad|iPod/i.test(platform);
 }
 
-function getModifierInfo(): ModifierKeyInfo {
-  const mac = isMacOS();
-  return {
-    symbol: mac ? '⌘' : 'Ctrl',
-    text: mac ? 'Cmd' : 'Ctrl',
-    shift: mac ? '⇧' : 'Shift+',
-    isMac: mac,
-  };
+function getModifierSnapshot(): ModifierKeyInfo {
+  return isMacOS() ? MAC_INFO : NON_MAC_INFO;
+}
+
+function getServerSnapshot(): ModifierKeyInfo {
+  return MAC_INFO;
+}
+
+function subscribe(_callback: () => void) {
+  return () => {};
 }
 
 export function useModifierKey(): ModifierKeyInfo {
-  const [mod, setMod] = useState<ModifierKeyInfo>(getModifierInfo);
-
-  useEffect(() => {
-    setMod(getModifierInfo());
-  }, []);
-
-  return mod;
+  return useSyncExternalStore(subscribe, getModifierSnapshot, getServerSnapshot);
 }
