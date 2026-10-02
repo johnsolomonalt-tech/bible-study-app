@@ -120,10 +120,10 @@ export function SetMilestoneModal({
               </div>
               <div>
                 <h2 className="text-lg sm:text-xl font-display font-bold text-fg tracking-tight">
-                  Set Milestone Goal
+                  Set Milestone
                 </h2>
                 <p className="text-xs text-muted mt-0.5">
-                  Set a reading streak milestone to aim for on your spiritual journey.
+                  Choose a reading streak milestone to aim for on your spiritual journey.
                 </p>
               </div>
             </div>
@@ -145,10 +145,10 @@ export function SetMilestoneModal({
               <div className="flex items-center justify-between">
                 <div>
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted">
-                    Goal Preview
+                    Milestone Preview
                   </span>
                   <div className="text-sm font-bold text-fg flex items-center gap-1.5 mt-0.5">
-                    <span>{effectiveDays}-Day Streak Goal</span>
+                    <span>{effectiveDays}-Day Milestone</span>
                     {isGoalReached && (
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
                         Achieved! 🎉
@@ -304,7 +304,7 @@ export function SetMilestoneModal({
               className="px-5 py-2 rounded-xl bg-accent text-accent-contrast hover:brightness-110 text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
             >
               <Check size={14} strokeWidth={2.5} />
-              <span>Save Milestone Goal</span>
+              <span>Save Milestone</span>
             </button>
           </div>
         </motion.div>

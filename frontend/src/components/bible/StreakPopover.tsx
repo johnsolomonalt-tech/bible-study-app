@@ -271,8 +271,11 @@ export function StreakPopover({
                     )}
 
                     <div className="space-y-2.5">
-                      <div className="text-[11px] font-bold uppercase tracking-widest text-muted">
-                        Spiritual Habits
+                      <div className="flex items-center justify-between">
+                        <div className="text-[11px] font-bold uppercase tracking-widest text-muted">
+                          Choose an Activity
+                        </div>
+                        <span className="text-[10px] text-muted">Complete any to build your streak</span>
                       </div>
 
                       {/* 1. Scripture */}
@@ -380,7 +383,7 @@ export function StreakPopover({
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
                               <h3 className="text-xs font-bold text-fg truncate">
-                                Milestone Goal: {streakData.targetMilestone.title}
+                                Milestone: {streakData.targetMilestone.title}
                               </h3>
                               {streakData.targetMilestone.isEarned && (
                                 <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
@@ -390,7 +393,7 @@ export function StreakPopover({
                             </div>
                             <div className="text-[11px] text-muted truncate">
                               {streakData.targetMilestone.isEarned 
-                                ? 'Milestone achieved! Set your next target.' 
+                                ? 'Milestone achieved! Set your next milestone.' 
                                 : `${streak} of ${streakData.targetMilestone.days} days completed • ${streakData.targetMilestone.daysRemaining} to go`}
                             </div>
                           </div>
@@ -401,10 +404,10 @@ export function StreakPopover({
                             type="button"
                             onClick={() => setIsSetMilestoneOpen(true)}
                             className="px-2.5 py-1 rounded-xl bg-bg hover:bg-surface-warm border border-border/80 text-fg text-xs font-semibold flex items-center gap-1 transition-all shadow-xs cursor-pointer group hover:border-accent/50"
-                            title="Set your milestone goal"
+                            title="Set your milestone"
                           >
                             <Sliders size={12} className="text-accent group-hover:scale-110 transition-transform" />
-                            <span>Set Goal</span>
+                            <span>Set Milestone</span>
                           </button>
                           <span className="text-xs font-mono font-bold text-accent">
                             {streakData.targetMilestone.progressPercent}%
@@ -460,10 +463,10 @@ export function StreakPopover({
                         type="button"
                         onClick={() => setIsSetMilestoneOpen(true)}
                         className="text-xs font-semibold text-accent hover:underline flex items-center gap-1 cursor-pointer"
-                        title="Set a milestone goal"
+                        title="Set a milestone"
                       >
                         <Sliders size={12} />
-                        <span>Set Goal</span>
+                        <span>Set Milestone</span>
                       </button>
                     </div>
 
@@ -494,7 +497,7 @@ export function StreakPopover({
                               </span>
                               {isCurrentGoal && (
                                 <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-accent/20 text-accent border border-accent/30">
-                                  Current Goal
+                                  Current Milestone
                                 </span>
                               )}
                             </div>
@@ -513,7 +516,7 @@ export function StreakPopover({
                                 }}
                                 className="px-2.5 py-1 rounded-xl bg-surface hover:bg-surface-hover border border-border text-xs font-semibold text-fg transition-colors cursor-pointer hover:border-accent/40"
                               >
-                                Set Goal
+                                Select Milestone
                               </button>
                             ) : null}
 
