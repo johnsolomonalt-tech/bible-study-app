@@ -298,9 +298,9 @@ function InnerCanvasBoard({
   const [boards, setBoards] = useState<CanvasBoardMetadata[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
     if (typeof window !== 'undefined') {
-      return window.innerWidth >= 768;
+      return window.innerWidth >= 1024;
     }
-    return true;
+    return false;
   });
 
   // Theologica AI Modal state
@@ -2215,17 +2215,17 @@ function InnerCanvasBoard({
         onSelectBoard={(id) => {
           handleSelectBoard(id);
           setIsCreatePageActive(false);
-          if (isMobile) setIsSidebarOpen(false);
+          if (typeof window !== 'undefined' && window.innerWidth < 1024) setIsSidebarOpen(false);
         }}
         onCreateBoard={() => {
           setIsCreatePageActive(true);
-          if (isMobile) setIsSidebarOpen(false);
+          if (typeof window !== 'undefined' && window.innerWidth < 1024) setIsSidebarOpen(false);
         }}
         onRenameBoard={handleRenameBoard}
         onDeleteBoard={handleDeleteBoard}
         onOpenImportModal={() => {
           setIsImportModalOpen(true);
-          if (isMobile) setIsSidebarOpen(false);
+          if (typeof window !== 'undefined' && window.innerWidth < 1024) setIsSidebarOpen(false);
         }}
         theme={theme}
       />

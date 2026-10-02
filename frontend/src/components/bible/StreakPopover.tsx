@@ -132,7 +132,7 @@ export function StreakPopover({
                 </button>
 
                 <div className="flex flex-col items-center text-center">
-                  <div className="relative mb-3">
+                  <div className="relative mb-3 flex flex-col items-center">
                     <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shadow-lg shadow-amber-500/15">
                       <Flame 
                         size={40} 
@@ -144,14 +144,15 @@ export function StreakPopover({
                       />
                     </div>
                     {isGlowing && (
-                      <span className="absolute -bottom-1 -right-1 px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold shadow-xs">
-                        Active Today
-                      </span>
+                      <div className="mt-2.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-[11px] font-bold">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span>Active Today</span>
+                      </div>
                     )}
                   </div>
 
                   <h2 className="text-3xl sm:text-4xl font-display font-bold text-fg tracking-tight mb-1">
-                    {streak} <span className="text-xl sm:text-2xl font-sans font-medium text-fg-2">{streak === 1 ? 'Day Streak' : 'Day Streak'}</span>
+                    {streak} <span className="text-xl sm:text-2xl font-sans font-medium text-fg-2">Day Streak</span>
                   </h2>
 
                   <p className="text-xs sm:text-sm text-fg-2 max-w-xs leading-relaxed">
@@ -201,11 +202,13 @@ export function StreakPopover({
                           )}
                         </div>
 
-                        {day.isToday && (
-                          <span className="text-[9px] font-bold text-accent tracking-tighter uppercase">
-                            Today
-                          </span>
-                        )}
+                        <div className="h-3 flex items-center justify-center">
+                          {day.isToday && (
+                            <span className="text-[9px] font-bold text-accent tracking-tighter uppercase">
+                              Today
+                            </span>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -430,9 +433,9 @@ export function StreakPopover({
               {/* Footer */}
               <div className="p-4 bg-bg border-t border-border flex items-center justify-between text-xs text-muted">
                 <div className="flex items-center gap-3">
-                  <span>Best: <strong className="text-fg">{streakData.longestStreak} days</strong></span>
+                  <span>Best: <strong className="text-fg">{streakData.longestStreak} {streakData.longestStreak === 1 ? 'day' : 'days'}</strong></span>
                   <span>&bull;</span>
-                  <span>Total: <strong className="text-fg">{streakData.totalActiveDays} days</strong></span>
+                  <span>Total: <strong className="text-fg">{streakData.totalActiveDays} {streakData.totalActiveDays === 1 ? 'day' : 'days'}</strong></span>
                 </div>
                 <button
                   type="button"

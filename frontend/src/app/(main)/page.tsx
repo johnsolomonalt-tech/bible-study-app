@@ -1106,6 +1106,32 @@ export default function App() {
     return createMarkdownComponents(navigateToVerse);
   }, [navigateToVerse]);
 
+  const prevChapterInfo = useMemo(() => {
+    if (activeChapter > 1) {
+      return { book: activeBook.name, chapter: activeChapter - 1 };
+    }
+    const allBooks = [...OT_BOOKS, ...NT_BOOKS];
+    const curIdx = allBooks.findIndex(b => b.name.toLowerCase() === activeBook.name.toLowerCase());
+    if (curIdx > 0) {
+      const prevBook = allBooks[curIdx - 1];
+      return { book: prevBook.name, chapter: prevBook.chapters };
+    }
+    return null;
+  }, [activeBook.name, activeChapter]);
+
+  const nextChapterInfo = useMemo(() => {
+    if (activeChapter < activeBook.chapters) {
+      return { book: activeBook.name, chapter: activeChapter + 1 };
+    }
+    const allBooks = [...OT_BOOKS, ...NT_BOOKS];
+    const curIdx = allBooks.findIndex(b => b.name.toLowerCase() === activeBook.name.toLowerCase());
+    if (curIdx !== -1 && curIdx < allBooks.length - 1) {
+      const nextBook = allBooks[curIdx + 1];
+      return { book: nextBook.name, chapter: 1 };
+    }
+    return null;
+  }, [activeBook.chapters, activeBook.name, activeChapter]);
+
   const handleReaderContextMenu = useCallback((e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     const verseEl = target.closest('[data-verse]');
@@ -3626,9 +3652,9 @@ export default function App() {
 
   return (
     <>
-        <div className="h-full flex flex-col bg-bg text-fg">
-      {/* Top Navbar */}
-      <header className="relative min-h-14 h-[calc(3.5rem+env(safe-area-inset-top,0px))] border-b border-border flex items-center justify-between px-4 sm:px-6 bg-bg z-10 shrink-0" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+      <div className="h-[100dvh] max-h-[100dvh] w-full flex flex-col bg-bg text-fg overflow-hidden select-none">
+        {/* Top Navbar */}
+        <header className="sticky top-0 z-30 min-h-14 h-[calc(3.5rem+env(safe-area-inset-top,0px))] border-b border-border flex items-center justify-between px-4 sm:px-6 bg-bg shrink-0" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         
         {/* Left: Logo */}
         <div className="flex-1 flex items-center min-w-0">
@@ -3758,7 +3784,7 @@ export default function App() {
       </header>
       
       {/* Main Viewport */}
-      <main className="flex-1 overflow-hidden flex relative">
+      <main className="flex-1 overflow-hidden min-h-0 flex relative">
         
         
         {/* MOBILE STUDY TAB (No Resizable Panels) */}
@@ -4323,6 +4349,43 @@ export default function App() {
                     </div>
                   ) : (
                     <span className="text-muted">Loading chapter...</span>
+                  )}
+
+                  {/* Chapter Navigation on Mobile */}
+                  {bibleVerses.length > 0 && !isVersesLoading && (
+                    <nav aria-label="Chapter Navigation" className="mt-10 pt-6 border-t border-border flex items-center justify-between gap-2.5 text-xs sm:text-sm">
+                      {prevChapterInfo ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigateToVerse(prevChapterInfo.book, prevChapterInfo.chapter, 1);
+                            document.querySelectorAll('.bible-reader-content').forEach(el => el.scrollTo({ top: 0, behavior: 'smooth' }));
+                          }}
+                          className="flex-1 min-w-0 max-w-[210px] flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-surface hover:bg-surface-hover border border-border text-fg font-semibold transition-all cursor-pointer shadow-xs active:scale-[0.98]"
+                        >
+                          <ChevronLeft size={16} className="shrink-0" />
+                          <span className="truncate">{prevChapterInfo.book} {prevChapterInfo.chapter}</span>
+                        </button>
+                      ) : (
+                        <div className="flex-1" />
+                      )}
+
+                      {nextChapterInfo ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigateToVerse(nextChapterInfo.book, nextChapterInfo.chapter, 1);
+                            document.querySelectorAll('.bible-reader-content').forEach(el => el.scrollTo({ top: 0, behavior: 'smooth' }));
+                          }}
+                          className="flex-1 min-w-0 max-w-[210px] flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-accent text-accent-on font-semibold hover:opacity-95 transition-all cursor-pointer shadow-xs active:scale-[0.98]"
+                        >
+                          <span className="truncate">{nextChapterInfo.book} {nextChapterInfo.chapter}</span>
+                          <ChevronRight size={16} className="shrink-0" />
+                        </button>
+                      ) : (
+                        <div className="flex-1" />
+                      )}
+                    </nav>
                   )}
                 </article>
               </div>
@@ -5130,6 +5193,43 @@ export default function App() {
                     </div>
                   ) : (
                     <span className="text-meta">Loading...</span>
+                  )}
+
+                  {/* Chapter Navigation on Desktop */}
+                  {bibleVerses.length > 0 && !isVersesLoading && (
+                    <nav aria-label="Chapter Navigation" className="mt-12 pt-6 border-t border-border flex items-center justify-between gap-4 text-sm select-none">
+                      {prevChapterInfo ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigateToVerse(prevChapterInfo.book, prevChapterInfo.chapter, 1);
+                            document.querySelectorAll('.bible-reader-content').forEach(el => el.scrollTo({ top: 0, behavior: 'smooth' }));
+                          }}
+                          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-surface hover:bg-surface-hover border border-border text-fg text-xs font-semibold transition-all cursor-pointer shadow-xs active:scale-[0.98]"
+                        >
+                          <ChevronLeft size={16} />
+                          <span>Previous: {prevChapterInfo.book} {prevChapterInfo.chapter}</span>
+                        </button>
+                      ) : (
+                        <div />
+                      )}
+
+                      {nextChapterInfo ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigateToVerse(nextChapterInfo.book, nextChapterInfo.chapter, 1);
+                            document.querySelectorAll('.bible-reader-content').forEach(el => el.scrollTo({ top: 0, behavior: 'smooth' }));
+                          }}
+                          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-accent text-accent-on text-xs font-semibold hover:opacity-95 transition-all cursor-pointer shadow-xs active:scale-[0.98]"
+                        >
+                          <span>Next: {nextChapterInfo.book} {nextChapterInfo.chapter}</span>
+                          <ChevronRight size={16} />
+                        </button>
+                      ) : (
+                        <div />
+                      )}
+                    </nav>
                   )}
                 </article>
               </div>
@@ -6116,7 +6216,7 @@ export default function App() {
                       {OT_BOOKS.map(book => {
                         const isBookExpanded = expandedBooks.includes(book.name);
                         return (
-                          <div key={book.name} className="bg-[#1c1c1b] rounded-[16px] overflow-hidden ring-1 ring-border">
+                          <div key={book.name} className="bg-surface rounded-[16px] overflow-hidden ring-1 ring-border">
                             <button 
                               onClick={() => toggleBook(book.name)}
                               className="w-full flex items-center justify-between p-4 hover:bg-surface transition-colors cursor-pointer"
@@ -6183,7 +6283,7 @@ export default function App() {
                       {NT_BOOKS.map(book => {
                         const isBookExpanded = expandedBooks.includes(book.name);
                         return (
-                          <div key={book.name} className="bg-[#1c1c1b] rounded-[16px] overflow-hidden ring-1 ring-border">
+                          <div key={book.name} className="bg-surface rounded-[16px] overflow-hidden ring-1 ring-border">
                             <button 
                               onClick={() => toggleBook(book.name)}
                               className="w-full flex items-center justify-between p-4 hover:bg-surface transition-colors cursor-pointer"
@@ -6274,39 +6374,52 @@ export default function App() {
         </div>
       </main>
         {/* Mobile Bottom Navigation */}
-        <div 
-          className={`lg:hidden shrink-0 h-[calc(64px+env(safe-area-inset-bottom))] bg-bg border-t border-border flex items-center justify-around px-2 z-50 w-full transition-all duration-200 ${
+        <nav 
+          aria-label="Mobile Navigation"
+          className={`lg:hidden shrink-0 h-[calc(60px+env(safe-area-inset-bottom))] bg-bg/95 backdrop-blur-md border-t border-border flex items-center justify-around px-1 z-40 w-full transition-all duration-200 select-none ${
             isMobileTyping ? 'hidden pointer-events-none' : 'flex'
           }`}
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
-          {['study', 'canvas', 'devotional', 'notes', 'chats', 'tracker'].map(tab => (
-            <button 
-              key={tab} 
-              onClick={() => {
-                setActiveTab(tab);
-                if (tab === 'notes') {
-                  setActiveNoteId(null);
-                }
-                if (tab === 'canvas') {
-                  setCanvasFocusTrigger(prev => prev + 1);
-                }
-                if (tab === 'chats') {
-                  setMobileChatView('chat');
-                }
-              }}
-              className={`flex flex-col items-center justify-center w-full h-full min-h-[44px] transition-colors ${activeTab === tab ? 'text-accent' : 'text-muted hover:text-fg'}`}
-            >
-              {tab === 'study' && <Layout size={20} className="mb-1" />}
-              {tab === 'canvas' && <Workflow size={20} className="mb-1" />}
-              {tab === 'devotional' && <BookOpen size={20} className="mb-1" />}
-              {tab === 'notes' && <Edit size={20} className="mb-1" />}
-              {tab === 'chats' && <Sparkles size={20} className="mb-1" />}
-              {tab === 'tracker' && <Target size={20} className="mb-1" />}
-              <span className="text-[10px] font-medium capitalize truncate max-w-full px-0.5">{tab === 'chats' ? 'AI Chats' : tab}</span>
-            </button>
-          ))}
-        </div>
+          {['study', 'canvas', 'devotional', 'notes', 'chats', 'tracker'].map(tab => {
+            const isActive = activeTab === tab;
+            return (
+              <button 
+                key={tab} 
+                onClick={() => {
+                  setActiveTab(tab);
+                  if (tab === 'notes') {
+                    setActiveNoteId(null);
+                  }
+                  if (tab === 'canvas') {
+                    setCanvasFocusTrigger(prev => prev + 1);
+                  }
+                  if (tab === 'chats') {
+                    setMobileChatView('chat');
+                  }
+                }}
+                className={`flex-1 flex flex-col items-center justify-center h-full min-h-[44px] py-1 transition-colors relative cursor-pointer active:scale-95 touch-manipulation ${
+                  isActive ? 'text-accent font-semibold' : 'text-muted hover:text-fg font-medium'
+                }`}
+              >
+                {isActive && (
+                  <span className="absolute top-0.5 w-6 h-0.5 rounded-full bg-accent" />
+                )}
+                <div className="relative">
+                  {tab === 'study' && <Layout size={19} className="mb-0.5" />}
+                  {tab === 'canvas' && <Workflow size={19} className="mb-0.5" />}
+                  {tab === 'devotional' && <BookOpen size={19} className="mb-0.5" />}
+                  {tab === 'notes' && <Edit size={19} className="mb-0.5" />}
+                  {tab === 'chats' && <Sparkles size={19} className="mb-0.5" />}
+                  {tab === 'tracker' && <Target size={19} className="mb-0.5" />}
+                </div>
+                <span className="text-[10px] tracking-tight capitalize truncate max-w-full px-0.5">
+                  {tab === 'chats' ? 'Chats' : tab === 'devotional' ? 'Devotion' : tab}
+                </span>
+              </button>
+            );
+          })}
+        </nav>
 
         <PWAInstallPrompt />
         <CookieConsentPrompt theme={theme as 'dark' | 'light'} />

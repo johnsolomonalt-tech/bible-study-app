@@ -92,14 +92,14 @@ export function CanvasSidebar({
 
   return (
     <>
-      {/* Mobile backdrop overlay to tap-dismiss */}
+      {/* Mobile & Tablet backdrop overlay to tap-dismiss */}
       <div 
         onClick={onToggle}
-        className="fixed inset-0 bg-black/50 z-30 md:hidden animate-in fade-in duration-200"
+        className="fixed inset-0 bg-black/50 z-30 lg:hidden animate-in fade-in duration-200"
         aria-hidden="true"
       />
       <aside 
-        className="fixed md:relative inset-y-0 left-0 z-40 md:z-20 w-72 lg:w-80 h-full shrink-0 flex flex-col border-r border-border bg-surface text-fg shadow-2xl md:shadow-none transition-all duration-200 animate-in slide-in-from-left-4"
+        className="fixed lg:relative inset-y-0 left-0 z-40 lg:z-20 w-72 lg:w-80 h-full shrink-0 flex flex-col border-r border-border bg-surface text-fg shadow-2xl lg:shadow-none transition-all duration-200 animate-in slide-in-from-left-4"
       >
       {/* Sidebar Header */}
       <div className="flex items-center justify-between px-4 py-3.5 border-b border-border shrink-0">
