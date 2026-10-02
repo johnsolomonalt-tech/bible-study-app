@@ -30,7 +30,7 @@ At the very beginning of every study response, before providing your final answe
 __THOUGHT__
 - Query Analysis: [Analyze the user's inquiry, theological themes, and intent]
 - Scripture Canon & Ground Truth: [Primary scriptures, key verses across OT/NT, and cross-references]
-- Linguistic & Lexicon Analysis: [Examine relevant Hebrew (OT) or Greek (NT) root words, Strong's numbers, and etymology]
+- Linguistic Analysis: [Analyze textual meaning, grammar, and literary context]
 - Hermeneutical & Lens Synthesis: [Doctrinal reasoning through the active theological lens]
 - Pastoral Application Outline: [Core spiritual takeaways and outline for the believer]
 __END_THOUGHT__
@@ -40,18 +40,9 @@ Immediately following __END_THOUGHT__, provide your full, beautifully written bi
 SCRIPTURE CITATION FORMATTING:
 Whenever citing or referencing Bible passages or verses in your response, always cite them clearly in standard canonical book and chapter/verse notation (for example: **John 14:27**, **Romans 8:28**, **Genesis 1:1**, **Psalm 23:1**, **1 Corinthians 13:4-7**). Standard references are automatically converted into interactive links for the user to open and read directly in the application's Bible reader.
 
-ORIGINAL LANGUAGE & ROOT WORD MANDATE:
-Whenever a user asks a question about scripture, theology, biblical doctrines, Christian living, or Bible stories, in addition to providing your thorough biblical answer and relevant verses, you MUST always include the original Hebrew (for Old Testament concepts or texts) and/or Greek (for New Testament concepts or texts) root words.
-For each key root word you introduce:
-- Provide the original script (Hebrew characters e.g. חֶסֶד or Greek alphabet e.g. ἀγάπη).
-- Provide the phonetic transliteration (e.g., *chesed*, *agape*, *shalom*, *logos*).
-- Provide the Strong's Concordance reference number if available (e.g., Strong's H7965, Strong's G26).
-- Explain its lexical and etymological meaning, showing how the original linguistic depth enriches the user's understanding of the biblical text or concept.
-Blend these original language insights naturally and clearly into your response alongside scripture citations and practical applications.
-
 CONCISE, FOCUSED RESPONSES:
 - Keep your final responses concise, punchy, and clear. Avoid filler, longwinded pleasantries, or excessive repetition.
-- Aim for high-density biblical insight: answer the question directly, provide the core scripture context and root word analysis clearly, and offer a practical takeaway in 2 to 4 focused paragraphs or clean bullet points unless the user specifically asks for an extensive treatise.
+- Aim for high-density biblical insight: answer the question directly, provide the core scripture context clearly, and offer a practical takeaway in 2 to 4 focused paragraphs or clean bullet points unless the user specifically asks for an extensive treatise.
 - Speak with natural human warmth, theological clarity, and reverence.
 
 TAILORED FOLLOW-UP QUESTIONS:
@@ -225,6 +216,7 @@ interface ProcessAiMessageParams {
   scriptureContext?: ScriptureContext;
   translation?: string;
   theologicalLens?: string;
+  includeOriginalRoots?: boolean;
   onStatusUpdate?: (status: string) => void;
   onThoughtUpdate?: (thought: string) => void;
 }
@@ -236,6 +228,7 @@ async function processAiMessage({
   scriptureContext,
   translation,
   theologicalLens = 'canonical',
+  includeOriginalRoots = false,
   onStatusUpdate,
   onThoughtUpdate,
 }: ProcessAiMessageParams) {
@@ -385,17 +378,21 @@ async function processAiMessage({
     }
   }
 
-  // Step B: Real Hebrew / Greek Lexicon Analysis
-  const detectedBookRef = resolvedGroundTruth?.reference || content;
-  const matchBook = detectedBookRef.match(/([0-9]?\s?[A-Za-z]+)\s+[0-9]+/);
-  const canonBook = matchBook ? findCanonicalBook(matchBook[1].trim()) : null;
+  // Step B: Original Language & Context Analysis
+  if (includeOriginalRoots) {
+    const detectedBookRef = resolvedGroundTruth?.reference || content;
+    const matchBook = detectedBookRef.match(/([0-9]?\s?[A-Za-z]+)\s+[0-9]+/);
+    const canonBook = matchBook ? findCanonicalBook(matchBook[1].trim()) : null;
 
-  if (canonBook && canonBook.testament === 'OT') {
-    onStatusUpdate?.("Examining Hebrew Masoretic text, roots & Strong's Concordance...");
-  } else if (canonBook && canonBook.testament === 'NT') {
-    onStatusUpdate?.("Examining Greek lemmas (NA28/Textus Receptus) & Strong's Lexicon...");
+    if (canonBook && canonBook.testament === 'OT') {
+      onStatusUpdate?.("Examining Hebrew Masoretic text, roots & Strong's Concordance...");
+    } else if (canonBook && canonBook.testament === 'NT') {
+      onStatusUpdate?.("Examining Greek lemmas (NA28/Textus Receptus) & Strong's Lexicon...");
+    } else {
+      onStatusUpdate?.("Consulting Hebrew (OT) and Greek (NT) root word lexicons...");
+    }
   } else {
-    onStatusUpdate?.("Consulting Hebrew (OT) and Greek (NT) root word lexicons...");
+    onStatusUpdate?.("Consulting canonical Scripture and cross-references...");
   }
 
   // Step C: Real Theological Lens Application
@@ -419,6 +416,19 @@ Passage Text: "${resolvedGroundTruth.text}"
 
 MANDATORY ACCURACY INSTRUCTION:
 You MUST treat the verse text above as the 100% authoritative ground truth. When referencing, quoting, or explaining this passage, use this exact translation text without speculating or altering the translation's wording.`;
+  }
+
+  if (includeOriginalRoots) {
+    effectiveSystemInstruction += `\n\n[ORIGINAL LANGUAGE & ROOT WORD ANALYSIS - REQUESTED BY USER]
+The user has specifically enabled original Hebrew and Greek root analysis for this query.
+When discussing key verses, theological doctrines, or concepts:
+- Provide the original Hebrew (OT) or Greek (NT) root word with script (e.g. חֶסֶד or ἀγάπη).
+- Provide the phonetic transliteration (e.g., *chesed*, *agape*, *shalom*, *logos*).
+- Provide the Strong's Concordance reference number if applicable (e.g., Strong's H7965, Strong's G26).
+- Explain its lexical meaning and etymological depth concisely.`;
+  } else {
+    effectiveSystemInstruction += `\n\n[ORIGINAL LANGUAGE GUIDANCE - ROOTS NOT REQUESTED]
+Do NOT inject original Hebrew/Greek characters, Strong's concordance numbers, or unsolicited root-word etymology into your response. The user wants a clean, direct, and accessible explanation in clear English with standard Scripture citations. Only discuss original roots if the user explicitly asks for a word study in their prompt.`;
   }
 
   if (theologicalLens && THEOLOGICAL_LENSES[theologicalLens]) {
@@ -488,7 +498,7 @@ You MUST treat the verse text above as the 100% authoritative ground truth. When
           // Granular thought milestones as the model reasons
           if (accumulatedThought.length > 50 && !sentThoughtStep1) {
             sentThoughtStep1 = true;
-            onStatusUpdate?.('Analyzing biblical context & original language roots...');
+            onStatusUpdate?.(includeOriginalRoots ? 'Analyzing biblical context & original language roots...' : 'Analyzing biblical context & cross-references...');
           } else if (accumulatedThought.length > 180 && !sentThoughtStep2) {
             sentThoughtStep2 = true;
             onStatusUpdate?.('Cross-referencing canonical themes & theological covenants...');
@@ -506,7 +516,7 @@ You MUST treat the verse text above as the 100% authoritative ground truth. When
   if (!aiResponseText.includes('__THOUGHT__')) {
     const canonRef = resolvedGroundTruth?.reference || 'Scripture Canon';
     const lensName = lensLabels[theologicalLens]?.replace('Applying ', '') || theologicalLens;
-    const fallbackThought = `- Query Analysis: Evaluated user question concerning ${canonRef} with focus on orthodox Christian doctrine.\n- Canonical Grounding: Anchored in verified biblical revelation and cross-canonical witness.\n- Linguistic Analysis: Examined original biblical root concepts and Strong's concordances.\n- Theological Hermeneutics: Filtered through ${lensName}.`;
+    const fallbackThought = `- Query Analysis: Evaluated user question concerning ${canonRef} with focus on orthodox Christian doctrine.\n- Canonical Grounding: Anchored in verified biblical revelation and cross-canonical witness.\n- Linguistic Analysis: ${includeOriginalRoots ? 'Examined original biblical root concepts and Strong\'s concordances.' : 'Examined biblical context and plain textual meaning.'}\n- Theological Hermeneutics: Filtered through ${lensName}.`;
     aiResponseText = `__THOUGHT__\n${fallbackThought}\n__END_THOUGHT__\n\n${aiResponseText}`;
   }
 
@@ -545,7 +555,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const chatId = parseInt(id);
   const body = await req.json();
-  const { content, image, scriptureContext, translation, theologicalLens } = body;
+  const { content, image, scriptureContext, translation, theologicalLens, includeOriginalRoots } = body;
 
   if (image) {
     recordAnalyticsEvent('chat_file_upload', userId, { feature: 'chat' }).catch(() => {});
@@ -580,6 +590,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             scriptureContext,
             translation,
             theologicalLens,
+            includeOriginalRoots: Boolean(includeOriginalRoots),
             onStatusUpdate: (status) => {
               send({ type: 'status', status });
             },
@@ -615,6 +626,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     scriptureContext,
     translation,
     theologicalLens,
+    includeOriginalRoots: Boolean(includeOriginalRoots),
   });
 
   return NextResponse.json(result, { status: 201 });

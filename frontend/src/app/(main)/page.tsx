@@ -2061,7 +2061,23 @@ export default function App() {
   const [aiActivityStatus, setAiActivityStatus] = useState('Ready');
   const [aiThinkingText, setAiThinkingText] = useState('');
   const [aiActivityType, setAiActivityType] = useState<'study' | 'image'>('study');
-  const [attachActiveChapter, setAttachActiveChapter] = useState(true);
+  interface AttachedScriptureContext {
+    reference: string;
+    text: string;
+    translation: string;
+    isSpecificVerse?: boolean;
+  }
+
+  const [attachedScripture, setAttachedScripture] = useState<AttachedScriptureContext | null>(null);
+  const [includeOriginalRoots, setIncludeOriginalRoots] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return getPreference(PREF_KEYS.INCLUDE_ORIGINAL_ROOTS) === 'true';
+  });
+
+  const handleToggleOriginalRoots = (enabled: boolean) => {
+    setIncludeOriginalRoots(enabled);
+    setPreference(PREF_KEYS.INCLUDE_ORIGINAL_ROOTS, enabled ? 'true' : 'false');
+  };
   const [showSlashCommands, setShowSlashCommands] = useState(false);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -2500,7 +2516,9 @@ export default function App() {
       reference: refStr,
       text: cleanText,
       translation: translation.toUpperCase(),
+      isSpecificVerse: true,
     };
+    setAttachedScripture(explicitScripture);
     handleSendMessage(undefined, query, explicitScripture);
   };
 
@@ -3301,6 +3319,7 @@ export default function App() {
     setActiveChatId(null);
     setChatInput('');
     setChatQuotes([]);
+    setAttachedScripture(null);
     setChatImage(null);
     setShowSlashCommands(false);
     setMobileChatView('chat');
@@ -3462,11 +3481,7 @@ export default function App() {
     ].some(kw => currentInput.toLowerCase().includes(kw)) && !currentImage && !currentAttached;
     setAiActivityType(isImageReq ? 'image' : 'study');
 
-    const scriptureContextToSend = explicitScripture || (attachActiveChapter && activeBook && activeChapter ? {
-      reference: `${activeBook.name} ${activeChapter}`,
-      text: bibleVerses.slice(0, 30).map((v: { verse: number; text: string }) => `${v.verse}. ${cleanVerseText(v.text)}`).join(' '),
-      translation: translation.toUpperCase(),
-    } : undefined);
+    const scriptureContextToSend = explicitScripture || (attachedScripture ? attachedScripture : undefined);
 
     if (isImageReq) {
       setAiActivityStatus('Initiating sacred artwork generation...');
@@ -3508,6 +3523,7 @@ export default function App() {
         scriptureContext: scriptureContextToSend,
         translation: translation.toUpperCase(),
         theologicalLens,
+        includeOriginalRoots,
       })
     });
 
@@ -4494,7 +4510,13 @@ export default function App() {
                   <Sparkles size={16} className="text-accent shrink-0" />
                   <span className="truncate">Study AI</span>
                 </div>
-                <TheologicalLensSelector currentLens={theologicalLens} onSelectLens={setTheologicalLens} compact />
+                <TheologicalLensSelector 
+                  currentLens={theologicalLens} 
+                  onSelectLens={setTheologicalLens} 
+                  includeOriginalRoots={includeOriginalRoots} 
+                  onToggleOriginalRoots={handleToggleOriginalRoots} 
+                  compact 
+                />
               </header>
               <div className="flex-1 flex flex-col h-[calc(100%-60px)]">
                 <div className="flex-1 overflow-y-auto custom-scroll p-4 space-y-4">
@@ -4538,33 +4560,57 @@ export default function App() {
                 <form onSubmit={handleSendMessage} className="p-3 border-t border-border bg-bg shrink-0">
                   <div className="flex flex-col relative">
                     {/* Scripture Context Pill */}
-                    {attachActiveChapter && activeBook && (
+                    {attachedScripture ? (
                       <div className="mb-2 flex items-center justify-between px-2.5 py-1 rounded-lg bg-surface border border-border-soft text-[11px] text-muted shadow-2xs">
                         <div className="flex items-center gap-1.5 truncate">
                           <BookOpen size={11} className="text-accent shrink-0" />
-                          <span className="font-medium text-fg truncate">{activeBook.name} {activeChapter}</span>
-                          <span className="text-[9px] uppercase font-bold text-muted bg-surface-warm px-1 rounded shrink-0">{translation}</span>
+                          <span className="font-medium text-fg truncate">{attachedScripture.reference}</span>
+                          <span className="text-[9px] uppercase font-bold text-muted bg-surface-warm px-1 rounded shrink-0">{attachedScripture.translation}</span>
                           <span className="text-[10px] text-emerald-400 font-medium shrink-0">Attached</span>
                         </div>
                         <button
                           type="button"
-                          onClick={() => setAttachActiveChapter(false)}
+                          onClick={() => setAttachedScripture(null)}
                           className="p-0.5 hover:text-fg hover:bg-surface-hover rounded transition-colors ml-1 cursor-pointer shrink-0"
-                          title="Unlink chapter context"
+                          title="Remove attached scripture"
                         >
                           <X size={11} />
                         </button>
                       </div>
-                    )}
-                    {!attachActiveChapter && (
-                      <button
-                        type="button"
-                        onClick={() => setAttachActiveChapter(true)}
-                        className="mb-2 inline-flex items-center gap-1 self-start px-2 py-0.5 rounded-lg border border-dashed border-border-soft hover:border-accent/40 text-[10px] text-meta hover:text-muted transition-colors cursor-pointer"
-                      >
-                        <BookOpen size={10} />
-                        <span>+ Link {activeBook.name} {activeChapter}</span>
-                      </button>
+                    ) : (
+                      <div className="mb-2 flex items-center gap-1.5 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const vNum = selectionVerse || 1;
+                            const vObj = bibleVerses.find(v => v.verse === vNum) || bibleVerses[0];
+                            setAttachedScripture({
+                              reference: `${activeBook.name} ${activeChapter}:${vNum}`,
+                              text: cleanVerseText(vObj?.text || ''),
+                              translation: translation.toUpperCase(),
+                              isSpecificVerse: true,
+                            });
+                          }}
+                          className="inline-flex items-center gap-1 self-start px-2 py-0.5 rounded-lg border border-dashed border-border-soft hover:border-accent/40 text-[10px] text-meta hover:text-fg transition-colors cursor-pointer"
+                        >
+                          <BookOpen size={10} className="text-accent" />
+                          <span>+ Attach Verse ({activeBook.name} {activeChapter}:{selectionVerse || 1})</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAttachedScripture({
+                              reference: `${activeBook.name} ${activeChapter}`,
+                              text: bibleVerses.slice(0, 30).map(v => `${v.verse}. ${cleanVerseText(v.text)}`).join(' '),
+                              translation: translation.toUpperCase(),
+                              isSpecificVerse: false,
+                            });
+                          }}
+                          className="inline-flex items-center gap-1 self-start px-2 py-0.5 rounded-lg border border-dashed border-border-soft hover:border-accent/40 text-[10px] text-meta hover:text-fg transition-colors cursor-pointer"
+                        >
+                          <span>+ Attach Chapter</span>
+                        </button>
+                      </div>
                     )}
 
                     {chatQuotes.length > 0 && (
@@ -5393,7 +5439,13 @@ export default function App() {
                   <Sparkles size={16} className="hidden lg:block text-accent shrink-0" />
                   <span className="truncate">Study AI</span>
                 </div>
-                <TheologicalLensSelector currentLens={theologicalLens} onSelectLens={setTheologicalLens} compact />
+                <TheologicalLensSelector 
+                  currentLens={theologicalLens} 
+                  onSelectLens={setTheologicalLens} 
+                  includeOriginalRoots={includeOriginalRoots} 
+                  onToggleOriginalRoots={handleToggleOriginalRoots} 
+                  compact 
+                />
               </header>
               <div className="flex-1 overflow-y-auto custom-scroll p-5 space-y-6">
                 {activeChat.messages.length === 0 ? (
@@ -5436,33 +5488,57 @@ export default function App() {
                 <form onSubmit={handleSendMessage} className="p-4 border-t border-border bg-bg shrink-0">
                   <div className="flex flex-col relative">
                     {/* Scripture Context Pill */}
-                    {attachActiveChapter && activeBook && (
+                    {attachedScripture ? (
                       <div className="mb-2.5 flex items-center justify-between px-2.5 py-1 rounded-lg bg-surface border border-border-soft text-[11px] text-muted shadow-2xs">
                         <div className="flex items-center gap-1.5 truncate">
                           <BookOpen size={11} className="text-accent shrink-0" />
-                          <span className="font-medium text-fg truncate">{activeBook.name} {activeChapter}</span>
-                          <span className="text-[9px] uppercase font-bold text-muted bg-surface-warm px-1 rounded shrink-0">{translation}</span>
+                          <span className="font-medium text-fg truncate">{attachedScripture.reference}</span>
+                          <span className="text-[9px] uppercase font-bold text-muted bg-surface-warm px-1 rounded shrink-0">{attachedScripture.translation}</span>
                           <span className="text-[10px] text-emerald-400 font-medium shrink-0">Attached</span>
                         </div>
                         <button
                           type="button"
-                          onClick={() => setAttachActiveChapter(false)}
+                          onClick={() => setAttachedScripture(null)}
                           className="p-0.5 hover:text-fg hover:bg-surface-hover rounded transition-colors ml-1 cursor-pointer shrink-0"
-                          title="Unlink chapter context"
+                          title="Remove attached scripture"
                         >
                           <X size={11} />
                         </button>
                       </div>
-                    )}
-                    {!attachActiveChapter && (
-                      <button
-                        type="button"
-                        onClick={() => setAttachActiveChapter(true)}
-                        className="mb-2.5 inline-flex items-center gap-1 self-start px-2 py-0.5 rounded-lg border border-dashed border-border-soft hover:border-accent/40 text-[10px] text-meta hover:text-muted transition-colors cursor-pointer"
-                      >
-                        <BookOpen size={10} />
-                        <span>+ Link {activeBook.name} {activeChapter}</span>
-                      </button>
+                    ) : (
+                      <div className="mb-2.5 flex items-center gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const vNum = selectionVerse || 1;
+                            const vObj = bibleVerses.find(v => v.verse === vNum) || bibleVerses[0];
+                            setAttachedScripture({
+                              reference: `${activeBook.name} ${activeChapter}:${vNum}`,
+                              text: cleanVerseText(vObj?.text || ''),
+                              translation: translation.toUpperCase(),
+                              isSpecificVerse: true,
+                            });
+                          }}
+                          className="inline-flex items-center gap-1.5 self-start px-2.5 py-1 rounded-lg border border-dashed border-border-soft hover:border-accent/50 text-[11px] text-meta hover:text-fg transition-all cursor-pointer bg-surface/40 hover:bg-surface"
+                        >
+                          <BookOpen size={11} className="text-accent" />
+                          <span>+ Attach Verse ({activeBook.name} {activeChapter}:{selectionVerse || 1})</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAttachedScripture({
+                              reference: `${activeBook.name} ${activeChapter}`,
+                              text: bibleVerses.slice(0, 30).map(v => `${v.verse}. ${cleanVerseText(v.text)}`).join(' '),
+                              translation: translation.toUpperCase(),
+                              isSpecificVerse: false,
+                            });
+                          }}
+                          className="inline-flex items-center gap-1.5 self-start px-2.5 py-1 rounded-lg border border-dashed border-border-soft hover:border-accent/50 text-[11px] text-meta hover:text-fg transition-all cursor-pointer bg-surface/20 hover:bg-surface"
+                        >
+                          <span>+ Attach Chapter</span>
+                        </button>
+                      </div>
                     )}
 
                     {chatQuotes.length > 0 && (
@@ -6013,7 +6089,13 @@ export default function App() {
                     {activeChat.title || 'New Conversation'}
                   </h2>
                 </div>
-                <TheologicalLensSelector currentLens={theologicalLens} onSelectLens={setTheologicalLens} compact />
+                <TheologicalLensSelector 
+                  currentLens={theologicalLens} 
+                  onSelectLens={setTheologicalLens} 
+                  includeOriginalRoots={includeOriginalRoots} 
+                  onToggleOriginalRoots={handleToggleOriginalRoots} 
+                  compact 
+                />
               </header>
               <div className="flex-1 overflow-y-auto custom-scroll p-4 sm:p-8 lg:p-12 space-y-6 sm:space-y-8 flex flex-col">
                 {activeChat.messages.length === 0 ? (
@@ -6057,33 +6139,57 @@ export default function App() {
               <form onSubmit={handleSendMessage} className="p-3 sm:p-6 border-t border-border w-full shrink-0">
                 <div className="flex flex-col max-w-4xl mx-auto w-full relative">
                   {/* Scripture Context Pill */}
-                  {attachActiveChapter && activeBook && (
+                  {attachedScripture ? (
                     <div className="mb-2.5 flex items-center justify-between px-3 py-1.5 rounded-xl bg-surface border border-border-soft text-[12px] text-muted shadow-2xs">
                       <div className="flex items-center gap-2 truncate">
                         <BookOpen size={13} className="text-accent shrink-0" />
-                        <span className="font-medium text-fg truncate">Studying: {activeBook.name} {activeChapter}</span>
-                        <span className="text-[10px] uppercase font-bold text-muted bg-surface-warm px-1.5 py-0.5 rounded shrink-0">{translation}</span>
-                        <span className="text-[10px] text-emerald-400 font-medium bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-full shrink-0">Passage Attached</span>
+                        <span className="font-medium text-fg truncate">Attached: {attachedScripture.reference}</span>
+                        <span className="text-[10px] uppercase font-bold text-muted bg-surface-warm px-1.5 py-0.5 rounded shrink-0">{attachedScripture.translation}</span>
+                        <span className="text-[10px] text-emerald-400 font-medium bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-full shrink-0">Scripture Attached</span>
                       </div>
                       <button
                         type="button"
-                        onClick={() => setAttachActiveChapter(false)}
+                        onClick={() => setAttachedScripture(null)}
                         className="p-1 hover:text-fg hover:bg-surface-hover rounded-lg transition-colors ml-2 cursor-pointer shrink-0"
-                        title="Unlink passage context from prompt"
+                        title="Remove attached scripture"
                       >
                         <X size={12} />
                       </button>
                     </div>
-                  )}
-                  {!attachActiveChapter && (
-                    <button
-                      type="button"
-                      onClick={() => setAttachActiveChapter(true)}
-                      className="mb-2.5 inline-flex items-center gap-1.5 self-start px-2.5 py-1 rounded-xl border border-dashed border-border-soft hover:border-accent/50 text-[11px] text-meta hover:text-fg transition-all cursor-pointer bg-surface/40 hover:bg-surface"
-                    >
-                      <BookOpen size={12} className="text-accent" />
-                      <span>+ Attach {activeBook.name} {activeChapter} as Scripture context</span>
-                    </button>
+                  ) : (
+                    <div className="mb-2.5 flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const vNum = selectionVerse || 1;
+                          const vObj = bibleVerses.find(v => v.verse === vNum) || bibleVerses[0];
+                          setAttachedScripture({
+                            reference: `${activeBook.name} ${activeChapter}:${vNum}`,
+                            text: cleanVerseText(vObj?.text || ''),
+                            translation: translation.toUpperCase(),
+                            isSpecificVerse: true,
+                          });
+                        }}
+                        className="inline-flex items-center gap-1.5 self-start px-2.5 py-1 rounded-xl border border-dashed border-border-soft hover:border-accent/50 text-[11px] text-meta hover:text-fg transition-all cursor-pointer bg-surface/40 hover:bg-surface"
+                      >
+                        <BookOpen size={12} className="text-accent" />
+                        <span>+ Attach Verse ({activeBook.name} {activeChapter}:{selectionVerse || 1})</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAttachedScripture({
+                            reference: `${activeBook.name} ${activeChapter}`,
+                            text: bibleVerses.slice(0, 30).map(v => `${v.verse}. ${cleanVerseText(v.text)}`).join(' '),
+                            translation: translation.toUpperCase(),
+                            isSpecificVerse: false,
+                          });
+                        }}
+                        className="inline-flex items-center gap-1.5 self-start px-2.5 py-1 rounded-xl border border-dashed border-border-soft hover:border-accent/50 text-[11px] text-meta hover:text-fg transition-all cursor-pointer bg-surface/20 hover:bg-surface"
+                      >
+                        <span>+ Attach Chapter ({activeBook.name} {activeChapter})</span>
+                      </button>
+                    </div>
                   )}
 
                   {chatQuotes.length > 0 && (

@@ -39,6 +39,7 @@ export const PREF_KEYS = {
   AUDIO_AUTO_ADVANCE: 'theologica_audio_auto_advance',
   // Study & AI Preferences
   THEOLOGICAL_LENS: 'theologica_theological_lens',
+  INCLUDE_ORIGINAL_ROOTS: 'theologica_include_original_roots',
   DAILY_CHAPTER_GOAL: 'theologica_daily_chapter_goal',
 } as const;
 

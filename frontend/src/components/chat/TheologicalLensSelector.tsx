@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, Sparkles, BookOpen, Scroll, Flame, GraduationCap, Heart, Check } from 'lucide-react';
+import { ChevronDown, Sparkles, BookOpen, Scroll, Flame, GraduationCap, Heart, Check, Languages } from 'lucide-react';
 
 export type TheologicalLensType = 'standard' | 'canonical' | 'patristic' | 'reformation' | 'scholarly' | 'contemplative';
 
@@ -20,8 +20,8 @@ export interface LensOption {
 export const THEOLOGICAL_LENS_OPTIONS: LensOption[] = [
   {
     id: 'standard',
-    name: 'Standard',
-    tagline: 'Balanced Bible Study',
+    name: 'General (Balanced)',
+    tagline: 'Overall Scripture Study',
     description: 'Clear, balanced, and direct biblical insight without favoring any single theological camp or tradition.',
     icon: <Sparkles size={13} />,
     accentColor: '#c96442',
@@ -80,16 +80,20 @@ export const THEOLOGICAL_LENS_OPTIONS: LensOption[] = [
   },
 ];
 
-interface TheologicalLensSelectorProps {
+export interface TheologicalLensSelectorProps {
   currentLens: TheologicalLensType;
   onSelectLens: (lens: TheologicalLensType) => void;
   compact?: boolean;
+  includeOriginalRoots?: boolean;
+  onToggleOriginalRoots?: (enabled: boolean) => void;
 }
 
 export function TheologicalLensSelector({
   currentLens,
   onSelectLens,
   compact = false,
+  includeOriginalRoots = false,
+  onToggleOriginalRoots,
 }: TheologicalLensSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -107,7 +111,7 @@ export function TheologicalLensSelector({
   const updatePosition = useCallback(() => {
     if (!buttonRef.current) return;
     const rect = buttonRef.current.getBoundingClientRect();
-    const desiredWidth = 284;
+    const desiredWidth = 310;
     const width = Math.min(desiredWidth, window.innerWidth - 24);
 
     // Right-align dropdown with button's right edge so it extends leftward into the study area if needed
@@ -196,13 +200,15 @@ export function TheologicalLensSelector({
           borderColor: selected.borderLight,
           color: selected.accentColor,
         }}
-        title={`Theological Perspective: ${selected.name} (${selected.tagline})`}
+        title={`Theological Perspective: ${selected.id === 'standard' ? 'General' : selected.name} (${includeOriginalRoots ? 'Roots On' : 'Roots Off'})`}
       >
         <span className="shrink-0">{selected.icon}</span>
-        <span className="font-semibold tracking-tight truncate max-w-[75px] xs:max-w-[100px] sm:max-w-none">{selected.name}</span>
-        {!compact && (
-          <span className="text-[10px] opacity-75 hidden sm:inline">
-            Lens
+        <span className="font-semibold tracking-tight truncate max-w-[85px] xs:max-w-[110px] sm:max-w-none">
+          {selected.id === 'standard' ? 'Perspective' : selected.name}
+        </span>
+        {includeOriginalRoots && (
+          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-accent/20 text-accent hidden xs:inline" title="Original roots enabled">
+            Roots
           </span>
         )}
         <ChevronDown size={11} className={`opacity-70 transition-transform shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
@@ -222,13 +228,51 @@ export function TheologicalLensSelector({
           }}
           className="flex flex-col rounded-2xl bg-surface border border-border shadow-2xl overflow-hidden divide-y divide-border/60 animate-in fade-in-0 zoom-in-95 duration-100 backdrop-blur-xl"
         >
-          <div className="px-3.5 py-2.5 bg-bg/80 border-b border-border/40 shrink-0">
+          {/* Original Language Roots Toggle */}
+          <div className="p-3 bg-surface-warm/40 border-b border-border/60">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className={`p-1.5 rounded-lg shrink-0 ${includeOriginalRoots ? 'bg-accent/15 text-accent' : 'bg-surface border border-border text-muted'}`}>
+                  <Languages size={15} />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[12px] font-semibold text-fg flex items-center gap-1.5">
+                    <span>Original Roots</span>
+                    {includeOriginalRoots && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-accent/20 text-accent">On</span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-muted leading-tight truncate">
+                    Hebrew &amp; Greek roots, Strong&apos;s &amp; etymology
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={includeOriginalRoots}
+                onClick={() => onToggleOriginalRoots?.(!includeOriginalRoots)}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                  includeOriginalRoots ? 'bg-accent' : 'bg-border'
+                }`}
+                title={includeOriginalRoots ? 'Disable Hebrew/Greek roots in AI responses' : 'Enable Hebrew/Greek roots in AI responses'}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                    includeOriginalRoots ? 'translate-x-4' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+
+          <div className="px-3.5 py-2 bg-bg/80 border-b border-border/40 shrink-0">
             <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted uppercase tracking-wider">
               <Sparkles size={11} className="text-accent" />
-              <span>Tradition Perspective Lens</span>
+              <span>Tradition Perspectives</span>
             </div>
             <p className="text-[11px] text-muted/80 mt-0.5 leading-relaxed">
-              Shapes AI interpretive methodology, historical voices, and depth of analysis.
+              Shapes AI theological methodology and historical context.
             </p>
           </div>
 
