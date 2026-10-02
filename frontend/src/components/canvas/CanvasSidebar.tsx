@@ -16,6 +16,7 @@ import {
   Download
 } from 'lucide-react';
 import { CanvasBoardMetadata } from '@/types/canvas';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 
 interface CanvasSidebarProps {
   isOpen: boolean;
@@ -45,6 +46,7 @@ export function CanvasSidebar({
   const [searchQuery, setSearchQuery] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
+  const [boardToDelete, setBoardToDelete] = useState<CanvasBoardMetadata | null>(null);
 
   const isDark = theme === 'dark';
 
@@ -284,11 +286,9 @@ export function CanvasSidebar({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (window.confirm(`Delete canvas "${board.title || 'Untitled Canvas'}"?`)) {
-                            onDeleteBoard(board.id);
-                          }
+                          setBoardToDelete(board);
                         }}
-                        className="p-1 rounded hover:bg-rose-500/20 text-zinc-400 hover:text-rose-400"
+                        className="p-1 rounded hover:bg-rose-500/20 text-zinc-400 hover:text-rose-400 cursor-pointer"
                         title="Delete canvas"
                       >
                         <Trash2 size={12} />
@@ -323,6 +323,23 @@ export function CanvasSidebar({
         <span className="font-mono text-[10px]">{boards.length} Total</span>
       </div>
     </aside>
+
+    {/* Delete Canvas Confirmation Modal */}
+    <ConfirmModal
+      isOpen={boardToDelete !== null}
+      title="Delete Canvas Board?"
+      message={`Are you sure you want to delete "${boardToDelete?.title || 'Untitled Canvas'}"? All cards and connections on this board will be removed.`}
+      confirmLabel="Delete Canvas"
+      variant="danger"
+      icon="trash"
+      onConfirm={() => {
+        if (boardToDelete) {
+          onDeleteBoard(boardToDelete.id);
+          setBoardToDelete(null);
+        }
+      }}
+      onCancel={() => setBoardToDelete(null)}
+    />
   </>
   );
 }

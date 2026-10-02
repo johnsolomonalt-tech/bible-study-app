@@ -12,6 +12,7 @@ import {
   ReaderLayout 
 } from '@/lib/appPreferences';
 import { TheologicalLensType, THEOLOGICAL_LENS_OPTIONS } from '@/components/chat/TheologicalLensSelector';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 
 export interface AccentOption {
   id: string;
@@ -143,6 +144,7 @@ export function SettingsModal(props: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>('appearance');
   const [isPreviewAudioPlaying, setIsPreviewAudioPlaying] = useState(false);
   const [importStatus, setImportStatus] = useState<string | null>(null);
+  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Close on Escape
@@ -875,12 +877,9 @@ export function SettingsModal(props: SettingsModalProps) {
                   <p className="text-xs text-muted mb-3">Restore all appearance, reader typography, and audio settings back to original defaults. Your saved notes and highlights will not be deleted.</p>
                   
                   <button
-                    onClick={() => {
-                      if (window.confirm("Are you sure you want to reset all workspace settings to their defaults?")) {
-                        onResetPreferences();
-                      }
-                    }}
-                    className="flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-medium text-red-500 hover:text-white hover:bg-red-500/90 rounded-xl border border-red-500/30 transition-colors"
+                    type="button"
+                    onClick={() => setIsResetConfirmOpen(true)}
+                    className="flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-medium text-red-500 hover:text-white hover:bg-red-500/90 rounded-xl border border-red-500/30 transition-colors cursor-pointer"
                   >
                     <RotateCcw size={15} />
                     <span>Reset Settings to Defaults</span>
@@ -960,12 +959,27 @@ export function SettingsModal(props: SettingsModalProps) {
           </div>
           <button
             onClick={onClose}
-            className="px-4 py-1.5 rounded-xl bg-accent text-white text-xs font-semibold hover:opacity-90 transition-opacity shadow-xs"
+            className="px-4 py-1.5 rounded-xl bg-accent text-white text-xs font-semibold hover:opacity-90 transition-opacity shadow-xs cursor-pointer"
           >
             Done
           </button>
         </footer>
       </div>
+
+      {/* Reset Confirmation Modal */}
+      <ConfirmModal
+        isOpen={isResetConfirmOpen}
+        title="Reset All Workspace Settings?"
+        message="Are you sure you want to reset all appearance, reader typography, and audio settings back to defaults? Your saved notes, chats, and highlights will not be affected."
+        confirmLabel="Reset Defaults"
+        variant="danger"
+        icon="warning"
+        onConfirm={() => {
+          onResetPreferences();
+          setIsResetConfirmOpen(false);
+        }}
+        onCancel={() => setIsResetConfirmOpen(false)}
+      />
     </div>
   );
 }

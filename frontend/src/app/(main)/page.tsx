@@ -54,6 +54,12 @@ import {
 import { SettingsModal } from '@/components/settings/SettingsModal';
 import { initSessionTracking, trackClientEvent } from '@/lib/analyticsClient';
 import { NotesWorkspace, NoteItem } from '@/components/notes/NotesWorkspace';
+import { StreakPopover } from '@/components/bible/StreakPopover';
+import { PrayerSanctuaryModal } from '@/components/bible/PrayerSanctuaryModal';
+import { TrackerStreakHero } from '@/components/bible/TrackerStreakHero';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import { PromptModal } from '@/components/ui/PromptModal';
+import { recordHabitActivity, unmarkChapterActivity } from '@/lib/streakService';
 
 // --- All 66 Books ---
 const otStr = "Genesis:50,Exodus:40,Leviticus:27,Numbers:36,Deuteronomy:34,Joshua:24,Judges:21,Ruth:4,1 Samuel:31,2 Samuel:24,1 Kings:22,2 Kings:25,1 Chronicles:29,2 Chronicles:36,Ezra:10,Nehemiah:13,Esther:10,Job:42,Psalms:150,Proverbs:31,Ecclesiastes:12,Song of Solomon:8,Isaiah:66,Jeremiah:52,Lamentations:5,Ezekiel:48,Daniel:12,Hosea:14,Joel:3,Amos:9,Obadiah:1,Jonah:4,Micah:7,Nahum:3,Habakkuk:3,Zephaniah:3,Haggai:2,Zechariah:14,Malachi:4";
@@ -758,6 +764,12 @@ export default function App() {
     chatTitle?: string;
   } | null>(null);
 
+  // Haven Streak & Prayer Sanctuary State
+  const [isPrayerSanctuaryOpen, setIsPrayerSanctuaryOpen] = useState(false);
+  const [chatToDelete, setChatToDelete] = useState<{ id: number; title: string } | null>(null);
+  const [chatToRename, setChatToRename] = useState<{ id: number; title: string } | null>(null);
+  const [noteToRename, setNoteToRename] = useState<{ id: number; title: string; content: string } | null>(null);
+
   // Synchronize activeTab to URL query params & cookies/storage for reliable refresh & bookmarking
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -772,6 +784,9 @@ export default function App() {
       if (window.location.pathname + window.location.search !== url.pathname + (url.search ? url.search : '')) {
         window.history.replaceState(null, '', newPath);
       }
+    }
+    if (activeTab === 'devotional') {
+      recordHabitActivity('devotional');
     }
   }, [activeTab]);
   
@@ -3154,17 +3169,21 @@ export default function App() {
     });
   };
 
-  const handleRenameChat = async (id: number, oldTitle: string) => {
-    const newTitle = window.prompt('Rename conversation:', oldTitle);
-    if (!newTitle || newTitle === oldTitle) return;
+  const handleRenameChat = (id: number, oldTitle: string) => {
+    setChatToRename({ id, title: oldTitle });
+  };
+
+  const submitRenameChat = async (newTitle: string) => {
+    if (!chatToRename) return;
+    const { id } = chatToRename;
     setChats(prev => prev.map(c => c.id === id ? { ...c, title: newTitle } : c));
+    setChatToRename(null);
     await fetchWithAuth(`${API_URL}/api/chats/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: newTitle })
     });
   };
-
 
   const handleDeleteNote = async (id: number) => {
     if (debounceTimerRef.current) {
@@ -3180,9 +3199,13 @@ export default function App() {
   };
 
   const handleRenameNoteSidebar = (id: number, oldTitle: string, content: string) => {
-    const newTitle = window.prompt('Rename note:', oldTitle);
-    if (!newTitle || newTitle === oldTitle) return;
-    updateNote(id, newTitle, content);
+    setNoteToRename({ id, title: oldTitle, content });
+  };
+
+  const submitRenameNote = (newTitle: string) => {
+    if (!noteToRename) return;
+    updateNote(noteToRename.id, newTitle, noteToRename.content);
+    setNoteToRename(null);
   };
 
 
@@ -3498,6 +3521,11 @@ export default function App() {
     setCompletedChapters(prev => 
       prevStatus ? prev.filter(id => id !== currentChapterId) : [...prev, currentChapterId]
     );
+    if (!prevStatus) {
+      recordHabitActivity('scripture', { chapterId: currentChapterId });
+    } else {
+      unmarkChapterActivity(Math.max(0, completedChapters.length - 1));
+    }
     await fetchWithAuth(`${API_URL}/api/tracker`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -3509,6 +3537,11 @@ export default function App() {
   const toggleAnyChapter = async (id: string) => {
     const checked = completedChapters.includes(id);
     setCompletedChapters(prev => checked ? prev.filter(c => c !== id) : [...prev, id]);
+    if (!checked) {
+      recordHabitActivity('scripture', { chapterId: id });
+    } else {
+      unmarkChapterActivity(Math.max(0, completedChapters.length - 1));
+    }
     await fetchWithAuth(`${API_URL}/api/tracker`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -3587,9 +3620,22 @@ export default function App() {
           ))}
         </nav>
         
-        {/* Right: Settings & Clerk UserButton */}
-        <div className="flex-1 flex justify-end items-center gap-3.5">
-          <button onClick={() => setIsSettingsOpen(true)} className="text-muted hover:text-fg transition-colors p-1.5 rounded-lg hover:bg-surface" title="Settings">
+        {/* Right: Streak, Prayer, Settings & Clerk UserButton */}
+        <div className="flex-1 flex justify-end items-center gap-2 sm:gap-3">
+          <StreakPopover 
+            onNavigateToTab={setActiveTab} 
+            onOpenPrayerSanctuary={() => setIsPrayerSanctuaryOpen(true)} 
+          />
+          <button 
+            type="button"
+            onClick={() => setIsPrayerSanctuaryOpen(true)} 
+            className="text-muted hover:text-rose-500 transition-colors p-1.5 rounded-xl hover:bg-surface flex items-center justify-center cursor-pointer" 
+            title="Prayer Sanctuary"
+            aria-label="Prayer Sanctuary"
+          >
+            <Heart size={18} />
+          </button>
+          <button onClick={() => setIsSettingsOpen(true)} className="text-muted hover:text-fg transition-colors p-1.5 rounded-lg hover:bg-surface cursor-pointer" title="Settings">
             <Settings size={18} />
           </button>
           <UserButton />
@@ -4693,6 +4739,14 @@ export default function App() {
                     </div>
                     <div className="flex items-center gap-1.5 lg:gap-2.5">
                       <button
+                        onClick={() => setIsPrayerSanctuaryOpen(true)}
+                        className="hidden 2xl:flex items-center gap-1.5 text-[13px] font-medium px-3 py-2 rounded-lg bg-surface text-fg hover:bg-border-soft hover:text-rose-500 border border-border ring-shadow transition-all cursor-pointer"
+                        title="Open Prayer Sanctuary for this passage"
+                      >
+                        <Heart size={15} className="text-rose-500" />
+                        <span>Prayer</span>
+                      </button>
+                      <button
                         onClick={() => setIsLectioModalOpen(true)}
                         className="hidden 2xl:flex items-center gap-1.5 text-[13px] font-medium px-3 py-2 rounded-lg bg-surface text-fg hover:bg-border-soft hover:text-accent border border-border ring-shadow transition-all cursor-pointer"
                         title="Lectio Divina Guided Prayer & Contemplation Mode"
@@ -5670,9 +5724,9 @@ export default function App() {
                       <button 
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleDeleteChat(c.id);
+                          setChatToDelete({ id: c.id, title: c.title });
                         }} 
-                        className="p-2 lg:p-1 min-w-[44px] min-h-[44px] lg:min-w-0 lg:min-h-0 text-meta hover:text-accent transition-colors cursor-pointer"
+                        className="p-2 lg:p-1 min-w-[44px] min-h-[44px] lg:min-w-0 lg:min-h-0 text-meta hover:text-rose-500 transition-colors cursor-pointer"
                         title="Delete Conversation"
                       >
                         <Trash2 size={14} />
@@ -5949,10 +6003,18 @@ export default function App() {
           return (
             <div className="flex-1 overflow-y-auto custom-scroll p-4 sm:p-10 lg:p-16 pb-24 lg:pb-16 bg-bg">
               <div className="max-w-5xl mx-auto">
-                <header className="mb-6 sm:mb-12">
+                <header className="mb-6 sm:mb-8">
                   <h1 className="text-2xl sm:text-[40px] font-display text-fg mb-2 sm:mb-3">Reading Tracker</h1>
-                  <p className="text-sm sm:text-[16px] text-muted">Track your progress through all 66 books.</p>
+                  <p className="text-sm sm:text-[16px] text-muted">Track your daily spiritual rhythm, reading streak, and journey through all 66 books.</p>
                 </header>
+
+                {/* Haven-style Streak, Daily Goal & 7-Day Consistency Dashboard */}
+                <TrackerStreakHero
+                  dailyChapterGoal={dailyChapterGoal}
+                  totalChaptersCompleted={completedCount}
+                  onNavigateToTab={setActiveTab}
+                  onOpenPrayerSanctuary={() => setIsPrayerSanctuaryOpen(true)}
+                />
 
                 <div className="bg-surface p-4 sm:p-8 rounded-[20px] ring-shadow mb-8 sm:mb-16">
                   <div className="flex justify-between items-end mb-4">
@@ -6259,6 +6321,56 @@ export default function App() {
             }
             e.target.value = '';
           }}
+        />
+
+        {/* Haven Prayer Sanctuary Modal */}
+        <PrayerSanctuaryModal
+          isOpen={isPrayerSanctuaryOpen}
+          onClose={() => setIsPrayerSanctuaryOpen(false)}
+          currentVerseReference={`${activeBook.name} ${activeChapter}:${selectionVerse || 1}`}
+          currentVerseText={bibleVerses.find(v => v.verse === selectionVerse)?.text || bibleVerses[0]?.text || ''}
+          onNavigateToScripture={navigateToVerse}
+        />
+
+        {/* AI Chat Delete Confirmation Modal */}
+        <ConfirmModal
+          isOpen={chatToDelete !== null}
+          title="Delete Conversation?"
+          message={`Are you sure you want to delete "${chatToDelete?.title || 'this conversation'}"? All messages in this conversation will be permanently removed.`}
+          confirmLabel="Delete Conversation"
+          variant="danger"
+          icon="trash"
+          onConfirm={() => {
+            if (chatToDelete) {
+              handleDeleteChat(chatToDelete.id);
+              setChatToDelete(null);
+            }
+          }}
+          onCancel={() => setChatToDelete(null)}
+        />
+
+        {/* Rename Conversation Modal */}
+        <PromptModal
+          isOpen={chatToRename !== null}
+          title="Rename Conversation"
+          message="Enter a new title for this conversation:"
+          initialValue={chatToRename?.title || ''}
+          placeholder="Conversation title..."
+          confirmLabel="Rename"
+          onConfirm={submitRenameChat}
+          onCancel={() => setChatToRename(null)}
+        />
+
+        {/* Rename Note Modal */}
+        <PromptModal
+          isOpen={noteToRename !== null}
+          title="Rename Note"
+          message="Enter a new title for this note:"
+          initialValue={noteToRename?.title || ''}
+          placeholder="Note title..."
+          confirmLabel="Rename"
+          onConfirm={submitRenameNote}
+          onCancel={() => setNoteToRename(null)}
         />
       </div>
     </>

@@ -61,6 +61,7 @@ import {
   Workflow
 } from 'lucide-react';
 import { useModifierKey } from '@/lib/os';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 
 interface CanvasBoardProps {
   theme?: 'dark' | 'light';
@@ -256,6 +257,7 @@ function InnerCanvasBoard({
   // Pane Context Menu state
   const [paneContextMenu, setPaneContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [paneAddSubmenuOpen, setPaneAddSubmenuOpen] = useState(false);
+  const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -1894,12 +1896,15 @@ function InnerCanvasBoard({
   // Clear Canvas
   const handleClear = useCallback(() => {
     if (nodes.length === 0) return;
-    if (window.confirm('Clear all cards on this board? You can undo this action.')) {
-      setNodes([]);
-      setEdges([]);
-      pushSnapshot([], []);
-    }
-  }, [nodes.length, pushSnapshot, setEdges, setNodes]);
+    setIsClearConfirmOpen(true);
+  }, [nodes.length]);
+
+  const confirmClearBoard = useCallback(() => {
+    setNodes([]);
+    setEdges([]);
+    pushSnapshot([], []);
+    setIsClearConfirmOpen(false);
+  }, [pushSnapshot, setEdges, setNodes]);
 
   // Apply updates from Theologica AI
   const handleApplyAiGraph = useCallback((
@@ -2638,6 +2643,18 @@ function InnerCanvasBoard({
         onClose={() => setIsImportModalOpen(false)}
         onImportSuccess={handleImportSuccess}
         theme={theme}
+      />
+
+      {/* Clear Canvas Confirmation Modal */}
+      <ConfirmModal
+        isOpen={isClearConfirmOpen}
+        title="Clear All Cards?"
+        message="Are you sure you want to clear all cards on this board? You can undo this action with Cmd+Z / Ctrl+Z."
+        confirmLabel="Clear Board"
+        variant="danger"
+        icon="trash"
+        onConfirm={confirmClearBoard}
+        onCancel={() => setIsClearConfirmOpen(false)}
       />
     </div>
   );

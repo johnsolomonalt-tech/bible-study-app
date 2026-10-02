@@ -31,6 +31,7 @@ import { VersePreviewPopup } from './VersePreviewPopup';
 import { NoteAiAssistantModal } from './NoteAiAssistantModal';
 import { NoteTemplate, NOTE_TEMPLATES } from './noteTemplates';
 import { BIBLE_VERSE_REGEX, CANONICAL_BOOKS } from '@/lib/bibleReferences';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 
 export interface NoteItem {
   id: number;
@@ -250,6 +251,7 @@ export function NotesWorkspace({
   const [isInsertVerseOpen, setIsInsertVerseOpen] = useState(false);
   const [isAiAssistantOpen, setIsAiAssistantOpen] = useState(false);
   const [previewVerse, setPreviewVerse] = useState<{ book: string; chapter: number; verse: number; raw?: string } | null>(null);
+  const [noteToDelete, setNoteToDelete] = useState<NoteItem | null>(null);
 
   // Tab Bar scroll, button refs, and cutoff states
   const tabsScrollRef = useRef<HTMLDivElement | null>(null);
@@ -935,9 +937,8 @@ export function NotesWorkspace({
                       <div className="w-full h-px bg-border my-1" />
                       <button
                         onClick={() => {
-                          if (confirm('Are you sure you want to delete this note?')) {
-                            onDeleteNote(activeNote.id);
-                          }
+                          setIsActionsMenuOpen(false);
+                          setNoteToDelete(activeNote);
                         }}
                         className="w-full text-left px-3 py-1.5 text-[12px] rounded-lg hover:bg-rose-500/10 flex items-center gap-2 text-rose-500 cursor-pointer"
                       >
@@ -1261,6 +1262,23 @@ export function NotesWorkspace({
         onAppendToNote={handleAppendAiText}
         theologicalLens={theologicalLens}
       />
+
+      {/* 5. Custom Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={noteToDelete !== null}
+        title="Delete Note?"
+        message={`Are you sure you want to delete "${noteToDelete?.title || 'Untitled Note'}"? This action cannot be undone.`}
+        confirmLabel="Delete Note"
+        variant="danger"
+        icon="trash"
+        onConfirm={() => {
+          if (noteToDelete) {
+            onDeleteNote(noteToDelete.id);
+            setNoteToDelete(null);
+          }
+        }}
+        onCancel={() => setNoteToDelete(null)}
+      />
     </div>
   );
 
@@ -1299,7 +1317,7 @@ export function NotesWorkspace({
             <button 
               onClick={(e) => {
                 e.stopPropagation();
-                if (confirm('Delete this note?')) onDeleteNote(n.id);
+                setNoteToDelete(n);
               }} 
               className="p-1 text-muted hover:text-rose-500 rounded transition-colors cursor-pointer"
               title="Delete Note"
