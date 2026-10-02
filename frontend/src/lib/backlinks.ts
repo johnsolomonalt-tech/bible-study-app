@@ -87,7 +87,7 @@ export function getScriptureBacklinks({
     }
   }
 
-  // 3. Scan Local Canvas Boards (Scripture Second Brain)
+  // 3. Scan Local Canvas Boards (Scripture Connections)
   const matchedCanvasItems: BacklinkCanvasItem[] = [];
   if (typeof window !== 'undefined') {
     try {

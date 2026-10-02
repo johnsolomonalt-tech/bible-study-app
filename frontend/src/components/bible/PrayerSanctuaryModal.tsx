@@ -38,7 +38,10 @@ export interface PrayerSanctuaryModalProps {
   onClose: () => void;
   currentVerseReference?: string;
   currentVerseText?: string;
+  currentChapterReference?: string;
+  chapterVerses?: { verse: number; text: string }[];
   onNavigateToScripture?: (book: string, chapter: number, verse: number) => void;
+  isStandaloneTab?: boolean;
 }
 
 export function PrayerSanctuaryModal({
@@ -46,18 +49,23 @@ export function PrayerSanctuaryModal({
   onClose,
   currentVerseReference,
   currentVerseText,
+  currentChapterReference,
+  chapterVerses,
   onNavigateToScripture,
+  isStandaloneTab = false,
 }: PrayerSanctuaryModalProps) {
   const [activeTab, setActiveTab] = useState<'active' | 'answered' | 'quiet' | 'ai'>('active');
   const [prayers, setPrayers] = useState<PrayerItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<PrayerCategory | 'all'>('all');
   
+  const defaultScriptureRef = currentChapterReference || currentVerseReference || '';
+
   // Add Prayer Form State
   const [isAddingPrayer, setIsAddingPrayer] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newContent, setNewContent] = useState('');
   const [newCategory, setNewCategory] = useState<PrayerCategory>('general');
-  const [newScripture, setNewScripture] = useState(currentVerseReference || '');
+  const [newScripture, setNewScripture] = useState(defaultScriptureRef);
 
   // Delete Confirm State
   const [prayerToDelete, setPrayerToDelete] = useState<PrayerItem | null>(null);
@@ -75,7 +83,7 @@ export function PrayerSanctuaryModal({
 
   // AI Scripture Prayer Generator State
   const [aiScripturePrompt, setAiScripturePrompt] = useState(
-    currentVerseReference ? `${currentVerseReference} - "${currentVerseText?.slice(0, 100)}..."` : 'Philippians 4:6-7'
+    currentChapterReference || currentVerseReference || 'Philippians 4:6-7'
   );
   const [aiFocus, setAiFocus] = useState('peace, trust, and surrender');
   const [generatedAiPrayer, setGeneratedAiPrayer] = useState<string | null>(null);
@@ -96,11 +104,12 @@ export function PrayerSanctuaryModal({
 
   // Sync default scripture prop
   useEffect(() => {
-    if (currentVerseReference) {
-      setNewScripture(currentVerseReference);
-      setAiScripturePrompt(`${currentVerseReference} ${currentVerseText ? `"${currentVerseText.slice(0, 80)}..."` : ''}`);
+    const targetRef = currentChapterReference || currentVerseReference;
+    if (targetRef) {
+      setNewScripture(targetRef);
+      setAiScripturePrompt(targetRef);
     }
-  }, [currentVerseReference, currentVerseText]);
+  }, [currentVerseReference, currentChapterReference]);
 
   // Quiet Time Timer logic
   useEffect(() => {
@@ -128,15 +137,15 @@ export function PrayerSanctuaryModal({
 
   // Handle ESC key
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen && !isStandaloneTab) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !prayerToDelete && !answeringPrayer) {
+      if (e.key === 'Escape' && !prayerToDelete && !answeringPrayer && !isStandaloneTab) {
         onClose();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, prayerToDelete, answeringPrayer, onClose]);
+  }, [isOpen, isStandaloneTab, prayerToDelete, answeringPrayer, onClose]);
 
   // Handle Create Prayer
   const handleCreatePrayer = (e: React.FormEvent) => {
@@ -152,7 +161,7 @@ export function PrayerSanctuaryModal({
 
     setNewTitle('');
     setNewContent('');
-    setNewScripture('');
+    setNewScripture(defaultScriptureRef);
     setIsAddingPrayer(false);
     refreshPrayers();
   };
@@ -172,15 +181,23 @@ export function PrayerSanctuaryModal({
     setGeneratedAiPrayer(null);
     setAiSavedSuccess(false);
 
+    const fullChapterText = (chapterVerses && chapterVerses.length > 0)
+      ? chapterVerses.map(v => `${v.verse}. ${v.text}`).join(' ')
+      : (currentVerseText || '');
+
+    const passagePrompt = fullChapterText
+      ? `Passage: ${aiScripturePrompt}\nFull Scripture Text:\n"${fullChapterText.slice(0, 3500)}"`
+      : `Passage/Context: ${aiScripturePrompt}`;
+
     try {
       const response = await fetch('/api/chats', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: `Prayer: ${aiScripturePrompt}`,
-          prompt: `You are a reverent, warm, and pastorally sensitive prayer companion. 
+          prompt: `You are a reverent, warm, and pastorally sensitive Christian prayer companion. 
 Write a sincere, heartfelt personal prayer grounded in this scripture passage and theme:
-Passage/Context: ${aiScripturePrompt}
+${passagePrompt}
 Spiritual Focus: ${aiFocus}
 
 Format the response purely as a beautiful, heartfelt prayer of devotion, repentance, praise, and petition (around 120-180 words). Do not include introductory notes or filler markdown headings; write the direct prayer to God.`,
@@ -232,44 +249,32 @@ Format the response purely as a beautiful, heartfelt prayer of devotion, repenta
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
-  if (!isOpen) return null;
+  if (!isOpen && !isStandaloneTab) return null;
 
-  return (
-    <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/65 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 12 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 12 }}
-        transition={{ duration: 0.22, ease: "easeOut" }}
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-2xl bg-surface border border-border/80 rounded-3xl shadow-2xl overflow-hidden ring-1 ring-black/10 flex flex-col max-h-[92vh]"
-      >
-        {/* Header */}
-        <header className="px-6 py-5 border-b border-border/70 flex items-center justify-between bg-bg/40">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-rose-500/10 text-rose-500 border border-rose-500/20 flex items-center justify-center shadow-xs">
-              <Heart size={20} className="fill-rose-500/20" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-xl sm:text-2xl font-display font-bold text-fg tracking-tight">
-                  Prayer Sanctuary
-                </h2>
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/25">
-                  Daily Rhythm
-                </span>
-              </div>
-              <p className="text-xs text-muted">
-                Bring your petitions, praise answered prayers, and rest in quiet contemplation.
-              </p>
-            </div>
+  const contentBody = (
+    <div className={`w-full ${isStandaloneTab ? 'max-w-4xl mx-auto flex-1' : 'max-w-2xl max-h-[92vh]'} bg-surface border border-border/80 rounded-3xl shadow-2xl overflow-hidden ring-1 ring-black/10 flex flex-col`}>
+      {/* Header */}
+      <header className="px-6 py-5 border-b border-border/70 flex items-center justify-between bg-bg/40 shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-rose-500/10 text-rose-500 border border-rose-500/20 flex items-center justify-center shadow-xs">
+            <Heart size={20} className="fill-rose-500/20" />
           </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl sm:text-2xl font-display font-bold text-fg tracking-tight">
+                Prayer Sanctuary
+              </h2>
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/25">
+                Daily Rhythm
+              </span>
+            </div>
+            <p className="text-xs text-muted">
+              Bring your petitions, praise answered prayers, and rest in quiet contemplation.
+            </p>
+          </div>
+        </div>
 
+        {!isStandaloneTab && (
           <button
             type="button"
             onClick={onClose}
@@ -278,7 +283,8 @@ Format the response purely as a beautiful, heartfelt prayer of devotion, repenta
           >
             <X size={18} />
           </button>
-        </header>
+        )}
+      </header>
 
         {/* Navigation Tabs */}
         <nav className="flex items-center gap-1 px-6 pt-2 border-b border-border bg-bg/20 select-none overflow-x-auto custom-scroll">
@@ -496,10 +502,18 @@ Format the response purely as a beautiful, heartfelt prayer of devotion, repenta
                   <div className="w-12 h-12 rounded-2xl bg-surface border border-border flex items-center justify-center mx-auto text-muted">
                     <Heart size={24} />
                   </div>
-                  <h3 className="text-base font-semibold text-fg">No prayer requests in this view</h3>
+                  <h3 className="text-base font-semibold text-fg">No active prayer petitions yet</h3>
                   <p className="text-xs text-muted max-w-sm mx-auto">
-                    Bring your requests to God. Tap &ldquo;New Prayer&rdquo; above or use &ldquo;Pray this Scripture&rdquo; to generate a prayer from today’s reading.
+                    Bring your requests and needs before the Lord. Tap below to write a new personal prayer.
                   </p>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingPrayer(true)}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent hover:opacity-90 text-white text-xs font-semibold transition-all shadow-xs cursor-pointer mt-2"
+                  >
+                    <Plus size={14} />
+                    <span>+ New Prayer</span>
+                  </button>
                 </div>
               ) : (
                 filteredActivePrayers.map((prayer) => {
@@ -728,6 +742,35 @@ Format the response purely as a beautiful, heartfelt prayer of devotion, repenta
               </p>
             </div>
 
+            {currentChapterReference && chapterVerses && chapterVerses.length > 0 && (
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-surface border border-border space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <BookOpen size={14} className="text-accent" />
+                    <span className="text-xs font-bold text-fg">Active Reading: {currentChapterReference}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAiScripturePrompt(currentChapterReference);
+                      setAiFocus(`Pray through the truths of ${currentChapterReference}`);
+                    }}
+                    className="text-[11px] font-semibold text-accent hover:underline cursor-pointer"
+                  >
+                    Pray This Chapter
+                  </button>
+                </div>
+                <div className="max-h-32 overflow-y-auto p-2.5 rounded-xl bg-bg border border-border-soft text-xs text-fg-2 font-serif leading-relaxed custom-scroll">
+                  {chapterVerses.map(v => (
+                    <span key={v.verse} className="mr-1.5 inline">
+                      <sup className="text-[9px] font-sans font-bold text-muted mr-0.5">{v.verse}</sup>
+                      {v.text}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="space-y-3">
               <div>
                 <label className="text-xs font-semibold text-fg block mb-1">
@@ -807,17 +850,46 @@ Format the response purely as a beautiful, heartfelt prayer of devotion, repenta
         )}
 
         {/* Footer info */}
-        <footer className="px-6 py-3 bg-bg/50 border-t border-border text-center text-[11px] text-muted flex items-center justify-between">
+        <footer className="px-6 py-3 bg-bg/50 border-t border-border text-center text-[11px] text-muted flex items-center justify-between shrink-0">
           <span>Prayers update your daily reading streak automatically.</span>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-xs font-semibold text-accent hover:underline cursor-pointer"
-          >
-            Done
-          </button>
+          {!isStandaloneTab && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-xs font-semibold text-accent hover:underline cursor-pointer"
+            >
+              Done
+            </button>
+          )}
         </footer>
-      </motion.div>
+      </div>
+  );
+
+  return (
+    <>
+      {isStandaloneTab ? (
+        <div className="w-full flex-1 flex flex-col p-4 sm:p-6 lg:p-8 overflow-y-auto custom-scroll">
+          {contentBody}
+        </div>
+      ) : (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/65 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          onClick={onClose}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 12 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 12 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-2xl flex flex-col"
+          >
+            {contentBody}
+          </motion.div>
+        </div>
+      )}
 
       {/* Answer Prayer Dialog */}
       <AnimatePresence>
@@ -888,6 +960,6 @@ Format the response purely as a beautiful, heartfelt prayer of devotion, repenta
         }}
         onCancel={() => setPrayerToDelete(null)}
       />
-    </div>
+    </>
   );
 }

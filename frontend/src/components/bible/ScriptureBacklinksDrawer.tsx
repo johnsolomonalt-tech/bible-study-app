@@ -65,8 +65,12 @@ export function ScriptureBacklinksDrawer({
   const totalLinks = notes.length + canvasItems.length + highlights.length;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
+    <div 
+      className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-xs animate-in fade-in duration-200"
+      onClick={onClose}
+    >
       <div 
+        onClick={(e) => e.stopPropagation()}
         className={`w-full max-w-md h-full flex flex-col shadow-2xl border-l backdrop-blur-xl animate-in slide-in-from-right duration-250 ${
           isDark 
             ? 'bg-[#18181b]/95 border-zinc-700/80 text-zinc-100 shadow-[0_0_50px_rgba(0,0,0,0.7)]' 
@@ -77,7 +81,7 @@ export function ScriptureBacklinksDrawer({
         <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-200 dark:border-zinc-800">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs uppercase font-bold tracking-wider text-accent">Scripture Second Brain</span>
+              <span className="text-xs uppercase font-bold tracking-wider text-accent">Scripture References</span>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/30">
                 {totalLinks} References
               </span>

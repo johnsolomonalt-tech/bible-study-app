@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Sparkles, BookOpen, Scroll, Flame, GraduationCap, Heart, Check } from 'lucide-react';
 
-export type TheologicalLensType = 'canonical' | 'patristic' | 'reformation' | 'scholarly' | 'contemplative';
+export type TheologicalLensType = 'standard' | 'canonical' | 'patristic' | 'reformation' | 'scholarly' | 'contemplative';
 
 export interface LensOption {
   id: TheologicalLensType;
@@ -18,6 +18,16 @@ export interface LensOption {
 }
 
 export const THEOLOGICAL_LENS_OPTIONS: LensOption[] = [
+  {
+    id: 'standard',
+    name: 'Standard',
+    tagline: 'Balanced Bible Study',
+    description: 'Clear, balanced, and direct biblical insight without favoring any single theological camp or tradition.',
+    icon: <Sparkles size={13} />,
+    accentColor: '#c96442',
+    bgLight: 'rgba(201, 100, 66, 0.1)',
+    borderLight: 'rgba(201, 100, 66, 0.25)',
+  },
   {
     id: 'canonical',
     name: 'Canonical',

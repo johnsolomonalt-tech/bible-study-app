@@ -169,8 +169,8 @@ export function StreakPopover({
                     </div>
                   </div>
 
-                  <h2 className="text-3xl sm:text-4xl font-display font-bold text-fg tracking-tight mb-1">
-                    {streak} <span className="text-xl sm:text-2xl font-sans font-medium text-fg-2">Day Streak</span>
+                  <h2 className="text-2xl sm:text-3xl font-display font-semibold text-fg tracking-tight mb-1">
+                    {streak} <span className="text-base sm:text-lg font-sans font-normal text-muted">Day Streak</span>
                   </h2>
 
                   <p className="text-xs sm:text-sm text-fg-2 max-w-xs leading-relaxed min-h-[36px] flex items-center justify-center">
@@ -240,7 +240,7 @@ export function StreakPopover({
                       : 'border-transparent text-muted hover:text-fg'
                   }`}
                 >
-                  Today’s Goals
+                  Today
                 </button>
                 <button
                   type="button"
@@ -263,9 +263,16 @@ export function StreakPopover({
               <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4 custom-scroll">
                 {activeTab === 'rhythm' ? (
                   <>
+                    {isGlowing && (
+                      <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex items-center gap-2.5 text-xs text-fg animate-in fade-in">
+                        <Sparkles size={16} className="text-amber-500 shrink-0" />
+                        <span className="font-medium">Congratulations! You spent time in the Word today.</span>
+                      </div>
+                    )}
+
                     <div className="space-y-2.5">
                       <div className="text-[11px] font-bold uppercase tracking-widest text-muted">
-                        Today’s Reading
+                        Spiritual Habits
                       </div>
 
                       {/* 1. Scripture */}

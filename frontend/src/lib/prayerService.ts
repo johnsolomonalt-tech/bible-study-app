@@ -41,28 +41,7 @@ export const PRAYER_CATEGORIES: { id: PrayerCategory; label: string; icon: strin
 
 const PRAYERS_STORAGE_KEY = 'theologica_prayers_v1';
 
-const INITIAL_STARTER_PRAYERS: PrayerItem[] = [
-  {
-    id: 'starter-1',
-    title: 'Peace in the Midst of the Day',
-    content: 'Lord, grant me a quiet spirit and stillness of heart today. Help me cast all my anxieties upon You, knowing You care for me deeply.',
-    category: 'health',
-    scripture: 'Philippians 4:6-7',
-    isAnswered: false,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'starter-2',
-    title: 'Wisdom for Decisions & Work',
-    content: 'Father, give me discerning wisdom and clarity in all my responsibilities and decisions this week. Let my words be seasoned with grace.',
-    category: 'guidance',
-    scripture: 'James 1:5',
-    isAnswered: false,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
+const INITIAL_STARTER_PRAYERS: PrayerItem[] = [];
 
 function loadLocalPrayers(): PrayerItem[] {
   if (typeof window === 'undefined') return INITIAL_STARTER_PRAYERS;
@@ -70,7 +49,10 @@ function loadLocalPrayers(): PrayerItem[] {
     const raw = localStorage.getItem(PRAYERS_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) {
+        // Filter out legacy starter template items so user starts fresh
+        return parsed.filter((p: PrayerItem) => p.id !== 'starter-1' && p.id !== 'starter-2');
+      }
     }
   } catch {}
   return INITIAL_STARTER_PRAYERS;

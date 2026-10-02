@@ -467,7 +467,7 @@ const AiThinkingIndicator = ({
   thinkingText?: string; 
   isFullView?: boolean; 
 }) => {
-  const [showLiveThoughts, setShowLiveThoughts] = useState(true);
+  const [showLiveThoughts, setShowLiveThoughts] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
 
   // Real-time elapsed stopwatch (updates every 100ms)
@@ -797,6 +797,9 @@ export default function App() {
     if (activeTab === 'devotional') {
       recordHabitActivity('devotional');
     }
+    if (activeTab === 'prayer') {
+      recordHabitActivity('prayer');
+    }
   }, [activeTab]);
   
   // Devotional State
@@ -861,7 +864,7 @@ export default function App() {
   const [completedChapters, setCompletedChapters] = useState<string[]>([]);
   
   // Theological Lens & Feature States
-  const [theologicalLens, setTheologicalLens] = useState<TheologicalLensType>('canonical');
+  const [theologicalLens, setTheologicalLens] = useState<TheologicalLensType>('standard');
   const [isLectioModalOpen, setIsLectioModalOpen] = useState(false);
   const [isInterlinearMode, setIsInterlinearMode] = useState(false);
   const [interlinearShowStrongs, setInterlinearShowStrongs] = useState(false);
@@ -2350,28 +2353,49 @@ export default function App() {
   const activeNote = notes.find(n => n.id === activeNoteId) || { id: 0, title: 'No Note Selected', content: '' };
   const activeChat = (activeChatId ? chats.find(c => c.id === activeChatId) : null) || { id: 0, title: 'New Conversation', messages: [] };
 
-  const saveHighlight = async (color: string) => {
-    if (!isOnline) {
-      alert("You must be connected to the internet to save highlights.");
-      return;
+  const LOCAL_HIGHLIGHTS_KEY = 'theologica_local_highlights_v1';
+
+  const getLocalHighlights = (): {id: number, book: string, chapter: number, verse: number, text: string, color: string}[] => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem(LOCAL_HIGHLIGHTS_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
     }
+  };
+
+  const saveLocalHighlights = (hlList: {id: number, book: string, chapter: number, verse: number, text: string, color: string}[]) => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(LOCAL_HIGHLIGHTS_KEY, JSON.stringify(hlList));
+    } catch {}
+  };
+
+  const saveHighlight = async (color: string) => {
     const rawText = selectedText || selectionRange?.toString().trim() || '';
     if (!rawText || !selectionVerse) return;
     
     if (toolbarPosition?.highlightId) {
       const existingId = toolbarPosition.highlightId;
-      setHighlights(prev => prev.map(h => h.id === existingId ? { ...h, color } : h));
+      setHighlights(prev => {
+        const updated = prev.map(h => h.id === existingId ? { ...h, color } : h);
+        saveLocalHighlights(updated);
+        return updated;
+      });
       setToolbarPosition(null);
       window.getSelection()?.removeAllRanges();
 
-      try {
-        await fetchWithAuth(`${API_URL}/api/highlights/${existingId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ color })
-        });
-      } catch (e) {
-        console.error("Failed to update highlight", e);
+      if (isOnline) {
+        try {
+          await fetchWithAuth(`${API_URL}/api/highlights/${existingId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ color })
+          });
+        } catch (e) {
+          console.warn("Highlight saved locally (cloud sync pending)", e);
+        }
       }
       return;
     }
@@ -2379,7 +2403,7 @@ export default function App() {
     let text = cleanVerseText(rawText, selectionVerse, endVerseNumber || selectionVerse);
     
     // Fallback protection: if they try to highlight over text that is already highlighted
-    const verseHighlights = highlights.filter(h => h.book === activeBook.name && h.chapter === activeChapter && h.verse === selectionVerse);
+    const verseHighlights = highlights.filter(h => (!h.book || h.book === activeBook.name) && (!h.chapter || h.chapter === activeChapter) && h.verse === selectionVerse);
     const hasOverlap = verseHighlights.some(h => h.text.toLowerCase().includes(text.toLowerCase()) || text.toLowerCase().includes(h.text.toLowerCase()));
     
     if (hasOverlap) {
@@ -2393,39 +2417,54 @@ export default function App() {
     const book = activeBook.name;
     const chapter = activeChapter;
 
-    // Optimistic UI update
+    // Optimistic UI and immediate local cache update
     const tempId = Date.now();
     const newHighlight = { id: tempId, book, chapter, verse, text, color };
-    setHighlights(prev => [...prev, newHighlight]);
+    setHighlights(prev => {
+      const updated = [...prev, newHighlight];
+      saveLocalHighlights(updated);
+      return updated;
+    });
     setToolbarPosition(null);
     window.getSelection()?.removeAllRanges();
 
-    try {
-      const res = await fetchWithAuth(`${API_URL}/api/highlights`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ book, chapter, verse, text, color })
-      });
-      const data = await res.json();
-      setHighlights(prev => prev.map(h => h.id === tempId ? data : h));
-    } catch (e) {
-      setHighlights(prev => prev.filter(h => h.id !== tempId));
-      console.error("Failed to save highlight", e);
+    if (isOnline) {
+      try {
+        const res = await fetchWithAuth(`${API_URL}/api/highlights`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ book, chapter, verse, text, color })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.id) {
+            setHighlights(prev => {
+              const updated = prev.map(h => h.id === tempId ? data : h);
+              saveLocalHighlights(updated);
+              return updated;
+            });
+          }
+        }
+      } catch (e) {
+        console.warn("Highlight saved locally, cloud sync pending", e);
+      }
     }
   };
 
   const deleteHighlight = async (id: number) => {
     setToolbarPosition(null);
-    if (!isOnline) {
-      alert("You must be connected to the internet to delete highlights.");
-      return;
-    }
+    setHighlights(prev => {
+      const updated = prev.filter(h => h.id !== id);
+      saveLocalHighlights(updated);
+      return updated;
+    });
 
-    setHighlights(prev => prev.filter(h => h.id !== id));
-    try {
-      await fetchWithAuth(`${API_URL}/api/highlights/${id}`, { method: 'DELETE' });
-    } catch (e) {
-      console.error("Failed to delete highlight", e);
+    if (isOnline) {
+      try {
+        await fetchWithAuth(`${API_URL}/api/highlights/${id}`, { method: 'DELETE' });
+      } catch (e) {
+        console.warn("Deleted highlight locally", e);
+      }
     }
   };
 
@@ -2753,7 +2792,11 @@ export default function App() {
 
   const renderVerseContent = (verse: number, text: string) => {
     const { mainText, footnote } = parseVerseFootnote(text);
-    const verseHighlights = highlights.filter(h => h.verse === verse);
+    const verseHighlights = highlights.filter(h => 
+      (!h.book || h.book === activeBook.name) && 
+      (!h.chapter || h.chapter === activeChapter) && 
+      h.verse === verse
+    );
     if (verseHighlights.length === 0) {
       if (!footnote || !showFootnotes) return <>{renderTextWithInterlinear(mainText, verse)}</>;
       return (
@@ -3010,13 +3053,30 @@ export default function App() {
         }
       });
 
-    // Fetch highlights for current chapter
+    // Immediately load highlights from local storage for instant responsiveness
+    const localList = getLocalHighlights();
+    const chapterLocal = localList.filter(h => (!h.book || h.book === activeBook.name) && (!h.chapter || h.chapter === activeChapter));
+    if (isMounted) {
+      setHighlights(chapterLocal);
+    }
+
+    // Fetch highlights for current chapter from cloud and merge
     fetchWithAuth(`${API_URL}/api/highlights?book=${encodeURIComponent(activeBook.name)}&chapter=${activeChapter}`)
-      .then(r => r.json())
+      .then(r => r.ok ? r.json() : null)
       .then(data => {
-        if (isMounted && Array.isArray(data)) setHighlights(data);
+        if (isMounted && Array.isArray(data)) {
+          const combined = [...data];
+          chapterLocal.forEach(lh => {
+            if (!combined.some(ch => ch.verse === lh.verse && ch.text === lh.text)) {
+              combined.push(lh);
+            }
+          });
+          setHighlights(combined);
+          const allOther = localList.filter(h => (h.book !== activeBook.name || h.chapter !== activeChapter));
+          saveLocalHighlights([...allOther, ...combined]);
+        }
       })
-      .catch(e => console.error("Failed to load highlights", e));
+      .catch(e => console.warn("Using local highlights cache", e));
       
     // Cancel any ongoing speech when chapter changes
     // eslint-disable-next-line
@@ -3163,7 +3223,7 @@ export default function App() {
         }
         setShowLeftSidebar(true);
         setTimeout(() => {
-          const searchInput = document.querySelector('input[placeholder*="Filter books"]') as HTMLInputElement;
+          const searchInput = document.querySelector('input[placeholder*="Search books"]') as HTMLInputElement;
           searchInput?.focus();
           searchInput?.select();
         }, 50);
@@ -3656,9 +3716,9 @@ export default function App() {
         {/* Top Navbar */}
         <header className="sticky top-0 z-30 min-h-14 h-[calc(3.5rem+env(safe-area-inset-top,0px))] border-b border-border flex items-center justify-between px-4 sm:px-6 bg-bg shrink-0" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         
-        {/* Left: Logo */}
-        <div className="flex-1 flex items-center min-w-0">
-          <div className="font-display text-[20px] tracking-tight flex items-center gap-2.5 select-none">
+        {/* Left: Logo & Navigation Sidebar Toggle */}
+        <div className="flex-1 flex items-center min-w-0 gap-3">
+          <div className="font-display text-[20px] tracking-tight flex items-center gap-2.5 select-none shrink-0">
             <div className="relative w-8 h-8 rounded-xl overflow-hidden shadow-xs shrink-0 flex items-center justify-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img 
@@ -3671,6 +3731,23 @@ export default function App() {
               Theologica
             </span>
           </div>
+
+          {/* Collapsible Navigation Toggle - pinned at the top navbar only in Study area */}
+          {activeTab === 'study' && (
+            <button
+              type="button"
+              onClick={() => setShowLeftSidebar(!showLeftSidebar)}
+              className={`hidden lg:flex items-center justify-center p-1.5 rounded-lg border border-border-soft transition-colors cursor-pointer shrink-0 ${
+                showLeftSidebar 
+                  ? 'bg-surface text-fg hover:bg-border-soft' 
+                  : 'bg-surface/50 text-muted hover:text-fg hover:bg-surface'
+              }`}
+              title={showLeftSidebar ? 'Collapse Navigation Sidebar' : 'Expand Navigation Sidebar'}
+              aria-label="Toggle Navigation Sidebar"
+            >
+              {showLeftSidebar ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
+            </button>
+          )}
         </div>
 
         {/* Center: Tabs (Desktop) */}
@@ -3678,7 +3755,7 @@ export default function App() {
           aria-label="Navigation Tabs"
           className="hidden lg:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 items-center gap-1 p-1 bg-surface border border-border-soft/60 rounded-xl shadow-xs select-none"
         >
-          {['study', 'canvas', 'devotional', 'notes', 'chats', 'tracker'].map(tab => (
+          {['study', 'canvas', 'prayer', 'devotional', 'notes', 'chats', 'tracker'].map(tab => (
             <button 
               key={tab} 
               onClick={() => {
@@ -3701,6 +3778,7 @@ export default function App() {
             >
               {tab === 'study' && <Layout size={14} className={activeTab === tab ? 'text-accent' : ''} />}
               {tab === 'canvas' && <Workflow size={14} className={activeTab === tab ? 'text-accent' : ''} />}
+              {tab === 'prayer' && <Heart size={14} className={activeTab === tab ? 'text-accent' : ''} />}
               {tab === 'devotional' && <BookOpen size={14} className={activeTab === tab ? 'text-accent' : ''} />}
               {tab === 'notes' && <Edit size={14} className={activeTab === tab ? 'text-accent' : ''} />}
               {tab === 'chats' && <Sparkles size={14} className={activeTab === tab ? 'text-accent' : ''} />}
@@ -3811,7 +3889,7 @@ export default function App() {
                     type="text"
                     value={bookSearchQuery}
                     onChange={(e) => setBookSearchQuery(e.target.value)}
-                    placeholder="Filter books..."
+                    placeholder="Search books..."
                     className="w-full bg-surface border border-border/60 rounded-xl pl-8 pr-7 py-1.5 text-xs text-fg placeholder:text-muted focus:outline-none focus:border-accent/60 transition-colors"
                   />
                   {bookSearchQuery && (
@@ -4167,7 +4245,7 @@ export default function App() {
                           className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-fg/5 text-fg text-xs font-medium cursor-pointer transition-colors"
                         >
                           <Heart size={16} className="text-rose-400" />
-                          <span>Lectio Divina (Prayer Mode)</span>
+                          <span>Lectio Divina</span>
                         </button>
 
                         {/* Mark Completed */}
@@ -4653,7 +4731,7 @@ export default function App() {
                     type="text"
                     value={bookSearchQuery}
                     onChange={(e) => setBookSearchQuery(e.target.value)}
-                    placeholder="Filter books..."
+                    placeholder="Search books..."
                     className="w-full bg-surface border border-border/60 rounded-xl pl-8 pr-7 py-1.5 text-xs text-fg placeholder:text-muted focus:outline-none focus:border-accent/60 transition-colors"
                   />
                   {bookSearchQuery && (
@@ -4860,39 +4938,12 @@ export default function App() {
             <Panel defaultSize="60" minSize="30" className={`w-full lg:w-auto flex-col h-full bg-bg ${mobileStudyView === 'reader' ? 'flex' : 'hidden lg:flex'}`}>
               <PanelGroup orientation="vertical" id="theologica-layout-vertical-v2">
                 <Panel defaultSize="75" minSize="30" className="flex flex-col relative">
-                  <header className="h-[60px] border-b border-border flex items-center justify-between px-4 lg:px-6 bg-bg shrink-0">
-                    <div className="flex items-center gap-1 lg:gap-2 min-w-0">
-                      <div className="font-display text-[18px] lg:text-[22px] truncate">{activeBook.name} {activeChapter}</div>
+                  <header className="h-[60px] border-b border-border flex items-center justify-between px-3 sm:px-4 lg:px-6 bg-bg shrink-0 gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0 shrink-0">
+                      <div className="font-display text-[16px] sm:text-[18px] lg:text-[20px] font-semibold whitespace-nowrap shrink-0">{activeBook.name} {activeChapter}</div>
                     </div>
-                    <div className="flex items-center gap-1.5 lg:gap-2.5">
-                      <button
-                        onClick={() => setIsPrayerSanctuaryOpen(true)}
-                        className="hidden 2xl:flex items-center gap-1.5 text-[13px] font-medium px-3 py-2 rounded-lg bg-surface text-fg hover:bg-border-soft hover:text-rose-500 border border-border ring-shadow transition-all cursor-pointer"
-                        title="Open Prayer Sanctuary for this passage"
-                      >
-                        <Heart size={15} className="text-rose-500" />
-                        <span>Prayer</span>
-                      </button>
-                      <button
-                        onClick={() => setIsLectioModalOpen(true)}
-                        className="hidden 2xl:flex items-center gap-1.5 text-[13px] font-medium px-3 py-2 rounded-lg bg-surface text-fg hover:bg-border-soft hover:text-accent border border-border ring-shadow transition-all cursor-pointer"
-                        title="Lectio Divina Guided Prayer & Contemplation Mode"
-                      >
-                        <Heart size={15} className="text-accent" />
-                        <span>Lectio</span>
-                      </button>
-                      <button
-                        onClick={() => handleToggleInterlinearMode()}
-                        className={`hidden xl:flex items-center gap-1.5 text-[13px] font-medium px-3 py-2 rounded-lg border ring-shadow transition-all cursor-pointer ${
-                          isInterlinearMode
-                            ? 'border-accent bg-accent text-accent-on shadow-accent/20'
-                            : 'border-border bg-surface text-fg hover:bg-border-soft'
-                        }`}
-                        title={isInterlinearMode ? "Disable Reverse Interlinear" : "Enable Reverse Interlinear (Original Hebrew/Greek Word Study)"}
-                      >
-                        <Languages size={15} />
-                        <span>Interlinear</span>
-                      </button>
+                    <div className="flex items-center gap-1 sm:gap-1.5 lg:gap-2 min-w-0 justify-end">
+                      {/* 1. Backlinks: First to collapse into 3 dots on narrower widths */}
                       <button
                         onClick={() => {
                           setBacklinksDrawerState({
@@ -4901,10 +4952,10 @@ export default function App() {
                             backlinks: totalChapterBacklinks,
                           });
                         }}
-                        className={`hidden 2xl:flex items-center gap-1.5 text-[13px] font-medium px-3 py-2 rounded-lg border ring-shadow transition-all cursor-pointer ${
+                        className={`hidden min-[1600px]:flex items-center gap-1.5 text-[13px] font-medium px-3 py-2 rounded-lg border ring-shadow transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                           totalChapterBacklinks.totalCount > 0
                             ? 'border-accent/40 bg-accent/10 text-accent hover:bg-accent/15'
-                            : 'border-border bg-surface text-muted hover:text-fg'
+                            : 'border-border bg-surface text-fg hover:bg-border-soft'
                         }`}
                         title="Scripture Backlinks (Notes, Canvas Boards & Highlights)"
                       >
@@ -4916,24 +4967,46 @@ export default function App() {
                           </span>
                         )}
                       </button>
-                      <button onClick={toggleCompleted} className="hidden xl:flex items-center gap-2 text-[13px] font-medium px-3.5 py-2 rounded-lg bg-surface text-fg hover:bg-border-soft ring-shadow ring-shadow-hover transition-all cursor-pointer">
-                        <Check size={16} className={isCompleted ? "text-accent" : "text-meta"} /> 
-                        {isCompleted ? "Completed" : "Mark Complete"}
-                      </button>
-                      <button onClick={toggleSpeech} className="flex items-center justify-center p-2 min-w-[44px] min-h-[44px] rounded-lg text-fg-2 hover:text-fg hover:bg-surface transition-colors cursor-pointer touch-manipulation" title="Read chapter aloud">
-                        {isSpeaking ? <VolumeX size={20} className="text-accent" /> : <Volume2 size={20} />}
-                      </button>
-                      
-                      <div className="hidden lg:block h-6 w-px bg-border/60"></div>
-                      
-                      <TranslationSelector 
-                        currentTranslation={translation} 
-                        onSelectTranslation={setTranslation}
-                        theme={theme as 'dark' | 'light'}
-                      />
 
-                      {/* Desktop 3-dots more menu when secondary tools collapse */}
-                      <div className="relative 2xl:hidden desktop-more-menu-container">
+                      {/* 2. Lectio: Second to collapse into 3 dots */}
+                      <button
+                        onClick={() => setIsLectioModalOpen(true)}
+                        className="hidden 2xl:flex items-center gap-1.5 text-[13px] font-medium px-3 py-2 rounded-lg bg-surface text-fg hover:bg-border-soft hover:text-accent border border-border ring-shadow transition-all cursor-pointer whitespace-nowrap shrink-0"
+                        title="Lectio Divina Guided Meditation"
+                      >
+                        <Heart size={15} className="text-accent" />
+                        <span>Lectio</span>
+                      </button>
+
+                      {/* 3. Interlinear: Third to collapse into 3 dots */}
+                      <button
+                        onClick={() => handleToggleInterlinearMode()}
+                        className={`hidden xl:flex items-center gap-1.5 text-[13px] font-medium px-3 py-2 rounded-lg border ring-shadow transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                          isInterlinearMode
+                            ? 'border-accent bg-accent text-accent-on shadow-accent/20'
+                            : 'border-border bg-surface text-fg hover:bg-border-soft'
+                        }`}
+                        title={isInterlinearMode ? "Disable Reverse Interlinear" : "Enable Reverse Interlinear (Original Hebrew/Greek Word Study)"}
+                      >
+                        <Languages size={15} />
+                        <span>Interlinear</span>
+                      </button>
+
+                      {/* 4. Mark Complete: Fourth/Last to collapse into 3 dots */}
+                      <button 
+                        onClick={toggleCompleted} 
+                        className="hidden lg:flex items-center gap-2 text-[13px] font-medium px-3.5 py-2 rounded-lg bg-surface text-fg hover:bg-border-soft ring-shadow ring-shadow-hover transition-all cursor-pointer whitespace-nowrap shrink-0"
+                      >
+                        <Check size={16} className={isCompleted ? "text-accent" : "text-meta"} /> 
+                        <span>{isCompleted ? "Completed" : "Mark Complete"}</span>
+                      </button>
+
+                      <button onClick={toggleSpeech} className="flex items-center justify-center p-2 min-w-[38px] min-h-[38px] rounded-lg text-fg-2 hover:text-fg hover:bg-surface transition-colors cursor-pointer touch-manipulation shrink-0" title="Read chapter aloud">
+                        {isSpeaking ? <VolumeX size={18} className="text-accent" /> : <Volume2 size={18} />}
+                      </button>
+                      
+                      {/* Desktop 3-dots more menu: visible when study tools collapse */}
+                      <div className="relative min-[1600px]:hidden desktop-more-menu-container shrink-0">
                         <button
                           type="button"
                           onClick={() => setIsDesktopMoreMenuOpen(!isDesktopMoreMenuOpen)}
@@ -4951,35 +5024,6 @@ export default function App() {
                             className="absolute right-0 top-full mt-2 w-64 rounded-2xl bg-surface border border-border shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 backdrop-blur-xl space-y-1"
                             onClick={() => setIsDesktopMoreMenuOpen(false)}
                           >
-                            {/* Reverse Interlinear */}
-                            <button
-                              type="button"
-                              onClick={() => handleToggleInterlinearMode()}
-                              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-fg/5 text-xs font-medium cursor-pointer transition-colors ${
-                                isInterlinearMode ? 'text-accent bg-accent/10 font-semibold' : 'text-fg'
-                              }`}
-                            >
-                              <div className="flex items-center gap-2.5">
-                                <Languages size={16} className={isInterlinearMode ? "text-accent" : "text-fg-2"} />
-                                <span>Reverse Interlinear</span>
-                              </div>
-                              {isInterlinearMode && (
-                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-accent text-accent-on">
-                                  Active
-                                </span>
-                              )}
-                            </button>
-
-                            {/* Lectio Divina */}
-                            <button
-                              type="button"
-                              onClick={() => setIsLectioModalOpen(true)}
-                              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-fg/5 text-fg text-xs font-medium cursor-pointer transition-colors"
-                            >
-                              <Heart size={16} className="text-rose-400" />
-                              <span>Lectio Divina (Prayer Mode)</span>
-                            </button>
-
                             {/* Scripture Backlinks */}
                             <button
                               type="button"
@@ -5003,6 +5047,35 @@ export default function App() {
                               )}
                             </button>
 
+                            {/* Lectio Divina */}
+                            <button
+                              type="button"
+                              onClick={() => setIsLectioModalOpen(true)}
+                              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-fg/5 text-fg text-xs font-medium cursor-pointer transition-colors"
+                            >
+                              <Heart size={16} className="text-rose-400" />
+                              <span>Lectio Divina</span>
+                            </button>
+
+                            {/* Reverse Interlinear */}
+                            <button
+                              type="button"
+                              onClick={() => handleToggleInterlinearMode()}
+                              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-fg/5 text-xs font-medium cursor-pointer transition-colors ${
+                                isInterlinearMode ? 'text-accent bg-accent/10 font-semibold' : 'text-fg'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <Languages size={16} className={isInterlinearMode ? "text-accent" : "text-fg-2"} />
+                                <span>Reverse Interlinear</span>
+                              </div>
+                              {isInterlinearMode && (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-accent text-accent-on">
+                                  Active
+                                </span>
+                              )}
+                            </button>
+
                             {/* Mark Completed */}
                             <button
                               type="button"
@@ -5013,7 +5086,7 @@ export default function App() {
                             >
                               <div className="flex items-center gap-2.5">
                                 <Check size={16} className={isCompleted ? "text-accent" : "text-meta"} />
-                                <span>{isCompleted ? 'Marked Completed' : 'Mark as Completed'}</span>
+                                <span>{isCompleted ? 'Marked Completed' : 'Mark Complete'}</span>
                               </div>
                               {isCompleted && (
                                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-accent/15 text-accent">
@@ -5025,10 +5098,17 @@ export default function App() {
                         )}
                       </div>
 
-                      <div className="hidden lg:flex items-center bg-surface rounded-lg p-0.5">
-                        <button onClick={() => setShowLeftSidebar(!showLeftSidebar)} className={`p-1.5 rounded-md transition-colors cursor-pointer ${showLeftSidebar ? 'text-fg hover:bg-border-soft' : 'text-muted hover:text-fg'}`} title="Toggle Navigation">
-                          {showLeftSidebar ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
-                        </button>
+                      <div className="hidden lg:block h-5 w-px bg-border/60 shrink-0"></div>
+                      
+                      <div className="shrink-0">
+                        <TranslationSelector 
+                          currentTranslation={translation} 
+                          onSelectTranslation={setTranslation}
+                          theme={theme as 'dark' | 'light'}
+                        />
+                      </div>
+
+                      <div className="hidden lg:flex items-center bg-surface rounded-lg p-0.5 shrink-0">
                         <button onClick={() => setShowBottomNotes(!showBottomNotes)} className={`p-1.5 rounded-md transition-colors cursor-pointer ${showBottomNotes ? 'text-fg hover:bg-border-soft' : 'text-muted hover:text-fg'}`} title="Toggle Notes">
                           {showBottomNotes ? <PanelBottomClose size={18} /> : <PanelBottomOpen size={18} />}
                         </button>
@@ -5535,13 +5615,11 @@ export default function App() {
         {toolbarPosition && (
           <div 
             onMouseDown={(e) => e.preventDefault()}
-            className={`floating-verse-toolbar fixed z-50 flex items-center gap-1 sm:gap-1.5 bg-surface/95 border border-border-soft p-1.5 rounded-xl shadow-xl backdrop-blur-md max-w-[calc(100vw-24px)] overflow-x-auto no-scrollbar custom-scroll ${
-              toolbarPosition.isBelow ? 'translate-y-2' : '-translate-y-full'
-            }`}
+            className="floating-verse-toolbar fixed z-50 flex items-center gap-1 sm:gap-1.5 bg-surface/95 border border-border-soft p-1.5 rounded-xl shadow-xl backdrop-blur-md max-w-[calc(100vw-24px)] overflow-x-auto no-scrollbar custom-scroll transition-opacity"
             style={{ 
               left: Math.max(12, Math.min(typeof window !== 'undefined' ? window.innerWidth - 12 : 360, toolbarPosition.x)), 
               top: toolbarPosition.y,
-              transform: 'translateX(-50%)'
+              transform: toolbarPosition.isBelow ? 'translate(-50%, 8px)' : 'translate(-50%, calc(-100% - 8px))'
             }}
           >
             <button 
@@ -6361,6 +6439,22 @@ export default function App() {
         )}
 
 
+        {/* PRAYER TAB */}
+        {activeTab === 'prayer' && (
+          <div className="flex-1 w-full h-full relative overflow-hidden flex flex-col bg-bg">
+            <PrayerSanctuaryModal
+              isOpen={true}
+              onClose={() => setActiveTab('study')}
+              currentVerseReference={`${activeBook.name} ${activeChapter}:${selectionVerse || 1}`}
+              currentVerseText={bibleVerses.find(v => v.verse === selectionVerse)?.text || bibleVerses[0]?.text || ''}
+              currentChapterReference={`${activeBook.name} ${activeChapter}`}
+              chapterVerses={bibleVerses}
+              onNavigateToScripture={navigateToVerse}
+              isStandaloneTab={true}
+            />
+          </div>
+        )}
+
         {/* CANVAS TAB */}
         <div className={`flex-1 w-full h-full relative overflow-hidden ${activeTab === 'canvas' ? 'flex flex-col' : 'hidden'}`}>
           <CanvasBoard
@@ -6381,7 +6475,7 @@ export default function App() {
           }`}
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
-          {['study', 'canvas', 'devotional', 'notes', 'chats', 'tracker'].map(tab => {
+          {['study', 'canvas', 'prayer', 'devotional', 'notes', 'chats', 'tracker'].map(tab => {
             const isActive = activeTab === tab;
             return (
               <button 
@@ -6408,13 +6502,14 @@ export default function App() {
                 <div className="relative">
                   {tab === 'study' && <Layout size={19} className="mb-0.5" />}
                   {tab === 'canvas' && <Workflow size={19} className="mb-0.5" />}
+                  {tab === 'prayer' && <Heart size={19} className="mb-0.5" />}
                   {tab === 'devotional' && <BookOpen size={19} className="mb-0.5" />}
                   {tab === 'notes' && <Edit size={19} className="mb-0.5" />}
                   {tab === 'chats' && <Sparkles size={19} className="mb-0.5" />}
                   {tab === 'tracker' && <Target size={19} className="mb-0.5" />}
                 </div>
                 <span className="text-[10px] tracking-tight capitalize truncate max-w-full px-0.5">
-                  {tab === 'chats' ? 'Chats' : tab === 'devotional' ? 'Devotion' : tab}
+                  {tab === 'chats' ? 'Chats' : tab === 'devotional' ? 'Devotion' : tab === 'prayer' ? 'Prayer' : tab}
                 </span>
               </button>
             );
@@ -6435,7 +6530,7 @@ export default function App() {
           onSaveToNotes={handleSaveLectioToNotes}
         />
 
-        {/* Scripture Backlinks Drawer (Scripture Second Brain) */}
+        {/* Scripture Backlinks Drawer (Scripture Connections) */}
         <ScriptureBacklinksDrawer
           isOpen={backlinksDrawerState.isOpen}
           onClose={() => setBacklinksDrawerState(prev => ({ ...prev, isOpen: false }))}
@@ -6507,6 +6602,8 @@ export default function App() {
           onClose={() => setIsPrayerSanctuaryOpen(false)}
           currentVerseReference={`${activeBook.name} ${activeChapter}:${selectionVerse || 1}`}
           currentVerseText={bibleVerses.find(v => v.verse === selectionVerse)?.text || bibleVerses[0]?.text || ''}
+          currentChapterReference={`${activeBook.name} ${activeChapter}`}
+          chapterVerses={bibleVerses}
           onNavigateToScripture={navigateToVerse}
         />
 

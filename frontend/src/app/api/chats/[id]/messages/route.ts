@@ -49,6 +49,11 @@ For each key root word you introduce:
 - Explain its lexical and etymological meaning, showing how the original linguistic depth enriches the user's understanding of the biblical text or concept.
 Blend these original language insights naturally and clearly into your response alongside scripture citations and practical applications.
 
+CONCISE, FOCUSED RESPONSES:
+- Keep your final responses concise, punchy, and clear. Avoid filler, longwinded pleasantries, or excessive repetition.
+- Aim for high-density biblical insight: answer the question directly, provide the core scripture context and root word analysis clearly, and offer a practical takeaway in 2 to 4 focused paragraphs or clean bullet points unless the user specifically asks for an extensive treatise.
+- Speak with natural human warmth, theological clarity, and reverence.
+
 TAILORED FOLLOW-UP QUESTIONS:
 At the very end of every study response (after all your text), provide exactly 3 concise, deeply engaging follow-up questions tailored specifically to the verses and theological themes you just discussed. Format them strictly on a single line at the very end as:
 __SUGGESTED_FOLLOW_UPS__["Question 1?", "Question 2?", "Question 3?"]__END_SUGGESTED_FOLLOW_UPS__`;
@@ -163,6 +168,12 @@ function resolveServerScripture(
 }
 
 const THEOLOGICAL_LENSES: Record<string, string> = {
+  standard: `[ACTIVE THEOLOGICAL LENS: BALANCED BIBLE STUDY / NEUTRAL]
+You are operating without bias toward any single theological tradition or school of thought. Present clear, balanced, and direct biblical insight rooted firmly in the scriptures themselves. Explain the passage faithfully, highlighting the plain meaning and historical context while avoiding narrow sectarian dogmas.`,
+
+  none: `[ACTIVE THEOLOGICAL LENS: BALANCED BIBLE STUDY / NEUTRAL]
+You are operating without bias toward any single theological tradition or school of thought. Present clear, balanced, and direct biblical insight rooted firmly in the scriptures themselves. Explain the passage faithfully, highlighting the plain meaning and historical context while avoiding narrow sectarian dogmas.`,
+
   canonical: `[ACTIVE THEOLOGICAL LENS: CANONICAL / BALANCED]
 You are operating from a canonical, Christ-centered, balanced biblical theology. Ground all analysis in the organic unity of the Old and New Testaments. Present mainstream orthodox Christian convictions with clarity, charity, and pastoral warmth.`,
 
@@ -389,6 +400,8 @@ async function processAiMessage({
 
   // Step C: Real Theological Lens Application
   const lensLabels: Record<string, string> = {
+    standard: 'Applying Standard lens: balanced biblical study...',
+    none: 'Applying Standard lens: balanced biblical study...',
     canonical: 'Applying Canonical lens: tracing redemptive-historical theology & Christological fulfillment...',
     patristic: 'Applying Patristic lens: consulting Early Church Fathers (Chrysostom, Augustine, Irenaeus)...',
     reformation: 'Applying Reformation lens: consulting Luther, Calvin & historic Protestant confessions...',
