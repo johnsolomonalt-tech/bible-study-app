@@ -153,13 +153,13 @@ export function ExportStudyGuideModal({
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-bold leading-tight flex items-center gap-2 text-fg">
-                Export Study Guide & Sermon Outline
+                Export Study Guide &amp; Sermon Outline
                 <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
                   {nodes.length} Cards
                 </span>
               </h2>
               <p className="text-xs text-muted">
-                Transform this visual mind-map into a structured, ready-to-teach curriculum.
+                Turn your study cards into a clean study guide, sermon outline, or discussion sheet.
               </p>
             </div>
           </div>
@@ -240,7 +240,7 @@ export function ExportStudyGuideModal({
             <div className="h-64 flex flex-col items-center justify-center gap-3">
               <Loader2 size={32} className="animate-spin text-accent" />
               <p className="text-sm font-medium text-muted animate-pulse">
-                Synthesizing {nodes.length} canvas nodes into {selectedFormat.replace('_', ' ')} format...
+                Writing {selectedFormat.replace('_', ' ')} from your {nodes.length} cards...
               </p>
             </div>
           ) : isEditing ? (

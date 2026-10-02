@@ -37,7 +37,7 @@ const CHAPTER_SPECIFIC_STARTERS: Record<string, { prompt: string; subtitle: stri
     { prompt: "How did the Early Church Fathers see the Burning Bush as a type of the Incarnation?", subtitle: "Patristic Typology", icon: "patristic" },
   ],
   'Psalm-23': [
-    { prompt: "Unpack the covenantal shepherd imagery in Psalm 23 and how Jesus fulfills it as the Good Shepherd in John 10.", subtitle: "Christological Fulfillment", icon: "cross" },
+    { prompt: "Explain the shepherd imagery in Psalm 23 and how Jesus fulfills it as the Good Shepherd in John 10.", subtitle: "Prophecy & Fulfillment", icon: "cross" },
     { prompt: "Give a contemplative devotional reflection on 'He restores my soul' in Psalm 23:3.", subtitle: "Spiritual Formation", icon: "heart" },
   ],
   'Isaiah-53': [
@@ -53,7 +53,7 @@ const CHAPTER_SPECIFIC_STARTERS: Record<string, { prompt: string; subtitle: stri
     { prompt: "How does John 1:14 ('and the Word became flesh and dwelt among us') echo Old Testament Tabernacle imagery?", subtitle: "Typology & Incarnation", icon: "cross" },
   ],
   'Romans-8': [
-    { prompt: "Unpack the Golden Chain of Redemption in Romans 8:29-30 and the assurance of salvation.", subtitle: "Soteriology & Grace", icon: "flame" },
+    { prompt: "Explain the Golden Chain of Redemption in Romans 8:29-30 and the assurance of salvation.", subtitle: "Salvation & Grace", icon: "flame" },
     { prompt: "What does Paul mean by the Spirit's 'groanings too deep for words' in Romans 8:26-27?", subtitle: "Pneumatology & Prayer", icon: "heart" },
   ],
   'Revelation-21': [
@@ -210,13 +210,13 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
         </div>
       </div>
 
-      {/* Thematic Deep Dives */}
+      {/* Study Topics */}
       {!isCompact && (
         <div className="w-full">
           <div className="flex items-center gap-2 mb-2.5 px-1">
             <Compass size={12} className="text-muted" />
             <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">
-              Thematic Exploration
+              Explore Topics
             </span>
           </div>
 

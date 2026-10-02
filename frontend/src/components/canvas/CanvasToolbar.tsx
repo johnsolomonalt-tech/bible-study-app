@@ -293,7 +293,7 @@ export function CanvasToolbar({
           type="button"
           onClick={onOpenAi}
           className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-accent text-accent-on hover:opacity-95 text-xs font-semibold shadow-xs active:scale-95 transition-all cursor-pointer ring-1 ring-accent/30"
-          title="Ask Theologica AI to architect or expand your canvas"
+          title="Ask Theologica AI to build or expand your canvas"
         >
           <Sparkles size={14} className="shrink-0" />
           <span className="hidden md:inline">Theologica AI</span>

@@ -92,7 +92,7 @@ export function NoteTemplatesModal({
                   Library
                 </span>
               </h2>
-              <p className="text-[12px] text-meta">Choose a time-tested study framework to elevate your personal notes</p>
+              <p className="text-[12px] text-meta">Choose a structured format for your Bible study notes</p>
             </div>
           </div>
           <button

@@ -813,7 +813,7 @@ export function SettingsModal(props: SettingsModalProps) {
                     </span>
                   </div>
                   <p className="text-xs text-muted leading-relaxed">
-                    Custom pace presets, forecasts, and target milestones are now configured directly within the <strong className="text-fg">Reading Tracker</strong> tab via the <strong className="text-accent">&quot;Edit Pace / Goals&quot;</strong> button.
+                    Daily chapter goals and reading timeline estimates can now be changed directly in the <strong className="text-fg">Reading Tracker</strong> tab using the <strong className="text-accent">&quot;Edit Daily Goal&quot;</strong> button.
                   </p>
                 </div>
               </div>

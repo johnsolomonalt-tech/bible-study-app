@@ -48,14 +48,14 @@ export interface StreakData {
 }
 
 export const STREAK_MILESTONES: Omit<StreakMilestone, 'isEarned'>[] = [
-  { days: 1, title: 'First Spark', badge: '✨', description: 'You lit the flame of daily quiet time.' },
-  { days: 3, title: 'Kindled Flame', badge: '🔥', description: '3 days of steadfast scripture seeking.' },
-  { days: 7, title: 'Steady Torch', badge: '🕯️', description: 'A full week walking in God’s presence.' },
-  { days: 14, title: 'Warm Hearth', badge: '🪵', description: 'Two weeks of consistent spiritual rhythm.' },
-  { days: 30, title: 'Radiant Beacon', badge: '🏮', description: 'A full month anchored in the Word.' },
-  { days: 60, title: 'Guiding Light', badge: '🌟', description: 'Two months shining brightly in faith.' },
-  { days: 100, title: 'City on a Hill', badge: '🏛️', description: 'A hundred days unyielding in truth.' },
-  { days: 365, title: 'Eternal Flame', badge: '👑', description: 'A full year immersed in Holy Scripture.' },
+  { days: 1, title: 'First Step', badge: '✨', description: 'Started your daily Bible reading.' },
+  { days: 3, title: '3-Day Streak', badge: '🔥', description: '3 days of reading Scripture.' },
+  { days: 7, title: 'One Week', badge: '🕯️', description: 'One full week of daily reading.' },
+  { days: 14, title: 'Two Weeks', badge: '🪵', description: 'Two weeks of consistent reading.' },
+  { days: 30, title: 'One Month', badge: '🏮', description: 'One full month in God’s Word.' },
+  { days: 60, title: 'Two Months', badge: '🌟', description: 'Two continuous months of daily reading.' },
+  { days: 100, title: '100 Days', badge: '🏛️', description: 'One hundred days of reading Scripture.' },
+  { days: 365, title: 'One Year', badge: '👑', description: 'A full year of daily Scripture reading.' },
 ];
 
 const STREAK_STORAGE_KEY = 'theologica_reading_streak_v1';

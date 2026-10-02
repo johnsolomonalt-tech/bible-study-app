@@ -430,8 +430,8 @@ export function LectioDivinaModal({
                     <h4 className="font-serif font-bold text-base text-fg">Contemplation Complete</h4>
                     <p className="text-xs text-muted max-w-sm mx-auto">
                       {canSaveToNotes
-                        ? "All four stages of Lectio Divina have been fulfilled. Save your reflection, stirring phrase, and prayer directly into your Notes."
-                        : "Almost done! Add some text to your Meditatio and Oratio stages below to unlock saving to your Notes."}
+                        ? "You've finished all four steps. Save your reflection, key verse, and prayer directly into your Notes."
+                        : "Almost done! Add your reflection to Meditation and Prayer below to save this to your Notes."}
                     </p>
                   </div>
 

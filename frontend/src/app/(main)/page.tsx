@@ -6169,7 +6169,7 @@ export default function App() {
               <div className="max-w-5xl mx-auto">
                 <header className="mb-6 sm:mb-8">
                   <h1 className="text-2xl sm:text-[40px] font-display text-fg mb-2 sm:mb-3">Reading Tracker</h1>
-                  <p className="text-sm sm:text-[16px] text-muted">Track your daily spiritual rhythm, reading streak, and journey through all 66 books.</p>
+                  <p className="text-sm sm:text-[16px] text-muted">Track your reading streak, daily goals, and progress through all 66 books.</p>
                 </header>
 
                 {/* Streak, Daily Goal & 7-Day Consistency Dashboard */}

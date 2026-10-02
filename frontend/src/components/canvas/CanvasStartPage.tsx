@@ -104,10 +104,10 @@ export function CanvasStartPage({
   };
 
   const MILESTONES = [
-    "Analyzing biblical passages & systematic theology...",
-    "Tracing cross-references & doctrinal connections...",
-    "Formulating structured theological cards...",
-    "Computing collision-free spatial layout coordinates...",
+    "Searching Scripture passages & context...",
+    "Finding cross-references & key verses...",
+    "Creating study cards...",
+    "Arranging cards on your board...",
   ];
 
   return (
@@ -164,7 +164,7 @@ export function CanvasStartPage({
 
             <div className="space-y-1">
               <h3 className="text-base font-bold tracking-tight">
-                Architecting Canvas Board
+                Building Your Canvas
               </h3>
               <p className="text-xs text-accent font-medium">
                 {MILESTONES[generatingStep] || 'Finalizing cards and connections...'}
@@ -215,10 +215,10 @@ export function CanvasStartPage({
                 <Sparkles size={20} className="text-accent" />
               </div>
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-fg">
-                Architect a Theological Canvas
+                Create a Study Board
               </h1>
               <p className="text-xs sm:text-sm text-muted max-w-md leading-relaxed">
-                Transform Scripture passages, doctrines, and theological themes into an interactive visual whiteboard graph.
+                Explore Scripture passages, themes, and study notes on a visual whiteboard.
               </p>
             </div>
 
@@ -303,7 +303,7 @@ export function CanvasStartPage({
                     className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent text-accent-on text-xs font-semibold hover:opacity-90 disabled:opacity-40 disabled:hover:opacity-40 active:scale-95 transition-all shadow-xs cursor-pointer"
                   >
                     <Sparkles size={14} />
-                    <span>Generate Canvas</span>
+                    <span>Create Board</span>
                   </button>
                 </div>
               </div>

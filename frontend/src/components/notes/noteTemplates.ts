@@ -117,7 +117,7 @@ Lord, seal this Word in my heart so that I do not merely listen, but act upon Yo
     id: 'word_study',
     name: 'Word & Character Study',
     badge: 'Original Languages',
-    description: 'Deep dive into Hebrew/Greek terms, Strong’s concordance, and biblical theology.',
+    description: 'Study Hebrew and Greek terms, Strong’s concordance, and biblical theology.',
     icon: 'Scroll',
     content: (date) => `# 📜 Word Study: [Word / Concept]
 *Date: ${date}* #wordstudy #original-languages

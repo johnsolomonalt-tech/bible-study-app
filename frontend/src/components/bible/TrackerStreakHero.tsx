@@ -64,7 +64,7 @@ export function TrackerStreakHero({
           <div className="flex items-start justify-between">
             <div className="space-y-1">
               <span className="text-[11px] font-bold uppercase tracking-wider text-muted">
-                Daily Habit Streak
+                Reading Streak
               </span>
               <div className="flex items-baseline gap-2">
                 <span className="text-3xl sm:text-4xl font-display font-bold text-fg">
@@ -90,10 +90,10 @@ export function TrackerStreakHero({
               {streakData.isCompletedToday ? (
                 <>
                   <Check size={14} className="text-emerald-500 font-bold" />
-                  <span className="text-emerald-500 font-medium">Flame active today</span>
+                  <span className="text-emerald-500 font-medium">Read today</span>
                 </>
               ) : (
-                <span>Read today to keep alive</span>
+                <span>Read today to keep your streak</span>
               )}
             </div>
             {streakData.isGraceActive && (
@@ -109,7 +109,7 @@ export function TrackerStreakHero({
           <div className="flex items-start justify-between">
             <div className="space-y-1">
               <span className="text-[11px] font-bold uppercase tracking-wider text-muted">
-                Today’s Reading Goal
+                Today’s Goal
               </span>
               <div className="flex items-baseline gap-2">
                 <span className="text-3xl sm:text-4xl font-display font-bold text-fg">
@@ -133,7 +133,7 @@ export function TrackerStreakHero({
           {/* Goal Progress bar */}
           <div className="mt-4 pt-3 border-t border-border/50 space-y-1.5">
             <div className="flex justify-between text-[11px] text-muted">
-              <span>{goalProgressPercent}% of daily pace</span>
+              <span>{goalProgressPercent}% completed</span>
               {isGoalMet && <span className="font-bold text-emerald-500">Goal Reached! 🎉</span>}
             </div>
             <div className="h-2 w-full bg-bg rounded-full overflow-hidden inset-shadow">
@@ -145,28 +145,28 @@ export function TrackerStreakHero({
               />
             </div>
 
-            {/* Clean Edit Pace / Goals Button */}
+            {/* Clean Edit Daily Goal Button */}
             {onUpdateDailyChapterGoal && (
               <button
                 type="button"
                 onClick={() => setIsEditPaceOpen(true)}
                 className="w-full mt-2.5 py-1.5 px-3 rounded-xl bg-bg hover:bg-surface-warm border border-border/80 text-fg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer group hover:border-accent/50"
-                title="Customize your daily chapter pace and completion projections"
+                title="Change your daily chapter reading goal"
               >
                 <Sliders size={13} className="text-accent group-hover:scale-110 transition-transform" />
-                <span>Edit Pace / Goals</span>
+                <span>Edit Daily Goal</span>
                 <ChevronRight size={13} className="text-muted group-hover:translate-x-0.5 transition-transform" />
               </button>
             )}
           </div>
         </div>
 
-        {/* Card 3: Bible Reading Pace & Milestone */}
+        {/* Card 3: Bible Reading Pace & Timeline */}
         <div className="p-5 sm:p-6 rounded-3xl bg-surface border border-border/80 ring-shadow flex flex-col justify-between">
           <div className="flex items-start justify-between">
             <div className="space-y-1">
               <span className="text-[11px] font-bold uppercase tracking-wider text-muted">
-                Pace &amp; Forecast
+                Reading Pace
               </span>
               <div className="flex items-baseline gap-1.5">
                 <span className="text-3xl sm:text-4xl font-display font-bold text-fg">
@@ -188,9 +188,9 @@ export function TrackerStreakHero({
                 type="button"
                 onClick={() => setIsEditPaceOpen(true)}
                 className="text-xs font-semibold text-accent hover:underline flex items-center gap-0.5 cursor-pointer"
-                title="Change daily reading pace"
+                title="Change daily reading goal"
               >
-                <span>Edit Pace</span>
+                <span>Edit Goal</span>
                 <ChevronRight size={12} />
               </button>
             ) : (
@@ -206,14 +206,14 @@ export function TrackerStreakHero({
           <div className="flex items-center gap-2">
             <Calendar size={18} className="text-accent" />
             <h3 className="text-sm sm:text-base font-bold text-fg">
-              This Week’s Consistency
+              This Week
             </h3>
           </div>
 
           <div className="flex items-center gap-3 text-xs text-muted">
-            <span>Best Streak: <strong className="text-fg">{streakData.longestStreak} days</strong></span>
+            <span>Best Streak: <strong className="text-fg">{streakData.longestStreak} {streakData.longestStreak === 1 ? 'day' : 'days'}</strong></span>
             <span>&bull;</span>
-            <span>Total Active: <strong className="text-fg">{streakData.totalActiveDays} days</strong></span>
+            <span>Total Active: <strong className="text-fg">{streakData.totalActiveDays} {streakData.totalActiveDays === 1 ? 'day' : 'days'}</strong></span>
           </div>
         </div>
 
@@ -260,7 +260,7 @@ export function TrackerStreakHero({
         {/* Quick Spiritual Action Links */}
         <div className="mt-5 pt-4 border-t border-border/60 flex flex-wrap items-center justify-between gap-3">
           <span className="text-xs font-semibold text-muted">
-            Daily Spiritual Habits:
+            Jump to:
           </span>
 
           <div className="flex flex-wrap items-center gap-2">

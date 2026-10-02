@@ -131,10 +131,10 @@ export function TheologicaAiCanvasModal({
 
   // Dynamic status milestones for the AI making the board (progresses over 20s without looping)
   const MILESTONES = [
-    "Analyzing biblical passages & systematic theology...",
-    "Tracing cross-references & doctrinal connections...",
-    "Formulating structured theological cards...",
-    "Computing collision-free spatial layout coordinates...",
+    "Searching Scripture passages & context...",
+    "Finding cross-references & key verses...",
+    "Creating study cards...",
+    "Arranging cards on your board...",
   ];
 
   const [isFinishingUp, setIsFinishingUp] = useState(false);

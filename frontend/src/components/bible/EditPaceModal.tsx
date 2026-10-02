@@ -36,37 +36,37 @@ interface PacePreset {
 const PACE_PRESETS: PacePreset[] = [
   {
     chapters: 1,
-    title: '1 Chapter / day',
-    description: 'Gentle, reflective rhythm for contemplative reading',
+    title: '1 Chapter a day',
+    description: 'A relaxed pace to read through Scripture at your own speed',
     approxDays: 1189,
     approxYears: '~3.3 years',
   },
   {
     chapters: 2,
-    title: '2 Chapters / day',
-    description: 'Steadfast daily walk balancing depth with steady progress',
+    title: '2 Chapters a day',
+    description: 'Steady daily reading with good time to reflect',
     approxDays: 595,
     approxYears: '~1.6 years',
   },
   {
     chapters: 3,
-    title: '3 Chapters / day',
-    badge: 'Recommended',
-    description: 'The classic Bible in a Year journey across all 66 books',
+    title: '3 Chapters a day',
+    badge: 'Popular',
+    description: 'Read through the entire Bible in about one year',
     approxDays: 396,
     approxYears: '~1.0 year',
   },
   {
     chapters: 4,
-    title: '4 Chapters / day',
-    description: 'Enriched devotional pace through narrative and letters',
+    title: '4 Chapters a day',
+    description: 'A quicker pace covering more ground each day',
     approxDays: 297,
     approxYears: '~10 months',
   },
   {
     chapters: 5,
-    title: '5 Chapters / day',
-    description: 'Immersive Scripture deep-dive for accelerated study',
+    title: '5 Chapters a day',
+    description: 'Finish the Bible in under 8 months',
     approxDays: 238,
     approxYears: '~8 months',
   },
@@ -152,11 +152,11 @@ export function EditPaceModal({
                     Reading Pace &amp; Goals
                   </h2>
                   <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20">
-                    Daily Habit
+                    Daily Goal
                   </span>
                 </div>
                 <p className="text-xs text-muted mt-0.5">
-                  Set how many chapters you want to read each day to forecast your journey.
+                  Choose how many chapters you want to read each day.
                 </p>
               </div>
             </div>
@@ -177,7 +177,7 @@ export function EditPaceModal({
             {/* Presets List */}
             <div className="space-y-2.5">
               <label className="text-[11px] font-bold uppercase tracking-wider text-muted block">
-                Choose a Reading Pace
+                Choose Your Daily Goal
               </label>
 
               <div className="space-y-2">
@@ -243,10 +243,10 @@ export function EditPaceModal({
                 <div className="flex items-center justify-between gap-3">
                   <div className="space-y-0.5">
                     <span className="text-sm font-bold text-fg flex items-center gap-2">
-                      Custom Daily Target
+                      Custom Goal
                     </span>
                     <p className="text-xs text-muted">
-                      Tailor your own chapters per day (1 to 50)
+                      Set any number of chapters per day (1 to 50)
                     </p>
                   </div>
 
@@ -282,60 +282,60 @@ export function EditPaceModal({
               </div>
             </div>
 
-            {/* Dynamic Forecast Card */}
+            {/* Reading Timeline Summary */}
             <div className="p-4 sm:p-5 rounded-2xl bg-bg border border-border/80 space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-muted flex items-center gap-1.5">
                   <TrendingUp size={13} className="text-accent" />
-                  Your Personalized Forecast
+                  At this pace
                 </span>
                 <span className="text-xs font-semibold text-fg">
-                  {effectiveGoal} {effectiveGoal === 1 ? 'chapter' : 'chapters'} / day
+                  {effectiveGoal} {effectiveGoal === 1 ? 'chapter' : 'chapters'} a day
                 </span>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <div className="p-3 rounded-xl bg-surface/70 border border-border/60">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted block mb-1">
-                    Days Remaining
+                    Days Left
                   </span>
                   <div className="text-xl font-display font-bold text-fg">
                     ~{daysToFinish}
                   </div>
                   <span className="text-[10px] text-muted">
-                    {remainingChapters} chapters left
+                    {remainingChapters} chapters to go
                   </span>
                 </div>
 
                 <div className="p-3 rounded-xl bg-surface/70 border border-border/60">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted block mb-1">
-                    Projected Finish
+                    Finish By
                   </span>
                   <div className="text-sm font-bold text-accent truncate mt-1">
                     {finishDateStr}
                   </div>
                   <span className="text-[10px] text-muted">
-                    Across 1,189 chapters
+                    Whole Bible (1,189 chs)
                   </span>
                 </div>
 
                 <div className="p-3 rounded-xl bg-surface/70 border border-border/60 col-span-2 sm:col-span-1">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted block mb-1">
-                    Daily Quiet Time
+                    Estimated Time
                   </span>
                   <div className="text-xl font-display font-bold text-fg">
                     ~{estMinutesPerDay}
                   </div>
                   <span className="text-[10px] text-muted">
-                    Minutes estimated
+                    Minutes per day
                   </span>
                 </div>
               </div>
 
               {/* Progress Summary */}
               <div className="pt-2 border-t border-border/50 flex items-center justify-between text-xs text-muted">
-                <span>Current Bible Progress: <strong className="text-fg">{totalChaptersCompleted}</strong> / 1,189</span>
-                <strong className="text-accent">{overallPercent}% Complete</strong>
+                <span>Completed so far: <strong className="text-fg">{totalChaptersCompleted}</strong> / 1,189</span>
+                <strong className="text-accent">{overallPercent}% Done</strong>
               </div>
             </div>
           </div>
@@ -355,7 +355,7 @@ export function EditPaceModal({
               className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-accent text-accent-on text-xs sm:text-sm font-semibold hover:opacity-90 active:scale-95 transition-all shadow-xs cursor-pointer"
             >
               <Check size={16} />
-              <span>Apply Reading Pace</span>
+              <span>Save Goal</span>
             </button>
           </div>
         </motion.div>

@@ -157,10 +157,10 @@ export function StreakPopover({
 
                   <p className="text-xs sm:text-sm text-fg-2 max-w-xs leading-relaxed">
                     {isGlowing
-                      ? 'Your flame is kindled for today! Consistency builds a lifetime in God’s word.'
+                      ? 'You’re checked in for today! Keep up the daily reading habit.'
                       : streakData.isGraceActive
-                      ? 'Grace protected! Read a chapter or devotional today to keep your flame glowing.'
-                      : 'Spend a quiet moment in scripture or prayer today to keep your flame alive.'}
+                      ? 'Grace day applied. Read a chapter or devotional today to keep your streak going.'
+                      : 'Read a chapter or spend a moment in prayer today to keep your streak active.'}
                   </p>
 
                   {/* Grace indicator badge */}
@@ -226,7 +226,7 @@ export function StreakPopover({
                       : 'border-transparent text-muted hover:text-fg'
                   }`}
                 >
-                  Daily Rhythm
+                  Today’s Goals
                 </button>
                 <button
                   type="button"
@@ -251,7 +251,7 @@ export function StreakPopover({
                   <>
                     <div className="space-y-2.5">
                       <div className="text-[11px] font-bold uppercase tracking-widest text-muted">
-                        Today’s Spiritual Rhythm
+                        Today’s Reading
                       </div>
 
                       {/* 1. Scripture */}
@@ -392,7 +392,7 @@ export function StreakPopover({
                   /* Milestones Tab */
                   <div className="space-y-3">
                     <div className="text-[11px] font-bold uppercase tracking-widest text-muted mb-2">
-                      Spiritual Habit Milestones
+                      Reading Milestones
                     </div>
                     {streakData.earnedMilestones.map((m) => (
                       <div 
