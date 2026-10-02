@@ -473,21 +473,150 @@ export function mergeAccountStreakData(remote: {
   return getStreakData();
 }
 
+export interface StreakScripture {
+  text: string;
+  reference: string;
+}
+
 /**
- * Daily Encouragement Verses on Consistency & Seeking God
+ * Daily Encouragement Verses on Scripture, Faithfulness, Wisdom & Seeking God
  */
-export const DAILY_STREAK_SCRIPTURES = [
-  { text: "Thy word is a lamp unto my feet, and a light unto my path.", reference: "Psalm 119:105" },
-  { text: "He will not grow tired or weary, and His understanding no one can fathom.", reference: "Isaiah 40:28" },
-  { text: "Let us not become weary in doing good, for at the proper time we will reap a harvest if we do not give up.", reference: "Galatians 6:9" },
+export const DAILY_STREAK_SCRIPTURES: StreakScripture[] = [
+  { text: "Your word is a lamp to my feet and a light to my path.", reference: "Psalm 119:105" },
+  { text: "He does not faint or grow weary; His understanding is unsearchable.", reference: "Isaiah 40:28" },
+  { text: "Let us not grow weary of doing good, for in due season we will reap, if we do not give up.", reference: "Galatians 6:9" },
   { text: "Draw near to God, and He will draw near to you.", reference: "James 4:8" },
-  { text: "Morning by morning He awakens me; He awakens my ear to listen like one being taught.", reference: "Isaiah 50:4" },
-  { text: "His mercies never come to an end; they are new every morning; great is Your faithfulness.", reference: "Lamentations 3:22-23" },
+  { text: "Morning by morning He awakens me; He awakens my ear to hear as those who are taught.", reference: "Isaiah 50:4" },
+  { text: "The steadfast love of the Lord never ceases; His mercies never come to an end; they are new every morning.", reference: "Lamentations 3:22-23" },
   { text: "I have stored up Your word in my heart, that I might not sin against You.", reference: "Psalm 119:11" },
-  { text: "Keep this Book of the Law always on your lips; meditate on it day and night.", reference: "Joshua 1:8" },
+  { text: "This Book of the Law shall not depart from your mouth, but you shall meditate on it day and night.", reference: "Joshua 1:8" },
+  { text: "His delight is in the law of the Lord, and on His law he meditates day and night.", reference: "Psalm 1:2" },
+  { text: "Man shall not live by bread alone, but by every word that comes from the mouth of God.", reference: "Matthew 4:4" },
+  { text: "So faith comes from hearing, and hearing through the word of Christ.", reference: "Romans 10:17" },
+  { text: "All Scripture is breathed out by God and profitable for teaching, for reproof, for correction, and for training in righteousness.", reference: "2 Timothy 3:16" },
+  { text: "For the word of God is living and active, sharper than any two-edged sword.", reference: "Hebrews 4:12" },
+  { text: "Trust in the Lord with all your heart, and do not lean on your own understanding.", reference: "Proverbs 3:5" },
+  { text: "In all your ways acknowledge Him, and He will make straight your paths.", reference: "Proverbs 3:6" },
+  { text: "Let the word of Christ dwell in you richly, teaching and admonishing one another in all wisdom.", reference: "Colossians 3:16" },
+  { text: "The unfolding of Your words gives light; it imparts understanding to the simple.", reference: "Psalm 119:130" },
+  { text: "Your words were found, and I ate them, and Your words became to me a joy and the delight of my heart.", reference: "Jeremiah 15:16" },
+  { text: "So shall My word be that goes out from My mouth; it shall not return to Me empty.", reference: "Isaiah 55:11" },
+  { text: "The law of the Lord is perfect, reviving the soul; the testimony of the Lord is sure, making wise the simple.", reference: "Psalm 19:7" },
+  { text: "Come to Me, all who labor and are heavy laden, and I will give you rest.", reference: "Matthew 11:28" },
+  { text: "Do not be anxious about anything, but in everything by prayer and supplication with thanksgiving let your requests be made known to God.", reference: "Philippians 4:6" },
+  { text: "And the peace of God, which surpasses all understanding, will guard your hearts and your minds in Christ Jesus.", reference: "Philippians 4:7" },
+  { text: "You keep him in perfect peace whose mind is stayed on You, because he trusts in You.", reference: "Isaiah 26:3" },
+  { text: "The Lord is my shepherd; I shall not want. He makes me lie down in green pastures. He restores my soul.", reference: "Psalm 23:1-3" },
+  { text: "Be attentive to My words; incline your ear to My sayings. For they are life to those who find them, and healing to all their flesh.", reference: "Proverbs 4:20, 22" },
+  { text: "Open my eyes, that I may behold wondrous things out of Your law.", reference: "Psalm 119:18" },
+  { text: "Like newborn infants, long for the pure spiritual milk, that by it you may grow up into salvation.", reference: "1 Peter 2:2" },
+  { text: "If you abide in My word, you are truly My disciples, and you will know the truth, and the truth will set you free.", reference: "John 8:31-32" },
+  { text: "O God, You are my God; earnestly I seek You; my soul thirsts for You, my flesh faints for You.", reference: "Psalm 63:1" },
+  { text: "What does the Lord require of you but to do justice, and to love kindness, and to walk humbly with your God?", reference: "Micah 6:8" },
+  { text: "How can a young person stay on the path of purity? By living according to Your word.", reference: "Psalm 119:9" },
+  { text: "Do not be conformed to this world, but be transformed by the renewal of your mind.", reference: "Romans 12:2" },
+  { text: "Be still, and know that I am God. I will be exalted among the nations, I will be exalted in the earth!", reference: "Psalm 46:10" },
+  { text: "Seek first the kingdom of God and His righteousness, and all these things will be added to you.", reference: "Matthew 6:33" },
+  { text: "This is my comfort in my affliction, that Your promise gives me life.", reference: "Psalm 119:50" },
+  { text: "Let us run with endurance the race that is set before us, looking to Jesus, the founder and perfecter of our faith.", reference: "Hebrews 12:1-2" },
+  { text: "Bless the Lord, O my soul, and forget not all His benefits.", reference: "Psalm 103:2" },
+  { text: "Fear not, for I am with you; be not dismayed, for I am your God; I will strengthen you, I will help you.", reference: "Isaiah 41:10" },
+  { text: "Commit your work to the Lord, and your plans will be established.", reference: "Proverbs 16:3" },
+  { text: "My grace is sufficient for you, for My power is made perfect in weakness.", reference: "2 Corinthians 12:9" },
+  { text: "Great peace have those who love Your law; nothing can make them stumble.", reference: "Psalm 119:165" },
+  { text: "So teach us to number our days that we may get a heart of wisdom.", reference: "Psalm 90:12" },
+  { text: "I am the vine; you are the branches. Whoever abides in Me and I in him, he it is that bears much fruit.", reference: "John 15:5" },
+  { text: "Oh, taste and see that the Lord is good! Blessed is the man who takes refuge in Him!", reference: "Psalm 34:8" },
+  { text: "Take the helmet of salvation, and the sword of the Spirit, which is the word of God.", reference: "Ephesians 6:17" },
+  { text: "The grass withers, the flower fades, but the word of our God will stand forever.", reference: "Isaiah 40:8" },
+  { text: "Every word of God proves true; He is a shield to those who take refuge in Him.", reference: "Proverbs 30:5" },
+  { text: "Blessed rather are those who hear the word of God and keep it!", reference: "Luke 11:28" },
+  { text: "Let the words of my mouth and the meditation of my heart be acceptable in Your sight, O Lord.", reference: "Psalm 19:14" },
+  { text: "For where your treasure is, there your heart will be also.", reference: "Matthew 6:21" },
+  { text: "Your righteousness is righteous forever, and Your law is true.", reference: "Psalm 119:142" },
 ];
 
-export function getTodayStreakQuote(): { text: string; reference: string } {
-  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24));
-  return DAILY_STREAK_SCRIPTURES[dayOfYear % DAILY_STREAK_SCRIPTURES.length];
+/**
+ * Varied, encouraging motivational messages tailored to reading consistency
+ */
+export const STREAK_ENCOURAGEMENTS = {
+  completed: [
+    "You’ve spent time in God’s Word today. Walk in His peace and truth.",
+    "Another day anchored in Scripture. Let His wisdom guide your steps.",
+    "Faithful in the Word today. May Christ dwell richly in your heart.",
+    "Daily faithfulness builds lifelong strength. Cherish what you read today.",
+    "A heart rooted in Scripture brings quiet peace to every part of your day.",
+    "Another faithful step forward. Hold fast to the promises you read today.",
+    "Treasuring God’s Word one day at a time. Blessed is the one who meditates on it.",
+    "You are drawing near to the Lord each day. He is faithful to guide you.",
+    "Faith comes by hearing, and hearing through the Word of God. Well done today.",
+    "Rooted and grounded in truth. Keep shining His light wherever you go.",
+    "Rest in the assurance of His love today. Your time in Scripture bears good fruit.",
+    "Steady and faithful. May the verses you reflected on stay close to your heart.",
+    "Walking with the Lord day by day. Keep pressing on in grace and hope.",
+    "Time in God’s Word is never wasted. Carry His truth with you through the rest of your day.",
+  ],
+  pending: [
+    "Spend a quiet moment in Scripture today to nourish your spirit and keep your streak going.",
+    "Even a few minutes in God’s Word can bring clarity and peace to your whole day.",
+    "A chapter a day keeps your heart attuned to His voice. Open your Bible when you’re ready.",
+    "Your daily reading is waiting. Pick up where you left off and rest in His promises.",
+    "Feed your soul with Scripture today. Every verse is living and active.",
+    "Take a deep breath and open God’s Word. He has something meaningful for you today.",
+    "Stay steady on your reading journey. Open a chapter or devotional whenever you have a moment.",
+    "Draw near to God today—He is always near to listen and speak through His Word.",
+    "A quiet moment with the Lord brings lasting peace. Read a chapter to keep your streak going.",
+    "Set aside a few minutes for Scripture today to strengthen your heart and stay on track.",
+    "God’s Word is a lamp for your path today. Take a few quiet minutes to read.",
+    "Nourish your mind with truth today. A chapter awaits whenever you’re ready.",
+  ],
+  grace: [
+    "Grace day applied. Take a peaceful moment with Scripture today to keep moving forward.",
+    "His mercies are new every morning. Pick up your reading today to carry your streak ahead.",
+    "Life gets full, and grace is here for you. Read a chapter today to renew your daily rhythm.",
+    "No worries—grace is active today. Spend a few quiet moments in the Word to keep going.",
+    "A fresh opportunity today! Open your Bible and continue your journey in faith.",
+    "Grace is sufficient for every season. Take time in the Word today to keep your streak alive.",
+  ],
+};
+
+export function getTodayStreakQuote(): StreakScripture & { index: number } {
+  const now = new Date();
+  const dayOfYear = Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24));
+  const index = Math.abs(dayOfYear) % DAILY_STREAK_SCRIPTURES.length;
+  return { ...DAILY_STREAK_SCRIPTURES[index], index };
+}
+
+export function getRandomStreakQuote(excludeIndex?: number): StreakScripture & { index: number } {
+  if (DAILY_STREAK_SCRIPTURES.length <= 1) {
+    return { ...DAILY_STREAK_SCRIPTURES[0], index: 0 };
+  }
+  let newIndex = Math.floor(Math.random() * DAILY_STREAK_SCRIPTURES.length);
+  if (excludeIndex !== undefined && newIndex === excludeIndex) {
+    newIndex = (newIndex + 1) % DAILY_STREAK_SCRIPTURES.length;
+  }
+  return { ...DAILY_STREAK_SCRIPTURES[newIndex], index: newIndex };
+}
+
+export function getEncouragingMessage(
+  isCompletedToday: boolean,
+  isGraceActive: boolean,
+  streak: number,
+  indexSeed?: number
+): string {
+  let list = STREAK_ENCOURAGEMENTS.pending;
+  if (isGraceActive) {
+    list = STREAK_ENCOURAGEMENTS.grace;
+  } else if (isCompletedToday) {
+    list = STREAK_ENCOURAGEMENTS.completed;
+  }
+
+  if (indexSeed !== undefined) {
+    return list[Math.abs(indexSeed) % list.length];
+  }
+
+  const now = new Date();
+  const dayOfYear = Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24));
+  const defaultIdx = Math.abs(dayOfYear * 7 + streak) % list.length;
+  return list[defaultIdx];
 }

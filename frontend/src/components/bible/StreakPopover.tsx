@@ -14,12 +14,15 @@ import {
   Sparkles,
   Calendar,
   ShieldCheck,
-  ArrowRight
+  ArrowRight,
+  RefreshCw
 } from 'lucide-react';
 import { 
   getStreakData, 
   StreakData, 
   getTodayStreakQuote, 
+  getRandomStreakQuote,
+  getEncouragingMessage,
   STREAK_MILESTONES 
 } from '@/lib/streakService';
 
@@ -35,6 +38,9 @@ export function StreakPopover({
   const [isOpen, setIsOpen] = useState(false);
   const [streakData, setStreakData] = useState<StreakData>(getStreakData());
   const [activeTab, setActiveTab] = useState<'rhythm' | 'milestones'>('rhythm');
+  const [currentQuote, setCurrentQuote] = useState(getTodayStreakQuote());
+  const [isQuoteSpinning, setIsQuoteSpinning] = useState(false);
+  const [encouragementSeed, setEncouragementSeed] = useState(0);
 
   // Listen to streak changes across the app
   useEffect(() => {
@@ -61,7 +67,20 @@ export function StreakPopover({
 
   const streak = streakData.currentStreak;
   const isGlowing = streakData.isCompletedToday;
-  const dailyQuote = getTodayStreakQuote();
+  const encouragingMessage = getEncouragingMessage(
+    isGlowing,
+    streakData.isGraceActive,
+    streak,
+    encouragementSeed > 0 ? encouragementSeed : undefined
+  );
+
+  const handleShuffleQuote = () => {
+    setIsQuoteSpinning(true);
+    const next = getRandomStreakQuote(currentQuote.index);
+    setCurrentQuote(next);
+    setEncouragementSeed((prev) => prev + 1);
+    setTimeout(() => setIsQuoteSpinning(false), 350);
+  };
 
   return (
     <>
@@ -79,7 +98,7 @@ export function StreakPopover({
             ? 'bg-surface border-border text-fg hover:border-amber-500/40 hover:text-amber-500'
             : 'bg-surface border-border/70 text-muted hover:text-fg'
         }`}
-        title={`${streak}-day reading streak • Keep your flame alive!`}
+        title={`${streak}-day reading streak`}
         aria-label="Daily Reading Streak"
       >
         <div className="relative flex items-center justify-center">
@@ -143,24 +162,14 @@ export function StreakPopover({
                         }`} 
                       />
                     </div>
-                    {isGlowing && (
-                      <div className="mt-2.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-[11px] font-bold">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        <span>Active Today</span>
-                      </div>
-                    )}
                   </div>
 
                   <h2 className="text-3xl sm:text-4xl font-display font-bold text-fg tracking-tight mb-1">
                     {streak} <span className="text-xl sm:text-2xl font-sans font-medium text-fg-2">Day Streak</span>
                   </h2>
 
-                  <p className="text-xs sm:text-sm text-fg-2 max-w-xs leading-relaxed">
-                    {isGlowing
-                      ? 'You’re checked in for today! Keep up the daily reading habit.'
-                      : streakData.isGraceActive
-                      ? 'Grace day applied. Read a chapter or devotional today to keep your streak going.'
-                      : 'Read a chapter or spend a moment in prayer today to keep your streak active.'}
+                  <p className="text-xs sm:text-sm text-fg-2 max-w-xs leading-relaxed min-h-[36px] flex items-center justify-center">
+                    {encouragingMessage}
                   </p>
 
                   {/* Grace indicator badge */}
@@ -379,14 +388,31 @@ export function StreakPopover({
                     </div>
 
                     {/* Daily Scripture Quote */}
-                    <blockquote className="p-3.5 rounded-2xl bg-surface/50 border border-border/50 text-center space-y-1">
-                      <p className="text-xs italic text-fg font-serif">
-                        &ldquo;{dailyQuote.text}&rdquo;
-                      </p>
-                      <cite className="text-[11px] font-semibold text-accent not-italic">
-                        {dailyQuote.reference}
-                      </cite>
-                    </blockquote>
+                    <div className="p-3.5 sm:p-4 rounded-2xl bg-surface/60 border border-border/60 space-y-2 relative">
+                      <div className="flex items-center justify-between text-muted pb-1 border-b border-border/40">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted flex items-center gap-1.5">
+                          <Sparkles size={11} className="text-accent" />
+                          <span>Words of Scripture</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleShuffleQuote}
+                          className="px-2 py-0.5 rounded-lg hover:bg-fg/5 text-muted hover:text-accent transition-colors cursor-pointer flex items-center gap-1 text-[11px] font-medium"
+                          title="Read another inspiring verse"
+                        >
+                          <RefreshCw size={11} className={isQuoteSpinning ? "animate-spin text-accent" : ""} />
+                          <span>Another verse</span>
+                        </button>
+                      </div>
+                      <blockquote className="text-center space-y-1.5 pt-0.5">
+                        <p className="text-xs sm:text-sm italic text-fg font-serif leading-relaxed">
+                          &ldquo;{currentQuote.text}&rdquo;
+                        </p>
+                        <cite className="text-[11px] font-semibold text-accent not-italic block">
+                          {currentQuote.reference}
+                        </cite>
+                      </blockquote>
+                    </div>
                   </>
                 ) : (
                   /* Milestones Tab */

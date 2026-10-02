@@ -14,9 +14,16 @@ import {
   ChevronRight,
   ShieldCheck,
   Sparkles,
-  Sliders
+  Sliders,
+  RefreshCw
 } from 'lucide-react';
-import { getStreakData, StreakData, STREAK_MILESTONES } from '@/lib/streakService';
+import { 
+  getStreakData, 
+  StreakData, 
+  STREAK_MILESTONES,
+  getTodayStreakQuote,
+  getRandomStreakQuote
+} from '@/lib/streakService';
 import { EditPaceModal } from './EditPaceModal';
 
 export interface TrackerStreakHeroProps {
@@ -36,6 +43,15 @@ export function TrackerStreakHero({
 }: TrackerStreakHeroProps) {
   const [streakData, setStreakData] = useState<StreakData>(getStreakData());
   const [isEditPaceOpen, setIsEditPaceOpen] = useState(false);
+  const [quote, setQuote] = useState(getTodayStreakQuote());
+  const [isQuoteSpinning, setIsQuoteSpinning] = useState(false);
+
+  const handleShuffleQuote = () => {
+    setIsQuoteSpinning(true);
+    const next = getRandomStreakQuote(quote.index);
+    setQuote(next);
+    setTimeout(() => setIsQuoteSpinning(false), 350);
+  };
 
   useEffect(() => {
     const handleUpdate = () => setStreakData(getStreakData());
@@ -291,6 +307,32 @@ export function TrackerStreakHero({
               <span>Prayer Sanctuary</span>
             </button>
           </div>
+        </div>
+
+        {/* Scripture Encouragement Bar */}
+        <div className="mt-4 pt-4 border-t border-border/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-7 h-7 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center shrink-0 text-accent">
+              <Sparkles size={13} />
+            </div>
+            <div className="min-w-0">
+              <p className="italic text-fg font-serif truncate sm:whitespace-normal text-xs leading-relaxed">
+                &ldquo;{quote.text}&rdquo;
+              </p>
+              <span className="text-[11px] font-semibold text-accent not-italic">
+                — {quote.reference}
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleShuffleQuote}
+            className="self-end sm:self-center shrink-0 px-2.5 py-1 rounded-xl border border-border bg-surface hover:bg-surface-hover text-muted hover:text-fg text-[11px] font-medium transition-colors flex items-center gap-1 cursor-pointer"
+            title="Read another inspiring verse"
+          >
+            <RefreshCw size={11} className={isQuoteSpinning ? "animate-spin text-accent" : ""} />
+            <span>Another verse</span>
+          </button>
         </div>
       </div>
 
