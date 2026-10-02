@@ -35,6 +35,7 @@ export async function pushStreakToAccount(
       longestStreak: raw.longestStreak,
       lastActiveDate: raw.lastActiveDate,
       dailyChapterGoal: dailyChapterGoal || 3,
+      targetMilestoneDays: raw.targetMilestoneDays || 7,
       todayGoals,
       prayers,
     };

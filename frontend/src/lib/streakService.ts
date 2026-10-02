@@ -33,6 +33,12 @@ export interface TodayGoals {
   chaptersCompletedToday: number;
 }
 
+export interface TargetMilestoneInfo extends StreakMilestone {
+  progressPercent: number;
+  daysRemaining: number;
+  isCustom?: boolean;
+}
+
 export interface StreakData {
   currentStreak: number;
   longestStreak: number;
@@ -44,7 +50,9 @@ export interface StreakData {
   isCompletedToday: boolean;
   isGraceActive: boolean;
   earnedMilestones: StreakMilestone[];
-  nextMilestone: StreakMilestone & { progressPercent: number; daysRemaining: number };
+  targetMilestoneDays: number;
+  targetMilestone: TargetMilestoneInfo;
+  nextMilestone: TargetMilestoneInfo; // Kept for backwards compatibility
 }
 
 export const STREAK_MILESTONES: Omit<StreakMilestone, 'isEarned'>[] = [
@@ -89,11 +97,48 @@ interface RawStreakStorage {
   longestStreak: number;
   lastActiveDate: string;
   graceUsedDate?: string;
+  targetMilestoneDays?: number;
+}
+
+const TARGET_MILESTONE_STORAGE_KEY = 'theologica_target_milestone_days';
+
+export function getTargetMilestoneDays(): number {
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem(TARGET_MILESTONE_STORAGE_KEY);
+      if (stored) {
+        const n = parseInt(stored, 10);
+        if (!isNaN(n) && n > 0) return n;
+      }
+    } catch {}
+  }
+  const raw = loadRawStorage();
+  if (typeof raw.targetMilestoneDays === 'number' && raw.targetMilestoneDays > 0) {
+    return raw.targetMilestoneDays;
+  }
+  return 7;
+}
+
+export function setTargetMilestoneDays(days: number): StreakData {
+  const sanitized = Math.max(1, Math.min(1000, Math.round(days)));
+  const raw = loadRawStorage();
+  raw.targetMilestoneDays = sanitized;
+  saveRawStorage(raw);
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(TARGET_MILESTONE_STORAGE_KEY, String(sanitized));
+    } catch {}
+    window.dispatchEvent(new CustomEvent('theologica_streak_updated', {
+      detail: { targetMilestoneDays: sanitized }
+    }));
+  }
+  notifyStreakSync();
+  return getStreakData();
 }
 
 function loadRawStorage(): RawStreakStorage {
   if (typeof window === 'undefined') {
-    return { activeDates: [], longestStreak: 0, lastActiveDate: '' };
+    return { activeDates: [], longestStreak: 0, lastActiveDate: '', targetMilestoneDays: 7 };
   }
   try {
     let raw = localStorage.getItem(STREAK_STORAGE_KEY);
@@ -107,10 +152,13 @@ function loadRawStorage(): RawStreakStorage {
         longestStreak: typeof parsed.longestStreak === 'number' ? parsed.longestStreak : 0,
         lastActiveDate: typeof parsed.lastActiveDate === 'string' ? parsed.lastActiveDate : '',
         graceUsedDate: parsed.graceUsedDate,
+        targetMilestoneDays: typeof parsed.targetMilestoneDays === 'number' && parsed.targetMilestoneDays > 0
+          ? parsed.targetMilestoneDays
+          : undefined,
       };
     }
   } catch {}
-  return { activeDates: [], longestStreak: 0, lastActiveDate: '' };
+  return { activeDates: [], longestStreak: 0, lastActiveDate: '', targetMilestoneDays: 7 };
 }
 
 function saveRawStorage(data: RawStreakStorage): void {
@@ -266,20 +314,19 @@ export function getStreakData(): StreakData {
     isEarned: currentStreak >= m.days || longestStreak >= m.days,
   }));
 
-  // Find next milestone to achieve
-  const nextTarget = STREAK_MILESTONES.find(m => currentStreak < m.days) || STREAK_MILESTONES[STREAK_MILESTONES.length - 1];
-  const prevTargetDays = STREAK_MILESTONES.filter(m => m.days < nextTarget.days).pop()?.days || 0;
-  
-  const range = nextTarget.days - prevTargetDays;
-  const currentProgressInRange = Math.max(0, currentStreak - prevTargetDays);
-  const progressPercent = Math.min(100, Math.round((currentProgressInRange / (range || 1)) * 100));
-  const daysRemaining = Math.max(0, nextTarget.days - currentStreak);
+  // User-defined milestone goal (or sensible default 7 days)
+  const targetDays = getTargetMilestoneDays();
+  const matchedPreset = STREAK_MILESTONES.find(m => m.days === targetDays);
 
-  const nextMilestone = {
-    ...nextTarget,
-    isEarned: currentStreak >= nextTarget.days,
-    progressPercent,
-    daysRemaining,
+  const targetMilestone: TargetMilestoneInfo = {
+    days: targetDays,
+    title: matchedPreset ? matchedPreset.title : `${targetDays}-Day Streak`,
+    badge: matchedPreset ? matchedPreset.badge : '🎯',
+    description: matchedPreset ? matchedPreset.description : `Reach a ${targetDays}-day reading streak in Scripture.`,
+    isEarned: currentStreak >= targetDays,
+    progressPercent: Math.min(100, Math.round((currentStreak / targetDays) * 100)),
+    daysRemaining: Math.max(0, targetDays - currentStreak),
+    isCustom: !matchedPreset,
   };
 
   return {
@@ -293,7 +340,9 @@ export function getStreakData(): StreakData {
     isCompletedToday,
     isGraceActive,
     earnedMilestones,
-    nextMilestone,
+    targetMilestoneDays: targetDays,
+    targetMilestone,
+    nextMilestone: targetMilestone,
   };
 }
 
@@ -422,6 +471,7 @@ export function mergeAccountStreakData(remote: {
   longestStreak?: number;
   lastActiveDate?: string;
   dailyChapterGoal?: number;
+  targetMilestoneDays?: number;
   todayGoals?: Partial<TodayGoals>;
 }): StreakData {
   const localRaw = loadRawStorage();
@@ -455,11 +505,16 @@ export function mergeAccountStreakData(remote: {
 
   saveTodayHabits(todayStr, mergedTodayHabits);
 
+  const incomingTarget = typeof remote.targetMilestoneDays === 'number' && remote.targetMilestoneDays > 0
+    ? remote.targetMilestoneDays
+    : localRaw.targetMilestoneDays;
+
   const updatedRaw: RawStreakStorage = {
     activeDates: mergedDates,
     longestStreak,
     lastActiveDate: mergedDates[mergedDates.length - 1] || '',
     graceUsedDate: localRaw.graceUsedDate,
+    targetMilestoneDays: incomingTarget,
   };
 
   saveRawStorage(updatedRaw);

@@ -15,7 +15,9 @@ import {
   Calendar,
   ShieldCheck,
   ArrowRight,
-  RefreshCw
+  RefreshCw,
+  Sliders,
+  Target
 } from 'lucide-react';
 import { 
   getStreakData, 
@@ -23,8 +25,10 @@ import {
   getTodayStreakQuote, 
   getRandomStreakQuote,
   getEncouragingMessage,
+  setTargetMilestoneDays,
   STREAK_MILESTONES 
 } from '@/lib/streakService';
+import { SetMilestoneModal } from './SetMilestoneModal';
 
 export interface StreakPopoverProps {
   onNavigateToTab: (tab: string) => void;
@@ -41,6 +45,7 @@ export function StreakPopover({
   const [currentQuote, setCurrentQuote] = useState(getTodayStreakQuote());
   const [isQuoteSpinning, setIsQuoteSpinning] = useState(false);
   const [encouragementSeed, setEncouragementSeed] = useState(0);
+  const [isSetMilestoneOpen, setIsSetMilestoneOpen] = useState(false);
 
   // Listen to streak changes across the app
   useEffect(() => {
@@ -358,31 +363,54 @@ export function StreakPopover({
                       </div>
                     </div>
 
-                    {/* Next Milestone Card */}
+                    {/* Target Milestone Goal Card */}
                     <div className="p-4 rounded-2xl bg-surface border border-border/80 ring-shadow">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg">{streakData.nextMilestone.badge}</span>
-                          <div>
-                            <div className="text-xs font-bold text-fg">
-                              Next: {streakData.nextMilestone.title} ({streakData.nextMilestone.days} Days)
+                      <div className="flex items-center justify-between mb-2.5">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="text-xl shrink-0 p-1.5 rounded-xl bg-accent/10 border border-accent/20">
+                            {streakData.targetMilestone.badge}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-xs font-bold text-fg truncate">
+                                Milestone Goal: {streakData.targetMilestone.title}
+                              </h3>
+                              {streakData.targetMilestone.isEarned && (
+                                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
+                                  Achieved! 🎉
+                                </span>
+                              )}
                             </div>
-                            <div className="text-[11px] text-muted">
-                              {streakData.nextMilestone.daysRemaining === 0 
-                                ? 'Milestone achieved!' 
-                                : `${streakData.nextMilestone.daysRemaining} days remaining`}
+                            <div className="text-[11px] text-muted truncate">
+                              {streakData.targetMilestone.isEarned 
+                                ? 'Milestone achieved! Set your next target.' 
+                                : `${streak} of ${streakData.targetMilestone.days} days completed • ${streakData.targetMilestone.daysRemaining} to go`}
                             </div>
                           </div>
                         </div>
-                        <span className="text-xs font-mono font-bold text-accent">
-                          {streakData.nextMilestone.progressPercent}%
-                        </span>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setIsSetMilestoneOpen(true)}
+                            className="px-2.5 py-1 rounded-xl bg-bg hover:bg-surface-warm border border-border/80 text-fg text-xs font-semibold flex items-center gap-1 transition-all shadow-xs cursor-pointer group hover:border-accent/50"
+                            title="Set your milestone goal"
+                          >
+                            <Sliders size={12} className="text-accent group-hover:scale-110 transition-transform" />
+                            <span>Set Goal</span>
+                          </button>
+                          <span className="text-xs font-mono font-bold text-accent">
+                            {streakData.targetMilestone.progressPercent}%
+                          </span>
+                        </div>
                       </div>
 
                       <div className="h-2 w-full bg-bg rounded-full overflow-hidden inset-shadow">
                         <div 
-                          className="h-full bg-accent transition-all duration-500 rounded-full" 
-                          style={{ width: `${streakData.nextMilestone.progressPercent}%` }} 
+                          className={`h-full transition-all duration-500 rounded-full ${
+                            streakData.targetMilestone.isEarned ? 'bg-emerald-500' : 'bg-accent'
+                          }`} 
+                          style={{ width: `${streakData.targetMilestone.progressPercent}%` }} 
                         />
                       </div>
                     </div>
@@ -417,41 +445,80 @@ export function StreakPopover({
                 ) : (
                   /* Milestones Tab */
                   <div className="space-y-3">
-                    <div className="text-[11px] font-bold uppercase tracking-widest text-muted mb-2">
-                      Reading Milestones
-                    </div>
-                    {streakData.earnedMilestones.map((m) => (
-                      <div 
-                        key={m.days} 
-                        className={`p-3.5 rounded-2xl border transition-all flex items-center gap-3.5 ${
-                          m.isEarned 
-                            ? 'bg-amber-500/10 border-amber-500/30' 
-                            : 'bg-bg border-border opacity-60'
-                        }`}
-                      >
-                        <div className="text-2xl shrink-0 p-1.5 rounded-xl bg-surface border border-border/60">
-                          {m.badge}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <h4 className="text-xs sm:text-sm font-bold text-fg">
-                              {m.title}
-                            </h4>
-                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-surface border border-border text-muted">
-                              {m.days}d
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-muted leading-tight mt-0.5">
-                            {m.description}
-                          </p>
-                        </div>
-                        {m.isEarned && (
-                          <div className="p-1 rounded-full bg-amber-500 text-white shrink-0">
-                            <Check size={12} />
-                          </div>
-                        )}
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-[11px] font-bold uppercase tracking-widest text-muted">
+                        Reading Milestones
                       </div>
-                    ))}
+                      <button
+                        type="button"
+                        onClick={() => setIsSetMilestoneOpen(true)}
+                        className="text-xs font-semibold text-accent hover:underline flex items-center gap-1 cursor-pointer"
+                        title="Set a milestone goal"
+                      >
+                        <Sliders size={12} />
+                        <span>Set Goal</span>
+                      </button>
+                    </div>
+
+                    {streakData.earnedMilestones.map((m) => {
+                      const isCurrentGoal = streakData.targetMilestone.days === m.days;
+
+                      return (
+                        <div 
+                          key={m.days} 
+                          className={`p-3.5 rounded-2xl border transition-all flex items-center gap-3.5 ${
+                            isCurrentGoal
+                              ? 'bg-accent/10 border-accent/40 shadow-xs'
+                              : m.isEarned 
+                              ? 'bg-amber-500/10 border-amber-500/30' 
+                              : 'bg-bg border-border opacity-70'
+                          }`}
+                        >
+                          <div className="text-2xl shrink-0 p-1.5 rounded-xl bg-surface border border-border/60">
+                            {m.badge}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-xs sm:text-sm font-bold text-fg">
+                                {m.title}
+                              </h4>
+                              <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-surface border border-border text-muted">
+                                {m.days}d
+                              </span>
+                              {isCurrentGoal && (
+                                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-accent/20 text-accent border border-accent/30">
+                                  Current Goal
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-muted leading-tight mt-0.5">
+                              {m.description}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            {!isCurrentGoal ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setTargetMilestoneDays(m.days);
+                                  setStreakData(getStreakData());
+                                }}
+                                className="px-2.5 py-1 rounded-xl bg-surface hover:bg-surface-hover border border-border text-xs font-semibold text-fg transition-colors cursor-pointer hover:border-accent/40"
+                              >
+                                Set Goal
+                              </button>
+                            ) : null}
+
+                            {m.isEarned && (
+                              <div className="p-1 rounded-full bg-emerald-500 text-white shrink-0" title="Milestone earned">
+                                <Check size={12} strokeWidth={2.5} />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -479,6 +546,18 @@ export function StreakPopover({
           </div>
         )}
       </AnimatePresence>
+
+      {/* Set Milestone Goal Modal */}
+      <SetMilestoneModal
+        isOpen={isSetMilestoneOpen}
+        currentStreak={streak}
+        currentMilestoneDays={streakData.targetMilestone.days}
+        onSave={(newDays) => {
+          setTargetMilestoneDays(newDays);
+          setStreakData(getStreakData());
+        }}
+        onClose={() => setIsSetMilestoneOpen(false)}
+      />
     </>
   );
 }

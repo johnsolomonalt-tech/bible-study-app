@@ -113,6 +113,10 @@ export async function GET() {
       ? accountStreak.dailyChapterGoal
       : 3;
 
+    const targetMilestoneDays = typeof accountStreak.targetMilestoneDays === 'number' && accountStreak.targetMilestoneDays > 0
+      ? accountStreak.targetMilestoneDays
+      : 7;
+
     return NextResponse.json({
       streak: {
         activeDates: allDates,
@@ -120,6 +124,7 @@ export async function GET() {
         longestStreak,
         lastActiveDate: allDates[allDates.length - 1] || '',
         dailyChapterGoal,
+        targetMilestoneDays,
         isCompletedToday,
         isGraceActive,
         todayGoals: accountStreak.todayGoals || {
@@ -184,6 +189,13 @@ export async function POST(req: Request) {
         ? accountStreak.dailyChapterGoal
         : 3);
 
+    // Target Milestone: prioritize newest incoming if valid, else server, else default 7
+    const targetMilestoneDays = typeof body?.targetMilestoneDays === 'number' && body.targetMilestoneDays > 0
+      ? body.targetMilestoneDays
+      : (typeof accountStreak.targetMilestoneDays === 'number' && accountStreak.targetMilestoneDays > 0
+        ? accountStreak.targetMilestoneDays
+        : 7);
+
     // Habits: union boolean flags and max chapters
     const serverHabits = accountStreak.todayGoals || {};
     const clientHabits = body?.todayGoals || {};
@@ -219,6 +231,7 @@ export async function POST(req: Request) {
       longestStreak,
       lastActiveDate: allDates[allDates.length - 1] || '',
       dailyChapterGoal,
+      targetMilestoneDays,
       todayGoals: mergedHabits,
       updatedAt: Date.now(),
     };
