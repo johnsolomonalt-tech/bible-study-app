@@ -124,11 +124,7 @@ export function CanvasToolbar({
     <div className="absolute top-4 left-4 right-4 z-20 flex items-center justify-between pointer-events-none gap-2">
       {/* Left: Sidebar Toggle & Board Title */}
       <div 
-        className={`pointer-events-auto flex items-center gap-2.5 px-3 py-2 rounded-xl shadow-lg border backdrop-blur-md transition-all ${
-          isDark 
-            ? 'bg-[#1e1e22]/90 border-zinc-700/70 text-zinc-100' 
-            : 'bg-white/95 border-zinc-200/90 text-zinc-800'
-        }`}
+        className="pointer-events-auto flex items-center gap-2.5 px-3 py-2 rounded-xl shadow-lg border border-border/80 bg-surface/90 text-fg backdrop-blur-md transition-all"
       >
         {/* Canvases Sidebar Toggle */}
         <button
@@ -136,10 +132,8 @@ export function CanvasToolbar({
           onClick={onToggleSidebar}
           className={`p-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-semibold ${
             isSidebarOpen 
-              ? 'bg-accent text-white shadow-sm' 
-              : isDark 
-                ? 'hover:bg-zinc-700/40 text-zinc-300' 
-                : 'hover:bg-zinc-100 text-zinc-700'
+              ? 'bg-accent text-accent-on shadow-xs' 
+              : 'hover:bg-surface-hover text-fg-2 hover:text-fg'
           }`}
           title={isSidebarOpen ? 'Close Your Canvases' : 'Your Canvases'}
         >
@@ -147,7 +141,7 @@ export function CanvasToolbar({
           <span className="hidden md:inline">Your Canvases</span>
         </button>
 
-        <div className="h-4 w-[1px] bg-zinc-700/40" />
+        <div className="h-4 w-[1px] bg-border-soft/60" />
 
         {/* Board Title */}
         <div className="flex items-center gap-1.5">
@@ -166,11 +160,7 @@ export function CanvasToolbar({
                   }
                 }}
                 autoFocus
-                className={`text-xs sm:text-sm font-semibold px-2 py-0.5 rounded border focus:outline-none focus:ring-1 focus:ring-accent ${
-                  isDark 
-                    ? 'bg-zinc-800 border-zinc-600 text-white' 
-                    : 'bg-zinc-100 border-zinc-300 text-zinc-900'
-                }`}
+                className="text-xs sm:text-sm font-semibold px-2 py-0.5 rounded border border-border bg-bg text-fg focus:outline-none focus:ring-1 focus:ring-accent"
               />
             ) : (
               <button
@@ -184,12 +174,12 @@ export function CanvasToolbar({
             )
           ) : (
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-zinc-400">No Canvas</span>
+              <span className="text-xs font-semibold text-muted">No Canvas</span>
               {onCreateBoard && (
                 <button
                   type="button"
                   onClick={onCreateBoard}
-                  className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-accent text-white text-[11px] font-semibold hover:bg-accent/90 transition-all cursor-pointer"
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-accent text-accent-on text-[11px] font-semibold hover:opacity-90 transition-all cursor-pointer shadow-xs"
                 >
                   <Plus size={12} />
                   <span>Create</span>
@@ -201,15 +191,15 @@ export function CanvasToolbar({
 
         {hasActiveBoard && (
           <>
-            <div className="h-4 w-[1px] bg-zinc-700/40 hidden sm:block" />
+            <div className="h-4 w-[1px] bg-border-soft/60 hidden sm:block" />
 
             {/* Node count and save indicator */}
-            <div className="hidden sm:flex items-center gap-2.5 text-xs text-zinc-400">
+            <div className="hidden sm:flex items-center gap-2.5 text-xs text-muted">
               <span className="font-mono text-[11px]">{nodeCount} {nodeCount === 1 ? 'card' : 'cards'}</span>
               <button
                 type="button"
                 onClick={onSave}
-                className="flex items-center gap-1.5 px-1.5 py-0.5 rounded hover:bg-zinc-700/20 transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 px-1.5 py-0.5 rounded hover:bg-surface-hover transition-colors cursor-pointer"
                 title={saveStatus === 'saving' ? 'Saving changes...' : saveStatus === 'unsaved' ? 'Unsaved changes (Click or Cmd+S to save)' : 'All changes saved (Click or Cmd+S to save)'}
               >
                 <span 
@@ -221,7 +211,7 @@ export function CanvasToolbar({
                         : 'bg-emerald-500'
                   }`} 
                 />
-                <span className="text-[11px] font-medium capitalize text-zinc-400">
+                <span className="text-[11px] font-medium capitalize text-muted">
                   {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'unsaved' ? 'Unsaved' : 'Saved'}
                 </span>
               </button>
@@ -232,11 +222,7 @@ export function CanvasToolbar({
 
       {/* Right: Actions Toolbar */}
       <div 
-        className={`pointer-events-auto flex items-center gap-1 sm:gap-1.5 p-1 sm:p-1.5 rounded-xl shadow-xl border backdrop-blur-md transition-all ${
-          isDark 
-            ? 'bg-[#1e1e22]/90 border-zinc-700/70 text-zinc-200' 
-            : 'bg-white/95 border-zinc-200/90 text-zinc-700'
-        }`}
+        className="pointer-events-auto flex items-center gap-1 sm:gap-1.5 p-1 sm:p-1.5 rounded-xl shadow-xl border border-border/80 bg-surface/90 text-fg backdrop-blur-md transition-all"
       >
         {/* Add Card Dropdown */}
         <div className="relative" ref={addMenuRef}>
@@ -253,13 +239,9 @@ export function CanvasToolbar({
 
           {isAddMenuOpen && (
             <div 
-              className={`absolute right-0 sm:left-0 top-full mt-2 w-64 rounded-2xl shadow-2xl border p-2 z-50 animate-in fade-in-50 zoom-in-95 ${
-                isDark 
-                  ? 'bg-[#222226] border-zinc-700 text-zinc-200' 
-                  : 'bg-white border-zinc-200 text-zinc-800 shadow-xl'
-              }`}
+              className="absolute right-0 sm:left-0 top-full mt-2 w-64 rounded-2xl shadow-2xl border border-border bg-surface text-fg p-2 z-50 animate-in fade-in-50 zoom-in-95 ring-1 ring-border/50"
             >
-              <div className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider px-3 py-1.5">
+              <div className="text-xs font-bold text-muted uppercase tracking-wider px-3 py-1.5">
                 Add Card
               </div>
               <div className="space-y-1">
@@ -274,9 +256,7 @@ export function CanvasToolbar({
                         setIsAddMenuOpen(false);
                         onAddNode(cat);
                       }}
-                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-                        isDark ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-zinc-100 text-zinc-800'
-                      }`}
+                      className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer hover:bg-surface-hover text-fg"
                     >
                       <div className="flex items-center gap-2.5">
                         <span 
@@ -285,7 +265,7 @@ export function CanvasToolbar({
                         />
                         <span>{cat === 'scripture' ? 'Scripture Verse...' : meta.label}</span>
                       </div>
-                      <Icon size={15} className="text-zinc-400 shrink-0" />
+                      <Icon size={15} className="text-muted shrink-0" />
                     </button>
                   );
                 })}
@@ -392,7 +372,7 @@ export function CanvasToolbar({
           <Redo2 size={16} />
         </button>
 
-        <div className="hidden sm:block h-4 w-[1px] bg-zinc-700/40 mx-0.5" />
+        <div className="hidden sm:block h-4 w-[1px] bg-border-soft/60 mx-0.5" />
 
         {/* Auto Arrange - desktop */}
         {onAutoArrange && (
@@ -402,8 +382,8 @@ export function CanvasToolbar({
             disabled={!hasActiveBoard || nodeCount === 0}
             className={`hidden sm:block p-1.5 rounded-lg transition-colors ${
               hasActiveBoard && nodeCount > 0
-                ? 'hover:bg-zinc-700/30 text-zinc-300 hover:text-white cursor-pointer active:scale-90'
-                : 'opacity-30 cursor-not-allowed text-zinc-500'
+                ? 'hover:bg-surface-hover text-fg-2 hover:text-fg cursor-pointer active:scale-90'
+                : 'opacity-30 cursor-not-allowed text-muted'
             }`}
             title="Auto Arrange Cards (Tidy layout)"
           >
@@ -418,8 +398,8 @@ export function CanvasToolbar({
           disabled={!hasActiveBoard || nodeCount === 0}
           className={`hidden sm:block p-1.5 rounded-lg transition-colors ${
             hasActiveBoard && nodeCount > 0
-              ? 'hover:bg-zinc-700/30 text-zinc-300 hover:text-white cursor-pointer active:scale-90'
-              : 'opacity-30 cursor-not-allowed text-zinc-500'
+              ? 'hover:bg-surface-hover text-fg-2 hover:text-fg cursor-pointer active:scale-90'
+              : 'opacity-30 cursor-not-allowed text-muted'
           }`}
           title="Fit view to all cards"
         >
@@ -433,8 +413,8 @@ export function CanvasToolbar({
           disabled={!hasActiveBoard || nodeCount === 0}
           className={`hidden sm:block p-1.5 rounded-lg transition-colors ${
             hasActiveBoard && nodeCount > 0
-              ? 'hover:bg-rose-500/20 text-zinc-400 hover:text-rose-400 cursor-pointer active:scale-90'
-              : 'opacity-30 cursor-not-allowed text-zinc-500'
+              ? 'hover:bg-rose-500/20 text-muted hover:text-rose-400 cursor-pointer active:scale-90'
+              : 'opacity-30 cursor-not-allowed text-muted'
           }`}
           title="Clear canvas"
         >
@@ -448,10 +428,8 @@ export function CanvasToolbar({
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
               isMobileMenuOpen 
-                ? 'bg-accent text-white' 
-                : isDark 
-                  ? 'hover:bg-zinc-800 text-zinc-300' 
-                  : 'hover:bg-zinc-100 text-zinc-700'
+                ? 'bg-accent text-accent-on' 
+                : 'hover:bg-surface-hover text-fg-2 hover:text-fg'
             }`}
             title="More canvas actions"
           >
@@ -460,11 +438,7 @@ export function CanvasToolbar({
 
           {isMobileMenuOpen && (
             <div 
-              className={`absolute right-0 top-full mt-2 w-56 rounded-2xl shadow-2xl border p-2 z-50 animate-in fade-in-50 zoom-in-95 ${
-                isDark 
-                  ? 'bg-[#222226] border-zinc-700 text-zinc-200' 
-                  : 'bg-white border-zinc-200 text-zinc-800 shadow-xl'
-              }`}
+              className="absolute right-0 top-full mt-2 w-56 rounded-2xl shadow-2xl border border-border bg-surface text-fg p-2 z-50 animate-in fade-in-50 zoom-in-95 ring-1 ring-border/50"
             >
 
               {onExportStudyGuide && (
@@ -477,8 +451,8 @@ export function CanvasToolbar({
                   disabled={!hasActiveBoard || nodeCount === 0}
                   className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
                     hasActiveBoard && nodeCount > 0 
-                      ? isDark ? 'hover:bg-zinc-800 text-zinc-200 cursor-pointer' : 'hover:bg-zinc-100 text-zinc-700 cursor-pointer'
-                      : 'opacity-30 cursor-not-allowed'
+                      ? 'hover:bg-surface-hover text-fg cursor-pointer'
+                      : 'opacity-30 cursor-not-allowed text-muted'
                   }`}
                 >
                   <FileText size={15} className="text-emerald-500" />
@@ -496,8 +470,8 @@ export function CanvasToolbar({
                   disabled={!hasActiveBoard}
                   className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
                     hasActiveBoard 
-                      ? isDark ? 'hover:bg-zinc-800 text-zinc-200 cursor-pointer' : 'hover:bg-zinc-100 text-zinc-700 cursor-pointer'
-                      : 'opacity-30 cursor-not-allowed'
+                      ? 'hover:bg-surface-hover text-fg cursor-pointer'
+                      : 'opacity-30 cursor-not-allowed text-muted'
                   }`}
                 >
                   <Share2 size={15} className="text-cyan-400" />
@@ -514,8 +488,8 @@ export function CanvasToolbar({
                 disabled={!hasActiveBoard || nodeCount === 0}
                 className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
                   hasActiveBoard && nodeCount > 0 
-                    ? isDark ? 'hover:bg-zinc-800 text-zinc-200 cursor-pointer' : 'hover:bg-zinc-100 text-zinc-700 cursor-pointer'
-                    : 'opacity-30 cursor-not-allowed'
+                    ? 'hover:bg-surface-hover text-fg cursor-pointer'
+                    : 'opacity-30 cursor-not-allowed text-muted'
                 }`}
               >
                 <Maximize2 size={15} />
@@ -532,8 +506,8 @@ export function CanvasToolbar({
                   disabled={!hasActiveBoard || nodeCount === 0}
                   className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
                     hasActiveBoard && nodeCount > 0 
-                      ? isDark ? 'hover:bg-zinc-800 text-zinc-200 cursor-pointer' : 'hover:bg-zinc-100 text-zinc-700 cursor-pointer'
-                      : 'opacity-30 cursor-not-allowed'
+                      ? 'hover:bg-surface-hover text-fg cursor-pointer'
+                      : 'opacity-30 cursor-not-allowed text-muted'
                   }`}
                 >
                   <LayoutGrid size={15} />
@@ -541,7 +515,7 @@ export function CanvasToolbar({
                 </button>
               )}
 
-              <div className={`border-t my-1 ${isDark ? 'border-zinc-700/60' : 'border-zinc-200'}`} />
+              <div className="border-t my-1 border-border" />
 
               <div className="flex items-center gap-1 px-1">
                 <button
@@ -552,8 +526,8 @@ export function CanvasToolbar({
                   disabled={!hasActiveBoard || !canUndo}
                   className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                     hasActiveBoard && canUndo 
-                      ? isDark ? 'hover:bg-zinc-800 text-zinc-200 cursor-pointer' : 'hover:bg-zinc-100 text-zinc-700 cursor-pointer'
-                      : 'opacity-30 cursor-not-allowed'
+                      ? 'hover:bg-surface-hover text-fg cursor-pointer'
+                      : 'opacity-30 cursor-not-allowed text-muted'
                   }`}
                 >
                   <Undo2 size={14} />
@@ -568,8 +542,8 @@ export function CanvasToolbar({
                   disabled={!hasActiveBoard || !canRedo}
                   className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                     hasActiveBoard && canRedo 
-                      ? isDark ? 'hover:bg-zinc-800 text-zinc-200 cursor-pointer' : 'hover:bg-zinc-100 text-zinc-700 cursor-pointer'
-                      : 'opacity-30 cursor-not-allowed'
+                      ? 'hover:bg-surface-hover text-fg cursor-pointer'
+                      : 'opacity-30 cursor-not-allowed text-muted'
                   }`}
                 >
                   <Redo2 size={14} />

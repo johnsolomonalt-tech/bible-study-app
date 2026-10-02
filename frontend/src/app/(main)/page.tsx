@@ -764,7 +764,7 @@ export default function App() {
     chatTitle?: string;
   } | null>(null);
 
-  // Haven Streak & Prayer Sanctuary State
+  // Streak & Prayer Sanctuary State
   const [isPrayerSanctuaryOpen, setIsPrayerSanctuaryOpen] = useState(false);
   const [chatToDelete, setChatToDelete] = useState<{ id: number; title: string } | null>(null);
   const [chatToRename, setChatToRename] = useState<{ id: number; title: string } | null>(null);
@@ -3577,7 +3577,7 @@ export default function App() {
                 className="w-full h-full object-contain filter contrast-105" 
               />
             </div>
-            <span className="font-semibold tracking-tight text-[#c96442] dark:text-[#d97746]">
+            <span className="font-serif text-[22px] font-bold tracking-tight text-[#c96442]">
               Theologica
             </span>
           </div>
@@ -6008,12 +6008,13 @@ export default function App() {
                   <p className="text-sm sm:text-[16px] text-muted">Track your daily spiritual rhythm, reading streak, and journey through all 66 books.</p>
                 </header>
 
-                {/* Haven-style Streak, Daily Goal & 7-Day Consistency Dashboard */}
+                {/* Streak, Daily Goal & 7-Day Consistency Dashboard */}
                 <TrackerStreakHero
                   dailyChapterGoal={dailyChapterGoal}
                   totalChaptersCompleted={completedCount}
                   onNavigateToTab={setActiveTab}
                   onOpenPrayerSanctuary={() => setIsPrayerSanctuaryOpen(true)}
+                  onUpdateDailyChapterGoal={handleDailyChapterGoalChange}
                 />
 
                 <div className="bg-surface p-4 sm:p-8 rounded-[20px] ring-shadow mb-8 sm:mb-16">
@@ -6323,7 +6324,7 @@ export default function App() {
           }}
         />
 
-        {/* Haven Prayer Sanctuary Modal */}
+        {/* Prayer Sanctuary Modal */}
         <PrayerSanctuaryModal
           isOpen={isPrayerSanctuaryOpen}
           onClose={() => setIsPrayerSanctuaryOpen(false)}

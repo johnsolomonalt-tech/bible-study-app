@@ -141,7 +141,7 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
     }
   };
 
-  const handleBaseClasses = `!w-3 !h-3 !bg-zinc-400 dark:!bg-zinc-500 !border-2 !border-[#161618] dark:!border-[#161618] !rounded-full transition-all duration-150 cursor-crosshair z-10 before:absolute before:-inset-2.5 before:content-[''] hover:!scale-125 hover:!bg-accent ${
+  const handleBaseClasses = `!w-3 !h-3 !bg-muted !border-2 !border-[var(--bg)] !rounded-full transition-all duration-150 cursor-crosshair z-10 before:absolute before:-inset-2.5 before:content-[''] hover:!scale-125 hover:!bg-accent ${
     selected ? '!opacity-90' : 'opacity-40 group-hover:opacity-100'
   }`;
 
@@ -155,14 +155,10 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
       }}
       className={`relative group rounded-xl transition-all duration-200 select-none w-[310px] sm:w-[380px] max-w-[calc(100vw-32px)] ${
         isMenuOpen ? '!z-50' : selected ? 'z-30' : 'z-0'
-      } ${
-        isDark 
-          ? 'bg-[#1a1a1c]/90 text-zinc-100 border-zinc-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.35)] backdrop-blur-md' 
-          : 'bg-white/95 text-zinc-800 border-zinc-200/90 shadow-[0_8px_30px_rgb(0,0,0,0.06)] backdrop-blur-md'
-      } border ${
+      } bg-surface text-fg border border-border shadow-[0_8px_30px_rgba(0,0,0,0.15)] backdrop-blur-md ${
         selected 
           ? 'ring-2 ring-accent border-accent/80 shadow-2xl scale-[1.008]' 
-          : 'hover:border-zinc-500/50 hover:shadow-xl'
+          : 'hover:border-border-soft hover:shadow-xl'
       }`}
       style={{
         width: width || (style as any)?.width || 380,
@@ -238,9 +234,7 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
 
       {/* Card Header */}
       <div 
-        className={`flex items-start justify-between px-3.5 py-2.5 border-b rounded-t-xl gap-2 ${
-          isDark ? 'border-zinc-800/80 bg-zinc-900/40' : 'border-zinc-100 bg-zinc-50/70'
-        }`}
+        className="flex items-start justify-between px-3.5 py-2.5 border-b border-border rounded-t-xl gap-2 bg-surface-warm/40"
       >
         {/* Category Badge & Title Textarea */}
         <div className="flex items-start gap-2 flex-1 min-w-0">
@@ -295,9 +289,7 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
               }
             }}
             placeholder="Card Title..."
-            className={`nodrag flex-1 min-w-0 bg-transparent text-[13px] font-semibold leading-snug focus:outline-none focus:ring-1 focus:ring-accent/50 rounded px-1.5 py-0.5 resize-none overflow-hidden break-words whitespace-pre-wrap ${
-              isDark ? 'text-zinc-200 placeholder-zinc-500' : 'text-zinc-800 placeholder-zinc-400'
-            }`}
+            className="nodrag flex-1 min-w-0 bg-transparent text-[13px] font-semibold leading-snug focus:outline-none focus:ring-1 focus:ring-accent/50 rounded px-1.5 py-0.5 resize-none overflow-hidden break-words whitespace-pre-wrap text-fg placeholder:text-muted"
             style={{
               height: 'auto',
               minHeight: '26px',
@@ -357,7 +349,7 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
                   e.stopPropagation();
                   setIsEditing(true);
                 }}
-                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/30 transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface-hover transition-colors cursor-pointer"
                 title="Edit card markdown"
               >
                 <Edit3 size={15} />
@@ -365,8 +357,8 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
               <button
                 type="button"
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className={`p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/30 transition-colors cursor-pointer ${
-                  isMenuOpen ? 'bg-zinc-700/30 text-zinc-200' : ''
+                className={`p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface-hover transition-colors cursor-pointer ${
+                  isMenuOpen ? 'bg-surface-warm text-fg' : ''
                 }`}
                 title="Card options"
               >
@@ -378,17 +370,13 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
           {/* Quick Action Dropdown */}
           {isMenuOpen && (
             <div 
-              className={`absolute right-0 top-full mt-1.5 w-64 rounded-2xl shadow-2xl border p-2 z-50 animate-in fade-in-50 zoom-in-95 ${
-                isDark 
-                  ? 'bg-[#222226] border-zinc-700 text-zinc-200' 
-                  : 'bg-white border-zinc-200 text-zinc-800 shadow-xl'
-              }`}
+              className="absolute right-0 top-full mt-1.5 w-64 rounded-2xl shadow-2xl border border-border bg-surface text-fg p-2 z-50 animate-in fade-in-50 zoom-in-95 ring-1 ring-border/50"
               style={{
                 transform: `scale(${menuScale})`,
                 transformOrigin: 'top right',
               }}
             >
-              <div className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider px-3 py-1.5">
+              <div className="text-xs font-bold text-muted uppercase tracking-wider px-3 py-1.5">
                 Change Category
               </div>
               <div className="space-y-1 mb-1.5">
@@ -403,8 +391,8 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
                       onClick={() => handleCategoryChange(cat)}
                       className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
                         isSelected 
-                          ? isDark ? 'bg-zinc-700/60 text-white font-semibold' : 'bg-zinc-100 text-black font-semibold'
-                          : isDark ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-zinc-100 text-zinc-700'
+                          ? 'bg-surface-warm text-fg font-semibold' 
+                          : 'hover:bg-surface-hover text-fg-2 hover:text-fg'
                       }`}
                     >
                       <div className="flex items-center gap-2.5">
@@ -414,13 +402,13 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
                         />
                         <span>{meta.label}</span>
                       </div>
-                      <Icon size={15} className="text-zinc-400 shrink-0" />
+                      <Icon size={15} className="text-muted shrink-0" />
                     </button>
                   );
                 })}
               </div>
 
-              <div className={`border-t my-1.5 ${isDark ? 'border-zinc-700/60' : 'border-zinc-100'}`} />
+              <div className="border-t my-1.5 border-border" />
 
               {/* Spawn Cross-References */}
               {(data.category === 'scripture' || parsedTitleRef) && data.onSpawnCrossReferences && (
@@ -433,9 +421,7 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
                       : data.title;
                     data.onSpawnCrossReferences?.(id, ref);
                   }}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer mb-1 ${
-                    isDark ? 'hover:bg-amber-500/20 text-amber-300' : 'hover:bg-amber-50 text-amber-800'
-                  }`}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer mb-1 hover:bg-amber-500/15 text-amber-500"
                   title="Spawn and link cross-reference verses from Treasury of Scripture Knowledge"
                 >
                   <div className="flex items-center gap-2.5">
@@ -521,9 +507,7 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
                   setIsMenuOpen(false);
                   if (data.onDuplicate) data.onDuplicate(id);
                 }}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-                  isDark ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-zinc-100 text-zinc-700'
-                }`}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer hover:bg-surface-hover text-fg-2 hover:text-fg"
               >
                 <Copy size={15} className="shrink-0" />
                 <span>Duplicate Card</span>
@@ -556,7 +540,7 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
         {isEditing ? (
           showPreviewToggle ? (
             /* Live Markdown Preview */
-            <div className={`prose prose-sm max-w-none break-words ${isDark ? 'prose-invert text-zinc-200' : 'text-zinc-800'}`}>
+            <div className="prose prose-sm max-w-none break-words text-fg">
               <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                 {editContent || '*No content yet. Type something...*'}
               </ReactMarkdown>
@@ -576,14 +560,10 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
                 }}
                 onBlur={commitChanges}
                 placeholder="Write markdown here..."
-                className={`w-full min-h-[120px] resize-y font-mono text-xs p-2.5 rounded-lg border focus:outline-none focus:ring-1 focus:ring-accent transition-all ${
-                  isDark 
-                    ? 'bg-[#121214] border-zinc-700 text-zinc-200 placeholder-zinc-600' 
-                    : 'bg-zinc-50 border-zinc-300 text-zinc-800 placeholder-zinc-400'
-                }`}
+                className="w-full min-h-[120px] resize-y font-mono text-xs p-2.5 rounded-lg border border-border bg-bg text-fg placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent transition-all"
               />
-              <div className="flex items-center justify-between text-[11px] text-zinc-400">
-                <span className="hidden sm:inline">Tip: Press <kbd className="px-1 py-0.5 bg-zinc-700/30 rounded text-[10px] font-mono">{mod.symbol}+Enter</kbd> to save</span>
+              <div className="flex items-center justify-between text-[11px] text-muted">
+                <span className="hidden sm:inline">Tip: Press <kbd className="px-1 py-0.5 bg-surface-warm rounded text-[10px] font-mono">{mod.symbol}+Enter</kbd> to save</span>
                 <button
                   type="button"
                   onMouseDown={(e) => {
@@ -595,7 +575,7 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
                     e.preventDefault();
                     commitChanges();
                   }}
-                  className="px-2.5 py-1 bg-accent text-white rounded-md font-semibold text-xs hover:bg-accent/90 active:scale-95 transition-all shadow-xs cursor-pointer ml-auto sm:ml-0"
+                  className="px-2.5 py-1 bg-accent text-accent-on rounded-md font-semibold text-xs hover:opacity-90 active:scale-95 transition-all shadow-xs cursor-pointer ml-auto sm:ml-0"
                 >
                   Done
                 </button>
@@ -605,18 +585,14 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
         ) : (
           /* Display Mode: Rich Markdown */
           <div 
-            className={`prose prose-sm max-w-none break-words cursor-text ${
-              isDark 
-                ? 'prose-invert text-zinc-300 prose-headings:text-zinc-100 prose-strong:text-zinc-100 prose-blockquote:border-accent prose-blockquote:text-zinc-400' 
-                : 'text-zinc-700 prose-headings:text-zinc-900 prose-strong:text-zinc-900 prose-blockquote:border-accent prose-blockquote:text-zinc-600'
-            }`}
+            className="prose prose-sm max-w-none break-words cursor-text text-fg prose-headings:text-fg prose-strong:text-fg prose-blockquote:border-accent prose-blockquote:text-muted"
           >
             {data.content ? (
               <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                 {data.content}
               </ReactMarkdown>
             ) : (
-              <div className="flex flex-col items-center justify-center py-6 text-zinc-400 text-xs text-center select-none">
+              <div className="flex flex-col items-center justify-center py-6 text-muted text-xs text-center select-none">
                 <Edit3 size={18} className="mb-1.5 opacity-40" />
                 <span className="hidden sm:inline">Double-click to write Markdown</span>
                 <span className="sm:hidden">Tap edit to write Markdown</span>

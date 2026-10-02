@@ -99,26 +99,20 @@ export function CanvasSidebar({
         aria-hidden="true"
       />
       <aside 
-        className={`fixed md:relative inset-y-0 left-0 z-40 md:z-20 w-72 lg:w-80 h-full shrink-0 flex flex-col border-r transition-all duration-200 animate-in slide-in-from-left-4 ${
-          isDark 
-            ? 'bg-[#18181b] border-zinc-800 text-zinc-100 shadow-2xl md:shadow-none' 
-            : 'bg-white border-zinc-200 text-zinc-800 shadow-2xl md:shadow-none'
-        }`}
+        className="fixed md:relative inset-y-0 left-0 z-40 md:z-20 w-72 lg:w-80 h-full shrink-0 flex flex-col border-r border-border bg-surface text-fg shadow-2xl md:shadow-none transition-all duration-200 animate-in slide-in-from-left-4"
       >
       {/* Sidebar Header */}
-      <div className={`flex items-center justify-between px-4 py-3.5 border-b shrink-0 ${
-        isDark ? 'border-zinc-800' : 'border-zinc-200'
-      }`}>
+      <div className="flex items-center justify-between px-4 py-3.5 border-b border-border shrink-0">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-accent/15 text-accent flex items-center justify-center">
             <Workflow size={16} />
           </div>
-          <span className="text-sm font-bold tracking-tight">Your Canvases</span>
+          <span className="text-sm font-bold tracking-tight text-fg">Your Canvases</span>
         </div>
         <button
           type="button"
           onClick={onToggle}
-          className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+          className="p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface-hover transition-colors cursor-pointer"
           title="Close Sidebar"
         >
           <PanelLeftClose size={16} />
@@ -131,7 +125,7 @@ export function CanvasSidebar({
           <button
             type="button"
             onClick={() => onCreateBoard()}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-accent text-white text-xs font-semibold hover:bg-accent/90 active:scale-[0.98] transition-all shadow-md cursor-pointer"
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-accent text-accent-on text-xs font-semibold hover:opacity-90 active:scale-[0.98] transition-all shadow-xs cursor-pointer"
           >
             <Plus size={15} />
             <span>New Canvas</span>
@@ -140,11 +134,7 @@ export function CanvasSidebar({
             <button
               type="button"
               onClick={onOpenImportModal}
-              className={`p-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
-                isDark 
-                  ? 'border-zinc-700 bg-zinc-800/80 text-zinc-300 hover:bg-zinc-700' 
-                  : 'border-zinc-200 bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
-              }`}
+              className="p-2 rounded-xl border border-border bg-bg/80 text-fg-2 hover:text-fg hover:bg-surface-hover text-xs font-semibold transition-all cursor-pointer shadow-xs"
               title="Import Shared Canvas by Link or Code"
             >
               <Download size={15} />
@@ -153,24 +143,20 @@ export function CanvasSidebar({
         </div>
 
         {/* Search */}
-        <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs ${
-          isDark 
-            ? 'bg-zinc-900/80 border-zinc-800 text-zinc-300' 
-            : 'bg-zinc-100/80 border-zinc-200 text-zinc-700'
-        }`}>
-          <Search size={13} className="text-zinc-400 shrink-0" />
+        <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-border bg-bg text-xs">
+          <Search size={13} className="text-muted shrink-0" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search canvases..."
-            className="bg-transparent focus:outline-none w-full placeholder-zinc-500 text-xs"
+            className="bg-transparent focus:outline-none w-full placeholder:text-muted text-fg text-xs"
           />
           {searchQuery && (
             <button 
               type="button" 
               onClick={() => setSearchQuery('')}
-              className="text-zinc-400 hover:text-zinc-200"
+              className="text-muted hover:text-fg cursor-pointer"
             >
               <X size={12} />
             </button>
@@ -195,13 +181,13 @@ export function CanvasSidebar({
                 <Workflow size={20} />
               </div>
               <div>
-                <p className="text-xs font-semibold text-zinc-200">No canvas boards yet</p>
-                <p className="text-[11px] text-zinc-500 mt-1">Start fresh with a blank canvas.</p>
+                <p className="text-xs font-semibold text-fg">No canvas boards yet</p>
+                <p className="text-[11px] text-muted mt-1">Start fresh with a blank canvas.</p>
               </div>
               <button
                 type="button"
                 onClick={() => onCreateBoard()}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent text-white text-xs font-semibold hover:bg-accent/90 transition-all cursor-pointer shadow-sm active:scale-95"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent text-accent-on text-xs font-semibold hover:opacity-90 transition-all cursor-pointer shadow-xs active:scale-95"
               >
                 <Plus size={13} />
                 <span>Create Canvas</span>
@@ -221,12 +207,8 @@ export function CanvasSidebar({
                 }}
                 className={`group relative flex flex-col px-3 py-2.5 rounded-xl border text-xs transition-all cursor-pointer ${
                   isActive
-                    ? isDark 
-                      ? 'bg-zinc-800/90 border-accent/60 shadow-md ring-1 ring-accent/30 text-white' 
-                      : 'bg-white border-accent/60 shadow-md ring-1 ring-accent/30 text-zinc-950 font-medium'
-                    : isDark 
-                      ? 'border-transparent hover:bg-zinc-800/50 hover:border-zinc-700/50 text-zinc-300' 
-                      : 'border-transparent hover:bg-zinc-100 hover:border-zinc-200 text-zinc-700'
+                    ? 'bg-surface-warm/90 border-accent/60 shadow-xs ring-1 ring-accent/30 text-fg font-medium'
+                    : 'border-transparent hover:bg-surface-hover text-fg-2 hover:text-fg'
                 }`}
               >
                 {/* Active strip indicator */}
@@ -238,7 +220,7 @@ export function CanvasSidebar({
                   <div className="flex items-center gap-2 flex-1 min-w-0">
                     <Workflow 
                       size={14} 
-                      className={`shrink-0 ${isActive ? 'text-accent' : 'text-zinc-400'}`} 
+                      className={`shrink-0 ${isActive ? 'text-accent' : 'text-muted'}`} 
                     />
                     
                     {isEditing ? (
@@ -252,20 +234,18 @@ export function CanvasSidebar({
                             if (e.key === 'Escape') setEditingId(null);
                           }}
                           autoFocus
-                          className={`w-full px-1.5 py-0.5 rounded border text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-accent ${
-                            isDark ? 'bg-zinc-900 border-zinc-700 text-white' : 'bg-white border-zinc-300 text-black'
-                          }`}
+                          className="w-full px-1.5 py-0.5 rounded border border-border bg-bg text-fg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-accent"
                         />
                         <button
                           type="button"
                           onClick={() => commitRename(board.id)}
-                          className="p-1 rounded bg-accent text-white hover:bg-accent/80"
+                          className="p-1 rounded bg-accent text-accent-on hover:opacity-90"
                         >
                           <Check size={11} />
                         </button>
                       </div>
                     ) : (
-                      <span className="font-semibold truncate text-[13px]">
+                      <span className="font-semibold truncate text-[13px] text-fg">
                         {board.title || 'Untitled Canvas'}
                       </span>
                     )}
@@ -277,7 +257,7 @@ export function CanvasSidebar({
                       <button
                         type="button"
                         onClick={(e) => startRename(board, e)}
-                        className="p-1 rounded hover:bg-zinc-700/40 text-zinc-400 hover:text-zinc-200"
+                        className="p-1 rounded hover:bg-surface-warm text-muted hover:text-fg transition-colors"
                         title="Rename canvas"
                       >
                         <Edit2 size={12} />
@@ -288,7 +268,7 @@ export function CanvasSidebar({
                           e.stopPropagation();
                           setBoardToDelete(board);
                         }}
-                        className="p-1 rounded hover:bg-rose-500/20 text-zinc-400 hover:text-rose-400 cursor-pointer"
+                        className="p-1 rounded hover:bg-rose-500/20 text-muted hover:text-rose-400 cursor-pointer transition-colors"
                         title="Delete canvas"
                       >
                         <Trash2 size={12} />
@@ -298,13 +278,13 @@ export function CanvasSidebar({
                 </div>
 
                 {/* Subtitle / Metadata */}
-                <div className="flex items-center justify-between text-[11px] text-zinc-400 mt-1 pl-5">
+                <div className="flex items-center justify-between text-[11px] text-muted mt-1 pl-5">
                   <div className="flex items-center gap-1">
                     <Layers size={11} />
                     <span>{board.nodeCount ?? 0} {board.nodeCount === 1 ? 'card' : 'cards'}</span>
                   </div>
                   {board.updatedAt && (
-                    <span className="text-[10px] text-zinc-500 font-mono">
+                    <span className="text-[10px] text-muted font-mono">
                       {formatTimestamp(board.updatedAt)}
                     </span>
                   )}
@@ -316,9 +296,7 @@ export function CanvasSidebar({
       </div>
 
       {/* Footer info */}
-      <div className={`p-3 border-t text-[11px] text-zinc-500 flex items-center justify-between shrink-0 ${
-        isDark ? 'border-zinc-800' : 'border-zinc-200'
-      }`}>
+      <div className="p-3 border-t border-border text-[11px] text-muted flex items-center justify-between shrink-0">
         <span>Saved offline & cloud</span>
         <span className="font-mono text-[10px]">{boards.length} Total</span>
       </div>

@@ -2201,9 +2201,9 @@ function InnerCanvasBoard({
   return (
     <div 
       ref={containerRef}
-      className="relative w-full h-full overflow-hidden select-none flex flex-row transition-colors duration-200"
+      className="relative w-full h-full overflow-hidden select-none flex flex-row bg-bg text-fg transition-colors duration-200"
       style={{
-        backgroundColor: isDark ? '#161618' : '#F6F6F6',
+        backgroundColor: 'var(--bg)',
       }}
     >
       {/* Canvases Sidebar */}
@@ -2348,7 +2348,7 @@ function InnerCanvasBoard({
           variant={BackgroundVariant.Dots}
           gap={20}
           size={1.5}
-          color={isDark ? '#323236' : '#D4D4D8'}
+          color={isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}
         />
 
         {/* MiniMap - hidden on mobile to maximize touch canvas workspace */}
@@ -2364,13 +2364,11 @@ function InnerCanvasBoard({
                 case 'historical_context': return '#8B5CF6';
                 case 'illustration': return '#10B981';
                 case 'application': return '#F43F5E';
-                default: return isDark ? '#52525b' : '#a1a1aa';
+                default: return isDark ? '#87867f' : '#b0aea5';
               }
             }}
-            maskColor={isDark ? 'rgba(22, 22, 24, 0.75)' : 'rgba(246, 246, 246, 0.75)'}
-            className={`!rounded-xl !border shadow-xl !overflow-hidden ${
-              isDark ? '!bg-[#1e1e22] !border-zinc-700/70' : '!bg-white !border-zinc-200'
-            }`}
+            maskColor={isDark ? 'rgba(20, 20, 19, 0.75)' : 'rgba(250, 249, 245, 0.75)'}
+            className="!rounded-xl !border !border-border shadow-xl !overflow-hidden !bg-surface"
             style={{ width: 160, height: 110 }}
           />
         )}
@@ -2380,11 +2378,7 @@ function InnerCanvasBoard({
           <Controls
             position="bottom-left"
             showInteractive={false}
-            className={`!rounded-xl !border shadow-xl !overflow-hidden mb-2 sm:mb-0 ${
-              isDark 
-                ? '!bg-[#1e1e22] !border-zinc-700/70 !text-zinc-200 [&>button]:!border-zinc-700 [&>button]:!bg-[#1e1e22] [&>button]:!fill-zinc-300 hover:[&>button]:!bg-zinc-800' 
-                : '!bg-white !border-zinc-200 !text-zinc-700 [&>button]:!border-zinc-200 [&>button]:!bg-white [&>button]:!fill-zinc-600 hover:[&>button]:!bg-zinc-50'
-            }`}
+            className="!rounded-xl !border !border-border shadow-xl !overflow-hidden mb-2 sm:mb-0 !bg-surface !text-fg [&>button]:!border-border [&>button]:!bg-surface [&>button]:!fill-fg hover:[&>button]:!bg-surface-hover hover:[&>button]:!text-fg"
           />
         )}
       </ReactFlow>
@@ -2397,12 +2391,10 @@ function InnerCanvasBoard({
             left: Math.min(paneContextMenu.x, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 270), 
             top: Math.min(paneContextMenu.y, (typeof window !== 'undefined' ? window.innerHeight : 800) - 400) 
           }}
-          className={`fixed z-50 w-64 rounded-2xl shadow-2xl border p-2 animate-in fade-in-50 zoom-in-95 backdrop-blur-md select-none ${
-            isDark ? 'bg-[#222226]/95 border-zinc-700 text-zinc-200' : 'bg-white/95 border-zinc-200 text-zinc-800 shadow-xl'
-          }`}
+          className="fixed z-50 w-64 rounded-2xl shadow-2xl border border-border p-2 animate-in fade-in-50 zoom-in-95 backdrop-blur-md select-none bg-surface/95 text-fg ring-1 ring-border/50"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider px-3 py-1.5">
+          <div className="text-xs font-bold text-muted uppercase tracking-wider px-3 py-1.5">
             Canvas Options
           </div>
 
@@ -2414,9 +2406,7 @@ function InnerCanvasBoard({
                   setPaneContextMenu(null);
                   handleCreateBoard();
                 }}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-                  isDark ? 'hover:bg-zinc-800 text-accent' : 'hover:bg-accent/10 text-accent'
-                }`}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer hover:bg-surface-hover text-accent"
               >
                 <Plus size={16} className="shrink-0" />
                 <span>New Canvas Board</span>
@@ -2428,7 +2418,7 @@ function InnerCanvasBoard({
                   setPaneContextMenu(null);
                   setIsAiModalOpen(true);
                 }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer hover:bg-accent/10 text-accent"
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer hover:bg-surface-hover text-accent"
               >
                 <Sparkles size={16} className="text-accent shrink-0" />
                 <span>Theologica AI</span>
@@ -2441,19 +2431,17 @@ function InnerCanvasBoard({
                 <button
                   type="button"
                   onClick={() => setPaneAddSubmenuOpen(!paneAddSubmenuOpen)}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-                    isDark ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-zinc-100 text-zinc-800'
-                  }`}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer hover:bg-surface-hover text-fg"
                 >
                   <div className="flex items-center gap-2.5">
                     <Plus size={16} className="text-accent" />
                     <span>Add Card...</span>
                   </div>
-                  <ChevronRight size={15} className={`text-zinc-400 transition-transform duration-150 ${paneAddSubmenuOpen ? 'rotate-90' : ''}`} />
+                  <ChevronRight size={15} className={`text-muted transition-transform duration-150 ${paneAddSubmenuOpen ? 'rotate-90' : ''}`} />
                 </button>
 
                 {paneAddSubmenuOpen && (
-                  <div className={`my-1.5 py-1.5 pl-3 border-l-2 space-y-1 ${isDark ? 'border-zinc-700' : 'border-zinc-200'}`}>
+                  <div className="my-1.5 py-1.5 pl-3 border-l-2 border-border space-y-1">
                     {(Object.keys(CATEGORY_METADATA) as NodeCategory[]).map((cat) => {
                       const meta = CATEGORY_METADATA[cat];
                       return (
@@ -2465,9 +2453,7 @@ function InnerCanvasBoard({
                             handleAddNode(cat, flowPos);
                             setPaneContextMenu(null);
                           }}
-                          className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors cursor-pointer text-left ${
-                            isDark ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-zinc-100 text-zinc-800'
-                          }`}
+                          className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors cursor-pointer text-left hover:bg-surface-hover text-fg"
                         >
                           <span className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: meta.accent }} />
                           <span>{meta.label}</span>
@@ -2485,13 +2471,13 @@ function InnerCanvasBoard({
               setPaneContextMenu(null);
               setIsAiModalOpen(true);
             }}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer hover:bg-accent/10 text-accent"
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer hover:bg-surface-hover text-accent"
           >
             <Sparkles size={16} className="text-accent shrink-0" />
             <span>Theologica AI</span>
           </button>
 
-          <div className={`border-t my-1.5 ${isDark ? 'border-zinc-700/60' : 'border-zinc-200'}`} />
+          <div className="border-t my-1.5 border-border" />
 
           {/* Auto Arrange */}
           <button
@@ -2500,11 +2486,9 @@ function InnerCanvasBoard({
               setPaneContextMenu(null);
               handleAutoArrange();
             }}
-            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-              isDark ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-zinc-100 text-zinc-800'
-            }`}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer hover:bg-surface-hover text-fg"
           >
-            <LayoutGrid size={16} className="shrink-0" />
+            <LayoutGrid size={16} className="shrink-0 text-muted" />
             <span>Auto Arrange</span>
           </button>
 
@@ -2517,15 +2501,13 @@ function InnerCanvasBoard({
                 fitView({ padding: 0.2, duration: 600, minZoom: 0.35, maxZoom: 1.1 });
               }
             }}
-            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-              isDark ? 'hover:bg-zinc-800 text-zinc-300' : 'hover:bg-zinc-100 text-zinc-800'
-            }`}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer hover:bg-surface-hover text-fg"
           >
-            <Maximize2 size={16} className="shrink-0" />
+            <Maximize2 size={16} className="shrink-0 text-muted" />
             <span>Fit to View</span>
           </button>
 
-          <div className={`border-t my-1.5 ${isDark ? 'border-zinc-700/60' : 'border-zinc-200'}`} />
+          <div className="border-t my-1.5 border-border" />
 
           {/* Undo */}
           <button
@@ -2537,15 +2519,15 @@ function InnerCanvasBoard({
             }}
             className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
               canUndo 
-                ? (isDark ? 'hover:bg-zinc-800 text-zinc-300 cursor-pointer' : 'hover:bg-zinc-100 text-zinc-800 cursor-pointer')
-                : 'opacity-40 cursor-not-allowed text-zinc-500'
+                ? 'hover:bg-surface-hover text-fg cursor-pointer'
+                : 'opacity-40 cursor-not-allowed text-muted'
             }`}
           >
             <div className="flex items-center gap-2.5">
               <Undo2 size={16} className="shrink-0" />
               <span>Undo</span>
             </div>
-            <span className="text-xs text-zinc-500 font-mono hidden sm:inline">{mod.symbol}Z</span>
+            <span className="text-xs text-muted font-mono hidden sm:inline">{mod.symbol}Z</span>
           </button>
 
           {/* Redo */}
@@ -2558,15 +2540,15 @@ function InnerCanvasBoard({
             }}
             className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
               canRedo 
-                ? (isDark ? 'hover:bg-zinc-800 text-zinc-300 cursor-pointer' : 'hover:bg-zinc-100 text-zinc-800 cursor-pointer')
-                : 'opacity-40 cursor-not-allowed text-zinc-500'
+                ? 'hover:bg-surface-hover text-fg cursor-pointer'
+                : 'opacity-40 cursor-not-allowed text-muted'
             }`}
           >
             <div className="flex items-center gap-2.5">
               <Redo2 size={16} className="shrink-0" />
               <span>Redo</span>
             </div>
-            <span className="text-xs text-zinc-500 font-mono hidden sm:inline">{mod.symbol}{mod.shift}Z</span>
+            <span className="text-xs text-muted font-mono hidden sm:inline">{mod.symbol}{mod.shift}Z</span>
           </button>
         </>
       )}

@@ -105,7 +105,7 @@ export function StreakPopover({
         </span>
       </button>
 
-      {/* Haven-style Streak & Daily Rhythm Drawer / Modal */}
+      {/* Streak & Daily Rhythm Drawer / Modal */}
       <AnimatePresence>
         {isOpen && (
           <div 

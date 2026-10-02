@@ -112,9 +112,9 @@ export function CanvasStartPage({
 
   return (
     <div 
-      className="w-full h-full overflow-y-auto custom-scroll flex flex-col justify-between p-4 sm:p-6 md:p-8 select-none animate-in fade-in duration-200"
+      className="w-full h-full overflow-y-auto custom-scroll flex flex-col justify-between p-4 sm:p-6 md:p-8 select-none animate-in fade-in duration-200 bg-bg text-fg"
       style={{
-        backgroundColor: isDark ? '#161618' : '#F6F6F6',
+        backgroundColor: 'var(--bg)',
       }}
     >
       {/* Top Bar Navigation */}
@@ -124,11 +124,7 @@ export function CanvasStartPage({
           <button
             type="button"
             onClick={onOpenSidebar}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer shadow-xs ${
-              isDark 
-                ? 'border-zinc-800 bg-zinc-900/90 text-zinc-300 hover:text-white hover:border-zinc-700' 
-                : 'border-zinc-200 bg-white text-zinc-700 hover:text-zinc-950 hover:border-zinc-300'
-            }`}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-surface text-fg-2 hover:text-fg hover:bg-surface-hover text-xs font-semibold transition-all cursor-pointer shadow-xs"
             title="Open Canvases Sidebar"
           >
             <PanelLeft size={14} className="text-accent" />
@@ -143,11 +139,7 @@ export function CanvasStartPage({
           <button
             type="button"
             onClick={onResumeActiveBoard}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer shadow-xs ml-auto ${
-              isDark 
-                ? 'border-accent/40 bg-accent/10 text-accent hover:bg-accent/20' 
-                : 'border-accent/40 bg-accent/10 text-accent hover:bg-accent/20'
-            }`}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-accent/40 bg-accent/10 text-accent hover:bg-accent/20 text-xs font-semibold transition-all cursor-pointer shadow-xs ml-auto"
           >
             <Workflow size={13} className="text-accent shrink-0" />
             <span className="truncate max-w-[180px] sm:max-w-xs">Return to &quot;{activeBoard.title}&quot;</span>
@@ -161,9 +153,7 @@ export function CanvasStartPage({
         {isGenerating ? (
           /* HUD GENERATION STATE */
           <div 
-            className={`w-full max-w-lg rounded-2xl border p-6 sm:p-8 flex flex-col items-center text-center space-y-6 shadow-xl backdrop-blur-md animate-in fade-in zoom-in-95 ${
-              isDark ? 'bg-[#1c1c20] border-zinc-800 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'
-            }`}
+            className="w-full max-w-lg rounded-2xl border border-border bg-surface text-fg p-6 sm:p-8 flex flex-col items-center text-center space-y-6 shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95"
           >
             <div className="relative flex items-center justify-center w-16 h-16">
               <div className="absolute inset-0 rounded-2xl bg-accent/15 border border-accent/30 animate-pulse" />
@@ -224,24 +214,20 @@ export function CanvasStartPage({
               <div className="w-11 h-11 rounded-2xl bg-accent/15 border border-accent/30 text-accent flex items-center justify-center shadow-xs">
                 <Sparkles size={20} className="text-accent" />
               </div>
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-fg">
                 Architect a Theological Canvas
               </h1>
-              <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 max-w-md leading-relaxed">
+              <p className="text-xs sm:text-sm text-muted max-w-md leading-relaxed">
                 Transform Scripture passages, doctrines, and theological themes into an interactive visual whiteboard graph.
               </p>
             </div>
 
             {/* Unified Input Card */}
             <div 
-              className={`w-full rounded-2xl border transition-all duration-200 shadow-xl ${
-                isDark 
-                  ? 'bg-[#1c1c20] border-zinc-800 focus-within:border-accent/80 focus-within:ring-2 focus-within:ring-accent/15' 
-                  : 'bg-white border-zinc-200 focus-within:border-accent/80 focus-within:ring-2 focus-within:ring-accent/15 shadow-zinc-200/50'
-              } p-3.5 sm:p-4 space-y-3`}
+              className="w-full rounded-2xl border border-border bg-surface text-fg focus-within:border-accent/80 focus-within:ring-2 focus-within:ring-accent/15 shadow-xl p-3.5 sm:p-4 space-y-3 transition-all duration-200"
             >
               {/* Architecture Mode Selector Pills */}
-              <div className="flex items-center gap-1.5 pb-2 border-b border-zinc-100 dark:border-zinc-800/80 overflow-x-auto no-scrollbar">
+              <div className="flex items-center gap-1.5 pb-2 border-b border-border-soft/60 overflow-x-auto no-scrollbar">
                 {[
                   { id: 'generate', label: 'Mind-Map', icon: Network },
                   { id: 'discourse', label: 'Logic Flowchart', icon: Workflow },
@@ -257,7 +243,7 @@ export function CanvasStartPage({
                       className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap ${
                         isSelected
                           ? 'bg-accent/15 text-accent font-semibold border border-accent/30'
-                          : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60'
+                          : 'text-fg-2 hover:text-fg hover:bg-surface-hover'
                       }`}
                     >
                       <Icon size={13} />
@@ -285,21 +271,19 @@ export function CanvasStartPage({
                     ? "e.g. Synthesize the key doctrines and study takeaways on the Covenant of Grace..."
                     : "e.g. Map Romans 8:28-30 (The Golden Chain) with scripture, doctrinal implications, and applications..."
                 }
-                className="w-full bg-transparent text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none resize-none leading-relaxed block"
+                className="w-full bg-transparent text-sm text-fg placeholder:text-muted focus:outline-none resize-none leading-relaxed block"
               />
 
               {/* Bottom Row inside Card */}
-              <div className="flex items-center justify-between pt-2 border-t border-zinc-100 dark:border-zinc-800/80 gap-2 flex-wrap">
+              <div className="flex items-center justify-between pt-2 border-t border-border-soft/60 gap-2 flex-wrap">
                 {/* Tradition Lens Selector Dropdown */}
-                <div className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+                <div className="flex items-center gap-1.5 text-xs text-muted">
                   <BookOpen size={13} className="text-accent shrink-0" />
                   <span className="hidden sm:inline font-medium">Tradition:</span>
                   <select
                     value={selectedLens}
                     onChange={(e) => setSelectedLens(e.target.value as any)}
-                    className={`text-xs font-medium px-2 py-1 rounded-lg border bg-transparent focus:outline-none cursor-pointer ${
-                      isDark ? 'border-zinc-700 text-zinc-200 bg-zinc-800/80' : 'border-zinc-200 text-zinc-800 bg-zinc-50'
-                    }`}
+                    className="text-xs font-medium px-2 py-1 rounded-lg border border-border text-fg bg-surface-warm focus:outline-none cursor-pointer"
                   >
                     <option value="canonical">Canonical Biblical</option>
                     <option value="patristic">Patristic & Early Church</option>
@@ -311,12 +295,12 @@ export function CanvasStartPage({
 
                 {/* Submit button & shortcut */}
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-zinc-400 hidden sm:inline">Press ↵ Enter</span>
+                  <span className="text-[11px] text-muted hidden sm:inline">Press ↵ Enter</span>
                   <button
                     type="button"
                     onClick={() => handleStartSubmit()}
                     disabled={!prompt.trim()}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent text-white text-xs font-semibold hover:bg-accent/90 disabled:opacity-40 disabled:hover:bg-accent active:scale-95 transition-all shadow-sm cursor-pointer"
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent text-accent-on text-xs font-semibold hover:opacity-90 disabled:opacity-40 disabled:hover:opacity-40 active:scale-95 transition-all shadow-xs cursor-pointer"
                   >
                     <Sparkles size={14} />
                     <span>Generate Canvas</span>
@@ -335,7 +319,7 @@ export function CanvasStartPage({
 
             {/* Sample Inspiration Chips */}
             <div className="flex flex-wrap items-center justify-center gap-1.5 max-w-xl">
-              <span className="text-[11px] text-zinc-400 mr-1 flex items-center gap-1">
+              <span className="text-[11px] text-muted mr-1 flex items-center gap-1">
                 <Lightbulb size={12} className="text-amber-500" /> Ideas:
               </span>
               {(mode === 'discourse' ? DISCOURSE_IDEAS : PRESET_IDEAS).map((item, idx) => (
@@ -346,11 +330,7 @@ export function CanvasStartPage({
                     setPrompt(item.query);
                     handleStartSubmit(item.query);
                   }}
-                  className={`text-[11px] px-2.5 py-1 rounded-full border transition-all cursor-pointer shadow-2xs ${
-                    isDark 
-                      ? 'border-zinc-800 bg-zinc-900/60 text-zinc-300 hover:border-accent/60 hover:text-accent' 
-                      : 'border-zinc-200 bg-white text-zinc-600 hover:border-accent/60 hover:text-accent'
-                  }`}
+                  className="text-[11px] px-2.5 py-1 rounded-full border border-border bg-surface text-fg-2 hover:border-accent/60 hover:text-accent transition-all cursor-pointer shadow-2xs"
                 >
                   {item.label}
                 </button>
@@ -358,7 +338,7 @@ export function CanvasStartPage({
             </div>
 
             {/* Subtle Secondary Actions */}
-            <div className="flex items-center justify-center gap-3 pt-1 text-xs text-zinc-500 dark:text-zinc-400">
+            <div className="flex items-center justify-center gap-3 pt-1 text-xs text-muted">
               <button
                 type="button"
                 onClick={onCreateBlankCanvas}

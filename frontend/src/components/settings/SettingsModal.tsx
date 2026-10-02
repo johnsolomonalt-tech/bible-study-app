@@ -804,30 +804,17 @@ export function SettingsModal(props: SettingsModalProps) {
                   </div>
                 </div>
 
-                {/* Daily Reading Goal */}
-                <div>
-                  <h3 className="text-sm font-semibold uppercase tracking-wider text-muted mb-2.5">Daily Reading Target</h3>
-                  <div className="grid grid-cols-5 gap-2 bg-surface p-1.5 rounded-2xl border border-border">
-                    {[1, 2, 3, 4, 5].map(chapters => (
-                      <button
-                        key={chapters}
-                        onClick={() => onDailyChapterGoalChange(chapters)}
-                        className={`py-2 px-1 rounded-xl text-center transition-all ${
-                          dailyChapterGoal === chapters
-                            ? 'bg-accent text-white shadow-xs'
-                            : 'text-fg-2 hover:bg-surface-warm'
-                        }`}
-                      >
-                        <div className="text-xs font-bold">{chapters} {chapters === 1 ? 'Ch' : 'Chs'}</div>
-                        <div className="text-[10px] opacity-75">/ day</div>
-                      </button>
-                    ))}
+                {/* Daily Reading Target relocated to Reading Tracker */}
+                <div className="p-4 bg-surface rounded-2xl border border-border space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-muted">Daily Reading Target</span>
+                    <span className="text-xs font-bold text-accent px-2.5 py-0.5 rounded-full bg-accent/10 border border-accent/20">
+                      {dailyChapterGoal} {dailyChapterGoal === 1 ? 'Chapter' : 'Chapters'} / day
+                    </span>
                   </div>
-
-                  <div className="mt-3 p-3.5 bg-surface rounded-xl border border-border text-xs text-muted">
-                    At a pace of <strong className="text-fg">{dailyChapterGoal} chapter{dailyChapterGoal > 1 ? 's' : ''}</strong> per day, you will read all 1,189 chapters of the Bible in approximately{' '}
-                    <strong className="text-accent">{Math.round(1189 / dailyChapterGoal)} days</strong> (~{(1189 / dailyChapterGoal / 365).toFixed(1)} years).
-                  </div>
+                  <p className="text-xs text-muted leading-relaxed">
+                    Custom pace presets, forecasts, and target milestones are now configured directly within the <strong className="text-fg">Reading Tracker</strong> tab via the <strong className="text-accent">&quot;Edit Pace / Goals&quot;</strong> button.
+                  </p>
                 </div>
               </div>
             )}

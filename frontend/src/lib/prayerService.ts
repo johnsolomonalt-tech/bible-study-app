@@ -1,5 +1,5 @@
 /**
- * Haven-inspired Prayer Sanctuary & Spiritual Journal Service
+ * Prayer Sanctuary & Spiritual Journal Service
  * 
  * Provides local & remote management for active prayers, answered praise logs,
  * and quiet time reflection prompts. Integrates with the streak engine.

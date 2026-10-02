@@ -88,11 +88,7 @@ export function ImportCanvasModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div 
-        className={`w-full max-w-md rounded-2xl shadow-2xl border p-5 sm:p-6 backdrop-blur-xl transition-all ${
-          isDark 
-            ? 'bg-[#1c1c20] border-zinc-700/80 text-zinc-100 shadow-[0_20px_50px_rgba(0,0,0,0.6)]' 
-            : 'bg-white border-zinc-200 text-zinc-900 shadow-2xl'
-        }`}
+        className="w-full max-w-md rounded-2xl shadow-2xl border border-border bg-surface text-fg p-5 sm:p-6 backdrop-blur-xl transition-all"
       >
         {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-4">
@@ -101,10 +97,10 @@ export function ImportCanvasModal({
               <Download size={18} />
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-bold">
+              <h2 className="text-base sm:text-lg font-bold text-fg">
                 Import Shared Canvas
               </h2>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              <p className="text-xs text-muted">
                 Save an interactive study canvas from a link or code into your account.
               </p>
             </div>
@@ -113,7 +109,7 @@ export function ImportCanvasModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/30 transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface-hover transition-colors cursor-pointer"
           >
             <X size={17} />
           </button>
@@ -122,7 +118,7 @@ export function ImportCanvasModal({
         {/* Form Body */}
         <div className="space-y-3.5 mb-5">
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-zinc-400 flex items-center justify-between">
+            <label className="text-xs font-semibold text-muted flex items-center justify-between">
               <span>Canvas Link or Share Code:</span>
               <button
                 type="button"
@@ -148,11 +144,7 @@ export function ImportCanvasModal({
                   }
                 }}
                 placeholder="e.g. board-1727458291024 or https://.../share/canvas/..."
-                className={`w-full px-3.5 py-2.5 rounded-xl border text-xs font-mono focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent transition-all ${
-                  isDark 
-                    ? 'bg-zinc-900 border-zinc-700 text-zinc-200' 
-                    : 'bg-zinc-50 border-zinc-300 text-zinc-800'
-                }`}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-bg text-fg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent transition-all placeholder:text-muted"
                 autoFocus
               />
             </div>
@@ -165,18 +157,18 @@ export function ImportCanvasModal({
             </div>
           )}
 
-          <div className="p-3 rounded-xl bg-zinc-100/70 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/50 text-[11px] text-zinc-500 dark:text-zinc-400 space-y-1">
+          <div className="p-3 rounded-xl bg-surface-warm/40 border border-border text-[11px] text-muted space-y-1">
             <p>• Creates an independent, editable copy on your canvas board.</p>
             <p>• Your personal edits will not alter the original shared canvas.</p>
           </div>
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+        <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+            className="px-4 py-2 rounded-xl text-xs font-medium text-muted hover:text-fg hover:bg-surface-hover transition-colors cursor-pointer"
           >
             Cancel
           </button>
@@ -184,7 +176,7 @@ export function ImportCanvasModal({
             type="button"
             onClick={handleImport}
             disabled={!codeOrLink.trim() || isLoading}
-            className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-accent text-white text-xs font-semibold hover:bg-accent/90 disabled:opacity-40 disabled:hover:bg-accent active:scale-95 transition-all shadow-md cursor-pointer"
+            className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-accent text-accent-on text-xs font-semibold hover:opacity-90 disabled:opacity-40 disabled:hover:opacity-40 active:scale-95 transition-all shadow-xs cursor-pointer"
           >
             {isLoading ? (
               <>

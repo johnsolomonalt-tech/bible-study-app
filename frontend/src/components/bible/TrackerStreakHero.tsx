@@ -13,15 +13,18 @@ import {
   TrendingUp, 
   ChevronRight,
   ShieldCheck,
-  Sparkles
+  Sparkles,
+  Sliders
 } from 'lucide-react';
 import { getStreakData, StreakData, STREAK_MILESTONES } from '@/lib/streakService';
+import { EditPaceModal } from './EditPaceModal';
 
 export interface TrackerStreakHeroProps {
   dailyChapterGoal: number;
   totalChaptersCompleted: number;
   onNavigateToTab: (tab: string) => void;
   onOpenPrayerSanctuary: () => void;
+  onUpdateDailyChapterGoal?: (goal: number) => void;
 }
 
 export function TrackerStreakHero({
@@ -29,8 +32,10 @@ export function TrackerStreakHero({
   totalChaptersCompleted,
   onNavigateToTab,
   onOpenPrayerSanctuary,
+  onUpdateDailyChapterGoal,
 }: TrackerStreakHeroProps) {
   const [streakData, setStreakData] = useState<StreakData>(getStreakData());
+  const [isEditPaceOpen, setIsEditPaceOpen] = useState(false);
 
   useEffect(() => {
     const handleUpdate = () => setStreakData(getStreakData());
@@ -54,7 +59,7 @@ export function TrackerStreakHero({
     <div className="space-y-6 mb-8 sm:mb-12">
       {/* Top 3-Card Grid: Streak Flame + Today's Chapter Goal + Longest Record */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Card 1: Haven Streak Card */}
+        {/* Card 1: Streak Card */}
         <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-amber-500/10 via-surface to-surface border border-border/80 ring-shadow relative overflow-hidden flex flex-col justify-between">
           <div className="flex items-start justify-between">
             <div className="space-y-1">
@@ -139,6 +144,20 @@ export function TrackerStreakHero({
                 style={{ width: `${goalProgressPercent}%` }}
               />
             </div>
+
+            {/* Clean Edit Pace / Goals Button */}
+            {onUpdateDailyChapterGoal && (
+              <button
+                type="button"
+                onClick={() => setIsEditPaceOpen(true)}
+                className="w-full mt-2.5 py-1.5 px-3 rounded-xl bg-bg hover:bg-surface-warm border border-border/80 text-fg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer group hover:border-accent/50"
+                title="Customize your daily chapter pace and completion projections"
+              >
+                <Sliders size={13} className="text-accent group-hover:scale-110 transition-transform" />
+                <span>Edit Pace / Goals</span>
+                <ChevronRight size={13} className="text-muted group-hover:translate-x-0.5 transition-transform" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -163,8 +182,20 @@ export function TrackerStreakHero({
           </div>
 
           <div className="mt-4 pt-3 border-t border-border/50 text-xs text-muted flex items-center justify-between">
-            <span>At <strong className="text-fg">{dailyChapterGoal} chapters/day</strong></span>
-            <span>Approx. <strong className="text-accent">{estimatedYearsLeft} years</strong></span>
+            <span>At <strong className="text-fg">{dailyChapterGoal} ch/day</strong></span>
+            {onUpdateDailyChapterGoal ? (
+              <button
+                type="button"
+                onClick={() => setIsEditPaceOpen(true)}
+                className="text-xs font-semibold text-accent hover:underline flex items-center gap-0.5 cursor-pointer"
+                title="Change daily reading pace"
+              >
+                <span>Edit Pace</span>
+                <ChevronRight size={12} />
+              </button>
+            ) : (
+              <span>Approx. <strong className="text-accent">{estimatedYearsLeft} years</strong></span>
+            )}
           </div>
         </div>
       </div>
@@ -262,6 +293,19 @@ export function TrackerStreakHero({
           </div>
         </div>
       </div>
+
+      {/* Edit Pace / Goals Modal */}
+      {onUpdateDailyChapterGoal && (
+        <EditPaceModal
+          isOpen={isEditPaceOpen}
+          currentGoal={dailyChapterGoal}
+          totalChaptersCompleted={totalChaptersCompleted}
+          onSave={(newGoal) => {
+            onUpdateDailyChapterGoal(newGoal);
+          }}
+          onClose={() => setIsEditPaceOpen(false)}
+        />
+      )}
     </div>
   );
 }

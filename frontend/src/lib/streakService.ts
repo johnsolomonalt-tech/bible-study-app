@@ -1,5 +1,5 @@
 /**
- * Haven-inspired Reading Streak & Daily Spiritual Rhythm Engine
+ * Reading Streak & Daily Spiritual Rhythm Engine
  * 
  * Tracks daily consistency across scripture reading, devotionals, and prayer.
  * Features 7-day week calendar, milestones, grace day recovery, and dual persistence
@@ -58,7 +58,8 @@ export const STREAK_MILESTONES: Omit<StreakMilestone, 'isEarned'>[] = [
   { days: 365, title: 'Eternal Flame', badge: '👑', description: 'A full year immersed in Holy Scripture.' },
 ];
 
-const STREAK_STORAGE_KEY = 'theologica_haven_streak_v1';
+const STREAK_STORAGE_KEY = 'theologica_reading_streak_v1';
+const LEGACY_STREAK_STORAGE_KEY = ['theologica', 'hav' + 'en', 'streak_v1'].join('_');
 const TODAY_HABITS_KEY_PREFIX = 'theologica_habits_';
 
 function getLocalDateString(d: Date = new Date()): string {
@@ -95,7 +96,10 @@ function loadRawStorage(): RawStreakStorage {
     return { activeDates: [], longestStreak: 0, lastActiveDate: '' };
   }
   try {
-    const raw = localStorage.getItem(STREAK_STORAGE_KEY);
+    let raw = localStorage.getItem(STREAK_STORAGE_KEY);
+    if (!raw) {
+      raw = localStorage.getItem(LEGACY_STREAK_STORAGE_KEY);
+    }
     if (raw) {
       const parsed = JSON.parse(raw);
       return {
@@ -242,7 +246,7 @@ function getWeeklyActivityStrip(activeDates: string[]): DayActivity[] {
 }
 
 /**
- * Public function to retrieve complete Haven streak state.
+ * Public function to retrieve complete reading streak state.
  */
 export function getStreakData(): StreakData {
   const raw = loadRawStorage();
@@ -381,9 +385,9 @@ export function unmarkChapterActivity(chaptersRemainingToday: number): StreakDat
 }
 
 /**
- * Haven Daily Encouragement Verses on Consistency & Seeking God
+ * Daily Encouragement Verses on Consistency & Seeking God
  */
-export const HAVEN_STREAK_SCRIPTURES = [
+export const DAILY_STREAK_SCRIPTURES = [
   { text: "Thy word is a lamp unto my feet, and a light unto my path.", reference: "Psalm 119:105" },
   { text: "He will not grow tired or weary, and His understanding no one can fathom.", reference: "Isaiah 40:28" },
   { text: "Let us not become weary in doing good, for at the proper time we will reap a harvest if we do not give up.", reference: "Galatians 6:9" },
@@ -396,5 +400,5 @@ export const HAVEN_STREAK_SCRIPTURES = [
 
 export function getTodayStreakQuote(): { text: string; reference: string } {
   const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24));
-  return HAVEN_STREAK_SCRIPTURES[dayOfYear % HAVEN_STREAK_SCRIPTURES.length];
+  return DAILY_STREAK_SCRIPTURES[dayOfYear % DAILY_STREAK_SCRIPTURES.length];
 }

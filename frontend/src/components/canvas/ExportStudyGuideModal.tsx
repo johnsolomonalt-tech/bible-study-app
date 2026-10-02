@@ -143,26 +143,22 @@ export function ExportStudyGuideModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div 
-        className={`w-full max-w-4xl max-h-[90vh] flex flex-col rounded-2xl shadow-2xl border overflow-hidden backdrop-blur-xl transition-all ${
-          isDark 
-            ? 'bg-[#1a1a1e] border-zinc-700/80 text-zinc-100 shadow-[0_20px_60px_rgba(0,0,0,0.7)]' 
-            : 'bg-white border-zinc-200 text-zinc-900 shadow-2xl'
-        }`}
+        className="w-full max-w-4xl max-h-[90vh] flex flex-col rounded-2xl shadow-2xl border border-border bg-surface text-fg overflow-hidden backdrop-blur-xl transition-all"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-200 dark:border-zinc-800">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-accent/15 text-accent border border-accent/20">
               <FileText size={18} />
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-bold leading-tight flex items-center gap-2">
+              <h2 className="text-base sm:text-lg font-bold leading-tight flex items-center gap-2 text-fg">
                 Export Study Guide & Sermon Outline
                 <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
                   {nodes.length} Cards
                 </span>
               </h2>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              <p className="text-xs text-muted">
                 Transform this visual mind-map into a structured, ready-to-teach curriculum.
               </p>
             </div>
@@ -171,14 +167,14 @@ export function ExportStudyGuideModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/30 transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface-hover transition-colors cursor-pointer"
           >
             <X size={18} />
           </button>
         </div>
 
         {/* Configuration Bar */}
-        <div className="px-5 py-3 border-b border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/40 flex flex-wrap items-center justify-between gap-3">
+        <div className="px-5 py-3 border-b border-border bg-surface-warm/40 flex flex-wrap items-center justify-between gap-3">
           {/* Format Selector Pills */}
           <div className="flex items-center flex-wrap gap-1.5">
             {FORMAT_OPTIONS.map((fmt) => {
@@ -194,10 +190,8 @@ export function ExportStudyGuideModal({
                   }}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer border ${
                     isSelected
-                      ? 'bg-accent text-white border-accent shadow-xs'
-                      : isDark
-                        ? 'bg-zinc-800/80 border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-white'
-                        : 'bg-white border-zinc-300 text-zinc-700 hover:bg-zinc-100 hover:text-black'
+                      ? 'bg-accent text-accent-on border-accent shadow-xs'
+                      : 'bg-surface border-border text-muted hover:bg-surface-hover hover:text-fg'
                   }`}
                   title={fmt.description}
                 >
@@ -210,7 +204,7 @@ export function ExportStudyGuideModal({
 
           {/* Lens Selector */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-zinc-400 font-medium">Lens:</span>
+            <span className="text-xs text-muted font-medium">Lens:</span>
             <select
               value={selectedLens}
               onChange={(e) => {
@@ -218,11 +212,7 @@ export function ExportStudyGuideModal({
                 setSelectedLens(lens);
                 handleGenerate(selectedFormat, lens);
               }}
-              className={`text-xs font-medium rounded-lg px-2.5 py-1.5 border focus:outline-none focus:ring-1 focus:ring-accent cursor-pointer ${
-                isDark 
-                  ? 'bg-zinc-800 border-zinc-700 text-zinc-200' 
-                  : 'bg-white border-zinc-300 text-zinc-800'
-              }`}
+              className="text-xs font-medium rounded-lg px-2.5 py-1.5 border border-border bg-surface text-fg focus:outline-none focus:ring-1 focus:ring-accent cursor-pointer"
             >
               {LENS_OPTIONS.map((l) => (
                 <option key={l.id} value={l.id}>
@@ -235,7 +225,7 @@ export function ExportStudyGuideModal({
               type="button"
               onClick={() => handleGenerate(selectedFormat, selectedLens)}
               disabled={isGenerating}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-xs font-semibold transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface border border-border hover:bg-surface-hover text-fg text-xs font-semibold transition-colors cursor-pointer"
               title="Regenerate guide"
             >
               {isGenerating ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} className="text-accent" />}
@@ -249,7 +239,7 @@ export function ExportStudyGuideModal({
           {isGenerating ? (
             <div className="h-64 flex flex-col items-center justify-center gap-3">
               <Loader2 size={32} className="animate-spin text-accent" />
-              <p className="text-sm font-medium text-zinc-400 animate-pulse">
+              <p className="text-sm font-medium text-muted animate-pulse">
                 Synthesizing {nodes.length} canvas nodes into {selectedFormat.replace('_', ' ')} format...
               </p>
             </div>
@@ -257,15 +247,11 @@ export function ExportStudyGuideModal({
             <textarea
               value={generatedMarkdown}
               onChange={(e) => setGeneratedMarkdown(e.target.value)}
-              className={`w-full h-96 p-4 rounded-xl font-mono text-xs focus:outline-none focus:ring-1 focus:ring-accent resize-none ${
-                isDark 
-                  ? 'bg-zinc-900 border border-zinc-700 text-zinc-200' 
-                  : 'bg-zinc-50 border border-zinc-300 text-zinc-800'
-              }`}
+              className="w-full h-96 p-4 rounded-xl font-mono text-xs focus:outline-none focus:ring-1 focus:ring-accent resize-none bg-bg border border-border text-fg"
               placeholder="Edit markdown guide directly..."
             />
           ) : (
-            <div className={`prose max-w-none break-words ${isDark ? 'prose-invert' : ''}`}>
+            <div className={`prose max-w-none break-words text-fg ${isDark ? 'prose-invert' : ''}`}>
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {generatedMarkdown || '# No content generated yet.\nClick **Regenerate** above.'}
               </ReactMarkdown>
@@ -274,7 +260,7 @@ export function ExportStudyGuideModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-between flex-wrap gap-2 px-5 py-3.5 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30">
+        <div className="flex items-center justify-between flex-wrap gap-2 px-5 py-3.5 border-t border-border bg-surface-warm/30">
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -282,7 +268,7 @@ export function ExportStudyGuideModal({
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer border ${
                 isEditing
                   ? 'bg-accent/15 border-accent/30 text-accent font-semibold'
-                  : 'border-zinc-300 dark:border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/20'
+                  : 'border-border text-muted hover:text-fg hover:bg-surface-hover'
               }`}
             >
               {isEditing ? <Eye size={14} /> : <Edit3 size={14} />}
@@ -295,7 +281,7 @@ export function ExportStudyGuideModal({
               type="button"
               onClick={handlePrint}
               disabled={!generatedMarkdown || isGenerating}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-300 dark:border-zinc-700 text-xs font-semibold hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border text-muted hover:text-fg hover:bg-surface-hover text-xs font-semibold transition-colors cursor-pointer"
               title="Print or export as clean PDF"
             >
               <Printer size={14} />
@@ -306,7 +292,7 @@ export function ExportStudyGuideModal({
               type="button"
               onClick={handleDownload}
               disabled={!generatedMarkdown || isGenerating}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-300 dark:border-zinc-700 text-xs font-semibold hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border text-muted hover:text-fg hover:bg-surface-hover text-xs font-semibold transition-colors cursor-pointer"
               title="Download as .md file"
             >
               <Download size={14} />
@@ -320,7 +306,7 @@ export function ExportStudyGuideModal({
               className={`flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer shadow-sm ${
                 copied
                   ? 'bg-emerald-600 text-white'
-                  : 'bg-accent text-white hover:bg-accent/90 active:scale-95'
+                  : 'bg-accent text-accent-on hover:opacity-90 active:scale-95'
               }`}
             >
               {copied ? <Check size={14} /> : <Copy size={14} />}

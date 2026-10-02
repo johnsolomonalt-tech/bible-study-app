@@ -261,7 +261,7 @@ Format the response purely as a beautiful, heartfelt prayer of devotion, repenta
                   Prayer Sanctuary
                 </h2>
                 <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/25">
-                  Haven Rhythm
+                  Daily Rhythm
                 </span>
               </div>
               <p className="text-xs text-muted">
@@ -808,7 +808,7 @@ Format the response purely as a beautiful, heartfelt prayer of devotion, repenta
 
         {/* Footer info */}
         <footer className="px-6 py-3 bg-bg/50 border-t border-border text-center text-[11px] text-muted flex items-center justify-between">
-          <span>Prayers update your daily Haven reading streak automatically.</span>
+          <span>Prayers update your daily reading streak automatically.</span>
           <button
             type="button"
             onClick={onClose}
