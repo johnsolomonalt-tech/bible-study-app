@@ -118,7 +118,7 @@ function saveRawStorage(data: RawStreakStorage): void {
   try {
     localStorage.setItem(STREAK_STORAGE_KEY, JSON.stringify(data));
     // Also store lightweight cookie for SSR / service workers
-    const activeStreak = calculateStreakNumber(data.activeDates);
+    const { streak: activeStreak } = calculateStreakNumber(data.activeDates);
     document.cookie = `theologica_streak=${activeStreak}; path=/; max-age=31536000; SameSite=Lax`;
   } catch {}
 }
@@ -349,6 +349,8 @@ export function recordHabitActivity(
     }));
   }
 
+  notifyStreakSync();
+
   return getStreakData();
 }
 
@@ -379,6 +381,93 @@ export function unmarkChapterActivity(chaptersRemainingToday: number): StreakDat
 
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('theologica_streak_updated'));
+  }
+
+  notifyStreakSync();
+
+  return getStreakData();
+}
+
+type StreakSyncCallback = () => void;
+let streakSyncCallback: StreakSyncCallback | null = null;
+
+export function registerStreakSyncCallback(cb: StreakSyncCallback | null): void {
+  streakSyncCallback = cb;
+}
+
+function notifyStreakSync(): void {
+  if (typeof streakSyncCallback === 'function') {
+    try {
+      streakSyncCallback();
+    } catch (e) {
+      console.warn('Streak sync callback error:', e);
+    }
+  }
+}
+
+export function getRawStreakStorage(): RawStreakStorage {
+  return loadRawStorage();
+}
+
+export function getTodayHabits(dateStr: string = getLocalDateString()): TodayGoals {
+  return loadTodayHabits(dateStr);
+}
+
+/**
+ * Merges streak data fetched from the user account into local storage
+ * and calculates the new unified streak across devices.
+ */
+export function mergeAccountStreakData(remote: {
+  activeDates?: string[];
+  longestStreak?: number;
+  lastActiveDate?: string;
+  dailyChapterGoal?: number;
+  todayGoals?: Partial<TodayGoals>;
+}): StreakData {
+  const localRaw = loadRawStorage();
+  const remoteDates = Array.isArray(remote.activeDates) ? remote.activeDates : [];
+  const localDates = Array.isArray(localRaw.activeDates) ? localRaw.activeDates : [];
+
+  const mergedDates = Array.from(new Set([...localDates, ...remoteDates]))
+    .filter(d => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d))
+    .sort();
+
+  const { streak: currentStreak } = calculateStreakNumber(mergedDates);
+  const longestStreak = Math.max(
+    localRaw.longestStreak || 0,
+    remote.longestStreak || 0,
+    currentStreak
+  );
+
+  const todayStr = getLocalDateString();
+  const localHabits = loadTodayHabits(todayStr);
+  const remoteHabits = remote.todayGoals || {};
+
+  const mergedTodayHabits: TodayGoals = {
+    scripture: Boolean(localHabits.scripture || remoteHabits.scripture),
+    devotional: Boolean(localHabits.devotional || remoteHabits.devotional),
+    prayer: Boolean(localHabits.prayer || remoteHabits.prayer),
+    chaptersCompletedToday: Math.max(
+      localHabits.chaptersCompletedToday || 0,
+      remoteHabits.chaptersCompletedToday || 0
+    ),
+  };
+
+  saveTodayHabits(todayStr, mergedTodayHabits);
+
+  const updatedRaw: RawStreakStorage = {
+    activeDates: mergedDates,
+    longestStreak,
+    lastActiveDate: mergedDates[mergedDates.length - 1] || '',
+    graceUsedDate: localRaw.graceUsedDate,
+  };
+
+  saveRawStorage(updatedRaw);
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('theologica_streak_updated', {
+      detail: { currentStreak, activeDatesCount: mergedDates.length }
+    }));
   }
 
   return getStreakData();

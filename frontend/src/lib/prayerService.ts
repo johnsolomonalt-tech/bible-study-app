@@ -117,6 +117,8 @@ export function addPrayer(item: {
     window.dispatchEvent(new CustomEvent('theologica_prayers_updated'));
   }
 
+  notifyPrayerSync();
+
   return newPrayer;
 }
 
@@ -144,6 +146,8 @@ export function markPrayerAnswered(id: string, answerPraise?: string): PrayerIte
     window.dispatchEvent(new CustomEvent('theologica_prayers_updated'));
   }
 
+  notifyPrayerSync();
+
   return updatedItem;
 }
 
@@ -155,6 +159,8 @@ export function deletePrayer(id: string): void {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('theologica_prayers_updated'));
   }
+
+  notifyPrayerSync();
 }
 
 export function updatePrayer(id: string, updates: Partial<Pick<PrayerItem, 'title' | 'content' | 'category' | 'scripture'>>): PrayerItem | null {
@@ -175,5 +181,57 @@ export function updatePrayer(id: string, updates: Partial<Pick<PrayerItem, 'titl
     window.dispatchEvent(new CustomEvent('theologica_prayers_updated'));
   }
 
+  notifyPrayerSync();
+
   return updatedItem;
 }
+
+type PrayerSyncCallback = () => void;
+let prayerSyncCallback: PrayerSyncCallback | null = null;
+
+export function registerPrayerSyncCallback(cb: PrayerSyncCallback | null): void {
+  prayerSyncCallback = cb;
+}
+
+function notifyPrayerSync(): void {
+  if (typeof prayerSyncCallback === 'function') {
+    try {
+      prayerSyncCallback();
+    } catch (e) {
+      console.warn('Prayer sync callback error:', e);
+    }
+  }
+}
+
+/**
+ * Merge remote prayers from user account with local prayers
+ */
+export function mergeAccountPrayers(remotePrayers: PrayerItem[]): PrayerItem[] {
+  if (!Array.isArray(remotePrayers)) return loadLocalPrayers();
+  const localPrayers = loadLocalPrayers();
+
+  const prayerMap = new Map<string, PrayerItem>();
+  localPrayers.forEach(p => { if (p?.id) prayerMap.set(p.id, p); });
+
+  remotePrayers.forEach(p => {
+    if (p?.id) {
+      const existing = prayerMap.get(p.id);
+      if (!existing || (p.updatedAt && p.updatedAt >= (existing.updatedAt || ''))) {
+        prayerMap.set(p.id, p);
+      }
+    }
+  });
+
+  const merged = Array.from(prayerMap.values()).sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+
+  saveLocalPrayers(merged);
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('theologica_prayers_updated'));
+  }
+
+  return merged;
+}
+

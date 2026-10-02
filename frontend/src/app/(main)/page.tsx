@@ -59,7 +59,16 @@ import { PrayerSanctuaryModal } from '@/components/bible/PrayerSanctuaryModal';
 import { TrackerStreakHero } from '@/components/bible/TrackerStreakHero';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { PromptModal } from '@/components/ui/PromptModal';
-import { recordHabitActivity, unmarkChapterActivity } from '@/lib/streakService';
+import { 
+  recordHabitActivity, 
+  unmarkChapterActivity,
+  registerStreakSyncCallback 
+} from '@/lib/streakService';
+import { registerPrayerSyncCallback } from '@/lib/prayerService';
+import { 
+  pullStreakFromAccount, 
+  queueStreakPush 
+} from '@/lib/streakSyncClient';
 
 // --- All 66 Books ---
 const otStr = "Genesis:50,Exodus:40,Leviticus:27,Numbers:36,Deuteronomy:34,Joshua:24,Judges:21,Ruth:4,1 Samuel:31,2 Samuel:24,1 Kings:22,2 Kings:25,1 Chronicles:29,2 Chronicles:36,Ezra:10,Nehemiah:13,Esther:10,Job:42,Psalms:150,Proverbs:31,Ecclesiastes:12,Song of Solomon:8,Isaiah:66,Jeremiah:52,Lamentations:5,Ezekiel:48,Daniel:12,Hosea:14,Joel:3,Amos:9,Obadiah:1,Jonah:4,Micah:7,Nahum:3,Habakkuk:3,Zephaniah:3,Haggai:2,Zechariah:14,Malachi:4";
@@ -1207,6 +1216,10 @@ export default function App() {
   const [accentColor, setAccentColor] = useState('#c96442');
   const [trackerFormat, setTrackerFormat] = useState<'percent' | 'fraction'>('percent');
   const [dailyChapterGoal, setDailyChapterGoal] = useState(3);
+  const dailyChapterGoalRef = useRef(dailyChapterGoal);
+  useEffect(() => {
+    dailyChapterGoalRef.current = dailyChapterGoal;
+  }, [dailyChapterGoal]);
 
   // Reader Typography States
   const [readerFontFamily, setReaderFontFamily] = useState<ReaderFontFamily>('serif');
@@ -1645,6 +1658,7 @@ export default function App() {
   const handleDailyChapterGoalChange = (goal: number) => {
     setDailyChapterGoal(goal);
     setPreference(PREF_KEYS.DAILY_CHAPTER_GOAL, String(goal));
+    queueStreakPush(fetchWithAuth, goal, 150);
   };
 
   const handleDefaultTranslationChange = (version: string) => {
@@ -2058,9 +2072,19 @@ export default function App() {
     return false;
   }, [fetchWithAuth, theologicalLens, activeBook, activeChapter]);
 
-  // Load Data
+  // Load Data & Sync Account Streak across devices
   useEffect(() => {
     initSessionTracking(userId);
+
+    // Register sync callbacks so habit & prayer activities immediately push to account
+    registerStreakSyncCallback(() => {
+      queueStreakPush(fetchWithAuth, dailyChapterGoalRef.current, 200);
+    });
+
+    registerPrayerSyncCallback(() => {
+      queueStreakPush(fetchWithAuth, dailyChapterGoalRef.current, 200);
+    });
+
     fetchWithAuth(`${API_URL}/api/notes`).then(r => r.json()).then(data => {
       setNotes(data);
     });
@@ -2080,8 +2104,46 @@ export default function App() {
     fetchWithAuth(`${API_URL}/api/tracker`).then(r => r.json()).then(data => {
       setCompletedChapters(data.map((item: {chapterId: string}) => item.chapterId));
     });
+
+    // 1. Initial Pull: syncs streaks, habits, reading pace, and prayers from account
+    pullStreakFromAccount(fetchWithAuth, dailyChapterGoalRef.current).then(res => {
+      if (res?.dailyChapterGoal && typeof res.dailyChapterGoal === 'number' && res.dailyChapterGoal > 0) {
+        setDailyChapterGoal(res.dailyChapterGoal);
+        setPreference(PREF_KEYS.DAILY_CHAPTER_GOAL, String(res.dailyChapterGoal));
+      }
+    });
+
+    // 2. High-speed cross-device sync: trigger pull whenever tab gains focus or becomes visible
+    const handleAccountSyncOnActive = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible' && navigator.onLine) {
+        pullStreakFromAccount(fetchWithAuth, dailyChapterGoalRef.current).then(res => {
+          if (res?.dailyChapterGoal && typeof res.dailyChapterGoal === 'number' && res.dailyChapterGoal > 0) {
+            setDailyChapterGoal(res.dailyChapterGoal);
+            setPreference(PREF_KEYS.DAILY_CHAPTER_GOAL, String(res.dailyChapterGoal));
+          }
+        });
+      }
+    };
+
+    window.addEventListener('focus', handleAccountSyncOnActive);
+    document.addEventListener('visibilitychange', handleAccountSyncOnActive);
+    window.addEventListener('online', handleAccountSyncOnActive);
+
+    // 3. Fast Heartbeat: every 15 seconds while app is open so dual-device usage stays in sync
+    const syncInterval = setInterval(() => {
+      handleAccountSyncOnActive();
+    }, 15000);
+
+    return () => {
+      registerStreakSyncCallback(null);
+      registerPrayerSyncCallback(null);
+      window.removeEventListener('focus', handleAccountSyncOnActive);
+      document.removeEventListener('visibilitychange', handleAccountSyncOnActive);
+      window.removeEventListener('online', handleAccountSyncOnActive);
+      clearInterval(syncInterval);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [userId]);
 
   // Analytics: track major feature tab activations (only on explicit user transitions, not initial mount/restore)
   useEffect(() => {
@@ -3532,6 +3594,7 @@ export default function App() {
       body: JSON.stringify({ chapterId: currentChapterId })
     });
     trackClientEvent('reading_tracker_updated');
+    queueStreakPush(fetchWithAuth, dailyChapterGoalRef.current, 100);
   };
 
   const toggleAnyChapter = async (id: string) => {
@@ -3548,6 +3611,7 @@ export default function App() {
       body: JSON.stringify({ chapterId: id })
     });
     trackClientEvent('reading_tracker_updated');
+    queueStreakPush(fetchWithAuth, dailyChapterGoalRef.current, 100);
   };
 
   if (!isLoaded) return <div className="h-screen w-full flex items-center justify-center bg-bg text-white">Loading...</div>;
