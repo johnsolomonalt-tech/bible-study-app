@@ -685,7 +685,7 @@ Format the response purely as a beautiful, heartfelt prayer of devotion, repenta
             {/* Timer Ring (iPhone style closing countdown ring) */}
             <div className="relative w-52 h-52 sm:w-60 sm:h-60 flex items-center justify-center my-1 select-none">
               <svg className="w-full h-full transform -rotate-90 pointer-events-none" viewBox="0 0 200 200">
-                {/* Background Track Circle */}
+                {/* Background Track Circle (visible greyed-out track line) */}
                 <circle
                   cx="100"
                   cy="100"
@@ -693,7 +693,7 @@ Format the response purely as a beautiful, heartfelt prayer of devotion, repenta
                   fill="transparent"
                   stroke="currentColor"
                   strokeWidth="6"
-                  className="text-border/50"
+                  className="text-fg/20"
                 />
                 {/* Progress Circle that smoothly closes as time runs down */}
                 <circle

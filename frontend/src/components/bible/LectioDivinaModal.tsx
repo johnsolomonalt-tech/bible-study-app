@@ -539,6 +539,7 @@ export function LectioDivinaModal({
                 <div className="flex flex-col items-center justify-center py-4">
                   <div className="relative w-40 h-40 flex items-center justify-center select-none my-1">
                     <svg className="w-full h-full transform -rotate-90 pointer-events-none" viewBox="0 0 160 160">
+                      {/* Background Track Circle (visible greyed-out track line) */}
                       <circle
                         cx="80"
                         cy="80"
@@ -546,7 +547,7 @@ export function LectioDivinaModal({
                         fill="transparent"
                         stroke="currentColor"
                         strokeWidth="5"
-                        className="text-border/50"
+                        className="text-fg/20"
                       />
                       <circle
                         cx="80"
