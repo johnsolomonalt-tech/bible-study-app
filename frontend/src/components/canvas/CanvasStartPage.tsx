@@ -71,7 +71,8 @@ export function CanvasStartPage({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
-    if (!isGenerating) {
+    // Only auto-focus on desktop devices to avoid opening the virtual keyboard or triggering mobileTyping focus handlers on mobile
+    if (!isGenerating && typeof window !== 'undefined' && window.innerWidth >= 1024) {
       const timer = setTimeout(() => {
         textareaRef.current?.focus();
       }, 100);

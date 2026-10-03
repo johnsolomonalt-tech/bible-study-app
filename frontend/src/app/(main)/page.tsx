@@ -905,6 +905,13 @@ export default function App() {
   });
   const [isMobileMoreMenuOpen, setIsMobileMoreMenuOpen] = useState(false);
   const [isMobileTyping, setIsMobileTyping] = useState(false);
+  const activeTabRef = useRef(activeTab);
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+    if (activeTab === 'canvas') {
+      setIsMobileTyping(false);
+    }
+  }, [activeTab]);
 
   // Hide mobile bottom toolbar when typing or virtual keyboard is active (prevents toolbar from showing/interfering on scroll)
   useEffect(() => {
@@ -923,6 +930,7 @@ export default function App() {
 
     const handleFocusIn = (e: FocusEvent) => {
       if (window.innerWidth >= 1024) return;
+      if (activeTabRef.current === 'canvas') return;
       if (isInputElement(e.target as Element)) {
         setIsMobileTyping(true);
       }
@@ -938,7 +946,7 @@ export default function App() {
 
     // If user scrolls anywhere on the screen while an input/textarea is focused, guarantee bottom toolbar remains hidden
     const handleScroll = () => {
-      if (window.innerWidth < 1024 && isInputElement(document.activeElement)) {
+      if (window.innerWidth < 1024 && activeTabRef.current !== 'canvas' && isInputElement(document.activeElement)) {
         setIsMobileTyping(true);
       }
     };
@@ -952,7 +960,7 @@ export default function App() {
       }
       if (vv && window.innerHeight) {
         const isKeyboardOpen = vv.height < window.innerHeight * 0.85;
-        if (isKeyboardOpen && isInputElement(document.activeElement)) {
+        if (isKeyboardOpen && activeTabRef.current !== 'canvas' && isInputElement(document.activeElement)) {
           setIsMobileTyping(true);
         } else if (!isInputElement(document.activeElement) && vv.height >= window.innerHeight * 0.88) {
           setIsMobileTyping(false);
@@ -1229,6 +1237,51 @@ export default function App() {
   const [chats, setChats] = useState<{id: number, title: string, messages: {role: string, content: string}[]}[]>([]);
   const [activeChatId, setActiveChatId] = useState<number | null>(null);
   const [mobileChatView, setMobileChatView] = useState<'chat' | 'list'>('chat');
+
+  // Swipe gesture detection for Mobile AI Chats conversation drawer
+  const chatSwipeStartXRef = useRef<number | null>(null);
+  const chatSwipeStartYRef = useRef<number | null>(null);
+
+  const handleConversationTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      chatSwipeStartXRef.current = e.touches[0].clientX;
+      chatSwipeStartYRef.current = e.touches[0].clientY;
+    }
+  };
+
+  const handleConversationTouchEnd = (e: React.TouchEvent) => {
+    if (chatSwipeStartXRef.current === null || chatSwipeStartYRef.current === null) return;
+    const deltaX = e.changedTouches[0].clientX - chatSwipeStartXRef.current;
+    const deltaY = e.changedTouches[0].clientY - chatSwipeStartYRef.current;
+
+    // Swiping right-to-left (deltaX < -45, predominantly horizontal) collapses/closes conversations
+    if (deltaX < -45 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2) {
+      setMobileChatView('chat');
+    }
+    chatSwipeStartXRef.current = null;
+    chatSwipeStartYRef.current = null;
+  };
+
+  const handleChatTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      chatSwipeStartXRef.current = e.touches[0].clientX;
+      chatSwipeStartYRef.current = e.touches[0].clientY;
+    }
+  };
+
+  const handleChatTouchEnd = (e: React.TouchEvent) => {
+    if (chatSwipeStartXRef.current === null || chatSwipeStartYRef.current === null) return;
+    const startX = chatSwipeStartXRef.current;
+    const deltaX = e.changedTouches[0].clientX - startX;
+    const deltaY = e.changedTouches[0].clientY - chatSwipeStartYRef.current;
+
+    // Edge swipe from left edge (startX < 60) towards right (deltaX > 45) opens conversations
+    if (startX < 60 && deltaX > 45 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2) {
+      setMobileChatView('list');
+    }
+    chatSwipeStartXRef.current = null;
+    chatSwipeStartYRef.current = null;
+  };
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [theme, setTheme] = useState('dark');
@@ -3020,8 +3073,19 @@ export default function App() {
   };
 
   useEffect(() => {
+    // On mobile, keep AI chats at the top when opened rather than auto-scrolling to the bottom
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      const resetScrollTop = () => {
+        if (messagesEndRef.current?.parentElement) {
+          messagesEndRef.current.parentElement.scrollTop = 0;
+        }
+      };
+      resetScrollTop();
+      const timer = setTimeout(resetScrollTop, 60);
+      return () => clearTimeout(timer);
+    }
     scrollToBottom();
-  }, [activeChat?.id, activeTab]);
+  }, [activeChat?.id, activeTab, mobileChatView, mobileStudyView]);
 
   useEffect(() => {
     if (cooldown > 0) {
@@ -3825,12 +3889,12 @@ export default function App() {
     <>
       <div className="h-[100dvh] max-h-[100dvh] w-full flex flex-col bg-bg text-fg overflow-hidden select-none">
         {/* Top Navbar */}
-        <header className="sticky top-0 z-30 min-h-14 h-[calc(3.5rem+env(safe-area-inset-top,0px))] border-b border-border flex items-center justify-between px-4 sm:px-6 bg-bg shrink-0" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+        <header className="sticky top-0 z-40 min-h-14 h-[calc(3.5rem+env(safe-area-inset-top,0px))] border-b border-border flex items-center justify-between px-3 sm:px-6 bg-bg shrink-0" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         
         {/* Left: Logo */}
-        <div className="flex items-center gap-2.5 shrink-0">
-          <div className="font-display text-[20px] tracking-tight flex items-center gap-2.5 select-none shrink-0">
-            <div className="relative w-8 h-8 rounded-xl overflow-hidden shadow-xs shrink-0 flex items-center justify-center">
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+          <div className="font-display text-[18px] sm:text-[20px] tracking-tight flex items-center gap-2 sm:gap-2.5 select-none shrink-0">
+            <div className="relative w-7 h-7 sm:w-8 sm:h-8 rounded-xl overflow-hidden shadow-xs shrink-0 flex items-center justify-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img 
                 src={(theme === 'light' || theme === 'sepia') ? '/logo-light.png' : '/logo-dark.png'} 
@@ -3838,7 +3902,7 @@ export default function App() {
                 className="w-full h-full object-contain filter contrast-105" 
               />
             </div>
-            <span className="font-serif text-[22px] font-bold tracking-tight text-[#c96442] hidden sm:inline">
+            <span className="font-serif text-[18px] sm:text-[22px] font-bold tracking-tight text-[#c96442] inline shrink-0">
               Theologica
             </span>
           </div>
@@ -3860,6 +3924,7 @@ export default function App() {
                     setActiveNoteId(null);
                   }
                   if (tab === 'canvas') {
+                    setIsMobileTyping(false);
                     setCanvasFocusTrigger(prev => prev + 1);
                   }
                   if (tab === 'chats') {
@@ -6131,13 +6196,32 @@ export default function App() {
 
         {/* AI CHATS TAB */}
         {activeTab === 'chats' && (
-          <div className="flex w-full h-full min-h-0 overflow-hidden">
-            <aside className={`w-full lg:w-[280px] h-full min-h-0 border-r border-border bg-bg flex flex-col shrink-0 overflow-hidden ${mobileChatView === 'list' ? 'flex' : 'hidden lg:flex'}`}>
+          <div className="flex w-full h-full min-h-0 overflow-hidden relative">
+            {/* Backdrop overlay on mobile when conversations drawer is open */}
+            <div 
+              onClick={() => setMobileChatView('chat')}
+              className={`lg:hidden absolute inset-0 z-20 bg-black/40 backdrop-blur-[2px] transition-opacity duration-300 ${
+                mobileChatView === 'list' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+              }`}
+            />
+
+            <aside 
+              onTouchStart={handleConversationTouchStart}
+              onTouchEnd={handleConversationTouchEnd}
+              className={`absolute lg:relative inset-y-0 left-0 z-30 lg:z-auto w-[85vw] max-w-[320px] lg:w-[280px] h-full min-h-0 border-r border-border bg-bg flex flex-col shrink-0 overflow-hidden shadow-2xl lg:shadow-none transition-transform duration-300 ease-out ${
+                mobileChatView === 'list' 
+                  ? 'translate-x-0 pointer-events-auto' 
+                  : '-translate-x-full lg:translate-x-0 pointer-events-none lg:pointer-events-auto'
+              }`}
+            >
               <header className="h-[60px] border-b border-border flex items-center justify-between px-4 sm:px-5 shrink-0">
                 <span className="text-[15px] font-medium text-fg">Conversations</span>
                 <div className="flex items-center gap-1">
                   <button 
-                    onClick={handleNewChat} 
+                    onClick={() => {
+                      handleNewChat();
+                      setMobileChatView('chat');
+                    }} 
                     className="p-2 text-fg-2 hover:text-fg hover:bg-surface rounded-lg transition-colors cursor-pointer"
                     title="New Conversation"
                   >
@@ -6146,9 +6230,10 @@ export default function App() {
                   <button
                     onClick={() => setMobileChatView('chat')}
                     className="lg:hidden p-2 text-fg-2 hover:text-fg hover:bg-surface rounded-lg transition-colors cursor-pointer"
-                    title="Back to Chat"
+                    title="Collapse Conversations"
+                    aria-label="Collapse Conversations"
                   >
-                    <ChevronRight size={18} />
+                    <ChevronLeft size={18} />
                   </button>
                 </div>
               </header>
@@ -6157,7 +6242,10 @@ export default function App() {
               <div className="p-3 pb-1 shrink-0">
                 <button
                   type="button"
-                  onClick={handleNewChat}
+                  onClick={() => {
+                    handleNewChat();
+                    setMobileChatView('chat');
+                  }}
                   className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border text-[13px] font-medium transition-all cursor-pointer ${
                     !activeChatId 
                       ? 'bg-accent/15 border-accent/40 text-accent font-semibold shadow-xs' 
@@ -6208,7 +6296,9 @@ export default function App() {
             </aside>
             
             <section 
-              className={`relative flex-1 h-full min-h-0 flex flex-col bg-bg overflow-hidden ${mobileChatView === 'chat' ? 'flex' : 'hidden lg:flex'}`}
+              onTouchStart={handleChatTouchStart}
+              onTouchEnd={handleChatTouchEnd}
+              className="relative flex-1 h-full min-h-0 flex flex-col bg-bg overflow-hidden"
               onDragEnter={handleChatDragEnter}
               onDragOver={handleChatDragOver}
               onDragLeave={handleChatDragLeave}
@@ -6233,9 +6323,10 @@ export default function App() {
                   <button 
                     onClick={() => setMobileChatView('list')} 
                     className="lg:hidden p-2 mr-1 text-fg-2 hover:text-fg shrink-0 cursor-pointer flex items-center"
-                    title="View Conversations"
+                    title="Open Conversations"
+                    aria-label="Open Conversations"
                   >
-                    {activeChatId ? <ChevronLeft size={20} /> : <MessageSquare size={18} />}
+                    <ChevronRight size={20} />
                   </button>
                   <h2 className="text-[15px] sm:text-[18px] font-medium truncate max-w-[140px] xs:max-w-[220px] sm:max-w-md">
                     {activeChat.title || 'New Conversation'}
@@ -6712,7 +6803,7 @@ export default function App() {
         <nav 
           aria-label="Mobile Navigation"
           className={`lg:hidden shrink-0 h-[calc(60px+env(safe-area-inset-bottom))] bg-bg/95 backdrop-blur-md border-t border-border flex items-center justify-around px-1 z-40 w-full transition-all duration-200 select-none ${
-            isMobileTyping ? 'hidden pointer-events-none' : 'flex'
+            (isMobileTyping && activeTab !== 'canvas') ? 'hidden pointer-events-none' : 'flex'
           }`}
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
@@ -6727,6 +6818,7 @@ export default function App() {
                     setActiveNoteId(null);
                   }
                   if (tab === 'canvas') {
+                    setIsMobileTyping(false);
                     setCanvasFocusTrigger(prev => prev + 1);
                   }
                   if (tab === 'chats') {
