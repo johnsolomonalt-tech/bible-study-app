@@ -4172,7 +4172,7 @@ export default function App() {
 
             {/* Mobile Center: Bible Reader */}
             <section className={`flex-1 flex-col h-full bg-bg ${mobileStudyView === 'reader' ? 'flex' : 'hidden'}`}>
-              <header className="h-[60px] border-b border-border flex items-center justify-between px-3 sm:px-4 bg-bg shrink-0 relative">
+              <header className="h-[60px] border-b border-border flex items-center justify-between px-3 sm:px-4 bg-bg shrink-0 relative z-20">
                 {/* Left: Book & Chapter Selector Trigger */}
                 <div className="flex items-center gap-1 min-w-0 shrink">
                   <button 
@@ -4234,10 +4234,13 @@ export default function App() {
                   </button>
 
                   {/* 3 Dots More Menu (Always available on mobile & tablet) */}
-                  <div className="relative mobile-more-menu-container">
+                  <div className="relative z-30 mobile-more-menu-container">
                     <button
                       type="button"
-                      onClick={() => setIsMobileMoreMenuOpen(!isMobileMoreMenuOpen)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsMobileMoreMenuOpen(!isMobileMoreMenuOpen);
+                      }}
                       className={`p-2 rounded-lg text-fg-2 hover:text-fg hover:bg-surface transition-colors cursor-pointer ${
                         isMobileMoreMenuOpen ? 'bg-surface text-fg' : ''
                       }`}
@@ -5043,7 +5046,7 @@ export default function App() {
                 <Panel defaultSize="75" minSize="30" className="flex flex-col relative">
                   <header 
                     ref={readerHeaderRef}
-                    className="h-[60px] border-b border-border flex items-center justify-between px-3 sm:px-4 lg:px-6 bg-bg shrink-0 gap-2 overflow-hidden"
+                    className="h-[60px] border-b border-border flex items-center justify-between px-3 sm:px-4 lg:px-6 bg-bg shrink-0 gap-2 relative z-20"
                   >
                     <div className="flex items-center gap-1.5 min-w-0 shrink-0 z-1">
                       <div className="font-display text-[16px] sm:text-[18px] lg:text-[20px] font-semibold whitespace-nowrap shrink-0">{activeBook.name} {activeChapter}</div>
@@ -5121,12 +5124,15 @@ export default function App() {
                       
                       {/* Desktop 3-dots more menu: visible when study tools collapse */}
                       {hasCollapsedStudyTools && (
-                        <div className="relative desktop-more-menu-container shrink-0">
+                        <div className="relative z-30 desktop-more-menu-container shrink-0">
                           <button
                             type="button"
-                            onClick={() => setIsDesktopMoreMenuOpen(!isDesktopMoreMenuOpen)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsDesktopMoreMenuOpen(!isDesktopMoreMenuOpen);
+                            }}
                             className={`p-2 rounded-lg text-fg-2 hover:text-fg hover:bg-surface transition-colors cursor-pointer ${
-                              isDesktopMoreMenuOpen ? 'bg-surface text-fg' : ''
+                              isDesktopMoreMenuOpen ? 'bg-surface text-fg ring-1 ring-border-soft' : ''
                             }`}
                             title="More study tools & options"
                             aria-label="More study options"
@@ -5136,14 +5142,14 @@ export default function App() {
 
                           {isDesktopMoreMenuOpen && (
                             <div 
-                              className="absolute right-0 top-full mt-2 w-64 rounded-2xl bg-surface border border-border shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 backdrop-blur-xl space-y-1"
-                              onClick={() => setIsDesktopMoreMenuOpen(false)}
+                              className="absolute right-0 top-full mt-2 w-64 rounded-2xl bg-surface border border-border shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 backdrop-blur-xl space-y-1 select-none"
                             >
                               {/* Scripture Backlinks */}
                               {!showBacklinksInBar && (
                                 <button
                                   type="button"
                                   onClick={() => {
+                                    setIsDesktopMoreMenuOpen(false);
                                     setBacklinksDrawerState({
                                       isOpen: true,
                                       reference: `${activeBook.name} ${activeChapter}`,
@@ -5168,7 +5174,10 @@ export default function App() {
                               {!showLectioInBar && (
                                 <button
                                   type="button"
-                                  onClick={() => setIsLectioModalOpen(true)}
+                                  onClick={() => {
+                                    setIsDesktopMoreMenuOpen(false);
+                                    setIsLectioModalOpen(true);
+                                  }}
                                   className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-fg/5 text-fg text-xs font-medium cursor-pointer transition-colors"
                                 >
                                   <Heart size={16} className="text-rose-400" />
@@ -5180,7 +5189,10 @@ export default function App() {
                               {!showInterlinearInBar && (
                                 <button
                                   type="button"
-                                  onClick={() => handleToggleInterlinearMode()}
+                                  onClick={() => {
+                                    setIsDesktopMoreMenuOpen(false);
+                                    handleToggleInterlinearMode();
+                                  }}
                                   className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-fg/5 text-xs font-medium cursor-pointer transition-colors ${
                                     isInterlinearMode ? 'text-accent bg-accent/10 font-semibold' : 'text-fg'
                                   }`}
@@ -5201,7 +5213,10 @@ export default function App() {
                               {!showMarkCompleteInBar && (
                                 <button
                                   type="button"
-                                  onClick={toggleCompleted}
+                                  onClick={() => {
+                                    setIsDesktopMoreMenuOpen(false);
+                                    toggleCompleted();
+                                  }}
                                   className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-fg/5 text-xs font-medium cursor-pointer border-t border-border mt-1 pt-2 transition-colors ${
                                     isCompleted ? 'text-accent font-semibold' : 'text-fg'
                                   }`}
