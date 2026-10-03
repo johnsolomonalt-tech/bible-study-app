@@ -32,6 +32,7 @@ import {
 } from '@/lib/prayerService';
 import { recordHabitActivity } from '@/lib/streakService';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import { notifyTimerComplete } from '@/lib/audioNotification';
 
 export interface PrayerSanctuaryModalProps {
   isOpen: boolean;
@@ -58,6 +59,9 @@ export function PrayerSanctuaryModal({
   const [prayers, setPrayers] = useState<PrayerItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<PrayerCategory | 'all'>('all');
   
+  const navTabsRef = useRef<HTMLElement>(null);
+  const categoriesRef = useRef<HTMLDivElement>(null);
+
   const defaultScriptureRef = currentChapterReference || currentVerseReference || '';
 
   // Add Prayer Form State
@@ -80,6 +84,30 @@ export function PrayerSanctuaryModal({
   const [isTimerRunning, setIsTimerRunning] = useState<boolean>(false);
   const [isQuietTimeFinished, setIsQuietTimeFinished] = useState<boolean>(false);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Horizontal mouse wheel scrolling for mice with standard vertical-only wheels
+  useEffect(() => {
+    const attachHorizontalScroll = (el: HTMLElement | null) => {
+      if (!el) return () => {};
+      const onWheel = (e: WheelEvent) => {
+        if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+        if (Math.abs(e.deltaY) > 0) {
+          e.preventDefault();
+          el.scrollLeft += e.deltaY;
+        }
+      };
+      el.addEventListener('wheel', onWheel, { passive: false });
+      return () => el.removeEventListener('wheel', onWheel);
+    };
+
+    const cleanupNav = attachHorizontalScroll(navTabsRef.current);
+    const cleanupCat = attachHorizontalScroll(categoriesRef.current);
+
+    return () => {
+      cleanupNav();
+      cleanupCat();
+    };
+  }, [isOpen, activeTab]);
 
   // AI Scripture Prayer Generator State
   const [aiScripturePrompt, setAiScripturePrompt] = useState(
@@ -120,8 +148,8 @@ export function PrayerSanctuaryModal({
             clearInterval(timerIntervalRef.current!);
             setIsTimerRunning(false);
             setIsQuietTimeFinished(true);
-            // Record prayer habit in streak!
             recordHabitActivity('prayer');
+            notifyTimerComplete();
             return 0;
           }
           return prev - 1;
@@ -287,7 +315,7 @@ Format the response purely as a beautiful, heartfelt prayer of devotion, repenta
       </header>
 
         {/* Navigation Tabs */}
-        <nav className="flex items-center gap-1 px-6 pt-2 border-b border-border bg-bg/20 select-none overflow-x-auto custom-scroll">
+        <nav ref={navTabsRef} className="flex items-center gap-1 px-6 pt-2 border-b border-border bg-bg/20 select-none overflow-x-auto no-scrollbar scroll-smooth">
           <button
             type="button"
             onClick={() => setActiveTab('active')}
@@ -352,7 +380,7 @@ Format the response purely as a beautiful, heartfelt prayer of devotion, repenta
             {/* Action Bar & Categories */}
             <div className="p-4 sm:p-5 border-b border-border/60 bg-bg/30 flex flex-wrap items-center justify-between gap-3">
               {/* Category Pills */}
-              <div className="flex items-center gap-1.5 overflow-x-auto custom-scroll pb-1 sm:pb-0 max-w-full">
+              <div ref={categoriesRef} className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth pb-1 sm:pb-0 max-w-full">
                 <button
                   type="button"
                   onClick={() => setSelectedCategory('all')}
@@ -512,7 +540,7 @@ Format the response purely as a beautiful, heartfelt prayer of devotion, repenta
                     className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent hover:opacity-90 text-white text-xs font-semibold transition-all shadow-xs cursor-pointer mt-2"
                   >
                     <Plus size={14} />
-                    <span>+ New Prayer</span>
+                    <span>New Prayer</span>
                   </button>
                 </div>
               ) : (
@@ -654,17 +682,41 @@ Format the response purely as a beautiful, heartfelt prayer of devotion, repenta
               </p>
             </div>
 
-            {/* Timer Ring & Breathing circle */}
-            <div className="relative w-44 h-44 sm:w-52 sm:h-52 rounded-full border-4 border-accent/20 flex flex-col items-center justify-center bg-surface ring-shadow">
-              {isTimerRunning && (
-                <div className="absolute inset-0 rounded-full border-4 border-accent animate-ping opacity-20 pointer-events-none" />
-              )}
-              <span className="text-4xl sm:text-5xl font-mono font-bold text-fg tracking-tight">
-                {formatTimer(timerSecondsLeft)}
-              </span>
-              <span className="text-xs font-semibold text-accent mt-1 uppercase tracking-wider">
-                {isTimerRunning ? 'Meditating' : isQuietTimeFinished ? 'Completed!' : 'Ready'}
-              </span>
+            {/* Timer Ring (iPhone style closing countdown ring) */}
+            <div className="relative w-52 h-52 sm:w-60 sm:h-60 flex items-center justify-center my-1 select-none">
+              <svg className="w-full h-full transform -rotate-90 pointer-events-none" viewBox="0 0 200 200">
+                {/* Background Track Circle */}
+                <circle
+                  cx="100"
+                  cy="100"
+                  r={86}
+                  fill="transparent"
+                  stroke="currentColor"
+                  strokeWidth="6"
+                  className="text-border/50"
+                />
+                {/* Progress Circle that smoothly closes as time runs down */}
+                <circle
+                  cx="100"
+                  cy="100"
+                  r={86}
+                  fill="transparent"
+                  stroke="currentColor"
+                  strokeWidth="6"
+                  strokeDasharray={2 * Math.PI * 86}
+                  strokeDashoffset={2 * Math.PI * 86 * (1 - (timerDuration > 0 ? timerSecondsLeft / timerDuration : 0))}
+                  strokeLinecap="round"
+                  className="text-accent transition-[stroke-dashoffset] duration-1000 ease-linear"
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-4xl sm:text-5xl font-mono font-bold text-fg tracking-tight">
+                  {formatTimer(timerSecondsLeft)}
+                </span>
+                <span className="text-xs font-semibold text-accent mt-1.5 uppercase tracking-wider">
+                  {isTimerRunning ? 'Meditating' : isQuietTimeFinished ? 'Completed' : 'Ready'}
+                </span>
+              </div>
             </div>
 
             {/* Timer Durations */}
@@ -722,8 +774,8 @@ Format the response purely as a beautiful, heartfelt prayer of devotion, repenta
 
             {isQuietTimeFinished && (
               <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-xs font-bold animate-in fade-in flex items-center gap-2">
-                <Flame size={16} className="text-amber-500 fill-amber-500" />
-                <span>Quiet time recorded! Your reading streak has been updated.</span>
+                <CheckCircle2 size={16} className="text-emerald-500" />
+                <span>Quiet contemplation completed. May His peace go with you.</span>
               </div>
             )}
           </div>
@@ -760,12 +812,16 @@ Format the response purely as a beautiful, heartfelt prayer of devotion, repenta
                     Pray This Chapter
                   </button>
                 </div>
-                <div className="max-h-32 overflow-y-auto p-2.5 rounded-xl bg-bg border border-border-soft text-xs text-fg-2 font-serif leading-relaxed custom-scroll">
+                <div className="max-h-60 overflow-y-auto p-3.5 rounded-xl bg-bg border border-border-soft text-xs text-fg leading-relaxed custom-scroll space-y-2.5 font-serif divide-y divide-border/30">
                   {chapterVerses.map(v => (
-                    <span key={v.verse} className="mr-1.5 inline">
-                      <sup className="text-[9px] font-sans font-bold text-muted mr-0.5">{v.verse}</sup>
-                      {v.text}
-                    </span>
+                    <div key={v.verse} className="pt-2.5 first:pt-0 flex items-start gap-2.5">
+                      <span className="text-[10px] font-sans font-bold text-accent min-w-[20px] text-right shrink-0 select-none pt-0.5">
+                        {v.verse}
+                      </span>
+                      <p className="flex-1 text-fg-2 leading-relaxed">
+                        {v.text}
+                      </p>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -851,7 +907,7 @@ Format the response purely as a beautiful, heartfelt prayer of devotion, repenta
 
         {/* Footer info */}
         <footer className="px-6 py-3 bg-bg/50 border-t border-border text-center text-[11px] text-muted flex items-center justify-between shrink-0">
-          <span>Prayers update your daily reading streak automatically.</span>
+          <span className="italic">&ldquo;Pray without ceasing. In every thing give thanks.&rdquo; — 1 Thessalonians 5:17-18</span>
           {!isStandaloneTab && (
             <button
               type="button"

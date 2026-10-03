@@ -14,6 +14,7 @@ import {
   Save,
   AlertCircle
 } from 'lucide-react';
+import { notifyTimerComplete } from '@/lib/audioNotification';
 
 interface LectioDivinaModalProps {
   isOpen: boolean;
@@ -125,7 +126,7 @@ export function LectioDivinaModal({
           if (prev <= 1) {
             setIsTimerRunning(false);
             setIsFinished(true);
-            playGentleBell();
+            notifyTimerComplete();
             return 0;
           }
           return prev - 1;
@@ -534,11 +535,39 @@ export function LectioDivinaModal({
                   </div>
                 </div>
               ) : (
-                /* Countdown Timer Display */
+                /* Countdown Timer Display (iPhone style closing countdown ring) */
                 <div className="flex flex-col items-center justify-center py-4">
-                  <div className="w-36 h-36 rounded-full border-4 border-accent/30 bg-surface/30 flex items-center justify-center relative shadow-inner">
-                    <div className="text-3xl font-mono font-bold tracking-tight text-accent">
-                      {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')}
+                  <div className="relative w-40 h-40 flex items-center justify-center select-none my-1">
+                    <svg className="w-full h-full transform -rotate-90 pointer-events-none" viewBox="0 0 160 160">
+                      <circle
+                        cx="80"
+                        cy="80"
+                        r={64}
+                        fill="transparent"
+                        stroke="currentColor"
+                        strokeWidth="5"
+                        className="text-border/50"
+                      />
+                      <circle
+                        cx="80"
+                        cy="80"
+                        r={64}
+                        fill="transparent"
+                        stroke="currentColor"
+                        strokeWidth="5"
+                        strokeDasharray={2 * Math.PI * 64}
+                        strokeDashoffset={2 * Math.PI * 64 * (1 - (timerDuration > 0 ? timeRemaining / timerDuration : 0))}
+                        strokeLinecap="round"
+                        className="text-accent transition-[stroke-dashoffset] duration-1000 ease-linear"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <div className="text-3xl font-mono font-bold tracking-tight text-fg">
+                        {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')}
+                      </div>
+                      <span className="text-[10px] font-semibold text-accent uppercase tracking-wider mt-0.5">
+                        {isTimerRunning ? 'Meditating' : timeRemaining === 0 ? 'Done' : 'Ready'}
+                      </span>
                     </div>
                   </div>
 
