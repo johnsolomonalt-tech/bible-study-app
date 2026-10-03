@@ -1184,6 +1184,8 @@ export default function App() {
   const [showBottomNotes, setShowBottomNotes] = useState(true);
   const readerHeaderRef = useRef<HTMLElement>(null);
   const [readerHeaderWidth, setReaderHeaderWidth] = useState<number>(1200);
+  const readerTitleRef = useRef<HTMLDivElement>(null);
+  const [readerTitleWidth, setReaderTitleWidth] = useState<number>(100);
   
   const [isSpeaking, setIsSpeaking] = useState(false);
   const isSpeakingRef = useRef(false);
@@ -1600,42 +1602,64 @@ export default function App() {
     metaTheme.content = themeColor;
   }, [theme]);
 
-  // Measure Bible reader header width to dynamically collapse study tools into 3 dots
+  // Measure Bible reader header width and title width to dynamically collapse study tools ONLY when actually cramped
   useEffect(() => {
     if (activeTab !== 'study') return;
-    const el = readerHeaderRef.current;
-    if (!el) return;
+    const headerEl = readerHeaderRef.current;
+    if (!headerEl) return;
 
-    const measureWidth = () => {
-      if (el) {
-        setReaderHeaderWidth(el.getBoundingClientRect().width);
+    const measureWidths = () => {
+      if (headerEl) {
+        setReaderHeaderWidth(headerEl.getBoundingClientRect().width);
+      }
+      if (readerTitleRef.current) {
+        setReaderTitleWidth(readerTitleRef.current.getBoundingClientRect().width);
       }
     };
 
-    measureWidth();
+    measureWidths();
 
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        if (entry.contentRect.width > 0) {
+        if (entry.target === headerEl && entry.contentRect.width > 0) {
           setReaderHeaderWidth(entry.contentRect.width);
+        } else if (entry.target === readerTitleRef.current && entry.contentRect.width > 0) {
+          setReaderTitleWidth(entry.contentRect.width);
         }
       }
     });
 
-    observer.observe(el);
+    observer.observe(headerEl);
+    if (readerTitleRef.current) {
+      observer.observe(readerTitleRef.current);
+    }
     return () => observer.disconnect();
-  }, [activeTab, showLeftSidebar, showRightSidebar]);
+  }, [activeTab, showLeftSidebar, showRightSidebar, activeBook.name, activeChapter]);
 
-  // Progressive study tools collapse thresholds based on reader panel width:
-  // Order requested by user:
-  // 1. Backlinks (first to collapse into 3 dots)
-  // 2. Lectio (second to collapse into 3 dots)
-  // 3. Interlinear (third to collapse into 3 dots)
-  // 4. Mark Complete (fourth/last to collapse into 3 dots)
-  const showBacklinksInBar = readerHeaderWidth >= 960;
-  const showLectioInBar = readerHeaderWidth >= 840;
-  const showInterlinearInBar = readerHeaderWidth >= 720;
-  const showMarkCompleteInBar = readerHeaderWidth >= 600;
+  // Available space for right-side study tools:
+  // Reader header width minus title width, horizontal padding (~48px), and safety margin (24px)
+  const availableToolsWidth = Math.max(0, readerHeaderWidth - readerTitleWidth - 72);
+
+  // Progressive study tools collapse thresholds: ONLY collapse when ACTUALLY cramped!
+  //
+  // Widths of tools:
+  // Base controls (volume button ~38px, divider ~13px, translation selector ~65px, gaps ~16px) = ~132px
+  // 1. Backlinks (~100px) -> First to collapse into 3 dots
+  // 2. Lectio (~80px) -> Second to collapse into 3 dots
+  // 3. Interlinear (~105px) -> Third to collapse into 3 dots
+  // 4. Mark Complete (~140px) -> Fourth/last to collapse into 3 dots
+  // 3-dots button (when active) = ~38px
+  //
+  // Cumulative needed widths:
+  // All 4 tools: 132 + 140 + 105 + 80 + 100 + gaps ~40 = ~597px (round to 605px)
+  // 3 tools (without Backlinks): 132 + 140 + 105 + 80 + 38 + gaps ~30 = ~505px (round to 510px)
+  // 2 tools (without Lectio): 132 + 140 + 105 + 38 + gaps ~20 = ~415px (round to 425px)
+  // 1 tool (without Interlinear): 132 + 140 + 38 + gaps ~10 = ~310px (round to 320px)
+  // 0 tools (all in 3 dots): 132 + 38 = 170px
+  const showBacklinksInBar = availableToolsWidth >= 605;
+  const showLectioInBar = availableToolsWidth >= 510;
+  const showInterlinearInBar = availableToolsWidth >= 425;
+  const showMarkCompleteInBar = availableToolsWidth >= 320;
   const hasCollapsedStudyTools = !showBacklinksInBar || !showLectioInBar || !showInterlinearInBar || !showMarkCompleteInBar;
 
   useEffect(() => {
@@ -5048,7 +5072,7 @@ export default function App() {
                     ref={readerHeaderRef}
                     className="h-[60px] border-b border-border flex items-center justify-between px-3 sm:px-4 lg:px-6 bg-bg shrink-0 gap-2 relative z-20"
                   >
-                    <div className="flex items-center gap-1.5 min-w-0 shrink-0 z-1">
+                    <div ref={readerTitleRef} className="flex items-center gap-1.5 min-w-0 shrink-0 z-1">
                       <div className="font-display text-[16px] sm:text-[18px] lg:text-[20px] font-semibold whitespace-nowrap shrink-0">{activeBook.name} {activeChapter}</div>
                     </div>
                     <div className="flex items-center gap-1 sm:gap-1.5 lg:gap-2 shrink-0">
