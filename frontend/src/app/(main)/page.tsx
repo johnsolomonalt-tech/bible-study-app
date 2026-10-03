@@ -1186,6 +1186,8 @@ export default function App() {
   const [readerHeaderWidth, setReaderHeaderWidth] = useState<number>(1200);
   const readerTitleRef = useRef<HTMLDivElement>(null);
   const [readerTitleWidth, setReaderTitleWidth] = useState<number>(100);
+  const desktopMoreMenuRef = useRef<HTMLDivElement>(null);
+  const mobileMoreMenuRef = useRef<HTMLDivElement>(null);
   
   const [isSpeaking, setIsSpeaking] = useState(false);
   const isSpeakingRef = useRef(false);
@@ -1662,11 +1664,45 @@ export default function App() {
   const showMarkCompleteInBar = availableToolsWidth >= 320;
   const hasCollapsedStudyTools = !showBacklinksInBar || !showLectioInBar || !showInterlinearInBar || !showMarkCompleteInBar;
 
+  // Outside click handler for desktop 3-dots study options menu
   useEffect(() => {
-    if (!hasCollapsedStudyTools && isDesktopMoreMenuOpen) {
-      setIsDesktopMoreMenuOpen(false);
-    }
-  }, [hasCollapsedStudyTools, isDesktopMoreMenuOpen]);
+    if (!isDesktopMoreMenuOpen) return;
+
+    const handleOutsideClick = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node | null;
+      if (!target) return;
+      if (desktopMoreMenuRef.current && !desktopMoreMenuRef.current.contains(target)) {
+        setIsDesktopMoreMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('touchstart', handleOutsideClick);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('touchstart', handleOutsideClick);
+    };
+  }, [isDesktopMoreMenuOpen]);
+
+  // Outside click handler for mobile 3-dots study options menu
+  useEffect(() => {
+    if (!isMobileMoreMenuOpen) return;
+
+    const handleOutsideClick = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node | null;
+      if (!target) return;
+      if (mobileMoreMenuRef.current && !mobileMoreMenuRef.current.contains(target)) {
+        setIsMobileMoreMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('touchstart', handleOutsideClick);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('touchstart', handleOutsideClick);
+    };
+  }, [isMobileMoreMenuOpen]);
 
   // Unified Settings Handlers
   const handleThemeChange = (newTheme: 'dark' | 'light' | 'sepia') => {
@@ -2378,10 +2414,6 @@ export default function App() {
     const handleDocumentClick = (e: MouseEvent | TouchEvent) => {
       const target = e.target as HTMLElement | null;
       if (!target) return;
-      if (!target.closest('.mobile-more-menu-container') && !target.closest('.desktop-more-menu-container')) {
-        setIsMobileMoreMenuOpen(false);
-        setIsDesktopMoreMenuOpen(false);
-      }
       if (target.closest('.floating-verse-toolbar') || target.closest('.verse-number-btn')) return;
       
       // Do not dismiss if user is actively selecting text
@@ -4258,20 +4290,17 @@ export default function App() {
                   </button>
 
                   {/* 3 Dots More Menu (Always available on mobile & tablet) */}
-                  <div className="relative z-30 mobile-more-menu-container">
+                  <div ref={mobileMoreMenuRef} className="relative z-30 mobile-more-menu-container">
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setIsMobileMoreMenuOpen(!isMobileMoreMenuOpen);
-                      }}
+                      onClick={() => setIsMobileMoreMenuOpen(prev => !prev)}
                       className={`p-2 rounded-lg text-fg-2 hover:text-fg hover:bg-surface transition-colors cursor-pointer ${
                         isMobileMoreMenuOpen ? 'bg-surface text-fg' : ''
                       }`}
                       title="More study tools & options"
                       aria-label="More study options"
                     >
-                      <MoreVertical size={18} />
+                      <MoreVertical size={18} className="pointer-events-none" />
                     </button>
 
                     {isMobileMoreMenuOpen && (
@@ -5148,20 +5177,17 @@ export default function App() {
                       
                       {/* Desktop 3-dots more menu: visible when study tools collapse */}
                       {hasCollapsedStudyTools && (
-                        <div className="relative z-30 desktop-more-menu-container shrink-0">
+                        <div ref={desktopMoreMenuRef} className="relative z-30 desktop-more-menu-container shrink-0">
                           <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setIsDesktopMoreMenuOpen(!isDesktopMoreMenuOpen);
-                            }}
+                            onClick={() => setIsDesktopMoreMenuOpen(prev => !prev)}
                             className={`p-2 rounded-lg text-fg-2 hover:text-fg hover:bg-surface transition-colors cursor-pointer ${
                               isDesktopMoreMenuOpen ? 'bg-surface text-fg ring-1 ring-border-soft' : ''
                             }`}
                             title="More study tools & options"
                             aria-label="More study options"
                           >
-                            <MoreVertical size={18} />
+                            <MoreVertical size={18} className="pointer-events-none" />
                           </button>
 
                           {isDesktopMoreMenuOpen && (
