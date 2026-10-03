@@ -21,3 +21,12 @@ export function getDevotionalForDay(dayOfYear: number): DevotionalEntry {
   const index = (dayOfYear - 1) % DEVOTIONALS.length;
   return DEVOTIONALS[index];
 }
+
+/**
+ * Strips the duplicated leading verse quotation and reference from the raw devotional text
+ * so the reader goes straight into the devotional reflection without repeating the verse.
+ */
+export function getDevotionalBody(rawText: string): string {
+  if (!rawText) return '';
+  return rawText.replace(/^("[^"]+"|\S[^\n]+?)\s*[-—–]\s*[^\n]+\s*\n+/, '').trimStart();
+}
