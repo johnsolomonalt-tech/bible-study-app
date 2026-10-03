@@ -1193,6 +1193,8 @@ export default function App() {
   const rightPanelRef = useRef<PanelImperativeHandle>(null);
   const bottomPanelRef = useRef<PanelImperativeHandle>(null);
   const [showBottomNotes, setShowBottomNotes] = useState(true);
+  const readerHeaderRef = useRef<HTMLElement>(null);
+  const [readerHeaderWidth, setReaderHeaderWidth] = useState<number>(1200);
   
   const [isSpeaking, setIsSpeaking] = useState(false);
   const isSpeakingRef = useRef(false);
@@ -1608,6 +1610,50 @@ export default function App() {
     }
     metaTheme.content = themeColor;
   }, [theme]);
+
+  // Measure Bible reader header width to dynamically collapse study tools into 3 dots
+  useEffect(() => {
+    if (activeTab !== 'study') return;
+    const el = readerHeaderRef.current;
+    if (!el) return;
+
+    const measureWidth = () => {
+      if (el) {
+        setReaderHeaderWidth(el.getBoundingClientRect().width);
+      }
+    };
+
+    measureWidth();
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.contentRect.width > 0) {
+          setReaderHeaderWidth(entry.contentRect.width);
+        }
+      }
+    });
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [activeTab, showLeftSidebar, showRightSidebar]);
+
+  // Progressive study tools collapse thresholds based on reader panel width:
+  // Order requested by user:
+  // 1. Backlinks (first to collapse into 3 dots)
+  // 2. Lectio (second to collapse into 3 dots)
+  // 3. Interlinear (third to collapse into 3 dots)
+  // 4. Mark Complete (fourth/last to collapse into 3 dots)
+  const showBacklinksInBar = readerHeaderWidth >= 960;
+  const showLectioInBar = readerHeaderWidth >= 840;
+  const showInterlinearInBar = readerHeaderWidth >= 720;
+  const showMarkCompleteInBar = readerHeaderWidth >= 600;
+  const hasCollapsedStudyTools = !showBacklinksInBar || !showLectioInBar || !showInterlinearInBar || !showMarkCompleteInBar;
+
+  useEffect(() => {
+    if (!hasCollapsedStudyTools && isDesktopMoreMenuOpen) {
+      setIsDesktopMoreMenuOpen(false);
+    }
+  }, [hasCollapsedStudyTools, isDesktopMoreMenuOpen]);
 
   // Unified Settings Handlers
   const handleThemeChange = (newTheme: 'dark' | 'light' | 'sepia') => {
@@ -4984,165 +5030,186 @@ export default function App() {
             <Panel defaultSize="60" minSize="30" className={`w-full lg:w-auto flex-col h-full bg-bg ${mobileStudyView === 'reader' ? 'flex' : 'hidden lg:flex'}`}>
               <PanelGroup orientation="vertical" id="theologica-layout-vertical-v2">
                 <Panel defaultSize="75" minSize="30" className="flex flex-col relative">
-                  <header className="h-[60px] border-b border-border flex items-center justify-between px-3 sm:px-4 lg:px-6 bg-bg shrink-0 gap-2">
-                    <div className="flex items-center gap-1.5 min-w-0 shrink-0">
+                  <header 
+                    ref={readerHeaderRef}
+                    className="h-[60px] border-b border-border flex items-center justify-between px-3 sm:px-4 lg:px-6 bg-bg shrink-0 gap-2 overflow-hidden"
+                  >
+                    <div className="flex items-center gap-1.5 min-w-0 shrink-0 z-1">
                       <div className="font-display text-[16px] sm:text-[18px] lg:text-[20px] font-semibold whitespace-nowrap shrink-0">{activeBook.name} {activeChapter}</div>
                     </div>
-                    <div className="flex items-center gap-1 sm:gap-1.5 lg:gap-2 min-w-0 justify-end">
+                    <div className="flex items-center gap-1 sm:gap-1.5 lg:gap-2 shrink-0">
                       {/* 1. Backlinks: First to collapse into 3 dots on narrower widths */}
-                      <button
-                        onClick={() => {
-                          setBacklinksDrawerState({
-                            isOpen: true,
-                            reference: `${activeBook.name} ${activeChapter}`,
-                            backlinks: totalChapterBacklinks,
-                          });
-                        }}
-                        className={`hidden min-[1600px]:flex items-center gap-1.5 text-[13px] font-medium px-3 py-2 rounded-lg border ring-shadow transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                          totalChapterBacklinks.totalCount > 0
-                            ? 'border-accent/40 bg-accent/10 text-accent hover:bg-accent/15'
-                            : 'border-border bg-surface text-fg hover:bg-border-soft'
-                        }`}
-                        title="Scripture Backlinks (Notes, Canvas Boards & Highlights)"
-                      >
-                        <Layers size={15} />
-                        <span>Backlinks</span>
-                        {totalChapterBacklinks.totalCount > 0 && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-accent text-accent-on ml-0.5">
-                            {totalChapterBacklinks.totalCount}
-                          </span>
-                        )}
-                      </button>
+                      {showBacklinksInBar && (
+                        <button
+                          onClick={() => {
+                            setBacklinksDrawerState({
+                              isOpen: true,
+                              reference: `${activeBook.name} ${activeChapter}`,
+                              backlinks: totalChapterBacklinks,
+                            });
+                          }}
+                          className={`flex items-center gap-1.5 text-[13px] font-medium px-3 py-2 rounded-lg border ring-shadow transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                            totalChapterBacklinks.totalCount > 0
+                              ? 'border-accent/40 bg-accent/10 text-accent hover:bg-accent/15'
+                              : 'border-border bg-surface text-fg hover:bg-border-soft'
+                          }`}
+                          title="Scripture Backlinks (Notes, Canvas Boards & Highlights)"
+                        >
+                          <Layers size={15} />
+                          <span>Backlinks</span>
+                          {totalChapterBacklinks.totalCount > 0 && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-accent text-accent-on ml-0.5">
+                              {totalChapterBacklinks.totalCount}
+                            </span>
+                          )}
+                        </button>
+                      )}
 
                       {/* 2. Lectio: Second to collapse into 3 dots */}
-                      <button
-                        onClick={() => setIsLectioModalOpen(true)}
-                        className="hidden 2xl:flex items-center gap-1.5 text-[13px] font-medium px-3 py-2 rounded-lg bg-surface text-fg hover:bg-border-soft hover:text-accent border border-border ring-shadow transition-all cursor-pointer whitespace-nowrap shrink-0"
-                        title="Lectio Divina Guided Meditation"
-                      >
-                        <Heart size={15} className="text-accent" />
-                        <span>Lectio</span>
-                      </button>
+                      {showLectioInBar && (
+                        <button
+                          onClick={() => setIsLectioModalOpen(true)}
+                          className="flex items-center gap-1.5 text-[13px] font-medium px-3 py-2 rounded-lg bg-surface text-fg hover:bg-border-soft hover:text-accent border border-border ring-shadow transition-all cursor-pointer whitespace-nowrap shrink-0"
+                          title="Lectio Divina Guided Meditation"
+                        >
+                          <Heart size={15} className="text-accent" />
+                          <span>Lectio</span>
+                        </button>
+                      )}
 
                       {/* 3. Interlinear: Third to collapse into 3 dots */}
-                      <button
-                        onClick={() => handleToggleInterlinearMode()}
-                        className={`hidden xl:flex items-center gap-1.5 text-[13px] font-medium px-3 py-2 rounded-lg border ring-shadow transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                          isInterlinearMode
-                            ? 'border-accent bg-accent text-accent-on shadow-accent/20'
-                            : 'border-border bg-surface text-fg hover:bg-border-soft'
-                        }`}
-                        title={isInterlinearMode ? "Disable Reverse Interlinear" : "Enable Reverse Interlinear (Original Hebrew/Greek Word Study)"}
-                      >
-                        <Languages size={15} />
-                        <span>Interlinear</span>
-                      </button>
+                      {showInterlinearInBar && (
+                        <button
+                          onClick={() => handleToggleInterlinearMode()}
+                          className={`flex items-center gap-1.5 text-[13px] font-medium px-3 py-2 rounded-lg border ring-shadow transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                            isInterlinearMode
+                              ? 'border-accent bg-accent text-accent-on shadow-accent/20'
+                              : 'border-border bg-surface text-fg hover:bg-border-soft'
+                          }`}
+                          title={isInterlinearMode ? "Disable Reverse Interlinear" : "Enable Reverse Interlinear (Original Hebrew/Greek Word Study)"}
+                        >
+                          <Languages size={15} />
+                          <span>Interlinear</span>
+                        </button>
+                      )}
 
                       {/* 4. Mark Complete: Fourth/Last to collapse into 3 dots */}
-                      <button 
-                        onClick={toggleCompleted} 
-                        className="hidden lg:flex items-center gap-2 text-[13px] font-medium px-3.5 py-2 rounded-lg bg-surface text-fg hover:bg-border-soft ring-shadow ring-shadow-hover transition-all cursor-pointer whitespace-nowrap shrink-0"
-                      >
-                        <Check size={16} className={isCompleted ? "text-accent" : "text-meta"} /> 
-                        <span>{isCompleted ? "Completed" : "Mark Complete"}</span>
-                      </button>
+                      {showMarkCompleteInBar && (
+                        <button 
+                          onClick={toggleCompleted} 
+                          className="flex items-center gap-2 text-[13px] font-medium px-3.5 py-2 rounded-lg bg-surface text-fg hover:bg-border-soft ring-shadow ring-shadow-hover transition-all cursor-pointer whitespace-nowrap shrink-0"
+                        >
+                          <Check size={16} className={isCompleted ? "text-accent" : "text-meta"} /> 
+                          <span>{isCompleted ? "Completed" : "Mark Complete"}</span>
+                        </button>
+                      )}
 
                       <button onClick={toggleSpeech} className="flex items-center justify-center p-2 min-w-[38px] min-h-[38px] rounded-lg text-fg-2 hover:text-fg hover:bg-surface transition-colors cursor-pointer touch-manipulation shrink-0" title="Read chapter aloud">
                         {isSpeaking ? <VolumeX size={18} className="text-accent" /> : <Volume2 size={18} />}
                       </button>
                       
                       {/* Desktop 3-dots more menu: visible when study tools collapse */}
-                      <div className="relative min-[1600px]:hidden desktop-more-menu-container shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => setIsDesktopMoreMenuOpen(!isDesktopMoreMenuOpen)}
-                          className={`p-2 rounded-lg text-fg-2 hover:text-fg hover:bg-surface transition-colors cursor-pointer ${
-                            isDesktopMoreMenuOpen ? 'bg-surface text-fg' : ''
-                          }`}
-                          title="More study tools & options"
-                          aria-label="More study options"
-                        >
-                          <MoreVertical size={18} />
-                        </button>
-
-                        {isDesktopMoreMenuOpen && (
-                          <div 
-                            className="absolute right-0 top-full mt-2 w-64 rounded-2xl bg-surface border border-border shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 backdrop-blur-xl space-y-1"
-                            onClick={() => setIsDesktopMoreMenuOpen(false)}
+                      {hasCollapsedStudyTools && (
+                        <div className="relative desktop-more-menu-container shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setIsDesktopMoreMenuOpen(!isDesktopMoreMenuOpen)}
+                            className={`p-2 rounded-lg text-fg-2 hover:text-fg hover:bg-surface transition-colors cursor-pointer ${
+                              isDesktopMoreMenuOpen ? 'bg-surface text-fg' : ''
+                            }`}
+                            title="More study tools & options"
+                            aria-label="More study options"
                           >
-                            {/* Scripture Backlinks */}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setBacklinksDrawerState({
-                                  isOpen: true,
-                                  reference: `${activeBook.name} ${activeChapter}`,
-                                  backlinks: totalChapterBacklinks,
-                                });
-                              }}
-                              className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-fg/5 text-fg text-xs font-medium cursor-pointer transition-colors"
-                            >
-                              <div className="flex items-center gap-2.5">
-                                <Layers size={16} className="text-accent" />
-                                <span>Scripture Backlinks</span>
-                              </div>
-                              {totalChapterBacklinks.totalCount > 0 && (
-                                <span className="min-w-[16px] h-4 px-1.5 bg-accent text-accent-on text-[10px] font-bold rounded-full flex items-center justify-center">
-                                  {totalChapterBacklinks.totalCount}
-                                </span>
-                              )}
-                            </button>
+                            <MoreVertical size={18} />
+                          </button>
 
-                            {/* Lectio Divina */}
-                            <button
-                              type="button"
-                              onClick={() => setIsLectioModalOpen(true)}
-                              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-fg/5 text-fg text-xs font-medium cursor-pointer transition-colors"
+                          {isDesktopMoreMenuOpen && (
+                            <div 
+                              className="absolute right-0 top-full mt-2 w-64 rounded-2xl bg-surface border border-border shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 backdrop-blur-xl space-y-1"
+                              onClick={() => setIsDesktopMoreMenuOpen(false)}
                             >
-                              <Heart size={16} className="text-rose-400" />
-                              <span>Lectio Divina</span>
-                            </button>
-
-                            {/* Reverse Interlinear */}
-                            <button
-                              type="button"
-                              onClick={() => handleToggleInterlinearMode()}
-                              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-fg/5 text-xs font-medium cursor-pointer transition-colors ${
-                                isInterlinearMode ? 'text-accent bg-accent/10 font-semibold' : 'text-fg'
-                              }`}
-                            >
-                              <div className="flex items-center gap-2.5">
-                                <Languages size={16} className={isInterlinearMode ? "text-accent" : "text-fg-2"} />
-                                <span>Reverse Interlinear</span>
-                              </div>
-                              {isInterlinearMode && (
-                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-accent text-accent-on">
-                                  Active
-                                </span>
+                              {/* Scripture Backlinks */}
+                              {!showBacklinksInBar && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setBacklinksDrawerState({
+                                      isOpen: true,
+                                      reference: `${activeBook.name} ${activeChapter}`,
+                                      backlinks: totalChapterBacklinks,
+                                    });
+                                  }}
+                                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-fg/5 text-fg text-xs font-medium cursor-pointer transition-colors"
+                                >
+                                  <div className="flex items-center gap-2.5">
+                                    <Layers size={16} className="text-accent" />
+                                    <span>Scripture Backlinks</span>
+                                  </div>
+                                  {totalChapterBacklinks.totalCount > 0 && (
+                                    <span className="min-w-[16px] h-4 px-1.5 bg-accent text-accent-on text-[10px] font-bold rounded-full flex items-center justify-center">
+                                      {totalChapterBacklinks.totalCount}
+                                    </span>
+                                  )}
+                                </button>
                               )}
-                            </button>
 
-                            {/* Mark Completed */}
-                            <button
-                              type="button"
-                              onClick={toggleCompleted}
-                              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-fg/5 text-xs font-medium cursor-pointer border-t border-border mt-1 pt-2 transition-colors ${
-                                isCompleted ? 'text-accent font-semibold' : 'text-fg'
-                              }`}
-                            >
-                              <div className="flex items-center gap-2.5">
-                                <Check size={16} className={isCompleted ? "text-accent" : "text-meta"} />
-                                <span>{isCompleted ? 'Marked Completed' : 'Mark Complete'}</span>
-                              </div>
-                              {isCompleted && (
-                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-accent/15 text-accent">
-                                  Done
-                                </span>
+                              {/* Lectio Divina */}
+                              {!showLectioInBar && (
+                                <button
+                                  type="button"
+                                  onClick={() => setIsLectioModalOpen(true)}
+                                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-fg/5 text-fg text-xs font-medium cursor-pointer transition-colors"
+                                >
+                                  <Heart size={16} className="text-rose-400" />
+                                  <span>Lectio Divina</span>
+                                </button>
                               )}
-                            </button>
-                          </div>
-                        )}
-                      </div>
+
+                              {/* Reverse Interlinear */}
+                              {!showInterlinearInBar && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleInterlinearMode()}
+                                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-fg/5 text-xs font-medium cursor-pointer transition-colors ${
+                                    isInterlinearMode ? 'text-accent bg-accent/10 font-semibold' : 'text-fg'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2.5">
+                                    <Languages size={16} className={isInterlinearMode ? "text-accent" : "text-fg-2"} />
+                                    <span>Reverse Interlinear</span>
+                                  </div>
+                                  {isInterlinearMode && (
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-accent text-accent-on">
+                                      Active
+                                    </span>
+                                  )}
+                                </button>
+                              )}
+
+                              {/* Mark Completed */}
+                              {!showMarkCompleteInBar && (
+                                <button
+                                  type="button"
+                                  onClick={toggleCompleted}
+                                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-fg/5 text-xs font-medium cursor-pointer border-t border-border mt-1 pt-2 transition-colors ${
+                                    isCompleted ? 'text-accent font-semibold' : 'text-fg'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2.5">
+                                    <Check size={16} className={isCompleted ? "text-accent" : "text-meta"} />
+                                    <span>{isCompleted ? 'Marked Completed' : 'Mark Complete'}</span>
+                                  </div>
+                                  {isCompleted && (
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-accent/15 text-accent">
+                                      Done
+                                    </span>
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       <div className="hidden lg:block h-5 w-px bg-border/60 shrink-0"></div>
                       
