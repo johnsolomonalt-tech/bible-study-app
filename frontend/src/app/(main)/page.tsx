@@ -3767,7 +3767,7 @@ export default function App() {
         {/* Top Navbar */}
         <header className="sticky top-0 z-30 min-h-14 h-[calc(3.5rem+env(safe-area-inset-top,0px))] border-b border-border flex items-center justify-between px-4 sm:px-6 bg-bg shrink-0" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         
-        {/* Left: Logo & Navigation Sidebar Toggle */}
+        {/* Left: Logo */}
         <div className="flex-1 flex items-center min-w-0 gap-3">
           <div className="font-display text-[20px] tracking-tight flex items-center gap-2.5 select-none shrink-0">
             <div className="relative w-8 h-8 rounded-xl overflow-hidden shadow-xs shrink-0 flex items-center justify-center">
@@ -3782,23 +3782,6 @@ export default function App() {
               Theologica
             </span>
           </div>
-
-          {/* Collapsible Navigation Toggle - pinned at the top navbar only in Study area */}
-          {activeTab === 'study' && (
-            <button
-              type="button"
-              onClick={() => setShowLeftSidebar(!showLeftSidebar)}
-              className={`hidden lg:flex items-center justify-center p-1.5 rounded-lg border border-border-soft transition-colors cursor-pointer shrink-0 ${
-                showLeftSidebar 
-                  ? 'bg-surface text-fg hover:bg-border-soft' 
-                  : 'bg-surface/50 text-muted hover:text-fg hover:bg-surface'
-              }`}
-              title={showLeftSidebar ? 'Collapse Navigation Sidebar' : 'Expand Navigation Sidebar'}
-              aria-label="Toggle Navigation Sidebar"
-            >
-              {showLeftSidebar ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
-            </button>
-          )}
         </div>
 
         {/* Center: Tabs (Desktop) */}
@@ -3839,8 +3822,47 @@ export default function App() {
           ))}
         </nav>
         
-        {/* Right: Streak, Prayer, Settings & Clerk UserButton */}
+        {/* Right: Panel Toggles, Streak, Prayer, Settings & Clerk UserButton */}
         <div className="flex-1 flex justify-end items-center gap-2 sm:gap-3">
+          {/* Collapsible Panel Toggles - Book Selector, Quick Note, Study AI */}
+          {activeTab === 'study' && (
+            <div className="hidden lg:flex items-center bg-surface border border-border-soft/60 rounded-lg p-0.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowLeftSidebar(!showLeftSidebar)}
+                className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                  showLeftSidebar ? 'text-fg hover:bg-border-soft' : 'text-muted hover:text-fg'
+                }`}
+                title={showLeftSidebar ? 'Collapse Book Selector' : 'Expand Book Selector'}
+                aria-label="Toggle Book Selector"
+              >
+                {showLeftSidebar ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowBottomNotes(!showBottomNotes)}
+                className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                  showBottomNotes ? 'text-fg hover:bg-border-soft' : 'text-muted hover:text-fg'
+                }`}
+                title={showBottomNotes ? 'Collapse Notes' : 'Expand Notes'}
+                aria-label="Toggle Notes"
+              >
+                {showBottomNotes ? <PanelBottomClose size={18} /> : <PanelBottomOpen size={18} />}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowRightSidebar(!showRightSidebar)}
+                className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                  showRightSidebar ? 'text-fg hover:bg-border-soft' : 'text-muted hover:text-fg'
+                }`}
+                title={showRightSidebar ? 'Collapse Study AI' : 'Expand Study AI'}
+                aria-label="Toggle Study AI"
+              >
+                {showRightSidebar ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
+              </button>
+            </div>
+          )}
+
           <StreakPopover 
             onNavigateToTab={setActiveTab} 
             onOpenPrayerSanctuary={() => setIsPrayerSanctuaryOpen(true)} 
@@ -5208,15 +5230,6 @@ export default function App() {
                           onSelectTranslation={setTranslation}
                           theme={theme as 'dark' | 'light'}
                         />
-                      </div>
-
-                      <div className="hidden lg:flex items-center bg-surface rounded-lg p-0.5 shrink-0">
-                        <button onClick={() => setShowBottomNotes(!showBottomNotes)} className={`p-1.5 rounded-md transition-colors cursor-pointer ${showBottomNotes ? 'text-fg hover:bg-border-soft' : 'text-muted hover:text-fg'}`} title="Toggle Notes">
-                          {showBottomNotes ? <PanelBottomClose size={18} /> : <PanelBottomOpen size={18} />}
-                        </button>
-                        <button onClick={() => setShowRightSidebar(!showRightSidebar)} className={`p-1.5 rounded-md transition-colors cursor-pointer ${showRightSidebar ? 'text-fg hover:bg-border-soft' : 'text-muted hover:text-fg'}`} title="Toggle Study AI">
-                          {showRightSidebar ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
-                        </button>
                       </div>
                     </div>
                   </header>
