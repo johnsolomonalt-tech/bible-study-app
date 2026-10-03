@@ -3,6 +3,8 @@ import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { recordAnalyticsEvent } from '@/lib/analyticsService';
 
+import { findCanonicalBook } from '@/lib/bibleCanon';
+
 export async function GET(request: Request) {
   const { userId } = await auth();
   if (!userId) {
@@ -16,10 +18,16 @@ export async function GET(request: Request) {
   try {
     const where: any = { userId };
     if (book) {
-      where.book = {
-        equals: book,
-        mode: 'insensitive',
-      };
+      const bookMeta = findCanonicalBook(book);
+      const possibleBooks = bookMeta 
+        ? Array.from(new Set([book, bookMeta.name, bookMeta.code, ...bookMeta.aliases]))
+        : [book];
+      where.OR = possibleBooks.map(b => ({
+        book: {
+          equals: b,
+          mode: 'insensitive',
+        }
+      }));
     }
     if (chapter) {
       where.chapter = parseInt(chapter, 10);

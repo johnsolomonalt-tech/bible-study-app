@@ -36,6 +36,7 @@ import { TranslationSelector } from '@/components/bible/TranslationSelector';
 import { getPassage, getStrongsPassage } from '@/lib/bibleProvider';
 import { AVAILABLE_TRANSLATIONS } from '@/types/bible';
 import { parseVerseFootnote, getCleanScriptureText } from '@/lib/verseParser';
+import { findCanonicalBook } from '@/lib/bibleCanon';
 import { 
   getPreference, 
   setPreference, 
@@ -75,6 +76,18 @@ const ntStr = "Matthew:28,Mark:16,Luke:24,John:21,Acts:28,Romans:16,1 Corinthian
 const OT_BOOKS = otStr.split(',').map(s => { const [n, c] = s.split(':'); return { name: n, chapters: parseInt(c) }; });
 const NT_BOOKS = ntStr.split(',').map(s => { const [n, c] = s.split(':'); return { name: n, chapters: parseInt(c) }; });
 const ALL_BOOKS = [...OT_BOOKS, ...NT_BOOKS];
+
+// Canonical book name equality helper (handles aliases, codes, case differences)
+const isSameBook = (b1?: string, b2?: string): boolean => {
+  if (!b1 || !b2) return true;
+  const s1 = b1.toLowerCase().trim();
+  const s2 = b2.toLowerCase().trim();
+  if (s1 === s2) return true;
+  const c1 = findCanonicalBook(b1);
+  const c2 = findCanonicalBook(b2);
+  if (c1 && c2) return c1.number === c2.number;
+  return false;
+};
 
 const markdownComponents = createMarkdownComponents();
 
@@ -1148,7 +1161,8 @@ export default function App() {
       setSelectionRange(range);
       setSelectionVerse(verseNum);
       setEndVerseNumber(verseNum);
-      setSelectedText(verseEl.textContent || '');
+      const vObj = bibleVerses.find(v => v.verse === verseNum);
+      setSelectedText(vObj ? parseVerseFootnote(vObj.text).mainText : (verseEl.textContent || ''));
     }
 
     const toolbarHalfWidth = 195;
@@ -1157,7 +1171,7 @@ export default function App() {
     const y = isNearTop ? e.clientY + 24 : e.clientY - 12;
 
     const existingHighlight = highlights.find(
-      h => (!h.book || h.book.toLowerCase() === activeBook.name.toLowerCase()) &&
+      h => isSameBook(h.book, activeBook.name) &&
            Number(h.chapter) === Number(activeChapter) &&
            Number(h.verse) === Number(verseNum)
     );
@@ -1168,7 +1182,7 @@ export default function App() {
       highlightId: existingHighlight?.id,
       isBelow: isNearTop,
     });
-  }, [activeBook.name, activeChapter, highlights]);
+  }, [activeBook.name, activeChapter, bibleVerses, highlights]);
   
   // Tracker State
   const [expandedTestaments, setExpandedTestaments] = useState<string[]>([]);
@@ -2340,8 +2354,14 @@ export default function App() {
         if (Array.isArray(data)) {
           setHighlights(prev => {
             const map = new Map<string, typeof prev[0]>();
-            prev.forEach(h => map.set(`${h.book?.toLowerCase()}:${h.chapter}:${h.verse}:${h.text}`, h));
-            data.forEach(ch => map.set(`${ch.book?.toLowerCase()}:${ch.chapter}:${ch.verse}:${ch.text}`, ch));
+            prev.forEach(h => {
+              const canon = findCanonicalBook(h.book)?.code || h.book?.toLowerCase();
+              map.set(`${canon}:${h.chapter}:${h.verse}:${h.text}`, h);
+            });
+            data.forEach(ch => {
+              const canon = findCanonicalBook(ch.book)?.code || ch.book?.toLowerCase();
+              map.set(`${canon}:${ch.chapter}:${ch.verse}:${ch.text}`, ch);
+            });
             const merged = Array.from(map.values());
             saveLocalHighlights(merged);
             return merged;
@@ -2422,7 +2442,7 @@ export default function App() {
     }
   }, [activeTab]);
 
-  // Helper to clean verse text and strip verse numbers cleanly
+  // Helper to clean verse text and strip verse numbers cleanly without destroying legitimate scripture numbers
   const cleanVerseText = (rawText: string, startVerse?: number | null, endVerse?: number | null): string => {
     if (!rawText) return '';
     let cleaned = rawText.trim();
@@ -2430,12 +2450,10 @@ export default function App() {
     const sVerse = startVerse && endVerse ? Math.min(startVerse, endVerse) : startVerse;
     const eVerse = startVerse && endVerse ? Math.max(startVerse, endVerse) : endVerse;
 
-    // 1. Remove leading verse number if present (e.g. "1 In the beginning" or "16 For God")
+    // 1. Remove leading verse number if it matches the start verse (e.g. "1 In the beginning" or "16 For God")
     if (sVerse) {
-      cleaned = cleaned.replace(new RegExp(`^${sVerse}\\s*`), '');
+      cleaned = cleaned.replace(new RegExp(`^${sVerse}\\s+`), '');
     }
-    // Fallback: strip any generic leading digits
-    cleaned = cleaned.replace(/^\d+\s+/, '');
 
     // 2. If multiple verses are spanned, remove verse numbers that appear between verses
     if (sVerse && eVerse && eVerse > sVerse) {
@@ -2445,20 +2463,60 @@ export default function App() {
       }
     }
 
-    // 3. Remove any remaining standalone numbers followed by capitalized words
-    cleaned = cleaned.replace(/([.!?,"';:])\s*\d+\s+([A-Z])/g, '$1 $2');
-
-    // 4. Normalize multiple spaces / newlines
+    // 3. Normalize multiple spaces / newlines
     cleaned = cleaned.replace(/\s+/g, ' ');
 
     return cleaned.trim();
   };
 
-  // Clicking a verse number dismisses any active toolbar without opening selection toolbar
-  const handleVerseNumberClick = (e: React.MouseEvent | React.TouchEvent) => {
+  // Clicking or tapping a verse number opens the floating toolbar to highlight or study that verse
+  const handleVerseNumberClick = (e: React.MouseEvent | React.TouchEvent, verseNum: number) => {
     e.stopPropagation();
-    window.getSelection()?.removeAllRanges();
-    setToolbarPosition(null);
+    
+    // Toggle off if currently selected
+    if (toolbarPosition && selectionVerse === verseNum && (!endVerseNumber || endVerseNumber === verseNum)) {
+      setToolbarPosition(null);
+      setSelectionVerse(null);
+      setEndVerseNumber(null);
+      setSelectedText('');
+      window.getSelection()?.removeAllRanges();
+      return;
+    }
+
+    const vObj = bibleVerses.find(v => v.verse === verseNum);
+    if (!vObj) return;
+
+    const cleanText = parseVerseFootnote(vObj.text).mainText;
+    
+    // Find verse element in DOM
+    const verseEl = document.querySelector(`[data-verse="${verseNum}"]`) as HTMLElement | null;
+    const rect = verseEl ? verseEl.getBoundingClientRect() : null;
+
+    // Check if this verse already has a highlight
+    const existingHl = highlights.find(h => 
+      isSameBook(h.book, activeBook.name) && 
+      Number(h.chapter) === Number(activeChapter) && 
+      Number(h.verse) === Number(verseNum)
+    );
+
+    setSelectionVerse(verseNum);
+    setEndVerseNumber(verseNum);
+    setSelectedText(cleanText);
+
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
+    const toolbarHalfWidth = 195;
+    const x = isMobile 
+      ? window.innerWidth / 2 
+      : (rect ? Math.max(toolbarHalfWidth + 12, Math.min(window.innerWidth - toolbarHalfWidth - 12, rect.left + rect.width / 2)) : window.innerWidth / 2);
+    const isNearTop = rect ? rect.top < 130 : false;
+    const y = rect ? (isNearTop ? rect.bottom + 8 : Math.max(70, rect.top - 6)) : window.innerHeight / 2;
+
+    setToolbarPosition({
+      x,
+      y,
+      highlightId: existingHl?.id,
+      isBelow: isNearTop
+    });
   };
 
   // Highlighting & Drag Selection Logic
@@ -2472,7 +2530,10 @@ export default function App() {
     if (!rawText || /^\d+$/.test(rawText)) return;
 
     const range = selection.getRangeAt(0);
-    const rect = range.getBoundingClientRect();
+    let rect = range.getBoundingClientRect();
+    if ((rect.width === 0 || rect.height === 0) && range.getClientRects().length > 0) {
+      rect = range.getClientRects()[0];
+    }
     if (rect.width === 0 && rect.height === 0) return;
     
     // Find the verse this selection belongs to by looking at parent elements or children
@@ -2509,26 +2570,28 @@ export default function App() {
 
     let startVerse = getVerseFromNode(range.startContainer, range.startOffset);
     let endVerse = getVerseFromNode(range.endContainer, range.endOffset) || startVerse;
-    if (!startVerse && endVerse) startVerse = endVerse;
 
-    if (!startVerse) {
-      const ancestorEl = range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
-        ? (range.commonAncestorContainer as HTMLElement)
-        : range.commonAncestorContainer.parentElement;
-      if (ancestorEl) {
-        const versesInside = ancestorEl.querySelectorAll('[data-verse]');
-        for (let i = 0; i < versesInside.length; i++) {
-          if (selection.containsNode(versesInside[i], true)) {
-            const v = parseInt(versesInside[i].getAttribute('data-verse') || '', 10);
-            if (!isNaN(v)) {
-              if (!startVerse) startVerse = v;
-              endVerse = v;
-            }
-          }
+    // Scan all [data-verse] elements in reader for multi-verse spans
+    const readerRoot = document.querySelector('.bible-reader-content');
+    if (readerRoot) {
+      const allVerseEls = readerRoot.querySelectorAll('[data-verse]');
+      const matchedVerses: number[] = [];
+      allVerseEls.forEach(el => {
+        if (selection.containsNode(el, true)) {
+          const v = parseInt(el.getAttribute('data-verse') || '', 10);
+          if (!isNaN(v)) matchedVerses.push(v);
+        }
+      });
+      if (matchedVerses.length > 0) {
+        matchedVerses.sort((a, b) => a - b);
+        if (!startVerse || matchedVerses[0] < startVerse) startVerse = matchedVerses[0];
+        if (!endVerse || matchedVerses[matchedVerses.length - 1] > endVerse) {
+          endVerse = matchedVerses[matchedVerses.length - 1];
         }
       }
     }
     
+    if (!startVerse && endVerse) startVerse = endVerse;
     if (startVerse) {
       const actualStart = Math.min(startVerse, endVerse || startVerse);
       const actualEnd = Math.max(startVerse, endVerse || startVerse);
@@ -2573,12 +2636,19 @@ export default function App() {
     }
   }, []);
 
-  // Dismiss toolbar when clicking outside (safely ignoring selection & toolbar clicks)
+  // Dismiss toolbar when clicking outside (safely ignoring selection, toolbar, and verse clicks)
   useEffect(() => {
     const handleDocumentClick = (e: MouseEvent | TouchEvent) => {
       const target = e.target as HTMLElement | null;
       if (!target) return;
-      if (target.closest('.floating-verse-toolbar') || target.closest('.verse-number-btn')) return;
+      if (
+        target.closest('.floating-verse-toolbar') || 
+        target.closest('.verse-number-btn') || 
+        target.closest('.verse-number') || 
+        target.closest('mark')
+      ) {
+        return;
+      }
       
       // Do not dismiss if user is actively selecting text
       const selection = window.getSelection();
@@ -2681,7 +2751,13 @@ export default function App() {
 
     if (startVerse === endVerse) {
       // Single verse selection
-      const cleanText = cleanVerseText(rawText, startVerse, endVerse);
+      const vObj = bibleVerses.find(bv => bv.verse === startVerse);
+      const wholeVerseMainText = vObj ? parseVerseFootnote(vObj.text).mainText : '';
+      
+      let cleanText = cleanVerseText(rawText, startVerse, endVerse);
+      if (!cleanText && wholeVerseMainText) {
+        cleanText = wholeVerseMainText;
+      }
       if (cleanText) {
         versesToHighlight.push({ verse: startVerse, text: cleanText });
       }
@@ -2692,7 +2768,7 @@ export default function App() {
       for (let v = minV; v <= maxV; v++) {
         const vObj = bibleVerses.find(bv => bv.verse === v);
         if (vObj) {
-          const fullVText = cleanVerseText(vObj.text, v, v);
+          const fullVText = parseVerseFootnote(vObj.text).mainText;
           if (fullVText) {
             versesToHighlight.push({ verse: v, text: fullVText });
           }
@@ -2723,7 +2799,7 @@ export default function App() {
     setHighlights(prev => {
       // Cleanly replace any exact or superseded highlights in these verses
       const filtered = prev.filter(h => {
-        const isSamePassage = (!h.book || h.book.toLowerCase() === book.toLowerCase()) &&
+        const isSamePassage = isSameBook(h.book, book) &&
           Number(h.chapter) === Number(chapter);
         if (!isSamePassage) return true;
         return !createdItems.some(ci => 
@@ -2981,8 +3057,32 @@ export default function App() {
     const taggedStr = strongsVersesMap[verseNum];
 
     if (taggedStr) {
-      const tokens = getVerseInterlinearTokens(taggedStr, isOldTestament, verseRef);
-      return tokens.map((token, tIdx) => {
+      const allTokens = getVerseInterlinearTokens(taggedStr, isOldTestament, verseRef);
+      const vFullObj = bibleVerses.find(v => v.verse === verseNum);
+      const vFullMain = vFullObj ? parseVerseFootnote(vFullObj.text).mainText.trim() : '';
+
+      // If rendering the full verse (no highlights or full verse segment)
+      const isFull = !vFullMain || rawStr.trim() === vFullMain || Math.abs(rawStr.length - vFullMain.length) < 5;
+      let targetTokens = allTokens;
+      if (!isFull) {
+        const normSegment = normalizeForMatch(rawStr);
+        let curIdx = 0;
+        targetTokens = allTokens.filter(t => {
+          const tNorm = normalizeForMatch(t.rawText);
+          if (!tNorm.trim()) return false;
+          const found = normSegment.indexOf(tNorm.trim(), curIdx);
+          if (found !== -1) {
+            curIdx = found + tNorm.trim().length;
+            return true;
+          }
+          return false;
+        });
+        if (targetTokens.length === 0) {
+          targetTokens = allTokens;
+        }
+      }
+
+      return targetTokens.map((token, tIdx) => {
         if (!token.isWord || !token.word || !token.word.lemma || token.word.lemma === '—') {
           return <span key={tIdx}>{token.rawText}</span>;
         }
@@ -3135,20 +3235,21 @@ export default function App() {
       return { start: idx, end: idx + normTarget.length };
     }
 
-    // 2. Whitespace-flexible regex search
+    // 2. Whitespace & punctuation flexible regex search
     const words = targetText
       .trim()
       .replace(new RegExp('^\\s*' + verseNum + '\\s*'), '')
       .split(/\s+/)
+      .map(w => w.replace(/[.,;:!?"'()\[\]{}]/g, '').trim())
+      .filter(w => w.length > 0)
       .map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
                  .replace(/['’]/g, "['’]")
                  .replace(/["“”]/g, '["“”]')
-                 .replace(/[-—–]/g, '[-—–]'))
-      .filter(Boolean);
+                 .replace(/[-—–]/g, '[-—–]'));
 
     if (words.length > 0) {
       try {
-        const pattern = new RegExp(words.join('\\s+'), 'i');
+        const pattern = new RegExp(words.join('[\\s.,;:!?"\'()\\-]+'), 'i');
         const match = segText.match(pattern);
         if (match && typeof match.index === 'number') {
           return { start: match.index, end: match.index + match[0].length };
@@ -3156,10 +3257,21 @@ export default function App() {
       } catch {}
     }
 
-    // 3. Segment containment
+    // 3. Containment / Full-verse coverage
     const trimmedNormSeg = normSeg.trim();
     if (trimmedNormSeg.length > 0 && normTarget.includes(trimmedNormSeg)) {
       return { start: 0, end: segText.length };
+    }
+
+    // 4. Overlap coverage (for cross-translation whole-verse highlights)
+    if (words.length >= 3) {
+      let matchedWords = 0;
+      for (const w of words) {
+        if (normSeg.includes(w.toLowerCase())) matchedWords++;
+      }
+      if (matchedWords / words.length >= 0.65) {
+        return { start: 0, end: segText.length };
+      }
     }
 
     return null;
@@ -3168,7 +3280,7 @@ export default function App() {
   const renderVerseContent = (verse: number, text: string) => {
     const { mainText, footnote } = parseVerseFootnote(text);
     const verseHighlights = highlights.filter(h => 
-      (!h.book || h.book.toLowerCase() === activeBook.name.toLowerCase()) && 
+      isSameBook(h.book, activeBook.name) && 
       Number(h.chapter) === Number(activeChapter) && 
       Number(h.verse) === Number(verse)
     );
@@ -3221,21 +3333,11 @@ export default function App() {
               data-highlight-id={seg.highlight.id}
               onClick={(e) => {
                 e.stopPropagation();
-                const range = document.createRange();
-                range.selectNodeContents(e.target as Node);
-                const selection = window.getSelection();
-                selection?.removeAllRanges();
-                selection?.addRange(range);
-                
-                const rect = (e.target as HTMLElement).getBoundingClientRect();
-                setSelectionRange(range);
-                
-                let verseNumber = null;
-                const verseNode = (e.target as HTMLElement).closest('[data-verse]');
-                if (verseNode) {
-                  verseNumber = parseInt(verseNode.getAttribute('data-verse')!, 10);
-                }
-                setSelectionVerse(verseNumber);
+                const vObj = bibleVerses.find(bv => bv.verse === verse);
+                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                setSelectionVerse(verse);
+                setEndVerseNumber(verse);
+                setSelectedText(seg.text || (vObj ? parseVerseFootnote(vObj.text).mainText : ''));
                 
                 const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
                 const isNearTop = rect.top < 130;
@@ -3246,8 +3348,30 @@ export default function App() {
                   isBelow: isNearTop
                 });
               }}
-              className={`cursor-pointer rounded-sm px-0.5 ${seg.highlight.color === 'yellow' ? 'bg-yellow-500/40 text-inherit' : seg.highlight.color === 'green' ? 'bg-green-500/40 text-inherit' : seg.highlight.color === 'blue' ? 'bg-blue-500/40 text-inherit' : seg.highlight.color === 'pink' ? 'bg-pink-500/40 text-inherit' : 'bg-purple-500/40 text-inherit'}`}
-              title="Click to remove highlight"
+              onTouchEnd={(e) => {
+                e.stopPropagation();
+                const vObj = bibleVerses.find(bv => bv.verse === verse);
+                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                setSelectionVerse(verse);
+                setEndVerseNumber(verse);
+                setSelectedText(seg.text || (vObj ? parseVerseFootnote(vObj.text).mainText : ''));
+                
+                const isNearTop = rect.top < 130;
+                setToolbarPosition({
+                  x: window.innerWidth / 2,
+                  y: isNearTop ? rect.bottom + 8 : Math.max(70, rect.top - 6),
+                  highlightId: seg.highlight!.id,
+                  isBelow: isNearTop
+                });
+              }}
+              className={`theologica-highlight ${
+                seg.highlight.color === 'yellow' ? 'hl-yellow' :
+                seg.highlight.color === 'green' ? 'hl-green' :
+                seg.highlight.color === 'blue' ? 'hl-blue' :
+                seg.highlight.color === 'pink' ? 'hl-pink' :
+                'hl-purple'
+              }`}
+              title="Click to change color or remove highlight"
             >
               {renderTextWithInterlinear(seg.text, verse)}
             </mark>
@@ -3435,8 +3559,14 @@ export default function App() {
       setHighlights(prev => {
         if (prev.length === 0) return localList;
         const map = new Map<string, typeof prev[0]>();
-        localList.forEach(h => map.set(`${h.book?.toLowerCase()}:${h.chapter}:${h.verse}:${h.text}`, h));
-        prev.forEach(h => map.set(`${h.book?.toLowerCase()}:${h.chapter}:${h.verse}:${h.text}`, h));
+        localList.forEach(h => {
+          const canon = findCanonicalBook(h.book)?.code || h.book?.toLowerCase();
+          map.set(`${canon}:${h.chapter}:${h.verse}:${h.text}`, h);
+        });
+        prev.forEach(h => {
+          const canon = findCanonicalBook(h.book)?.code || h.book?.toLowerCase();
+          map.set(`${canon}:${h.chapter}:${h.verse}:${h.text}`, h);
+        });
         return Array.from(map.values());
       });
     }
@@ -3448,8 +3578,14 @@ export default function App() {
         if (isMounted && Array.isArray(data) && data.length > 0) {
           setHighlights(prev => {
             const map = new Map<string, typeof prev[0]>();
-            prev.forEach(h => map.set(`${h.book?.toLowerCase()}:${h.chapter}:${h.verse}:${h.text}`, h));
-            data.forEach(ch => map.set(`${ch.book?.toLowerCase()}:${ch.chapter}:${ch.verse}:${ch.text}`, ch));
+            prev.forEach(h => {
+              const canon = findCanonicalBook(h.book)?.code || h.book?.toLowerCase();
+              map.set(`${canon}:${h.chapter}:${h.verse}:${h.text}`, h);
+            });
+            data.forEach(ch => {
+              const canon = findCanonicalBook(ch.book)?.code || ch.book?.toLowerCase();
+              map.set(`${canon}:${ch.chapter}:${ch.verse}:${ch.text}`, ch);
+            });
             const combined = Array.from(map.values());
             saveLocalHighlights(combined);
             return combined;
@@ -4711,12 +4847,13 @@ export default function App() {
                             >
                               {showVerseNumbers && (
                                 <sup 
-                                  onClick={handleVerseNumberClick}
-                                  onTouchEnd={handleVerseNumberClick}
-                                  className={`verse-number select-none text-[11px] font-sans font-semibold mr-1 cursor-default align-baseline relative -top-0.5 inline-block shrink-0 ${
-                                    currentSpeakingVerseIndex === index ? 'text-accent' : 'text-muted/80'
+                                  onClick={(e) => handleVerseNumberClick(e, v.verse)}
+                                  onTouchEnd={(e) => handleVerseNumberClick(e, v.verse)}
+                                  className={`verse-number select-none text-[11px] font-sans font-semibold mr-1 cursor-pointer hover:text-accent hover:underline align-baseline relative -top-0.5 inline-block shrink-0 transition-all ${
+                                    currentSpeakingVerseIndex === index ? 'text-accent' : 
+                                    selectionVerse === v.verse ? 'text-accent font-bold scale-110' : 'text-muted/80'
                                   }`}
-                                  title={`Verse ${v.verse}`}
+                                  title={`Click verse ${v.verse} to highlight or study`}
                                 >
                                   {v.verse}
                                 </sup>
@@ -4768,16 +4905,17 @@ export default function App() {
                               data-verse={v.verse} 
                               className={`group relative rounded-lg py-1 px-1.5 sm:px-2 -mx-1 sm:-mx-2 transition-colors duration-200 break-words ${
                                 currentSpeakingVerseIndex === index ? 'text-accent bg-accent/5' : ''
-                              }`}
+                              } ${selectionVerse === v.verse && (!endVerseNumber || endVerseNumber === v.verse) ? 'bg-accent/10 ring-1 ring-accent/30' : ''}`}
                             >
                               {showVerseNumbers && (
                                 <sup 
-                                  onClick={handleVerseNumberClick}
-                                  onTouchEnd={handleVerseNumberClick}
-                                  className={`verse-number select-none text-[11px] font-sans font-semibold mr-1.5 cursor-default align-baseline relative -top-0.5 inline-block shrink-0 ${
-                                    currentSpeakingVerseIndex === index ? 'text-accent' : 'text-muted/80'
+                                  onClick={(e) => handleVerseNumberClick(e, v.verse)}
+                                  onTouchEnd={(e) => handleVerseNumberClick(e, v.verse)}
+                                  className={`verse-number select-none text-[11px] font-sans font-semibold mr-1.5 cursor-pointer hover:text-accent hover:underline align-baseline relative -top-0.5 inline-block shrink-0 transition-all ${
+                                    currentSpeakingVerseIndex === index ? 'text-accent' : 
+                                    selectionVerse === v.verse ? 'text-accent font-bold scale-110' : 'text-muted/80'
                                   }`}
-                                  title={`Verse ${v.verse}`}
+                                  title={`Click verse ${v.verse} to highlight or study`}
                                 >
                                   {v.verse}
                                 </sup>
@@ -5629,12 +5767,13 @@ export default function App() {
                             >
                               {showVerseNumbers && (
                                 <sup 
-                                  onClick={handleVerseNumberClick}
-                                  onTouchEnd={handleVerseNumberClick}
-                                  className={`verse-number select-none text-[11px] font-sans font-semibold mr-1 cursor-default align-baseline relative -top-0.5 inline-block shrink-0 ${
-                                    currentSpeakingVerseIndex === index ? 'text-accent' : 'text-muted/80'
+                                  onClick={(e) => handleVerseNumberClick(e, v.verse)}
+                                  onTouchEnd={(e) => handleVerseNumberClick(e, v.verse)}
+                                  className={`verse-number select-none text-[11px] font-sans font-semibold mr-1 cursor-pointer hover:text-accent hover:underline align-baseline relative -top-0.5 inline-block shrink-0 transition-all ${
+                                    currentSpeakingVerseIndex === index ? 'text-accent' : 
+                                    selectionVerse === v.verse ? 'text-accent font-bold scale-110' : 'text-muted/80'
                                   }`}
-                                  title={`Verse ${v.verse}`}
+                                  title={`Click verse ${v.verse} to highlight or study`}
                                 >
                                   {v.verse}
                                 </sup>
@@ -5686,16 +5825,17 @@ export default function App() {
                               data-verse={v.verse} 
                               className={`group relative rounded-lg py-1 px-2 -mx-2 transition-colors duration-300 break-words ${
                                 currentSpeakingVerseIndex === index ? 'text-accent bg-accent/5' : ''
-                              }`}
+                              } ${selectionVerse === v.verse && (!endVerseNumber || endVerseNumber === v.verse) ? 'bg-accent/10 ring-1 ring-accent/30' : ''}`}
                             >
                               {showVerseNumbers && (
                                 <sup 
-                                  onClick={handleVerseNumberClick}
-                                  onTouchEnd={handleVerseNumberClick}
-                                  className={`verse-number select-none text-[11px] font-sans font-semibold mr-1.5 cursor-default align-baseline relative -top-0.5 inline-block shrink-0 ${
-                                    currentSpeakingVerseIndex === index ? 'text-accent' : 'text-muted/80'
+                                  onClick={(e) => handleVerseNumberClick(e, v.verse)}
+                                  onTouchEnd={(e) => handleVerseNumberClick(e, v.verse)}
+                                  className={`verse-number select-none text-[11px] font-sans font-semibold mr-1.5 cursor-pointer hover:text-accent hover:underline align-baseline relative -top-0.5 inline-block shrink-0 transition-all ${
+                                    currentSpeakingVerseIndex === index ? 'text-accent' : 
+                                    selectionVerse === v.verse ? 'text-accent font-bold scale-110' : 'text-muted/80'
                                   }`}
-                                  title={`Verse ${v.verse}`}
+                                  title={`Click verse ${v.verse} to highlight or study`}
                                 >
                                   {v.verse}
                                 </sup>
