@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   Plus, 
   Workflow, 
@@ -88,6 +88,29 @@ export function CanvasSidebar({
     }
   };
 
+  const touchStartXRef = useRef<number | null>(null);
+  const touchStartYRef = useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      touchStartXRef.current = e.touches[0].clientX;
+      touchStartYRef.current = e.touches[0].clientY;
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartXRef.current === null || touchStartYRef.current === null) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartXRef.current;
+    const deltaY = e.changedTouches[0].clientY - touchStartYRef.current;
+
+    // Swiping right-to-left (towards the left edge) closes the left sidebar
+    if (deltaX < -45 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2) {
+      onToggle();
+    }
+    touchStartXRef.current = null;
+    touchStartYRef.current = null;
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -95,11 +118,13 @@ export function CanvasSidebar({
       {/* Mobile & Tablet backdrop overlay to tap-dismiss */}
       <div 
         onClick={onToggle}
-        className="fixed inset-0 bg-black/50 z-30 lg:hidden animate-in fade-in duration-200"
+        className="fixed inset-0 bg-black/50 z-30 lg:hidden animate-in fade-in duration-300"
         aria-hidden="true"
       />
       <aside 
-        className="fixed lg:relative inset-y-0 left-0 z-40 lg:z-20 w-72 lg:w-80 h-full shrink-0 flex flex-col border-r border-border bg-surface text-fg shadow-2xl lg:shadow-none transition-all duration-200 animate-in slide-in-from-left-4"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        className="fixed lg:relative inset-y-0 left-0 z-40 lg:z-20 w-72 lg:w-80 h-full shrink-0 flex flex-col border-r border-border bg-surface text-fg shadow-2xl lg:shadow-none transition-transform duration-300 ease-out animate-in slide-in-from-left"
       >
       {/* Sidebar Header */}
       <div className="flex items-center justify-between px-4 py-3.5 border-b border-border shrink-0">

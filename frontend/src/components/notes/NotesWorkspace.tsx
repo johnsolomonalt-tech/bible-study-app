@@ -263,6 +263,30 @@ export function NotesWorkspace({
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
+  // Mobile swipe gestures
+  const noteSwipeStartXRef = useRef<number | null>(null);
+  const noteSwipeStartYRef = useRef<number | null>(null);
+
+  const handleNoteTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      noteSwipeStartXRef.current = e.touches[0].clientX;
+      noteSwipeStartYRef.current = e.touches[0].clientY;
+    }
+  };
+
+  const handleNoteTouchEnd = (e: React.TouchEvent) => {
+    if (noteSwipeStartXRef.current === null || noteSwipeStartYRef.current === null) return;
+    const deltaX = e.changedTouches[0].clientX - noteSwipeStartXRef.current;
+    const deltaY = e.changedTouches[0].clientY - noteSwipeStartYRef.current;
+
+    // Swiping left-to-right (from left edge towards right) goes back to notes list on mobile
+    if (deltaX > 45 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2 && noteSwipeStartXRef.current < 80) {
+      handleSelectNote(null);
+    }
+    noteSwipeStartXRef.current = null;
+    noteSwipeStartYRef.current = null;
+  };
+
   const togglePin = (id: number) => {
     const updated = pinnedIds.includes(id)
       ? pinnedIds.filter(x => x !== id)
@@ -737,7 +761,7 @@ export function NotesWorkspace({
       {/* SIDEBAR: Notebooks & Notes List (Option 5) */}
       <aside 
         className={`w-full lg:w-[320px] rounded-2xl border border-border/80 bg-surface/15 flex flex-col shrink-0 h-full min-h-0 overflow-hidden shadow-xs transition-all ${
-          activeNoteId ? 'hidden lg:flex' : 'flex'
+          activeNoteId ? 'hidden lg:flex' : 'flex animate-in slide-in-from-left duration-300 ease-out'
         }`}
       >
         {/* Sidebar Header with Notes vs Backlinks vs Templates Tabs */}
@@ -846,7 +870,11 @@ export function NotesWorkspace({
       </aside>
 
       {/* MAIN SECTION: Active Note Workspace */}
-      <section className={`flex-1 flex-col bg-surface/10 rounded-2xl border border-border/80 overflow-hidden shadow-xs ${activeNoteId ? 'flex' : 'hidden lg:flex'}`}>
+      <section 
+        onTouchStart={handleNoteTouchStart}
+        onTouchEnd={handleNoteTouchEnd}
+        className={`flex-1 flex-col bg-surface/10 rounded-2xl border border-border/80 overflow-hidden shadow-xs ${activeNoteId ? 'flex animate-in slide-in-from-right duration-300 ease-out' : 'hidden lg:flex'}`}
+      >
         {activeNote ? (
           <>
             {/* Note Top Header */}

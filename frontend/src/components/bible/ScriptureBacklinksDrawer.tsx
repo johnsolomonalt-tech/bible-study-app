@@ -59,6 +59,28 @@ export function ScriptureBacklinksDrawer({
   theme,
 }: ScriptureBacklinksDrawerProps) {
   const isDark = theme === 'dark';
+  const touchStartXRef = React.useRef<number | null>(null);
+  const touchStartYRef = React.useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      touchStartXRef.current = e.touches[0].clientX;
+      touchStartYRef.current = e.touches[0].clientY;
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartXRef.current === null || touchStartYRef.current === null) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartXRef.current;
+    const deltaY = e.changedTouches[0].clientY - touchStartYRef.current;
+
+    // Swiping left-to-right (towards the right edge) closes the right drawer
+    if (deltaX > 45 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2) {
+      onClose();
+    }
+    touchStartXRef.current = null;
+    touchStartYRef.current = null;
+  };
 
   if (!isOpen) return null;
 
@@ -66,12 +88,14 @@ export function ScriptureBacklinksDrawer({
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-xs animate-in fade-in duration-300"
       onClick={onClose}
     >
       <div 
         onClick={(e) => e.stopPropagation()}
-        className={`w-full max-w-md h-full flex flex-col shadow-2xl border-l backdrop-blur-xl animate-in slide-in-from-right duration-250 ${
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        className={`w-full max-w-md h-full flex flex-col shadow-2xl border-l backdrop-blur-xl animate-in slide-in-from-right duration-300 ease-out ${
           isDark 
             ? 'bg-[#18181b]/95 border-zinc-700/80 text-zinc-100 shadow-[0_0_50px_rgba(0,0,0,0.7)]' 
             : 'bg-white/98 border-zinc-200 text-zinc-900 shadow-2xl'

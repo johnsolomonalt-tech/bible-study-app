@@ -1283,6 +1283,50 @@ export default function App() {
     chatSwipeStartYRef.current = null;
   };
 
+  // Swipe gesture detection for Mobile Study Tab (Book Selector & Study AI)
+  const studySwipeStartXRef = useRef<number | null>(null);
+  const studySwipeStartYRef = useRef<number | null>(null);
+
+  const handleBookSelectorTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      studySwipeStartXRef.current = e.touches[0].clientX;
+      studySwipeStartYRef.current = e.touches[0].clientY;
+    }
+  };
+
+  const handleBookSelectorTouchEnd = (e: React.TouchEvent) => {
+    if (studySwipeStartXRef.current === null || studySwipeStartYRef.current === null) return;
+    const deltaX = e.changedTouches[0].clientX - studySwipeStartXRef.current;
+    const deltaY = e.changedTouches[0].clientY - studySwipeStartYRef.current;
+
+    // Swiping right-to-left collapses the book selector back to reader
+    if (deltaX < -45 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2) {
+      setMobileStudyView('reader');
+    }
+    studySwipeStartXRef.current = null;
+    studySwipeStartYRef.current = null;
+  };
+
+  const handleMobileStudyAiTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      studySwipeStartXRef.current = e.touches[0].clientX;
+      studySwipeStartYRef.current = e.touches[0].clientY;
+    }
+  };
+
+  const handleMobileStudyAiTouchEnd = (e: React.TouchEvent) => {
+    if (studySwipeStartXRef.current === null || studySwipeStartYRef.current === null) return;
+    const deltaX = e.changedTouches[0].clientX - studySwipeStartXRef.current;
+    const deltaY = e.changedTouches[0].clientY - studySwipeStartYRef.current;
+
+    // Swiping left-to-right collapses the mobile Study AI back to reader
+    if (deltaX > 45 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2) {
+      setMobileStudyView('reader');
+    }
+    studySwipeStartXRef.current = null;
+    studySwipeStartYRef.current = null;
+  };
+
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [theme, setTheme] = useState('dark');
   const [accentColor, setAccentColor] = useState('#c96442');
@@ -4060,7 +4104,11 @@ export default function App() {
         {activeTab === 'study' && (
           <div className="lg:hidden flex w-full h-full">
             {/* Mobile Left Sidebar: Navigation */}
-            <aside className={`w-full border-r border-border bg-bg flex-col ${mobileStudyView === 'chapters' ? 'flex' : 'hidden'}`}>
+            <aside 
+              onTouchStart={handleBookSelectorTouchStart}
+              onTouchEnd={handleBookSelectorTouchEnd}
+              className={`w-full border-r border-border bg-bg flex-col animate-in slide-in-from-left duration-300 ease-out ${mobileStudyView === 'chapters' ? 'flex' : 'hidden'}`}
+            >
               <header className="h-[60px] border-b border-border flex items-center justify-between px-4 shrink-0 bg-bg">
                 <div className="flex items-center gap-2">
                   <button onClick={() => setMobileStudyView('reader')} className="p-2 -ml-2 text-fg-2 hover:text-fg rounded-lg hover:bg-surface cursor-pointer" title="Back to reader">
@@ -4662,7 +4710,9 @@ export default function App() {
 
             {/* Mobile Right Sidebar: Study AI */}
             <aside 
-              className={`relative w-full border-l border-border bg-bg flex-col ${mobileStudyView === 'ai' ? 'flex' : 'hidden'}`}
+              onTouchStart={handleMobileStudyAiTouchStart}
+              onTouchEnd={handleMobileStudyAiTouchEnd}
+              className={`relative w-full border-l border-border bg-bg flex-col animate-in slide-in-from-right duration-300 ease-out ${mobileStudyView === 'ai' ? 'flex' : 'hidden'}`}
               onDragEnter={handleChatDragEnter}
               onDragOver={handleChatDragOver}
               onDragLeave={handleChatDragLeave}
