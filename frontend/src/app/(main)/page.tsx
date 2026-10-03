@@ -422,35 +422,24 @@ const AiThinkingAccordion = ({ thought }: { thought: string }) => {
 
   if (!thought) return null;
 
-  const lines = thought.split('\n').filter(l => l.trim().length > 0);
-  const count = Math.max(lines.length, 1);
-
   return (
-    <div className="w-full mb-3 rounded-xl border border-border-soft/90 bg-surface/35 hover:bg-surface/60 transition-all overflow-hidden shadow-2xs">
+    <div className="w-full mb-3 rounded-xl border border-border-soft/80 bg-surface/30 hover:bg-surface/50 transition-all overflow-hidden shadow-2xs">
       <button
         type="button"
         onClick={() => setIsOpen(prev => !prev)}
-        className="w-full flex items-center justify-between px-3.5 py-2.5 text-left cursor-pointer group select-none transition-colors"
+        className="w-full flex items-center justify-between px-3 py-2 text-left cursor-pointer group select-none transition-colors"
       >
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-5 h-5 rounded-md bg-accent/15 border border-accent/30 flex items-center justify-center text-accent shrink-0">
-            <BrainCircuit size={12} />
-          </div>
-          <span className="text-[12px] font-semibold text-fg/90 group-hover:text-fg transition-colors truncate">
-            Theological Reasoning Process
-          </span>
-          <span className="text-[10px] text-accent font-medium bg-accent/10 px-1.5 py-0.5 rounded-md shrink-0">
-            {count} {count === 1 ? 'consideration' : 'considerations'}
+        <div className="flex items-center gap-2 min-w-0 text-muted group-hover:text-fg transition-colors">
+          <BrainCircuit size={13} className="text-accent/80 shrink-0" />
+          <span className="text-[12px] font-medium">
+            {isOpen ? 'Hide thinking' : 'Show thinking'}
           </span>
         </div>
-        <div className="flex items-center gap-1.5 text-muted group-hover:text-fg text-[11px] shrink-0 ml-2">
-          <span>{isOpen ? 'Collapse' : 'Show reasoning'}</span>
-          <ChevronDown size={13} className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
-        </div>
+        <ChevronDown size={13} className={`text-muted group-hover:text-fg transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {isOpen && (
-        <div className="px-4 py-3 border-t border-border-soft/60 bg-bg/50 text-[12px] leading-relaxed text-muted/95 max-h-80 overflow-y-auto custom-scroll whitespace-pre-wrap font-sans space-y-1.5 selection:bg-accent/20">
+        <div className="px-3.5 py-2.5 border-t border-border-soft/50 bg-bg/40 text-[12px] leading-relaxed text-muted/95 max-h-72 overflow-y-auto custom-scroll whitespace-pre-wrap font-sans space-y-1.5 selection:bg-accent/20">
           {thought}
         </div>
       )}
@@ -489,7 +478,7 @@ const AiThinkingIndicator = ({
         </div>
         <span className="text-[11px] font-semibold tracking-wider uppercase text-muted">Theologica AI</span>
         <span className="text-[10px] text-accent bg-accent/10 px-2 py-0.5 rounded-full font-mono font-medium animate-pulse">
-          Reasoning Active • {elapsedSec}s
+          Thinking • {elapsedSec}s
         </span>
       </div>
 
@@ -516,7 +505,7 @@ const AiThinkingIndicator = ({
               onClick={() => setShowLiveThoughts(prev => !prev)}
               className="text-[11px] text-muted hover:text-fg transition-colors flex items-center gap-1 cursor-pointer shrink-0 ml-auto"
             >
-              <span>{showLiveThoughts ? 'Hide stream' : 'Show live thoughts'}</span>
+              <span>{showLiveThoughts ? 'Hide thinking' : 'Show thinking'}</span>
               <ChevronDown size={13} className={`transition-transform duration-200 ${showLiveThoughts ? 'rotate-180' : ''}`} />
             </button>
           )}
@@ -527,7 +516,7 @@ const AiThinkingIndicator = ({
           <div className="px-4 py-3 bg-bg/60 text-[12px] leading-relaxed text-muted/90 max-h-56 overflow-y-auto custom-scroll whitespace-pre-wrap border-t border-border-soft/50 animate-in fade-in duration-150">
             <div className="flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-wider text-accent mb-1.5 select-none">
               <Sparkles size={10} />
-              <span>Real-Time Internal Exegesis & Deliberation</span>
+              <span>Thinking Process</span>
             </div>
             {thinkingText}
             <span className="inline-block w-1.5 h-3 ml-1 bg-accent animate-pulse align-middle" />
