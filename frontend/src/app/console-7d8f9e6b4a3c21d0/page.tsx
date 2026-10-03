@@ -616,7 +616,7 @@ export default function DevDashboardPage() {
   // ==========================================
   if (isUnlocked === false) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 bg-gradient-to-b from-[#141413] via-[#1a1a19] to-[#141413]">
+      <div className="flex-1 min-h-full w-full flex flex-col items-center justify-center p-4 sm:p-6 bg-gradient-to-b from-[#141413] via-[#1a1a19] to-[#141413]">
         <div className="w-full max-w-md bg-[#232321] border border-[#3d3d3a] rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden backdrop-blur-md">
           {/* Subtle Accent Glow */}
           <div className="absolute -top-24 -right-24 w-48 h-48 bg-accent/15 rounded-full blur-3xl pointer-events-none" />
@@ -726,7 +726,7 @@ export default function DevDashboardPage() {
   // VIEW: 2. Full Developer Portal Dashboard
   // ==========================================
   return (
-    <div className="flex-1 flex flex-col min-h-screen bg-[var(--bg)] text-[var(--fg)]">
+    <div className="flex-1 flex flex-col w-full min-h-full bg-[var(--bg)] text-[var(--fg)]">
       {/* Top Developer Navigation Header */}
       <header className="sticky top-0 z-40 bg-[var(--bg)]/90 backdrop-blur-md border-b border-[var(--border)] px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
         {/* Left Branding */}
@@ -839,7 +839,7 @@ export default function DevDashboardPage() {
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6 sm:space-y-8">
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 pb-20 space-y-6 sm:space-y-8">
         {/* Navigation Tabs */}
         <div className="flex border-b border-[var(--border)] gap-2 sm:gap-6 text-sm font-medium overflow-x-auto no-scrollbar">
           <button

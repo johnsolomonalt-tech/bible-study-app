@@ -22,7 +22,7 @@ export default async function DevLayout({
   const { userId } = await auth();
   if (!userId) {
     return (
-      <div className="min-h-screen w-full bg-[var(--bg)] text-[var(--fg)] flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen h-dvh max-h-dvh w-full bg-[var(--bg)] text-[var(--fg)] flex flex-col items-center justify-center p-4 overflow-y-auto custom-scroll">
         <div className="w-full max-w-md bg-[var(--surface)] border border-[var(--border)] rounded-3xl p-6 sm:p-8 shadow-2xl text-center space-y-6">
           <div className="w-14 h-14 rounded-2xl bg-accent/15 border border-accent/30 text-accent flex items-center justify-center mx-auto">
             <Shield className="w-7 h-7" />
@@ -56,7 +56,7 @@ export default async function DevLayout({
   const authorized = await isAuthorizedAdmin(userId, primaryEmail);
   if (!authorized) {
     return (
-      <div className="min-h-screen w-full bg-[var(--bg)] text-[var(--fg)] flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen h-dvh max-h-dvh w-full bg-[var(--bg)] text-[var(--fg)] flex flex-col items-center justify-center p-4 overflow-y-auto custom-scroll">
         <div className="w-full max-w-md bg-[var(--surface)] border border-red-500/20 rounded-3xl p-6 sm:p-8 shadow-2xl text-center space-y-5">
           <div className="w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 flex items-center justify-center mx-auto">
             <ShieldAlert className="w-7 h-7" />
@@ -88,7 +88,7 @@ export default async function DevLayout({
   }
 
   return (
-    <div className="min-h-screen w-full bg-[var(--bg)] text-[var(--fg)] flex flex-col font-sans selection:bg-accent/30 selection:text-white">
+    <div className="h-dvh max-h-dvh w-full bg-[var(--bg)] text-[var(--fg)] flex flex-col font-sans selection:bg-accent/30 selection:text-white overflow-y-auto overflow-x-hidden custom-scroll">
       {children}
     </div>
   );
