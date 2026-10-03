@@ -6,16 +6,15 @@ import {
   Award, 
   Target, 
   BookOpen, 
-  Heart, 
   Sun, 
   Check, 
   Calendar, 
   TrendingUp, 
-  ChevronRight,
-  ShieldCheck,
-  Sparkles,
-  Sliders,
-  RefreshCw
+  ChevronRight, 
+  ShieldCheck, 
+  Sparkles, 
+  Sliders, 
+  RefreshCw 
 } from 'lucide-react';
 import { 
   getStreakData, 
@@ -30,7 +29,6 @@ export interface TrackerStreakHeroProps {
   dailyChapterGoal: number;
   totalChaptersCompleted: number;
   onNavigateToTab: (tab: string) => void;
-  onOpenPrayerSanctuary: () => void;
   onUpdateDailyChapterGoal?: (goal: number) => void;
 }
 
@@ -38,7 +36,6 @@ export function TrackerStreakHero({
   dailyChapterGoal,
   totalChaptersCompleted,
   onNavigateToTab,
-  onOpenPrayerSanctuary,
   onUpdateDailyChapterGoal,
 }: TrackerStreakHeroProps) {
   const [streakData, setStreakData] = useState<StreakData>(getStreakData());
@@ -296,15 +293,6 @@ export function TrackerStreakHero({
             >
               <Sun size={13} className="text-amber-500" />
               <span>Today’s Devotional</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={onOpenPrayerSanctuary}
-              className="px-3 py-1.5 rounded-xl bg-surface hover:bg-surface-hover text-fg text-xs font-semibold border border-border transition-colors cursor-pointer flex items-center gap-1.5"
-            >
-              <Heart size={13} className="text-rose-500" />
-              <span>Prayer Sanctuary</span>
             </button>
           </div>
         </div>

@@ -9,7 +9,6 @@ import {
   Award, 
   BookOpen, 
   Sun, 
-  Heart, 
   Check, 
   Sparkles,
   Calendar,
@@ -32,12 +31,10 @@ import { SetMilestoneModal } from './SetMilestoneModal';
 
 export interface StreakPopoverProps {
   onNavigateToTab: (tab: string) => void;
-  onOpenPrayerSanctuary: () => void;
 }
 
 export function StreakPopover({
   onNavigateToTab,
-  onOpenPrayerSanctuary,
 }: StreakPopoverProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [streakData, setStreakData] = useState<StreakData>(getStreakData());
@@ -339,35 +336,6 @@ export function StreakPopover({
                           className="px-3 py-1.5 rounded-xl bg-surface hover:bg-surface-hover text-fg text-xs font-semibold border border-border transition-colors cursor-pointer flex items-center gap-1"
                         >
                           <span>{streakData.todayGoals.devotional ? 'Revisit' : 'Open'}</span>
-                          <ChevronRight size={14} />
-                        </button>
-                      </div>
-
-                      {/* 3. Prayer Sanctuary */}
-                      <div className="p-3.5 rounded-2xl bg-bg border border-border flex items-center justify-between gap-3 group hover:border-border-soft transition-all">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                            streakData.todayGoals.prayer 
-                              ? 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/30'
-                              : 'bg-surface text-muted border border-border'
-                          }`}>
-                            {streakData.todayGoals.prayer ? <Check size={18} /> : <Heart size={18} />}
-                          </div>
-                          <div>
-                            <div className="text-xs sm:text-sm font-bold text-fg">Prayer &amp; Quiet Time</div>
-                            <p className="text-[11px] text-muted">Reflect, petition, or praise</p>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsOpen(false);
-                            onOpenPrayerSanctuary();
-                          }}
-                          className="px-3 py-1.5 rounded-xl bg-surface hover:bg-surface-hover text-fg text-xs font-semibold border border-border transition-colors cursor-pointer flex items-center gap-1"
-                        >
-                          <span>{streakData.todayGoals.prayer ? 'Pray More' : 'Pray'}</span>
                           <ChevronRight size={14} />
                         </button>
                       </div>

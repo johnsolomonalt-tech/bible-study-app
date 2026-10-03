@@ -55,7 +55,6 @@ import { SettingsModal } from '@/components/settings/SettingsModal';
 import { initSessionTracking, trackClientEvent } from '@/lib/analyticsClient';
 import { NotesWorkspace, NoteItem } from '@/components/notes/NotesWorkspace';
 import { StreakPopover } from '@/components/bible/StreakPopover';
-import { PrayerSanctuaryModal } from '@/components/bible/PrayerSanctuaryModal';
 import { TrackerStreakHero } from '@/components/bible/TrackerStreakHero';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { PromptModal } from '@/components/ui/PromptModal';
@@ -64,7 +63,6 @@ import {
   unmarkChapterActivity,
   registerStreakSyncCallback 
 } from '@/lib/streakService';
-import { registerPrayerSyncCallback } from '@/lib/prayerService';
 import { 
   pullStreakFromAccount, 
   queueStreakPush 
@@ -762,8 +760,7 @@ export default function App() {
     chatTitle?: string;
   } | null>(null);
 
-  // Streak & Prayer Sanctuary State
-  const [isPrayerSanctuaryOpen, setIsPrayerSanctuaryOpen] = useState(false);
+  // Streak & Confirmation State
   const [chatToDelete, setChatToDelete] = useState<{ id: number; title: string } | null>(null);
   const [chatToRename, setChatToRename] = useState<{ id: number; title: string } | null>(null);
   const [noteToRename, setNoteToRename] = useState<{ id: number; title: string; content: string } | null>(null);
@@ -785,9 +782,6 @@ export default function App() {
     }
     if (activeTab === 'devotional') {
       recordHabitActivity('devotional');
-    }
-    if (activeTab === 'prayer') {
-      recordHabitActivity('prayer');
     }
   }, [activeTab]);
   
@@ -1611,8 +1605,12 @@ export default function App() {
     if (!headerEl) return;
 
     const measureWidths = () => {
-      if (headerEl) {
-        setReaderHeaderWidth(headerEl.getBoundingClientRect().width);
+      const containerEl = headerEl.parentElement || headerEl;
+      if (containerEl) {
+        const rect = containerEl.getBoundingClientRect();
+        if (rect.width > 0) {
+          setReaderHeaderWidth(rect.width);
+        }
       }
       if (readerTitleRef.current) {
         setReaderTitleWidth(readerTitleRef.current.getBoundingClientRect().width);
@@ -1623,7 +1621,7 @@ export default function App() {
 
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        if (entry.target === headerEl && entry.contentRect.width > 0) {
+        if ((entry.target === headerEl || entry.target === headerEl.parentElement) && entry.contentRect.width > 0) {
           setReaderHeaderWidth(entry.contentRect.width);
         } else if (entry.target === readerTitleRef.current && entry.contentRect.width > 0) {
           setReaderTitleWidth(entry.contentRect.width);
@@ -1632,6 +1630,9 @@ export default function App() {
     });
 
     observer.observe(headerEl);
+    if (headerEl.parentElement) {
+      observer.observe(headerEl.parentElement);
+    }
     if (readerTitleRef.current) {
       observer.observe(readerTitleRef.current);
     }
@@ -1639,29 +1640,29 @@ export default function App() {
   }, [activeTab, showLeftSidebar, showRightSidebar, activeBook.name, activeChapter]);
 
   // Available space for right-side study tools:
-  // Reader header width minus title width, horizontal padding (~48px), and safety margin (24px)
-  const availableToolsWidth = Math.max(0, readerHeaderWidth - readerTitleWidth - 72);
+  // Reader header width minus title width, horizontal padding (~48px), and safety margin (16px)
+  const availableToolsWidth = Math.max(0, readerHeaderWidth - readerTitleWidth - 64);
 
   // Progressive study tools collapse thresholds: ONLY collapse when ACTUALLY cramped!
   //
   // Widths of tools:
-  // Base controls (volume button ~38px, divider ~13px, translation selector ~65px, gaps ~16px) = ~132px
-  // 1. Backlinks (~100px) -> First to collapse into 3 dots
-  // 2. Lectio (~80px) -> Second to collapse into 3 dots
-  // 3. Interlinear (~105px) -> Third to collapse into 3 dots
+  // Base controls (volume button ~38px, divider ~13px, translation selector ~70px, gaps ~16px) = ~137px
+  // 3-dots button (when active) = ~38px -> Base with 3-dots = ~175px
+  // 1. Backlinks (~115px) -> First to collapse into 3 dots
+  // 2. Lectio (~85px) -> Second to collapse into 3 dots
+  // 3. Interlinear (~110px) -> Third to collapse into 3 dots
   // 4. Mark Complete (~140px) -> Fourth/last to collapse into 3 dots
-  // 3-dots button (when active) = ~38px
   //
   // Cumulative needed widths:
-  // All 4 tools: 132 + 140 + 105 + 80 + 100 + gaps ~40 = ~597px (round to 605px)
-  // 3 tools (without Backlinks): 132 + 140 + 105 + 80 + 38 + gaps ~30 = ~505px (round to 510px)
-  // 2 tools (without Lectio): 132 + 140 + 105 + 38 + gaps ~20 = ~415px (round to 425px)
-  // 1 tool (without Interlinear): 132 + 140 + 38 + gaps ~10 = ~310px (round to 320px)
-  // 0 tools (all in 3 dots): 132 + 38 = 170px
-  const showBacklinksInBar = availableToolsWidth >= 605;
-  const showLectioInBar = availableToolsWidth >= 510;
-  const showInterlinearInBar = availableToolsWidth >= 425;
-  const showMarkCompleteInBar = availableToolsWidth >= 320;
+  // All 4 tools: 137 + 140 + 110 + 85 + 115 + gaps ~35 = ~622px (threshold: 625px)
+  // 3 tools (without Backlinks): 175 + 140 + 110 + 85 + gaps ~25 = ~535px (threshold: 535px)
+  // 2 tools (without Lectio): 175 + 140 + 110 + gaps ~16 = ~441px (threshold: 445px)
+  // 1 tool (without Interlinear): 175 + 140 + gaps ~8 = ~323px (threshold: 330px)
+  // 0 tools (all in 3 dots): ~175px
+  const showBacklinksInBar = availableToolsWidth >= 625;
+  const showLectioInBar = availableToolsWidth >= 535;
+  const showInterlinearInBar = availableToolsWidth >= 445;
+  const showMarkCompleteInBar = availableToolsWidth >= 330;
   const hasCollapsedStudyTools = !showBacklinksInBar || !showLectioInBar || !showInterlinearInBar || !showMarkCompleteInBar;
 
   // Outside click handler for desktop 3-dots study options menu
@@ -2216,12 +2217,8 @@ export default function App() {
   useEffect(() => {
     initSessionTracking(userId);
 
-    // Register sync callbacks so habit & prayer activities immediately push to account
+    // Register sync callbacks so habit activities immediately push to account
     registerStreakSyncCallback(() => {
-      queueStreakPush(fetchWithAuth, dailyChapterGoalRef.current, 200);
-    });
-
-    registerPrayerSyncCallback(() => {
       queueStreakPush(fetchWithAuth, dailyChapterGoalRef.current, 200);
     });
 
@@ -2245,7 +2242,7 @@ export default function App() {
       setCompletedChapters(data.map((item: {chapterId: string}) => item.chapterId));
     });
 
-    // 1. Initial Pull: syncs streaks, habits, reading pace, and prayers from account
+    // 1. Initial Pull: syncs streaks, habits, reading pace from account
     pullStreakFromAccount(fetchWithAuth, dailyChapterGoalRef.current).then(res => {
       if (res?.dailyChapterGoal && typeof res.dailyChapterGoal === 'number' && res.dailyChapterGoal > 0) {
         setDailyChapterGoal(res.dailyChapterGoal);
@@ -2276,7 +2273,6 @@ export default function App() {
 
     return () => {
       registerStreakSyncCallback(null);
-      registerPrayerSyncCallback(null);
       window.removeEventListener('focus', handleAccountSyncOnActive);
       document.removeEventListener('visibilitychange', handleAccountSyncOnActive);
       window.removeEventListener('online', handleAccountSyncOnActive);
@@ -3824,7 +3820,7 @@ export default function App() {
         <header className="sticky top-0 z-30 min-h-14 h-[calc(3.5rem+env(safe-area-inset-top,0px))] border-b border-border flex items-center justify-between px-4 sm:px-6 bg-bg shrink-0" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         
         {/* Left: Logo */}
-        <div className="flex-1 flex items-center min-w-0 gap-3">
+        <div className="flex items-center gap-2.5 shrink-0">
           <div className="font-display text-[20px] tracking-tight flex items-center gap-2.5 select-none shrink-0">
             <div className="relative w-8 h-8 rounded-xl overflow-hidden shadow-xs shrink-0 flex items-center justify-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -3834,7 +3830,7 @@ export default function App() {
                 className="w-full h-full object-contain filter contrast-105" 
               />
             </div>
-            <span className="font-serif text-[22px] font-bold tracking-tight text-[#c96442]">
+            <span className="font-serif text-[22px] font-bold tracking-tight text-[#c96442] hidden sm:inline">
               Theologica
             </span>
           </div>
@@ -3843,43 +3839,48 @@ export default function App() {
         {/* Center: Tabs (Desktop) */}
         <nav 
           aria-label="Navigation Tabs"
-          className="hidden lg:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 items-center gap-1 p-1 bg-surface border border-border-soft/60 rounded-xl shadow-xs select-none"
+          className="hidden lg:flex items-center gap-0.5 xl:gap-1 p-1 bg-surface border border-border-soft/60 rounded-xl shadow-xs select-none mx-auto shrink-0"
         >
-          {['study', 'canvas', 'prayer', 'devotional', 'notes', 'chats', 'tracker'].map(tab => (
-            <button 
-              key={tab} 
-              onClick={() => {
-                setActiveTab(tab);
-                if (tab === 'notes') {
-                  setActiveNoteId(null);
-                }
-                if (tab === 'canvas') {
-                  setCanvasFocusTrigger(prev => prev + 1);
-                }
-                if (tab === 'chats') {
-                  setMobileChatView('chat');
-                }
-              }}
-              className={`px-2.5 xl:px-3 py-1 rounded-lg text-xs xl:text-[13px] font-medium transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-                activeTab === tab 
-                  ? 'bg-bg text-fg shadow-xs border border-border-soft/60 font-semibold' 
-                  : 'text-fg-2 hover:text-fg hover:bg-surface-hover/60 border border-transparent'
-              }`}
-            >
-              {tab === 'study' && <Layout size={14} className={activeTab === tab ? 'text-accent' : ''} />}
-              {tab === 'canvas' && <Workflow size={14} className={activeTab === tab ? 'text-accent' : ''} />}
-              {tab === 'prayer' && <Heart size={14} className={activeTab === tab ? 'text-accent' : ''} />}
-              {tab === 'devotional' && <BookOpen size={14} className={activeTab === tab ? 'text-accent' : ''} />}
-              {tab === 'notes' && <Edit size={14} className={activeTab === tab ? 'text-accent' : ''} />}
-              {tab === 'chats' && <Sparkles size={14} className={activeTab === tab ? 'text-accent' : ''} />}
-              {tab === 'tracker' && <Target size={14} className={activeTab === tab ? 'text-accent' : ''} />}
-              <span className="capitalize">{tab === 'chats' ? 'AI Chats' : tab}</span>
-            </button>
-          ))}
+          {['study', 'canvas', 'devotional', 'notes', 'chats', 'tracker'].map(tab => {
+            const label = tab === 'chats' ? 'AI Chats' : tab.charAt(0).toUpperCase() + tab.slice(1);
+            return (
+              <button 
+                key={tab} 
+                onClick={() => {
+                  setActiveTab(tab);
+                  if (tab === 'notes') {
+                    setActiveNoteId(null);
+                  }
+                  if (tab === 'canvas') {
+                    setCanvasFocusTrigger(prev => prev + 1);
+                  }
+                  if (tab === 'chats') {
+                    setMobileChatView('chat');
+                  }
+                }}
+                title={label}
+                className={`px-2 xl:px-2.5 2xl:px-3 py-1 rounded-lg text-xs xl:text-[13px] font-medium transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  activeTab === tab 
+                    ? 'bg-bg text-fg shadow-xs border border-border-soft/60 font-semibold' 
+                    : 'text-fg-2 hover:text-fg hover:bg-surface-hover/60 border border-transparent'
+                }`}
+              >
+                {tab === 'study' && <Layout size={14} className={activeTab === tab ? 'text-accent' : ''} />}
+                {tab === 'canvas' && <Workflow size={14} className={activeTab === tab ? 'text-accent' : ''} />}
+                {tab === 'devotional' && <BookOpen size={14} className={activeTab === tab ? 'text-accent' : ''} />}
+                {tab === 'notes' && <Edit size={14} className={activeTab === tab ? 'text-accent' : ''} />}
+                {tab === 'chats' && <Sparkles size={14} className={activeTab === tab ? 'text-accent' : ''} />}
+                {tab === 'tracker' && <Target size={14} className={activeTab === tab ? 'text-accent' : ''} />}
+                <span className={activeTab === tab ? "inline capitalize" : "hidden 2xl:inline capitalize"}>
+                  {tab === 'chats' ? 'AI Chats' : tab}
+                </span>
+              </button>
+            );
+          })}
         </nav>
         
-        {/* Right: Panel Toggles, Streak, Prayer, Settings & Clerk UserButton */}
-        <div className="flex-1 flex justify-end items-center gap-2 sm:gap-3">
+        {/* Right: Panel Toggles, Streak, Settings & Clerk UserButton */}
+        <div className="flex justify-end items-center gap-1.5 sm:gap-2.5 shrink-0">
           {/* Collapsible Panel Toggles - Book Selector, Quick Note, Study AI */}
           {activeTab === 'study' && (
             <div className="hidden lg:flex items-center bg-surface border border-border-soft/60 rounded-lg p-0.5 shrink-0">
@@ -3921,17 +3922,7 @@ export default function App() {
 
           <StreakPopover 
             onNavigateToTab={setActiveTab} 
-            onOpenPrayerSanctuary={() => setIsPrayerSanctuaryOpen(true)} 
           />
-          <button 
-            type="button"
-            onClick={() => setIsPrayerSanctuaryOpen(true)} 
-            className="text-muted hover:text-rose-500 transition-colors p-1.5 rounded-xl hover:bg-surface flex items-center justify-center cursor-pointer" 
-            title="Prayer Sanctuary"
-            aria-label="Prayer Sanctuary"
-          >
-            <Heart size={18} />
-          </button>
           <button onClick={() => setIsSettingsOpen(true)} className="text-muted hover:text-fg transition-colors p-1.5 rounded-lg hover:bg-surface cursor-pointer" title="Settings">
             <Settings size={18} />
           </button>
@@ -5094,12 +5085,12 @@ export default function App() {
             )}
 
             {/* Center: Bible Reader */}
-            <Panel defaultSize="60" minSize="30" className={`w-full lg:w-auto flex-col h-full bg-bg ${mobileStudyView === 'reader' ? 'flex' : 'hidden lg:flex'}`}>
+            <Panel defaultSize="60" minSize="30" className={`w-full lg:w-auto flex-col h-full bg-bg min-w-0 ${mobileStudyView === 'reader' ? 'flex' : 'hidden lg:flex'}`}>
               <PanelGroup orientation="vertical" id="theologica-layout-vertical-v2">
-                <Panel defaultSize="75" minSize="30" className="flex flex-col relative">
+                <Panel defaultSize="75" minSize="30" className="flex flex-col relative min-w-0">
                   <header 
                     ref={readerHeaderRef}
-                    className="h-[60px] border-b border-border flex items-center justify-between px-3 sm:px-4 lg:px-6 bg-bg shrink-0 gap-2 relative z-20"
+                    className="w-full max-w-full min-w-0 h-[60px] border-b border-border flex items-center justify-between px-3 sm:px-4 lg:px-6 bg-bg shrink-0 gap-2 relative z-20"
                   >
                     <div ref={readerTitleRef} className="flex items-center gap-1.5 min-w-0 shrink-0 z-1">
                       <div className="font-display text-[16px] sm:text-[18px] lg:text-[20px] font-semibold whitespace-nowrap shrink-0">{activeBook.name} {activeChapter}</div>
@@ -5171,10 +5162,6 @@ export default function App() {
                         </button>
                       )}
 
-                      <button onClick={toggleSpeech} className="flex items-center justify-center p-2 min-w-[38px] min-h-[38px] rounded-lg text-fg-2 hover:text-fg hover:bg-surface transition-colors cursor-pointer touch-manipulation shrink-0" title="Read chapter aloud">
-                        {isSpeaking ? <VolumeX size={18} className="text-accent" /> : <Volume2 size={18} />}
-                      </button>
-                      
                       {/* Desktop 3-dots more menu: visible when study tools collapse */}
                       {hasCollapsedStudyTools && (
                         <div ref={desktopMoreMenuRef} className="relative z-30 desktop-more-menu-container shrink-0">
@@ -5286,6 +5273,11 @@ export default function App() {
                           )}
                         </div>
                       )}
+
+                      {/* Always Visible Audio Button */}
+                      <button onClick={toggleSpeech} className="flex items-center justify-center p-2 min-w-[38px] min-h-[38px] rounded-lg text-fg-2 hover:text-fg hover:bg-surface transition-colors cursor-pointer touch-manipulation shrink-0" title="Read chapter aloud">
+                        {isSpeaking ? <VolumeX size={18} className="text-accent" /> : <Volume2 size={18} />}
+                      </button>
 
                       <div className="hidden lg:block h-5 w-px bg-border/60 shrink-0"></div>
                       
@@ -6495,7 +6487,6 @@ export default function App() {
                   dailyChapterGoal={dailyChapterGoal}
                   totalChaptersCompleted={completedCount}
                   onNavigateToTab={setActiveTab}
-                  onOpenPrayerSanctuary={() => setIsPrayerSanctuaryOpen(true)}
                   onUpdateDailyChapterGoal={handleDailyChapterGoalChange}
                 />
 
@@ -6679,22 +6670,6 @@ export default function App() {
         )}
 
 
-        {/* PRAYER TAB */}
-        {activeTab === 'prayer' && (
-          <div className="flex-1 w-full h-full relative overflow-hidden flex flex-col bg-bg">
-            <PrayerSanctuaryModal
-              isOpen={true}
-              onClose={() => setActiveTab('study')}
-              currentVerseReference={`${activeBook.name} ${activeChapter}:${selectionVerse || 1}`}
-              currentVerseText={bibleVerses.find(v => v.verse === selectionVerse)?.text || bibleVerses[0]?.text || ''}
-              currentChapterReference={`${activeBook.name} ${activeChapter}`}
-              chapterVerses={bibleVerses}
-              onNavigateToScripture={navigateToVerse}
-              isStandaloneTab={true}
-            />
-          </div>
-        )}
-
         {/* CANVAS TAB */}
         <div className={`flex-1 w-full h-full relative overflow-hidden ${activeTab === 'canvas' ? 'flex flex-col' : 'hidden'}`}>
           <CanvasBoard
@@ -6715,7 +6690,7 @@ export default function App() {
           }`}
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
-          {['study', 'canvas', 'prayer', 'devotional', 'notes', 'chats', 'tracker'].map(tab => {
+          {['study', 'canvas', 'devotional', 'notes', 'chats', 'tracker'].map(tab => {
             const isActive = activeTab === tab;
             return (
               <button 
@@ -6742,14 +6717,13 @@ export default function App() {
                 <div className="relative">
                   {tab === 'study' && <Layout size={19} className="mb-0.5" />}
                   {tab === 'canvas' && <Workflow size={19} className="mb-0.5" />}
-                  {tab === 'prayer' && <Heart size={19} className="mb-0.5" />}
                   {tab === 'devotional' && <BookOpen size={19} className="mb-0.5" />}
                   {tab === 'notes' && <Edit size={19} className="mb-0.5" />}
                   {tab === 'chats' && <Sparkles size={19} className="mb-0.5" />}
                   {tab === 'tracker' && <Target size={19} className="mb-0.5" />}
                 </div>
                 <span className="text-[10px] tracking-tight capitalize truncate max-w-full px-0.5">
-                  {tab === 'chats' ? 'Chats' : tab === 'devotional' ? 'Devotion' : tab === 'prayer' ? 'Prayer' : tab}
+                  {tab === 'chats' ? 'Chats' : tab === 'devotional' ? 'Devotion' : tab}
                 </span>
               </button>
             );
@@ -6834,17 +6808,6 @@ export default function App() {
             }
             e.target.value = '';
           }}
-        />
-
-        {/* Prayer Sanctuary Modal */}
-        <PrayerSanctuaryModal
-          isOpen={isPrayerSanctuaryOpen}
-          onClose={() => setIsPrayerSanctuaryOpen(false)}
-          currentVerseReference={`${activeBook.name} ${activeChapter}:${selectionVerse || 1}`}
-          currentVerseText={bibleVerses.find(v => v.verse === selectionVerse)?.text || bibleVerses[0]?.text || ''}
-          currentChapterReference={`${activeBook.name} ${activeChapter}`}
-          chapterVerses={bibleVerses}
-          onNavigateToScripture={navigateToVerse}
         />
 
         {/* AI Chat Delete Confirmation Modal */}
