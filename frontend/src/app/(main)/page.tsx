@@ -3839,7 +3839,7 @@ export default function App() {
         {/* Center: Tabs (Desktop) */}
         <nav 
           aria-label="Navigation Tabs"
-          className="hidden lg:flex items-center gap-0.5 xl:gap-1 p-1 bg-surface border border-border-soft/60 rounded-xl shadow-xs select-none mx-auto shrink-0"
+          className="hidden lg:flex items-center gap-1 p-1 bg-surface border border-border-soft/60 rounded-xl shadow-xs select-none mx-auto shrink-0"
         >
           {['study', 'canvas', 'devotional', 'notes', 'chats', 'tracker'].map(tab => {
             const label = tab === 'chats' ? 'AI Chats' : tab.charAt(0).toUpperCase() + tab.slice(1);
@@ -3859,7 +3859,7 @@ export default function App() {
                   }
                 }}
                 title={label}
-                className={`px-2 xl:px-2.5 2xl:px-3 py-1 rounded-lg text-xs xl:text-[13px] font-medium transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                className={`px-2.5 xl:px-3 py-1 rounded-lg text-xs xl:text-[13px] font-medium transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                   activeTab === tab 
                     ? 'bg-bg text-fg shadow-xs border border-border-soft/60 font-semibold' 
                     : 'text-fg-2 hover:text-fg hover:bg-surface-hover/60 border border-transparent'
@@ -3871,9 +3871,7 @@ export default function App() {
                 {tab === 'notes' && <Edit size={14} className={activeTab === tab ? 'text-accent' : ''} />}
                 {tab === 'chats' && <Sparkles size={14} className={activeTab === tab ? 'text-accent' : ''} />}
                 {tab === 'tracker' && <Target size={14} className={activeTab === tab ? 'text-accent' : ''} />}
-                <span className={activeTab === tab ? "inline capitalize" : "hidden 2xl:inline capitalize"}>
-                  {tab === 'chats' ? 'AI Chats' : tab}
-                </span>
+                <span className="capitalize">{tab === 'chats' ? 'AI Chats' : tab}</span>
               </button>
             );
           })}
