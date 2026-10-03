@@ -13,17 +13,21 @@ export async function GET(request: Request) {
   const book = searchParams.get('book');
   const chapter = searchParams.get('chapter');
   
-  if (!book || !chapter) {
-    return NextResponse.json({ error: 'Book and chapter are required' }, { status: 400 });
-  }
-  
   try {
+    const where: any = { userId };
+    if (book) {
+      where.book = {
+        equals: book,
+        mode: 'insensitive',
+      };
+    }
+    if (chapter) {
+      where.chapter = parseInt(chapter, 10);
+    }
+
     const highlights = await prisma.highlight.findMany({
-      where: {
-        userId,
-        book,
-        chapter: parseInt(chapter, 10),
-      }
+      where,
+      orderBy: { createdAt: 'asc' }
     });
     return NextResponse.json(highlights);
   } catch (error) {

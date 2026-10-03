@@ -1157,7 +1157,9 @@ export default function App() {
     const y = isNearTop ? e.clientY + 24 : e.clientY - 12;
 
     const existingHighlight = highlights.find(
-      h => h.book === activeBook.name && h.chapter === activeChapter && h.verse === verseNum
+      h => (!h.book || h.book.toLowerCase() === activeBook.name.toLowerCase()) &&
+           Number(h.chapter) === Number(activeChapter) &&
+           Number(h.verse) === Number(verseNum)
     );
 
     setToolbarPosition({
@@ -2327,6 +2329,27 @@ export default function App() {
       queueStreakPush(fetchWithAuth, dailyChapterGoalRef.current, 200);
     });
 
+    // Load local highlights immediately, then sync all user highlights from account
+    const localHls = getLocalHighlights();
+    if (localHls.length > 0) {
+      setHighlights(localHls);
+    }
+    fetchWithAuth(`${API_URL}/api/highlights`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (Array.isArray(data)) {
+          setHighlights(prev => {
+            const map = new Map<string, typeof prev[0]>();
+            prev.forEach(h => map.set(`${h.book?.toLowerCase()}:${h.chapter}:${h.verse}:${h.text}`, h));
+            data.forEach(ch => map.set(`${ch.book?.toLowerCase()}:${ch.chapter}:${ch.verse}:${ch.text}`, ch));
+            const merged = Array.from(map.values());
+            saveLocalHighlights(merged);
+            return merged;
+          });
+        }
+      })
+      .catch(e => console.warn("Using local highlights cache", e));
+
     fetchWithAuth(`${API_URL}/api/notes`).then(r => r.json()).then(data => {
       setNotes(data);
     });
@@ -2441,7 +2464,7 @@ export default function App() {
   // Highlighting & Drag Selection Logic
   const handleSelection = useCallback(() => {
     const selection = window.getSelection();
-    if (!selection || selection.isCollapsed) {
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
       return;
     }
     const rawText = selection.toString().trim();
@@ -2452,19 +2475,59 @@ export default function App() {
     const rect = range.getBoundingClientRect();
     if (rect.width === 0 && rect.height === 0) return;
     
-    // Find the verse this selection belongs to by looking at parent elements
-    const getVerseFromNode = (n: Node | null): number | null => {
+    // Find the verse this selection belongs to by looking at parent elements or children
+    const getVerseFromNode = (n: Node | null, offset?: number): number | null => {
       if (!n) return null;
-      const el = n.nodeType === Node.ELEMENT_NODE ? (n as HTMLElement) : n.parentElement;
-      const verseEl = el?.closest('[data-verse]');
-      if (!verseEl) return null;
-      const v = verseEl.getAttribute('data-verse');
-      return v ? parseInt(v, 10) : null;
+      if (n.nodeType === Node.ELEMENT_NODE) {
+        const el = n as HTMLElement;
+        const direct = el.closest('[data-verse]');
+        if (direct) {
+          const v = direct.getAttribute('data-verse');
+          if (v) return parseInt(v, 10);
+        }
+        if (typeof offset === 'number' && el.childNodes.length > 0) {
+          const childIdx = Math.min(Math.max(0, offset), el.childNodes.length - 1);
+          const child = el.childNodes[childIdx];
+          if (child) {
+            const childEl = child.nodeType === Node.ELEMENT_NODE ? (child as HTMLElement) : child.parentElement;
+            const childVerse = childEl?.closest('[data-verse]');
+            if (childVerse) {
+              const v = childVerse.getAttribute('data-verse');
+              if (v) return parseInt(v, 10);
+            }
+          }
+        }
+      } else if (n.parentElement) {
+        const direct = n.parentElement.closest('[data-verse]');
+        if (direct) {
+          const v = direct.getAttribute('data-verse');
+          if (v) return parseInt(v, 10);
+        }
+      }
+      return null;
     };
 
-    let startVerse = getVerseFromNode(range.startContainer);
-    let endVerse = getVerseFromNode(range.endContainer) || startVerse;
+    let startVerse = getVerseFromNode(range.startContainer, range.startOffset);
+    let endVerse = getVerseFromNode(range.endContainer, range.endOffset) || startVerse;
     if (!startVerse && endVerse) startVerse = endVerse;
+
+    if (!startVerse) {
+      const ancestorEl = range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
+        ? (range.commonAncestorContainer as HTMLElement)
+        : range.commonAncestorContainer.parentElement;
+      if (ancestorEl) {
+        const versesInside = ancestorEl.querySelectorAll('[data-verse]');
+        for (let i = 0; i < versesInside.length; i++) {
+          if (selection.containsNode(versesInside[i], true)) {
+            const v = parseInt(versesInside[i].getAttribute('data-verse') || '', 10);
+            if (!isNaN(v)) {
+              if (!startVerse) startVerse = v;
+              endVerse = v;
+            }
+          }
+        }
+      }
+    }
     
     if (startVerse) {
       const actualStart = Math.min(startVerse, endVerse || startVerse);
@@ -2608,53 +2671,98 @@ export default function App() {
       return;
     }
     
-    let text = cleanVerseText(rawText, selectionVerse, endVerseNumber || selectionVerse);
-    
-    // Fallback protection: if they try to highlight over text that is already highlighted
-    const verseHighlights = highlights.filter(h => (!h.book || h.book === activeBook.name) && (!h.chapter || h.chapter === activeChapter) && h.verse === selectionVerse);
-    const hasOverlap = verseHighlights.some(h => h.text.toLowerCase().includes(text.toLowerCase()) || text.toLowerCase().includes(h.text.toLowerCase()));
-    
-    if (hasOverlap) {
-      alert("This text is already highlighted. Click the highlight to change its color or delete it.");
-      setToolbarPosition(null);
-      window.getSelection()?.removeAllRanges();
-      return;
-    }
-    
-    const verse = selectionVerse;
+    const startVerse = selectionVerse;
+    const endVerse = endVerseNumber || selectionVerse;
     const book = activeBook.name;
     const chapter = activeChapter;
 
-    // Optimistic UI and immediate local cache update
-    const tempId = Date.now();
-    const newHighlight = { id: tempId, book, chapter, verse, text, color };
-    setHighlights(prev => {
-      const updated = [...prev, newHighlight];
-      saveLocalHighlights(updated);
-      return updated;
-    });
+    // Determine verses to highlight
+    const versesToHighlight: { verse: number; text: string }[] = [];
+
+    if (startVerse === endVerse) {
+      // Single verse selection
+      const cleanText = cleanVerseText(rawText, startVerse, endVerse);
+      if (cleanText) {
+        versesToHighlight.push({ verse: startVerse, text: cleanText });
+      }
+    } else {
+      // Multi-verse selection across verses startVerse to endVerse
+      const minV = Math.min(startVerse, endVerse);
+      const maxV = Math.max(startVerse, endVerse);
+      for (let v = minV; v <= maxV; v++) {
+        const vObj = bibleVerses.find(bv => bv.verse === v);
+        if (vObj) {
+          const fullVText = cleanVerseText(vObj.text, v, v);
+          if (fullVText) {
+            versesToHighlight.push({ verse: v, text: fullVText });
+          }
+        }
+      }
+    }
+
+    if (versesToHighlight.length === 0) return;
+
     setToolbarPosition(null);
     window.getSelection()?.removeAllRanges();
 
+    const createdItems: { id: number; book: string; chapter: number; verse: number; text: string; color: string }[] = [];
+
+    versesToHighlight.forEach((item, idx) => {
+      const tempId = Date.now() + idx;
+      createdItems.push({
+        id: tempId,
+        book,
+        chapter: Number(chapter),
+        verse: Number(item.verse),
+        text: item.text,
+        color,
+      });
+    });
+
+    // Optimistic UI and immediate local cache update
+    setHighlights(prev => {
+      // Cleanly replace any exact or superseded highlights in these verses
+      const filtered = prev.filter(h => {
+        const isSamePassage = (!h.book || h.book.toLowerCase() === book.toLowerCase()) &&
+          Number(h.chapter) === Number(chapter);
+        if (!isSamePassage) return true;
+        return !createdItems.some(ci => 
+          Number(ci.verse) === Number(h.verse) && 
+          (ci.text.toLowerCase().trim() === h.text.toLowerCase().trim() || ci.text.toLowerCase().includes(h.text.toLowerCase().trim()))
+        );
+      });
+      const updated = [...filtered, ...createdItems];
+      saveLocalHighlights(updated);
+      return updated;
+    });
+
     if (isOnline) {
-      try {
-        const res = await fetchWithAuth(`${API_URL}/api/highlights`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ book, chapter, verse, text, color })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.id) {
-            setHighlights(prev => {
-              const updated = prev.map(h => h.id === tempId ? data : h);
-              saveLocalHighlights(updated);
-              return updated;
-            });
+      for (const item of createdItems) {
+        try {
+          const res = await fetchWithAuth(`${API_URL}/api/highlights`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              book: item.book,
+              chapter: item.chapter,
+              verse: item.verse,
+              text: item.text,
+              color: item.color,
+            })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.id) {
+              setHighlights(prev => {
+                const updated = prev.map(h => h.id === item.id ? data : h);
+                saveLocalHighlights(updated);
+                return updated;
+              });
+            }
           }
+        } catch (e) {
+          console.warn("Highlight saved locally, cloud sync pending", e);
         }
-      } catch (e) {
-        console.warn("Highlight saved locally, cloud sync pending", e);
       }
     }
   };
@@ -3000,12 +3108,69 @@ export default function App() {
     });
   };
 
+  // Helper to normalize quotes, apostrophes, dashes, and whitespace for robust text matching
+  const normalizeForMatch = (str: string): string => {
+    return str
+      .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'")
+      .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"')
+      .replace(/[\u2013\u2014]/g, '-')
+      .replace(/[\u00A0\u2000-\u200B\u202F\u205F]/g, ' ')
+      .toLowerCase();
+  };
+
+  const findHighlightMatch = (segText: string, targetText: string, verseNum: number): { start: number; end: number } | null => {
+    if (!segText || !targetText) return null;
+    const normSeg = normalizeForMatch(segText);
+    let normTarget = normalizeForMatch(targetText.trim());
+
+    // 1. Direct normalized search (1-to-1 character matching preserves exact offsets)
+    let idx = normSeg.indexOf(normTarget);
+    if (idx === -1) {
+      const cleaned = normTarget.replace(new RegExp('^\\s*' + verseNum + '\\s*'), '');
+      idx = normSeg.indexOf(cleaned);
+      if (idx !== -1) {
+        return { start: idx, end: idx + cleaned.length };
+      }
+    } else {
+      return { start: idx, end: idx + normTarget.length };
+    }
+
+    // 2. Whitespace-flexible regex search
+    const words = targetText
+      .trim()
+      .replace(new RegExp('^\\s*' + verseNum + '\\s*'), '')
+      .split(/\s+/)
+      .map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+                 .replace(/['’]/g, "['’]")
+                 .replace(/["“”]/g, '["“”]')
+                 .replace(/[-—–]/g, '[-—–]'))
+      .filter(Boolean);
+
+    if (words.length > 0) {
+      try {
+        const pattern = new RegExp(words.join('\\s+'), 'i');
+        const match = segText.match(pattern);
+        if (match && typeof match.index === 'number') {
+          return { start: match.index, end: match.index + match[0].length };
+        }
+      } catch {}
+    }
+
+    // 3. Segment containment
+    const trimmedNormSeg = normSeg.trim();
+    if (trimmedNormSeg.length > 0 && normTarget.includes(trimmedNormSeg)) {
+      return { start: 0, end: segText.length };
+    }
+
+    return null;
+  };
+
   const renderVerseContent = (verse: number, text: string) => {
     const { mainText, footnote } = parseVerseFootnote(text);
     const verseHighlights = highlights.filter(h => 
-      (!h.book || h.book === activeBook.name) && 
-      (!h.chapter || h.chapter === activeChapter) && 
-      h.verse === verse
+      (!h.book || h.book.toLowerCase() === activeBook.name.toLowerCase()) && 
+      Number(h.chapter) === Number(activeChapter) && 
+      Number(h.verse) === Number(verse)
     );
     if (verseHighlights.length === 0) {
       if (!footnote || !showFootnotes) return <>{renderTextWithInterlinear(mainText, verse)}</>;
@@ -3021,7 +3186,7 @@ export default function App() {
       );
     }
 
-    // For perfect non-overlapping rendering:
+    // For perfect non-overlapping rendering with normalized matching:
     let segments: { text: string, highlight?: typeof highlights[0] }[] = [{ text: mainText }];
     
     verseHighlights.forEach(h => {
@@ -3030,25 +3195,15 @@ export default function App() {
         if (seg.highlight) {
           newSegments.push(seg);
         } else {
-          let matchText = h.text;
-          let index = seg.text.toLowerCase().indexOf(matchText.toLowerCase());
-          
-          if (index === -1) {
-            // Strip leading verse number if accidentally highlighted
-            const cleanedMatch = matchText.replace(new RegExp('^\\s*' + verse + '\\s*'), '');
-            index = seg.text.toLowerCase().indexOf(cleanedMatch.toLowerCase());
-            if (index !== -1) {
-              matchText = cleanedMatch;
-            }
-          }
+          const match = findHighlightMatch(seg.text, h.text, verse);
+          if (match && match.end > match.start) {
+            const before = seg.text.substring(0, match.start);
+            const hlText = seg.text.substring(match.start, match.end);
+            const after = seg.text.substring(match.end);
 
-          if (index !== -1) {
-            newSegments.push({ text: seg.text.substring(0, index) });
-            newSegments.push({ text: seg.text.substring(index, index + matchText.length), highlight: h });
-            newSegments.push({ text: seg.text.substring(index + matchText.length) });
-          } else if (h.text.toLowerCase().includes(seg.text.toLowerCase().trim()) && seg.text.trim().length > 0) {
-            // Highlight covers this entire segment
-            newSegments.push({ text: seg.text, highlight: h });
+            if (before) newSegments.push({ text: before });
+            if (hlText) newSegments.push({ text: hlText, highlight: h });
+            if (after) newSegments.push({ text: after });
           } else {
             newSegments.push(seg);
           }
@@ -3274,27 +3429,31 @@ export default function App() {
         }
       });
 
-    // Immediately load highlights from local storage for instant responsiveness
+    // Ensure all local highlights are in state without clearing other chapters
     const localList = getLocalHighlights();
-    const chapterLocal = localList.filter(h => (!h.book || h.book === activeBook.name) && (!h.chapter || h.chapter === activeChapter));
-    if (isMounted) {
-      setHighlights(chapterLocal);
+    if (isMounted && localList.length > 0) {
+      setHighlights(prev => {
+        if (prev.length === 0) return localList;
+        const map = new Map<string, typeof prev[0]>();
+        localList.forEach(h => map.set(`${h.book?.toLowerCase()}:${h.chapter}:${h.verse}:${h.text}`, h));
+        prev.forEach(h => map.set(`${h.book?.toLowerCase()}:${h.chapter}:${h.verse}:${h.text}`, h));
+        return Array.from(map.values());
+      });
     }
 
-    // Fetch highlights for current chapter from cloud and merge
+    // Fetch highlights for current chapter from cloud and merge into full state
     fetchWithAuth(`${API_URL}/api/highlights?book=${encodeURIComponent(activeBook.name)}&chapter=${activeChapter}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => {
-        if (isMounted && Array.isArray(data)) {
-          const combined = [...data];
-          chapterLocal.forEach(lh => {
-            if (!combined.some(ch => ch.verse === lh.verse && ch.text === lh.text)) {
-              combined.push(lh);
-            }
+        if (isMounted && Array.isArray(data) && data.length > 0) {
+          setHighlights(prev => {
+            const map = new Map<string, typeof prev[0]>();
+            prev.forEach(h => map.set(`${h.book?.toLowerCase()}:${h.chapter}:${h.verse}:${h.text}`, h));
+            data.forEach(ch => map.set(`${ch.book?.toLowerCase()}:${ch.chapter}:${ch.verse}:${ch.text}`, ch));
+            const combined = Array.from(map.values());
+            saveLocalHighlights(combined);
+            return combined;
           });
-          setHighlights(combined);
-          const allOther = localList.filter(h => (h.book !== activeBook.name || h.chapter !== activeChapter));
-          saveLocalHighlights([...allOther, ...combined]);
         }
       })
       .catch(e => console.warn("Using local highlights cache", e));

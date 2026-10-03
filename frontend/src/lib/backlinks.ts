@@ -74,9 +74,9 @@ export function getScriptureBacklinks({
   if (Array.isArray(highlights)) {
     const hlFiltered = highlights.filter(
       (h) =>
-        h.book.toLowerCase() === book.toLowerCase() &&
-        h.chapter === chapter &&
-        (verse === undefined || h.verse === verse)
+        h.book?.toLowerCase() === book.toLowerCase() &&
+        Number(h.chapter) === Number(chapter) &&
+        (verse === undefined || Number(h.verse) === Number(verse))
     );
     for (const hl of hlFiltered) {
       matchedHighlights.push({
