@@ -188,6 +188,27 @@ body {
   animation: versePulse 2.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }
 
+@keyframes verseClickPulse {
+  0% {
+    background-color: rgba(201, 100, 66, 0.38);
+    box-shadow: 0 0 0 3px rgba(201, 100, 66, 0.28);
+    border-radius: 6px;
+  }
+  25% {
+    background-color: rgba(201, 100, 66, 0.22);
+    box-shadow: 0 0 0 4px rgba(201, 100, 66, 0.16);
+    border-radius: 6px;
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: none;
+  }
+}
+
+.verse-click-pulse {
+  animation: verseClickPulse 1.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 /* Universal automatic line-wrapping: text automatically breaks onto next line without clipping */
 .verse-text,
 .verse-number,

@@ -79,7 +79,7 @@ const ALL_BOOKS = [...OT_BOOKS, ...NT_BOOKS];
 
 // Canonical book name equality helper (handles aliases, codes, case differences)
 const isSameBook = (b1?: string, b2?: string): boolean => {
-  if (!b1 || !b2) return true;
+  if (!b1 || !b2) return false;
   const s1 = b1.toLowerCase().trim();
   const s2 = b2.toLowerCase().trim();
   if (s1 === s2) return true;
@@ -2468,16 +2468,46 @@ export default function App() {
     return cleaned.trim();
   };
 
-  // Clicking or tapping a verse number opens the floating toolbar to highlight or study that verse
-  const handleVerseNumberClick = (e: React.MouseEvent | React.TouchEvent, verseNum: number) => {
+  // Clicking or tapping a verse opens the floating toolbar to highlight or study that verse
+  const handleVerseClick = (e: React.MouseEvent | React.TouchEvent, verseNum: number) => {
+    // If user was actively selecting text (e.g. mouse drag selection), don't treat it as a whole-verse click
+    const sel = typeof window !== 'undefined' ? window.getSelection() : null;
+    if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) {
+      return;
+    }
+
+    const target = e.target as HTMLElement | null;
+    if (target) {
+      // Don't intercept button clicks inside the verse (e.g. interlinear or backlink badges)
+      if (target.closest('button') || target.closest('[data-footnote="true"]')) {
+        return;
+      }
+      // If clicking directly on an existing <mark>, let the mark's own handler handle it
+      if (target.closest('mark')) {
+        return;
+      }
+    }
+
     e.stopPropagation();
-    
-    // Toggle off if currently selected
+
+    // Find the visible verse element in DOM
+    const currentEl = e.currentTarget as HTMLElement | null;
+    let verseEl: HTMLElement | null = null;
+    if (currentEl) {
+      verseEl = (currentEl.hasAttribute('data-verse') ? currentEl : currentEl.closest('[data-verse]')) as HTMLElement | null;
+    }
+    if (!verseEl || verseEl.offsetParent === null) {
+      const candidates = document.querySelectorAll(`[data-verse="${verseNum}"]`);
+      verseEl = (Array.from(candidates).find(el => (el as HTMLElement).offsetParent !== null) as HTMLElement) || (candidates[0] as HTMLElement | null);
+    }
+
+    // Toggle off if currently selected and toolbar is open
     if (toolbarPosition && selectionVerse === verseNum && (!endVerseNumber || endVerseNumber === verseNum)) {
       setToolbarPosition(null);
       setSelectionVerse(null);
       setEndVerseNumber(null);
       setSelectedText('');
+      if (verseEl) verseEl.classList.remove('verse-click-pulse');
       window.getSelection()?.removeAllRanges();
       return;
     }
@@ -2486,12 +2516,18 @@ export default function App() {
     if (!vObj) return;
 
     const cleanText = parseVerseFootnote(vObj.text).mainText;
-    
-    // Find verse element in DOM
-    const verseEl = document.querySelector(`[data-verse="${verseNum}"]`) as HTMLElement | null;
-    const rect = verseEl ? verseEl.getBoundingClientRect() : null;
 
-    // Check if this verse already has a highlight
+    // Trigger clean quick fade-in / smooth fade-out pulse animation on click (like verse links)
+    if (verseEl) {
+      verseEl.classList.remove('verse-click-pulse');
+      void verseEl.offsetWidth; // force reflow for smooth animation restart
+      verseEl.classList.add('verse-click-pulse');
+      setTimeout(() => {
+        verseEl?.classList.remove('verse-click-pulse');
+      }, 2000);
+    }
+
+    // Check if this verse already has a highlight in current chapter
     const existingHl = highlights.find(h => 
       isSameBook(h.book, activeBook.name) && 
       Number(h.chapter) === Number(activeChapter) && 
@@ -2502,13 +2538,23 @@ export default function App() {
     setEndVerseNumber(verseNum);
     setSelectedText(cleanText);
 
-    const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
+    const rect = verseEl ? verseEl.getBoundingClientRect() : null;
+    const winWidth = typeof window !== 'undefined' ? window.innerWidth : 1000;
     const toolbarHalfWidth = 195;
-    const x = isMobile 
-      ? window.innerWidth / 2 
-      : (rect ? Math.max(toolbarHalfWidth + 12, Math.min(window.innerWidth - toolbarHalfWidth - 12, rect.left + rect.width / 2)) : window.innerWidth / 2);
+
+    // Center toolbar horizontally over the center of the verse text (not pinned to the left or verse number)
+    let x: number;
+    if (rect && rect.width > 0) {
+      const verseCenterX = rect.left + rect.width / 2;
+      x = winWidth <= 420 
+        ? winWidth / 2 
+        : Math.max(toolbarHalfWidth + 12, Math.min(winWidth - toolbarHalfWidth - 12, verseCenterX));
+    } else {
+      x = winWidth / 2;
+    }
+
     const isNearTop = rect ? rect.top < 130 : false;
-    const y = rect ? (isNearTop ? rect.bottom + 8 : Math.max(70, rect.top - 6)) : window.innerHeight / 2;
+    const y = rect ? (isNearTop ? rect.bottom + 8 : Math.max(70, rect.top - 6)) : (typeof window !== 'undefined' ? window.innerHeight / 2 : 300);
 
     setToolbarPosition({
       x,
@@ -2517,6 +2563,8 @@ export default function App() {
       isBelow: isNearTop
     });
   };
+
+  const handleVerseNumberClick = handleVerseClick;
 
   // Highlighting & Drag Selection Logic
   const handleSelection = useCallback(() => {
@@ -2618,11 +2666,11 @@ export default function App() {
         }
       }
 
-      const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
+      const winWidth = typeof window !== 'undefined' ? window.innerWidth : 1000;
       const toolbarHalfWidth = 195;
-      const x = isMobile 
-        ? window.innerWidth / 2 
-        : Math.max(toolbarHalfWidth + 12, Math.min(window.innerWidth - toolbarHalfWidth - 12, rect.left + rect.width / 2));
+      const x = winWidth <= 420 
+        ? winWidth / 2 
+        : Math.max(toolbarHalfWidth + 12, Math.min(winWidth - toolbarHalfWidth - 12, rect.left + rect.width / 2));
       const isNearTop = rect.top < 130;
       const y = isNearTop ? rect.bottom + 8 : Math.max(70, rect.top - 6);
 
@@ -2644,6 +2692,7 @@ export default function App() {
         target.closest('.floating-verse-toolbar') || 
         target.closest('.verse-number-btn') || 
         target.closest('.verse-number') || 
+        target.closest('[data-verse]') ||
         target.closest('mark')
       ) {
         return;
@@ -2656,6 +2705,9 @@ export default function App() {
       }
 
       setToolbarPosition(null);
+      setSelectionVerse(null);
+      setEndVerseNumber(null);
+      setSelectedText('');
     };
 
     document.addEventListener('mousedown', handleDocumentClick);
@@ -2719,11 +2771,14 @@ export default function App() {
     if (toolbarPosition?.highlightId) {
       const existingId = toolbarPosition.highlightId;
       setHighlights(prev => {
-        const updated = prev.map(h => h.id === existingId ? { ...h, color } : h);
+        const updated = prev.map(h => h.id === existingId ? { ...h, color, text: rawText || h.text } : h);
         saveLocalHighlights(updated);
         return updated;
       });
       setToolbarPosition(null);
+      setSelectionVerse(null);
+      setEndVerseNumber(null);
+      setSelectedText('');
       window.getSelection()?.removeAllRanges();
 
       if (isOnline) {
@@ -2731,7 +2786,7 @@ export default function App() {
           await fetchWithAuth(`${API_URL}/api/highlights/${existingId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ color })
+            body: JSON.stringify({ color, text: rawText })
           });
         } catch (e) {
           console.warn("Highlight saved locally (cloud sync pending)", e);
@@ -2778,6 +2833,9 @@ export default function App() {
     if (versesToHighlight.length === 0) return;
 
     setToolbarPosition(null);
+    setSelectionVerse(null);
+    setEndVerseNumber(null);
+    setSelectedText('');
     window.getSelection()?.removeAllRanges();
 
     const createdItems: { id: number; book: string; chapter: number; verse: number; text: string; color: string }[] = [];
@@ -2796,15 +2854,17 @@ export default function App() {
 
     // Optimistic UI and immediate local cache update
     setHighlights(prev => {
-      // Cleanly replace any exact or superseded highlights in these verses
+      // Cleanly replace any exact, superseded, or conflicting highlights in these verses
       const filtered = prev.filter(h => {
         const isSamePassage = isSameBook(h.book, book) &&
           Number(h.chapter) === Number(chapter);
         if (!isSamePassage) return true;
-        return !createdItems.some(ci => 
-          Number(ci.verse) === Number(h.verse) && 
-          (ci.text.toLowerCase().trim() === h.text.toLowerCase().trim() || ci.text.toLowerCase().includes(h.text.toLowerCase().trim()))
-        );
+        return !createdItems.some(ci => {
+          if (Number(ci.verse) !== Number(h.verse)) return false;
+          const ciNorm = ci.text.toLowerCase().trim();
+          const hNorm = h.text.toLowerCase().trim();
+          return ciNorm === hNorm || ciNorm.includes(hNorm) || hNorm.includes(ciNorm);
+        });
       });
       const updated = [...filtered, ...createdItems];
       saveLocalHighlights(updated);
@@ -2844,6 +2904,10 @@ export default function App() {
 
   const deleteHighlight = async (id: number) => {
     setToolbarPosition(null);
+    setSelectionVerse(null);
+    setEndVerseNumber(null);
+    setSelectedText('');
+    window.getSelection()?.removeAllRanges();
     setHighlights(prev => {
       const updated = prev.filter(h => h.id !== id);
       saveLocalHighlights(updated);
@@ -2882,6 +2946,9 @@ export default function App() {
     if (!showRightSidebar) setShowRightSidebar(true);
     
     setToolbarPosition(null);
+    setSelectionVerse(null);
+    setEndVerseNumber(null);
+    setSelectedText('');
     window.getSelection()?.removeAllRanges();
     
     const refStr = startVerse === endVerse 
@@ -2927,6 +2994,9 @@ export default function App() {
     if (!showRightSidebar) setShowRightSidebar(true);
     
     setToolbarPosition(null);
+    setSelectionVerse(null);
+    setEndVerseNumber(null);
+    setSelectedText('');
     window.getSelection()?.removeAllRanges();
   };
 
@@ -2950,6 +3020,9 @@ export default function App() {
     });
     
     setToolbarPosition(null);
+    setSelectionVerse(null);
+    setEndVerseNumber(null);
+    setSelectedText('');
     window.getSelection()?.removeAllRanges();
     setActiveTab('canvas');
   };
@@ -3296,7 +3369,7 @@ export default function App() {
 
     // 3. Containment / Full-verse coverage
     const trimmedNormSeg = normSeg.trim();
-    if (trimmedNormSeg.length > 0 && normTarget.includes(trimmedNormSeg)) {
+    if (trimmedNormSeg.length > 0 && (normTarget.includes(trimmedNormSeg) || trimmedNormSeg.includes(normTarget))) {
       return { start: 0, end: segText.length };
     }
 
@@ -3306,7 +3379,7 @@ export default function App() {
       for (const w of words) {
         if (normSeg.includes(w.toLowerCase())) matchedWords++;
       }
-      if (matchedWords / words.length >= 0.65) {
+      if (matchedWords / words.length >= 0.40) {
         return { start: 0, end: segText.length };
       }
     }
@@ -3335,10 +3408,13 @@ export default function App() {
       );
     }
 
+    // Sort so most recently added/updated highlights take rendering priority
+    const sortedVerseHighlights = [...verseHighlights].sort((a, b) => b.id - a.id);
+
     // For perfect non-overlapping rendering with normalized matching:
     let segments: { text: string, highlight?: typeof highlights[0] }[] = [{ text: mainText }];
     
-    verseHighlights.forEach(h => {
+    sortedVerseHighlights.forEach(h => {
       let newSegments: typeof segments = [];
       segments.forEach(seg => {
         if (seg.highlight) {
@@ -3376,10 +3452,12 @@ export default function App() {
                 setEndVerseNumber(verse);
                 setSelectedText(seg.text || (vObj ? parseVerseFootnote(vObj.text).mainText : ''));
                 
-                const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
+                const winWidth = typeof window !== 'undefined' ? window.innerWidth : 1000;
+                const toolbarHalfWidth = 195;
+                const verseCenterX = rect.left + rect.width / 2;
                 const isNearTop = rect.top < 130;
                 setToolbarPosition({
-                  x: isMobile ? window.innerWidth / 2 : Math.max(200, Math.min(window.innerWidth - 200, rect.left + rect.width / 2)),
+                  x: winWidth <= 420 ? winWidth / 2 : Math.max(toolbarHalfWidth + 12, Math.min(winWidth - toolbarHalfWidth - 12, verseCenterX)),
                   y: isNearTop ? rect.bottom + 8 : Math.max(70, rect.top - 6),
                   highlightId: seg.highlight!.id,
                   isBelow: isNearTop
@@ -3393,9 +3471,12 @@ export default function App() {
                 setEndVerseNumber(verse);
                 setSelectedText(seg.text || (vObj ? parseVerseFootnote(vObj.text).mainText : ''));
                 
+                const winWidth = typeof window !== 'undefined' ? window.innerWidth : 1000;
+                const toolbarHalfWidth = 195;
+                const verseCenterX = rect.left + rect.width / 2;
                 const isNearTop = rect.top < 130;
                 setToolbarPosition({
-                  x: window.innerWidth / 2,
+                  x: winWidth <= 420 ? winWidth / 2 : Math.max(toolbarHalfWidth + 12, Math.min(winWidth - toolbarHalfWidth - 12, verseCenterX)),
                   y: isNearTop ? rect.bottom + 8 : Math.max(70, rect.top - 6),
                   highlightId: seg.highlight!.id,
                   isBelow: isNearTop
@@ -4880,14 +4961,15 @@ export default function App() {
                             <span 
                               key={v.verse} 
                               data-verse={v.verse} 
-                              className={`inline rounded-sm px-0.5 transition-colors duration-200 ${
+                              onClick={(e) => handleVerseClick(e, v.verse)}
+                              className={`inline rounded-sm px-0.5 transition-colors duration-200 cursor-pointer ${
                                 currentSpeakingVerseIndex === index ? 'text-accent bg-accent/10' : ''
                               }`}
                             >
                               {showVerseNumbers && (
                                 <sup 
-                                  onClick={(e) => handleVerseNumberClick(e, v.verse)}
-                                  onTouchEnd={(e) => handleVerseNumberClick(e, v.verse)}
+                                  onClick={(e) => handleVerseClick(e, v.verse)}
+                                  onTouchEnd={(e) => handleVerseClick(e, v.verse)}
                                   className={`verse-number select-none text-[11px] font-sans font-semibold mr-1 cursor-pointer hover:text-accent hover:underline align-baseline relative -top-0.5 inline-block shrink-0 transition-all ${
                                     currentSpeakingVerseIndex === index ? 'text-accent' : 
                                     selectionVerse === v.verse ? 'text-accent font-bold scale-110' : 'text-muted/80'
@@ -4942,14 +5024,15 @@ export default function App() {
                             <p 
                               key={v.verse} 
                               data-verse={v.verse} 
-                              className={`group relative rounded-lg py-1 px-1.5 sm:px-2 -mx-1 sm:-mx-2 transition-colors duration-200 break-words ${
+                              onClick={(e) => handleVerseClick(e, v.verse)}
+                              className={`group relative rounded-lg py-1 px-1.5 sm:px-2 -mx-1 sm:-mx-2 transition-colors duration-200 break-words cursor-pointer ${
                                 currentSpeakingVerseIndex === index ? 'text-accent bg-accent/5' : ''
-                              } ${selectionVerse === v.verse && (!endVerseNumber || endVerseNumber === v.verse) ? 'bg-accent/10 ring-1 ring-accent/30' : ''}`}
+                              }`}
                             >
                               {showVerseNumbers && (
                                 <sup 
-                                  onClick={(e) => handleVerseNumberClick(e, v.verse)}
-                                  onTouchEnd={(e) => handleVerseNumberClick(e, v.verse)}
+                                  onClick={(e) => handleVerseClick(e, v.verse)}
+                                  onTouchEnd={(e) => handleVerseClick(e, v.verse)}
                                   className={`verse-number select-none text-[11px] font-sans font-semibold mr-1.5 cursor-pointer hover:text-accent hover:underline align-baseline relative -top-0.5 inline-block shrink-0 transition-all ${
                                     currentSpeakingVerseIndex === index ? 'text-accent' : 
                                     selectionVerse === v.verse ? 'text-accent font-bold scale-110' : 'text-muted/80'
@@ -5800,14 +5883,15 @@ export default function App() {
                             <span 
                               key={v.verse} 
                               data-verse={v.verse} 
-                              className={`inline rounded-sm px-0.5 transition-colors duration-200 ${
+                              onClick={(e) => handleVerseClick(e, v.verse)}
+                              className={`inline rounded-sm px-0.5 transition-colors duration-200 cursor-pointer ${
                                 currentSpeakingVerseIndex === index ? 'text-accent bg-accent/10' : ''
                               }`}
                             >
                               {showVerseNumbers && (
                                 <sup 
-                                  onClick={(e) => handleVerseNumberClick(e, v.verse)}
-                                  onTouchEnd={(e) => handleVerseNumberClick(e, v.verse)}
+                                  onClick={(e) => handleVerseClick(e, v.verse)}
+                                  onTouchEnd={(e) => handleVerseClick(e, v.verse)}
                                   className={`verse-number select-none text-[11px] font-sans font-semibold mr-1 cursor-pointer hover:text-accent hover:underline align-baseline relative -top-0.5 inline-block shrink-0 transition-all ${
                                     currentSpeakingVerseIndex === index ? 'text-accent' : 
                                     selectionVerse === v.verse ? 'text-accent font-bold scale-110' : 'text-muted/80'
@@ -5862,14 +5946,15 @@ export default function App() {
                             <p 
                               key={v.verse} 
                               data-verse={v.verse} 
-                              className={`group relative rounded-lg py-1 px-2 -mx-2 transition-colors duration-300 break-words ${
+                              onClick={(e) => handleVerseClick(e, v.verse)}
+                              className={`group relative rounded-lg py-1 px-2 -mx-2 transition-colors duration-300 break-words cursor-pointer ${
                                 currentSpeakingVerseIndex === index ? 'text-accent bg-accent/5' : ''
-                              } ${selectionVerse === v.verse && (!endVerseNumber || endVerseNumber === v.verse) ? 'bg-accent/10 ring-1 ring-accent/30' : ''}`}
+                              }`}
                             >
                               {showVerseNumbers && (
                                 <sup 
-                                  onClick={(e) => handleVerseNumberClick(e, v.verse)}
-                                  onTouchEnd={(e) => handleVerseNumberClick(e, v.verse)}
+                                  onClick={(e) => handleVerseClick(e, v.verse)}
+                                  onTouchEnd={(e) => handleVerseClick(e, v.verse)}
                                   className={`verse-number select-none text-[11px] font-sans font-semibold mr-1.5 cursor-pointer hover:text-accent hover:underline align-baseline relative -top-0.5 inline-block shrink-0 transition-all ${
                                     currentSpeakingVerseIndex === index ? 'text-accent' : 
                                     selectionVerse === v.verse ? 'text-accent font-bold scale-110' : 'text-muted/80'
@@ -6305,35 +6390,40 @@ export default function App() {
             <button 
               type="button" 
               onMouseDown={(e) => e.preventDefault()} 
-              onClick={() => saveHighlight('yellow')} 
+              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); saveHighlight('yellow'); }}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); saveHighlight('yellow'); }} 
               className="w-5 h-5 sm:w-5.5 sm:h-5.5 min-w-[20px] sm:min-w-[22px] rounded-full bg-yellow-400 hover:scale-120 active:scale-90 transition-transform shadow-xs cursor-pointer ring-1 ring-black/10 dark:ring-white/10" 
               title="Highlight Yellow" 
             />
             <button 
               type="button" 
               onMouseDown={(e) => e.preventDefault()} 
-              onClick={() => saveHighlight('green')} 
+              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); saveHighlight('green'); }}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); saveHighlight('green'); }} 
               className="w-5 h-5 sm:w-5.5 sm:h-5.5 min-w-[20px] sm:min-w-[22px] rounded-full bg-green-500 hover:scale-120 active:scale-90 transition-transform shadow-xs cursor-pointer ring-1 ring-black/10 dark:ring-white/10" 
               title="Highlight Green" 
             />
             <button 
               type="button" 
               onMouseDown={(e) => e.preventDefault()} 
-              onClick={() => saveHighlight('blue')} 
+              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); saveHighlight('blue'); }}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); saveHighlight('blue'); }} 
               className="w-5 h-5 sm:w-5.5 sm:h-5.5 min-w-[20px] sm:min-w-[22px] rounded-full bg-blue-500 hover:scale-120 active:scale-90 transition-transform shadow-xs cursor-pointer ring-1 ring-black/10 dark:ring-white/10" 
               title="Highlight Blue" 
             />
             <button 
               type="button" 
               onMouseDown={(e) => e.preventDefault()} 
-              onClick={() => saveHighlight('pink')} 
+              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); saveHighlight('pink'); }}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); saveHighlight('pink'); }} 
               className="w-5 h-5 sm:w-5.5 sm:h-5.5 min-w-[20px] sm:min-w-[22px] rounded-full bg-pink-400 hover:scale-120 active:scale-90 transition-transform shadow-xs cursor-pointer ring-1 ring-black/10 dark:ring-white/10" 
               title="Highlight Pink" 
             />
             <button 
               type="button" 
               onMouseDown={(e) => e.preventDefault()} 
-              onClick={() => saveHighlight('purple')} 
+              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); saveHighlight('purple'); }}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); saveHighlight('purple'); }} 
               className="w-5 h-5 sm:w-5.5 sm:h-5.5 min-w-[20px] sm:min-w-[22px] rounded-full bg-purple-400 hover:scale-120 active:scale-90 transition-transform shadow-xs cursor-pointer ring-1 ring-black/10 dark:ring-white/10" 
               title="Highlight Purple" 
             />
@@ -6341,7 +6431,8 @@ export default function App() {
             <button 
               type="button"
               onMouseDown={(e) => e.preventDefault()} 
-              onClick={askAiAboutHighlight} 
+              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); askAiAboutHighlight(); }}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); askAiAboutHighlight(); }} 
               className="flex items-center justify-center h-7 sm:h-8 px-2.5 rounded-lg bg-accent text-white hover:bg-[#d87654] active:scale-95 transition-all text-xs font-semibold shadow-xs gap-1.5 cursor-pointer shrink-0"
               title="Ask AI about this verse"
             >
@@ -6350,7 +6441,8 @@ export default function App() {
             <button 
               type="button"
               onMouseDown={(e) => e.preventDefault()} 
-              onClick={addHighlightToChat} 
+              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); addHighlightToChat(); }}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); addHighlightToChat(); }} 
               className="flex items-center justify-center h-7 sm:h-8 px-2.5 rounded-lg bg-surface border border-border-soft text-fg hover:bg-border-soft active:scale-95 transition-all text-xs font-semibold shadow-xs gap-1.5 cursor-pointer shrink-0" 
               title="Add to Chat"
             >
@@ -6360,7 +6452,8 @@ export default function App() {
             <button 
               type="button"
               onMouseDown={(e) => e.preventDefault()} 
-              onClick={addHighlightToCanvas} 
+              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); addHighlightToCanvas(); }}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); addHighlightToCanvas(); }} 
               className="flex items-center justify-center h-7 sm:h-8 px-2.5 rounded-lg bg-surface border border-border-soft text-fg hover:bg-border-soft active:scale-95 transition-all text-xs font-semibold shadow-xs gap-1.5 cursor-pointer shrink-0" 
               title="Send to Canvas"
             >
@@ -6370,7 +6463,8 @@ export default function App() {
             <button 
               type="button"
               onMouseDown={(e) => e.preventDefault()} 
-              onClick={handleSelectionWordStudy} 
+              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); handleSelectionWordStudy(); }}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleSelectionWordStudy(); }} 
               className="flex items-center justify-center h-7 sm:h-8 px-2.5 rounded-lg bg-surface border border-border-soft text-fg hover:bg-border-soft active:scale-95 transition-all text-xs font-semibold shadow-xs gap-1.5 cursor-pointer shrink-0" 
               title="Inspect Hebrew/Greek Word Study"
             >
@@ -6383,7 +6477,8 @@ export default function App() {
                 <button 
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => deleteHighlight(toolbarPosition.highlightId!)} 
+                  onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); deleteHighlight(toolbarPosition.highlightId!); }}
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteHighlight(toolbarPosition.highlightId!); }} 
                   className="flex items-center justify-center h-7 sm:h-8 px-2 rounded-lg bg-surface border border-border-soft text-error hover:bg-error hover:text-white transition-all shadow-xs cursor-pointer shrink-0"
                   title="Delete Highlight"
                 >
