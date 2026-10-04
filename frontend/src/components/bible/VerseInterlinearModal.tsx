@@ -34,6 +34,7 @@ interface VerseInterlinearModalProps {
     category: NodeCategory;
   }) => void;
   onSelectWord?: (word: InterlinearWord) => void;
+  strongsVersesMap?: Record<number, string>;
 }
 
 export function VerseInterlinearModal({
@@ -48,18 +49,37 @@ export function VerseInterlinearModal({
   theme,
   onSendToCanvas,
   onSelectWord,
+  strongsVersesMap: initialStrongsVersesMap,
 }: VerseInterlinearModalProps) {
   const [selectedVerseNum, setSelectedVerseNum] = useState<number>(initialVerse || 1);
   const [hasExportedAll, setHasExportedAll] = useState(false);
   const [addedWordIds, setAddedWordIds] = useState<Record<string, boolean>>({});
-  const [strongsVersesMap, setStrongsVersesMap] = useState<Record<number, string>>({});
+  const [localStrongsMap, setLocalStrongsMap] = useState<Record<number, string>>({});
   const [resolvedWords, setResolvedWords] = useState<Record<number, InterlinearWord>>({});
 
   const isDark = theme === 'dark';
 
-  // Load Strong's tagged chapter for accurate word-level alignment
+  // Always sync selected verse when modal opens or initialVerse changes
+  useEffect(() => {
+    if (isOpen && initialVerse && initialVerse > 0) {
+      setSelectedVerseNum(initialVerse);
+    }
+  }, [isOpen, initialVerse]);
+
+  // Clear transient resolved words when verse or chapter changes
+  useEffect(() => {
+    setResolvedWords({});
+  }, [selectedVerseNum, bookName, chapter]);
+
+  const effectiveStrongsMap = initialStrongsVersesMap && Object.keys(initialStrongsVersesMap).length > 0
+    ? initialStrongsVersesMap
+    : localStrongsMap;
+
+  // Load Strong's tagged chapter for accurate word-level alignment if not provided
   useEffect(() => {
     if (!isOpen) return;
+    if (initialStrongsVersesMap && Object.keys(initialStrongsVersesMap).length > 0) return;
+
     let isCancelled = false;
     getStrongsPassage(bookName, chapter)
       .then(async (ch) => {
@@ -70,14 +90,14 @@ export function VerseInterlinearModal({
           ch.verses.forEach((v) => {
             map[v.verse] = v.text;
           });
-          setStrongsVersesMap(map);
+          setLocalStrongsMap(map);
         }
       })
       .catch(() => {});
     return () => {
       isCancelled = true;
     };
-  }, [isOpen, bookName, chapter]);
+  }, [isOpen, bookName, chapter, initialStrongsVersesMap]);
 
   // Find selected verse text
   const currentVerseObj = useMemo(() => {
@@ -88,7 +108,7 @@ export function VerseInterlinearModal({
   }, [verses, selectedVerseNum]);
 
   // Tokenize verse into original language words using Strong's-tagged text if available
-  const taggedText = strongsVersesMap[currentVerseObj.verse];
+  const taggedText = effectiveStrongsMap[currentVerseObj.verse];
   const tokens = useMemo(() => {
     return getVerseInterlinearTokens(
       taggedText || currentVerseObj.text,
@@ -187,7 +207,7 @@ export function VerseInterlinearModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6 bg-black/60 backdrop-blur-md animate-in fade-in duration-200"
+      className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-6 bg-black/60 backdrop-blur-md animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
@@ -311,115 +331,129 @@ export function VerseInterlinearModal({
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {wordTokens.map((t, idx) => {
-              const w = t.word!;
-              const isAdded = addedWordIds[w.id];
+          {wordTokens.length === 0 ? (
+            <div className="py-12 px-4 text-center space-y-3">
+              <div className="inline-flex p-3 rounded-full bg-accent/10 text-accent animate-pulse">
+                <Languages size={24} />
+              </div>
+              <p className="text-sm font-medium text-zinc-600 dark:text-zinc-300">
+                Analyzing original {isOldTestament ? 'Hebrew' : 'Greek'} morphology and Strong's concordance...
+              </p>
+              <p className="text-xs text-zinc-400">
+                Resolving word roots and cross-references for {bookName} {chapter}:{currentVerseObj.verse}
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {wordTokens.map((t, idx) => {
+                const w = t.word!;
+                const isAdded = addedWordIds[w.id];
 
-              return (
-                <div
-                  key={`${t.rawText}-${idx}`}
-                  className={`p-3.5 rounded-2xl border transition-all hover:scale-[1.01] flex flex-col justify-between ${
-                    isDark
-                      ? 'bg-zinc-800/40 border-zinc-700/60 hover:border-accent/50 hover:bg-zinc-800/70'
-                      : 'bg-zinc-50 border-zinc-200 hover:border-accent/40 hover:bg-zinc-100/80'
-                  }`}
-                >
-                  <div className="space-y-2">
-                    {/* Top Row: English Token & Original Script */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <div className="text-sm font-bold text-fg">
-                          {t.rawText}
+                return (
+                  <div
+                    key={`${t.rawText}-${idx}`}
+                    className={`p-3.5 rounded-2xl border transition-all hover:scale-[1.01] flex flex-col justify-between ${
+                      isDark
+                        ? 'bg-zinc-800/40 border-zinc-700/60 hover:border-accent/50 hover:bg-zinc-800/70'
+                        : 'bg-zinc-50 border-zinc-200 hover:border-accent/40 hover:bg-zinc-100/80'
+                    }`}
+                  >
+                    <div className="space-y-2">
+                      {/* Top Row: English Token & Original Script */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="text-sm font-bold text-fg">
+                            {t.rawText}
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span
+                              className={`text-lg font-serif font-bold ${
+                                w.language === 'Hebrew'
+                                  ? 'text-amber-500 dark:text-amber-400'
+                                  : 'text-cyan-600 dark:text-cyan-400'
+                              }`}
+                            >
+                              {w.lemma}
+                            </span>
+                            <span className="text-xs italic text-zinc-500 dark:text-zinc-400">
+                              /{w.transliteration}/
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleSpeak(w.transliteration)}
+                              className="p-1 rounded-full text-zinc-400 hover:text-accent transition-colors cursor-pointer"
+                              title={`Hear pronunciation: ${w.pronunciation}`}
+                            >
+                              <Volume2 size={13} />
+                            </button>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span
-                            className={`text-lg font-serif font-bold ${
-                              w.language === 'Hebrew'
-                                ? 'text-amber-500 dark:text-amber-400'
-                                : 'text-cyan-600 dark:text-cyan-400'
-                            }`}
-                          >
-                            {w.lemma}
+
+                        <div className="text-right">
+                          <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/30 inline-block">
+                            {w.strongs}
                           </span>
-                          <span className="text-xs italic text-zinc-500 dark:text-zinc-400">
-                            /{w.transliteration}/
-                          </span>
+                          <div className="text-[10px] text-zinc-400 mt-1 font-medium">
+                            {w.partOfSpeech}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Derivation / Etymology */}
+                      {w.derivation && (
+                        <div className="text-[11px] text-zinc-500 dark:text-zinc-400 font-serif italic line-clamp-1">
+                          {w.derivation}
+                        </div>
+                      )}
+
+                      {/* Definition */}
+                      <p className="text-xs text-zinc-600 dark:text-zinc-300 line-clamp-2 leading-relaxed">
+                        {w.definition}
+                      </p>
+                    </div>
+
+                    {/* Card Bottom: Occurrences & Add to Canvas */}
+                    <div className="flex items-center justify-between pt-2.5 mt-2 border-t border-zinc-200/60 dark:border-zinc-700/50">
+                      <span className="text-[10px] text-zinc-400 font-medium">
+                        Occurs <strong className="text-accent">{w.occurrences}×</strong> in {w.testament}
+                      </span>
+
+                      <div className="flex items-center gap-1.5">
+                        {onSelectWord && (
                           <button
                             type="button"
-                            onClick={() => handleSpeak(w.transliteration)}
-                            className="p-1 rounded-full text-zinc-400 hover:text-accent transition-colors cursor-pointer"
-                            title={`Hear pronunciation: ${w.pronunciation}`}
+                            onClick={() => {
+                              onSelectWord(w);
+                              onClose();
+                            }}
+                            className="text-[11px] font-semibold text-accent hover:underline px-2 py-1 rounded cursor-pointer"
                           >
-                            <Volume2 size={13} />
+                            Deep Study
                           </button>
-                        </div>
-                      </div>
+                        )}
 
-                      <div className="text-right">
-                        <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/30 inline-block">
-                          {w.strongs}
-                        </span>
-                        <div className="text-[10px] text-zinc-400 mt-1 font-medium">
-                          {w.partOfSpeech}
-                        </div>
+                        {onSendToCanvas && (
+                          <button
+                            type="button"
+                            onClick={() => handleAddWordToCanvas(w)}
+                            disabled={isAdded}
+                            className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                              isAdded
+                                ? 'bg-emerald-600 text-white border-emerald-600'
+                                : 'bg-surface hover:bg-accent hover:text-white border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-300'
+                            }`}
+                            title="Add this word study card to Canvas"
+                          >
+                            {isAdded ? <Check size={13} /> : <Plus size={13} />}
+                          </button>
+                        )}
                       </div>
                     </div>
-
-                    {/* Derivation / Etymology */}
-                    {w.derivation && (
-                      <div className="text-[11px] text-zinc-500 dark:text-zinc-400 font-serif italic line-clamp-1">
-                        {w.derivation}
-                      </div>
-                    )}
-
-                    {/* Definition */}
-                    <p className="text-xs text-zinc-600 dark:text-zinc-300 line-clamp-2 leading-relaxed">
-                      {w.definition}
-                    </p>
                   </div>
-
-                  {/* Card Bottom: Occurrences & Add to Canvas */}
-                  <div className="flex items-center justify-between pt-2.5 mt-2 border-t border-zinc-200/60 dark:border-zinc-700/50">
-                    <span className="text-[10px] text-zinc-400 font-medium">
-                      Occurs <strong className="text-accent">{w.occurrences}×</strong> in {w.testament}
-                    </span>
-
-                    <div className="flex items-center gap-1.5">
-                      {onSelectWord && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            onSelectWord(w);
-                            onClose();
-                          }}
-                          className="text-[11px] font-semibold text-accent hover:underline px-2 py-1 rounded cursor-pointer"
-                        >
-                          Deep Study
-                        </button>
-                      )}
-
-                      {onSendToCanvas && (
-                        <button
-                          type="button"
-                          onClick={() => handleAddWordToCanvas(w)}
-                          disabled={isAdded}
-                          className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
-                            isAdded
-                              ? 'bg-emerald-600 text-white border-emerald-600'
-                              : 'bg-surface hover:bg-accent hover:text-white border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-300'
-                          }`}
-                          title="Add this word study card to Canvas"
-                        >
-                          {isAdded ? <Check size={13} /> : <Plus size={13} />}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>

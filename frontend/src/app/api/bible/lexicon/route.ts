@@ -125,14 +125,62 @@ export async function GET(req: NextRequest) {
   // 2. English word / lemma reverse lookup
   if (word && REVERSE_INDEX) {
     const clean = word.toLowerCase().replace(/[^a-z]/g, '');
+    const candidates: string[] = [clean];
+
+    if (clean.endsWith('ed')) {
+      candidates.push(clean.slice(0, -1)); // created -> create, loved -> love
+      candidates.push(clean.slice(0, -2)); // walked -> walk
+    }
+    if (clean.endsWith('ing')) {
+      candidates.push(clean.slice(0, -3));
+      candidates.push(clean.slice(0, -3) + 'e'); // loving -> love, creating -> create
+    }
+    if (clean.endsWith('eth') || clean.endsWith('est')) {
+      candidates.push(clean.slice(0, -3));
+      candidates.push(clean.slice(0, -3) + 'e'); // maketh -> make, giveth -> give
+    }
+    if (clean.endsWith('es')) {
+      candidates.push(clean.slice(0, -2)); // churches -> church
+      candidates.push(clean.slice(0, -1)); // gives -> give
+    } else if (clean.endsWith('s') && !clean.endsWith('ss')) {
+      candidates.push(clean.slice(0, -1)); // heavens -> heaven, words -> word
+    }
+
+    const irregulars: Record<string, string> = {
+      spake: 'speak', dwelt: 'dwell', begat: 'beget', smote: 'smite',
+      saw: 'see', went: 'go', came: 'come', said: 'say', knew: 'know',
+      stood: 'stand', sent: 'send', gave: 'give', took: 'take',
+      found: 'find', made: 'make', built: 'build', heavens: 'heaven',
+      brethren: 'brother', children: 'child', men: 'man', women: 'woman',
+      feet: 'foot', eyes: 'eye', hearts: 'heart', holy: 'holy',
+      righteousness: 'righteous', faith: 'faith', spirit: 'spirit'
+    };
+    if (irregulars[clean]) {
+      candidates.push(irregulars[clean]);
+    }
+
     let matchedId: string | undefined;
 
-    if (testament === 'OT') {
-      matchedId = REVERSE_INDEX.OT[clean]?.[0] || REVERSE_INDEX.NT[clean]?.[0];
-    } else if (testament === 'NT') {
-      matchedId = REVERSE_INDEX.NT[clean]?.[0] || REVERSE_INDEX.OT[clean]?.[0];
-    } else {
-      matchedId = REVERSE_INDEX.OT[clean]?.[0] || REVERSE_INDEX.NT[clean]?.[0];
+    // Search preferred testament first
+    for (const c of candidates) {
+      if (testament === 'OT' && REVERSE_INDEX.OT[c]?.[0]) {
+        matchedId = REVERSE_INDEX.OT[c][0];
+        break;
+      }
+      if (testament === 'NT' && REVERSE_INDEX.NT[c]?.[0]) {
+        matchedId = REVERSE_INDEX.NT[c][0];
+        break;
+      }
+    }
+
+    // Fallback to either testament
+    if (!matchedId) {
+      for (const c of candidates) {
+        matchedId = testament === 'OT'
+          ? REVERSE_INDEX.OT[c]?.[0] || REVERSE_INDEX.NT[c]?.[0]
+          : REVERSE_INDEX.NT[c]?.[0] || REVERSE_INDEX.OT[c]?.[0];
+        if (matchedId) break;
+      }
     }
 
     if (matchedId) {
@@ -148,33 +196,6 @@ export async function GET(req: NextRequest) {
             'Cache-Control': 'public, max-age=31536000, immutable'
           }
         });
-      }
-    }
-
-    // Try common stem variations (e.g. strip s, es, ed, ing)
-    let stem = clean;
-    if (stem.endsWith('ing') && stem.length > 5) stem = stem.slice(0, -3);
-    else if (stem.endsWith('ed') && stem.length > 4) stem = stem.slice(0, -2);
-    else if (stem.endsWith('es') && stem.length > 4) stem = stem.slice(0, -2);
-    else if (stem.endsWith('s') && stem.length > 3 && !stem.endsWith('ss')) stem = stem.slice(0, -1);
-
-    if (stem !== clean) {
-      const stemId = testament === 'OT' 
-        ? REVERSE_INDEX.OT[stem]?.[0] || REVERSE_INDEX.NT[stem]?.[0]
-        : REVERSE_INDEX.NT[stem]?.[0] || REVERSE_INDEX.OT[stem]?.[0];
-      if (stemId) {
-        const rawEntry = stemId.startsWith('H') ? HEBREW_DATA?.[stemId] : GREEK_DATA?.[stemId];
-        if (rawEntry) {
-          const payload: LexiconWordPayload = {
-            ...rawEntry,
-            keyVerses: verseRef ? [verseRef] : []
-          };
-          return NextResponse.json({ success: true, word: payload }, {
-            headers: {
-              'Cache-Control': 'public, max-age=31536000, immutable'
-            }
-          });
-        }
       }
     }
   }

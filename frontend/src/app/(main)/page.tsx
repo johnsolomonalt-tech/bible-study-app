@@ -16,7 +16,7 @@ import { ScriptureBacklinksDrawer } from '@/components/bible/ScriptureBacklinksD
 import { InterlinearHoverCard } from '@/components/bible/InterlinearHoverCard';
 import { InterlinearModeRibbon } from '@/components/bible/InterlinearModeRibbon';
 import { VerseInterlinearModal } from '@/components/bible/VerseInterlinearModal';
-import { findInterlinearWord, getOrGenerateInterlinearWord, fetchInterlinearWord, getVerseInterlinearTokens, preloadChapterLexicon, STOPWORDS, InterlinearWord } from '@/lib/interlinearData';
+import { findInterlinearWord, getOrGenerateInterlinearWord, fetchInterlinearWord, getVerseInterlinearTokens, preloadChapterLexicon, CLIENT_LEXICON_CACHE, STOPWORDS, InterlinearWord } from '@/lib/interlinearData';
 import { getScriptureBacklinks, BacklinksResult } from '@/lib/backlinks';
 import { TheologicalLensSelector, TheologicalLensType, THEOLOGICAL_LENS_OPTIONS } from '@/components/chat/TheologicalLensSelector';
 import { ChatEmptyState } from '@/components/chat/ChatEmptyState';
@@ -886,9 +886,8 @@ export default function App() {
     }
   }, [isInterlinearMode]);
 
-  // Pre-load Strong's tagged chapter for accurate word-by-word reverse interlinear alignment
+  // Pre-load Strong's tagged chapter for accurate word-by-word reverse interlinear alignment and instant word study
   useEffect(() => {
-    if (!isInterlinearMode) return;
     let isCancelled = false;
     getStrongsPassage(activeBook.name, activeChapter)
       .then(async (ch) => {
@@ -906,7 +905,7 @@ export default function App() {
     return () => {
       isCancelled = true;
     };
-  }, [isInterlinearMode, activeBook.name, activeChapter]);
+  }, [activeBook.name, activeChapter]);
   const [backlinksDrawerState, setBacklinksDrawerState] = useState<{
     isOpen: boolean;
     reference: string;
@@ -3022,30 +3021,68 @@ export default function App() {
   };
 
   const handleSelectionWordStudy = async () => {
-    const rawText = selectedText || selectionRange?.toString().trim() || '';
-    if (!rawText) return;
-    const firstWord = rawText.split(/\s+/)[0].replace(/[^a-zA-Z]/g, '');
-    if (!firstWord) return;
-    const verseRef = `${activeBook.name} ${activeChapter}:${selectionVerse || 1}`;
+    const rawText = (selectedText || selectionRange?.toString() || '').trim();
+    const targetVerse = selectionVerse || 1;
+    const verseRef = `${activeBook.name} ${activeChapter}:${targetVerse}`;
+
     setToolbarPosition(null);
     window.getSelection()?.removeAllRanges();
 
-    // Check synchronous lookup first for 0ms render
-    const syncWord = getOrGenerateInterlinearWord(firstWord, isOldTestament, verseRef);
-    setActiveInterlinearWord({
-      word: syncWord,
-      position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
-      verseRef,
-    });
+    // 1. If multi-word selection or full verse: open comprehensive verse interlinear breakdown modal
+    const words = rawText ? rawText.split(/\s+/).filter(Boolean) : [];
+    if (words.length > 1 || !rawText) {
+      setVerseInterlinearTarget(targetVerse);
+      setIsVerseInterlinearOpen(true);
+      return;
+    }
 
-    // Asynchronously resolve authentic Strong's entry (e.g. Jezreel -> H3157)
-    const authenticWord = await fetchInterlinearWord(firstWord, isOldTestament, verseRef);
-    if (authenticWord && authenticWord.id !== syncWord.id) {
+    // 2. Single word selected:
+    const cleanWord = words[0].replace(/[^a-zA-Z]/g, '').trim();
+    if (!cleanWord || STOPWORDS.has(cleanWord.toLowerCase())) {
+      setVerseInterlinearTarget(targetVerse);
+      setIsVerseInterlinearOpen(true);
+      return;
+    }
+
+    // 3. Search for authentic Strong's tagged token in the verse
+    let matchedStrongId: string | undefined = undefined;
+    const taggedVerse = strongsVersesMap[targetVerse];
+    if (taggedVerse) {
+      const tokens = getVerseInterlinearTokens(taggedVerse, isOldTestament, verseRef);
+      const cleanLower = cleanWord.toLowerCase();
+      const foundToken = tokens.find(t =>
+        t.isWord && t.cleanWord && (
+          t.cleanWord.toLowerCase() === cleanLower ||
+          cleanLower.startsWith(t.cleanWord.toLowerCase().slice(0, 4)) ||
+          t.cleanWord.toLowerCase().startsWith(cleanLower.slice(0, 4))
+        ) && t.strongsId
+      );
+      if (foundToken) {
+        matchedStrongId = foundToken.strongsId;
+      }
+    }
+
+    // 4. Resolve authentic lexical entry
+    let wordToDisplay: InterlinearWord | null = null;
+    if (matchedStrongId && CLIENT_LEXICON_CACHE.has(matchedStrongId)) {
+      wordToDisplay = CLIENT_LEXICON_CACHE.get(matchedStrongId)!;
+    } else {
+      const authenticWord = await fetchInterlinearWord(cleanWord, isOldTestament, verseRef, matchedStrongId);
+      if (authenticWord && authenticWord.lemma && authenticWord.lemma !== '—') {
+        wordToDisplay = authenticWord;
+      }
+    }
+
+    if (wordToDisplay && wordToDisplay.lemma && wordToDisplay.lemma !== '—') {
       setActiveInterlinearWord({
-        word: authenticWord,
+        word: wordToDisplay,
         position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
         verseRef,
       });
+    } else {
+      // Fallback: If word is unindexed, open full verse breakdown modal
+      setVerseInterlinearTarget(targetVerse);
+      setIsVerseInterlinearOpen(true);
     }
   };
 
@@ -3727,6 +3764,7 @@ export default function App() {
         if (isLectioModalOpen) { setIsLectioModalOpen(false); return; }
         if (backlinksDrawerState.isOpen) { setBacklinksDrawerState(prev => ({ ...prev, isOpen: false })); return; }
         if (activeInterlinearWord) { setActiveInterlinearWord(null); return; }
+        if (isVerseInterlinearOpen) { setIsVerseInterlinearOpen(false); return; }
         if (isDesktopMoreMenuOpen) { setIsDesktopMoreMenuOpen(false); return; }
         if (isMobileMoreMenuOpen) { setIsMobileMoreMenuOpen(false); return; }
       }
@@ -3792,6 +3830,7 @@ export default function App() {
     isLectioModalOpen, 
     backlinksDrawerState.isOpen, 
     activeInterlinearWord, 
+    isVerseInterlinearOpen,
     isDesktopMoreMenuOpen, 
     isMobileMoreMenuOpen
   ]);
@@ -7235,6 +7274,7 @@ export default function App() {
           verses={bibleVerses}
           isOldTestament={isOldTestament}
           theme={theme as 'dark' | 'light'}
+          strongsVersesMap={strongsVersesMap}
           onSendToCanvas={handleSendWordStudyToCanvas}
           onSelectWord={(w) => {
             setActiveInterlinearWord({
@@ -7248,7 +7288,7 @@ export default function App() {
         {/* Reverse Interlinear Original Language Word Card */}
         {activeInterlinearWord && (
           <div 
-            className="fixed inset-0 z-50 pointer-events-auto flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+            className="fixed inset-0 z-[70] pointer-events-auto flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
             onClick={() => setActiveInterlinearWord(null)}
           >
             <div onClick={(e) => e.stopPropagation()}>
