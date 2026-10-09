@@ -469,6 +469,7 @@ const AiThinkingIndicator = ({
 }) => {
   const [showLiveThoughts, setShowLiveThoughts] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
+  const thoughtsContainerRef = useRef<HTMLDivElement>(null);
 
   // Real-time elapsed stopwatch (updates every 100ms)
   useEffect(() => {
@@ -479,7 +480,15 @@ const AiThinkingIndicator = ({
     return () => clearInterval(timer);
   }, []);
 
+  // Auto-scroll thoughts stream to bottom when expanded as new thoughts arrive
+  useEffect(() => {
+    if (showLiveThoughts && thoughtsContainerRef.current) {
+      thoughtsContainerRef.current.scrollTop = thoughtsContainerRef.current.scrollHeight;
+    }
+  }, [thinkingText, showLiveThoughts]);
+
   const elapsedSec = (elapsedMs / 1000).toFixed(1);
+  const trimmedThinking = thinkingText?.trim() || '';
 
   return (
     <div className={`flex flex-col items-start w-full ${isFullView ? 'max-w-3xl mx-auto' : ''} py-3 animate-in fade-in duration-200`}>
@@ -510,7 +519,7 @@ const AiThinkingIndicator = ({
             </span>
           </div>
 
-          {thinkingText && (
+          {trimmedThinking && (
             <button
               type="button"
               onClick={() => setShowLiveThoughts(prev => !prev)}
@@ -522,15 +531,54 @@ const AiThinkingIndicator = ({
           )}
         </div>
 
-        {/* Real-time thoughts stream */}
-        {thinkingText && showLiveThoughts && (
-          <div className="px-4 py-3 bg-bg/60 text-[12px] leading-relaxed text-muted/90 max-h-56 overflow-y-auto custom-scroll whitespace-pre-wrap border-t border-border-soft/50 animate-in fade-in duration-150">
-            <div className="flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-wider text-accent mb-1.5 select-none">
-              <Sparkles size={10} />
-              <span>Thinking Process</span>
+        {/* Live thinking preview: couple of lines with '... Show thinking' */}
+        {trimmedThinking && !showLiveThoughts && (
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => setShowLiveThoughts(true)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setShowLiveThoughts(true);
+              }
+            }}
+            className="w-full text-left px-3.5 py-2.5 border-t border-border-soft/50 bg-bg/30 hover:bg-bg/50 transition-colors cursor-pointer group block select-none"
+          >
+            <p className="text-[12px] leading-relaxed text-muted/85 font-sans line-clamp-2 selection:bg-accent/20">
+              {trimmedThinking}
+            </p>
+            <div className="mt-1.5 flex items-center gap-1 text-[11px] font-medium text-accent group-hover:text-accent/90">
+              <span>... Show thinking</span>
+              <ChevronDown size={12} className="transition-transform duration-150 group-hover:translate-y-0.5" />
             </div>
-            {thinkingText}
-            <span className="inline-block w-1.5 h-3 ml-1 bg-accent animate-pulse align-middle" />
+          </div>
+        )}
+
+        {/* Real-time thoughts stream (expanded) */}
+        {trimmedThinking && showLiveThoughts && (
+          <div className="border-t border-border-soft/50 bg-bg/60 animate-in fade-in duration-150">
+            <div className="flex items-center justify-between px-3.5 pt-2.5 pb-1 select-none">
+              <div className="flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-wider text-accent">
+                <Sparkles size={11} />
+                <span>Thinking Process</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowLiveThoughts(false)}
+                className="text-[11px] text-muted hover:text-fg transition-colors flex items-center gap-1 cursor-pointer"
+              >
+                <span>Hide thinking</span>
+                <ChevronDown size={12} className="rotate-180 transition-transform duration-200" />
+              </button>
+            </div>
+            <div 
+              ref={thoughtsContainerRef}
+              className="px-3.5 pb-3 pt-1 text-[12px] leading-relaxed text-muted/90 max-h-56 overflow-y-auto custom-scroll whitespace-pre-wrap selection:bg-accent/20 font-sans"
+            >
+              {trimmedThinking}
+              <span className="inline-block w-1.5 h-3.5 ml-1 bg-accent animate-pulse align-middle" />
+            </div>
           </div>
         )}
       </div>
