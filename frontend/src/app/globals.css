@@ -368,21 +368,36 @@ mark.hl-purple {
 }
 
 /* Blue temporary selection highlight when dragging across scripture text */
+.bible-reader-content::selection,
 .bible-reader-content ::selection,
-.bible-reader-content *::selection {
-  background-color: rgba(59, 130, 246, 0.40) !important;
+.bible-reader-content *::selection,
+[data-verse]::selection,
+[data-verse] *::selection,
+.verse-text::selection,
+.verse-text *::selection {
+  background-color: rgba(59, 130, 246, 0.45) !important;
   color: inherit !important;
 }
 
+:root[data-theme='light'] .bible-reader-content::selection,
 :root[data-theme='light'] .bible-reader-content ::selection,
-:root[data-theme='light'] .bible-reader-content *::selection {
-  background-color: rgba(59, 130, 246, 0.32) !important;
+:root[data-theme='light'] .bible-reader-content *::selection,
+:root[data-theme='light'] [data-verse]::selection,
+:root[data-theme='light'] [data-verse] *::selection,
+:root[data-theme='light'] .verse-text::selection,
+:root[data-theme='light'] .verse-text *::selection {
+  background-color: rgba(59, 130, 246, 0.35) !important;
   color: inherit !important;
 }
 
+:root[data-theme='sepia'] .bible-reader-content::selection,
 :root[data-theme='sepia'] .bible-reader-content ::selection,
-:root[data-theme='sepia'] .bible-reader-content *::selection {
-  background-color: rgba(37, 99, 235, 0.28) !important;
+:root[data-theme='sepia'] .bible-reader-content *::selection,
+:root[data-theme='sepia'] [data-verse]::selection,
+:root[data-theme='sepia'] [data-verse] *::selection,
+:root[data-theme='sepia'] .verse-text::selection,
+:root[data-theme='sepia'] .verse-text *::selection {
+  background-color: rgba(37, 99, 235, 0.32) !important;
   color: inherit !important;
 }
 

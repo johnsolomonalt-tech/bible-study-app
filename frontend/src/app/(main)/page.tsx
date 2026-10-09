@@ -2,7 +2,7 @@
 const API_URL = '';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useAuth, UserButton, SignIn } from '@clerk/nextjs';
+import { useAuth, UserButton, SignIn, SignInButton } from '@clerk/nextjs';
 import { Send, Plus, Layout, Edit, Sparkles, Target, Check, Copy, ChevronRight, ChevronLeft, ChevronDown, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquare, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow, ShieldCheck, Heart, Layers, Languages, MoreVertical, Search, BookMarked, Quote, Compass, ArrowRight, Square, BrainCircuit, FileText, UploadCloud } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import TextareaAutosize from 'react-textarea-autosize';
@@ -802,6 +802,9 @@ export default function App() {
   }, []);
   
   const fetchWithAuth = useCallback(async (url: string, options: RequestInit = {}) => {
+    if (!userId) {
+      return new Response(JSON.stringify({ error: 'Guest mode' }), { status: 401 });
+    }
     const token = await getToken();
     return fetch(url, {
       ...options,
@@ -810,7 +813,7 @@ export default function App() {
         Authorization: `Bearer ${token}`
       }
     });
-  }, [getToken]);
+  }, [getToken, userId]);
   const [activeTab, setActiveTab] = useState('study'); // study, notes, chats, tracker, devotional, canvas
   const [canvasFocusTrigger, setCanvasFocusTrigger] = useState(0);
   const [canvasIncomingNode, setCanvasIncomingNode] = useState<{
@@ -2384,62 +2387,78 @@ export default function App() {
 
   // Load Data & Sync Account Streak across devices
   useEffect(() => {
-    initSessionTracking(userId);
-
-    // Register sync callbacks so habit activities immediately push to account
-    registerStreakSyncCallback(() => {
-      queueStreakPush(fetchWithAuth, dailyChapterGoalRef.current, 200);
-    });
-
-    // Load local highlights immediately, then sync all user highlights from account
+    // Load local highlights immediately
     const localHls = getLocalHighlights();
     if (localHls.length > 0) {
       setHighlights(localHls);
     }
-    fetchWithAuth(`${API_URL}/api/highlights`)
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (Array.isArray(data)) {
-          setHighlights(prev => {
-            const map = new Map<number, typeof prev[0]>();
-            data.forEach(ch => map.set(ch.id, ch));
-            // Keep pending local items not yet assigned server IDs
-            prev.filter(h => h.id > 1000000000000).forEach(h => map.set(h.id, h));
-            const merged = Array.from(map.values());
-            saveLocalHighlights(merged);
-            return merged;
-          });
-        }
-      })
-      .catch(e => console.warn("Using local highlights cache", e));
 
-    fetchWithAuth(`${API_URL}/api/notes`).then(r => r.json()).then(data => {
-      setNotes(data);
-    });
-    fetchWithAuth(`${API_URL}/api/chats`).then(r => r.json()).then(data => {
-      setChats(data);
-      if (Array.isArray(data)) {
-        data.forEach((c: { title: string }) => seenTitles.add(c.title));
-        const savedChatIdStr = getPreference(PREF_KEYS.ACTIVE_CHAT_ID);
-        const savedChatId = savedChatIdStr ? parseInt(savedChatIdStr, 10) : null;
-        if (savedChatId && data.some((c: { id: number }) => c.id === savedChatId)) {
-          setActiveChatId(savedChatId);
-        } else {
-          setActiveChatId(null);
-        }
-      }
-    });
-    fetchWithAuth(`${API_URL}/api/tracker`).then(r => r.json()).then(data => {
-      setCompletedChapters(data.map((item: {chapterId: string}) => item.chapterId));
-    });
+    if (userId) {
+      initSessionTracking(userId);
 
-    // 1. Initial Pull: syncs streaks, habits, reading pace from account
-    pullStreakFromAccount(fetchWithAuth, dailyChapterGoalRef.current).then(res => {
-      if (res?.dailyChapterGoal && typeof res.dailyChapterGoal === 'number' && res.dailyChapterGoal > 0) {
-        setDailyChapterGoal(res.dailyChapterGoal);
-        setPreference(PREF_KEYS.DAILY_CHAPTER_GOAL, String(res.dailyChapterGoal));
-      }
-    });
+      // Register sync callbacks so habit activities immediately push to account
+      registerStreakSyncCallback(() => {
+        queueStreakPush(fetchWithAuth, dailyChapterGoalRef.current, 200);
+      });
+
+      fetchWithAuth(`${API_URL}/api/highlights`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (Array.isArray(data)) {
+            setHighlights(prev => {
+              const map = new Map<number, typeof prev[0]>();
+              data.forEach(ch => map.set(ch.id, ch));
+              // Keep pending local items not yet assigned server IDs
+              prev.filter(h => h.id > 1000000000000).forEach(h => map.set(h.id, h));
+              const merged = Array.from(map.values());
+              saveLocalHighlights(merged);
+              return merged;
+            });
+          }
+        })
+        .catch(e => console.warn("Using local highlights cache", e));
+
+      fetchWithAuth(`${API_URL}/api/notes`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (Array.isArray(data)) setNotes(data);
+        })
+        .catch(() => {});
+
+      fetchWithAuth(`${API_URL}/api/chats`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (Array.isArray(data)) {
+            setChats(data);
+            data.forEach((c: { title: string }) => seenTitles.add(c.title));
+            const savedChatIdStr = getPreference(PREF_KEYS.ACTIVE_CHAT_ID);
+            const savedChatId = savedChatIdStr ? parseInt(savedChatIdStr, 10) : null;
+            if (savedChatId && data.some((c: { id: number }) => c.id === savedChatId)) {
+              setActiveChatId(savedChatId);
+            } else {
+              setActiveChatId(null);
+            }
+          }
+        })
+        .catch(() => {});
+
+      fetchWithAuth(`${API_URL}/api/tracker`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (Array.isArray(data)) {
+            setCompletedChapters(data.map((item: {chapterId: string}) => item.chapterId));
+          }
+        })
+        .catch(() => {});
+
+      // 1. Initial Pull: syncs streaks, habits, reading pace from account
+      pullStreakFromAccount(fetchWithAuth, dailyChapterGoalRef.current).then(res => {
+        if (res?.dailyChapterGoal && typeof res.dailyChapterGoal === 'number' && res.dailyChapterGoal > 0) {
+          setDailyChapterGoal(res.dailyChapterGoal);
+          setPreference(PREF_KEYS.DAILY_CHAPTER_GOAL, String(res.dailyChapterGoal));
+        }
+      });
+    }
 
     // 2. High-speed cross-device sync: trigger pull whenever tab gains focus or becomes visible
     const handleAccountSyncOnActive = () => {
@@ -2549,6 +2568,10 @@ export default function App() {
     const vObj = bibleVerses.find(v => v.verse === verseNum);
     if (!vObj) return;
 
+    if (typeof window !== 'undefined') {
+      window.getSelection()?.removeAllRanges();
+    }
+
     const cleanText = parseVerseFootnote(vObj.text).mainText;
 
     // Trigger clean quick fade-in / smooth fade-out pulse animation on click (like verse links)
@@ -2612,11 +2635,10 @@ export default function App() {
     if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
       return;
     }
-    const rawText = selection.toString().trim();
+    const range = selection.getRangeAt(0);
+    const rawText = (selection.toString() || range.toString()).trim();
     // Do not trigger toolbar on empty text or isolated verse numbers
     if (!rawText || /^\d+$/.test(rawText)) return;
-
-    const range = selection.getRangeAt(0);
     let rect = range.getBoundingClientRect();
     if ((rect.width === 0 || rect.height === 0) && range.getClientRects().length > 0) {
       rect = range.getClientRects()[0];
@@ -2730,9 +2752,9 @@ export default function App() {
         isBelow
       });
     }
-  }, []);
+  }, [highlights, activeBook.name, activeChapter]);
 
-  // Dismiss toolbar when clicking outside (safely ignoring selection, toolbar, and verse clicks)
+  // Dismiss toolbar when clicking outside (safely ignoring active text selection and toolbar buttons)
   useEffect(() => {
     const handleDocumentClick = (e: MouseEvent | TouchEvent) => {
       const target = e.target as HTMLElement | null;
@@ -2741,15 +2763,15 @@ export default function App() {
         target.closest('.floating-verse-toolbar') || 
         target.closest('.verse-number-btn') || 
         target.closest('.verse-number') || 
-        target.closest('[data-verse]') ||
         target.closest('mark')
       ) {
         return;
       }
       
-      // If user clicked inside the reader container but outside a verse, only keep if text is actively selected
+      // If user clicked inside the reader container, only keep if text is actively selected
       const selection = window.getSelection();
-      if (target.closest('.bible-reader-content') && selection && !selection.isCollapsed && selection.toString().trim().length > 0) {
+      const hasActiveSelection = selection && !selection.isCollapsed && (selection.toString() || (selection.rangeCount > 0 ? selection.getRangeAt(0).toString() : '')).trim().length > 0;
+      if (hasActiveSelection) {
         return;
       }
 
@@ -2757,13 +2779,14 @@ export default function App() {
       setSelectionVerse(null);
       setEndVerseNumber(null);
       setSelectedText('');
-      window.getSelection()?.removeAllRanges();
     };
 
     document.addEventListener('mousedown', handleDocumentClick);
+    document.addEventListener('click', handleDocumentClick);
     document.addEventListener('touchend', handleDocumentClick);
     return () => {
       document.removeEventListener('mousedown', handleDocumentClick);
+      document.removeEventListener('click', handleDocumentClick);
       document.removeEventListener('touchend', handleDocumentClick);
     };
   }, []);
@@ -2774,14 +2797,16 @@ export default function App() {
 
     const checkAndTriggerSelection = () => {
       const sel = window.getSelection();
-      if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) {
-        const range = sel.getRangeAt(0);
-        const el = range.startContainer.nodeType === Node.ELEMENT_NODE 
-          ? (range.startContainer as HTMLElement) 
-          : range.startContainer.parentElement;
-        if (el?.closest('.bible-reader-content')) {
-          handleSelection();
-        }
+      if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+      const range = sel.getRangeAt(0);
+      const rawText = (sel.toString() || range.toString()).trim();
+      if (!rawText || /^\d+$/.test(rawText)) return;
+
+      const el = range.startContainer.nodeType === Node.ELEMENT_NODE 
+        ? (range.startContainer as HTMLElement) 
+        : range.startContainer.parentElement;
+      if (el?.closest('.bible-reader-content') || el?.closest('[data-verse]')) {
+        handleSelection();
       }
     };
 
@@ -3315,7 +3340,7 @@ export default function App() {
                 });
               }
             }}
-            className="inline-block text-center align-baseline cursor-pointer group px-0.5 select-none max-w-full break-inside-avoid"
+            className="inline-block text-center align-baseline cursor-pointer group px-0.5 max-w-full break-inside-avoid select-text"
             title={`${match.lemma} (${match.strongs}) - Click to inspect`}
           >
             <span className="block text-center leading-none mb-1 select-none pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity">
@@ -3340,7 +3365,7 @@ export default function App() {
               )}
             </span>
 
-            <span className="block text-center border-b border-dotted border-border-soft/80 group-hover:border-accent group-hover:text-accent transition-colors leading-normal font-serif break-words">
+            <span className="block text-center border-b border-dotted border-border-soft/80 group-hover:border-accent group-hover:text-accent transition-colors leading-normal font-serif break-words select-text">
               {token.rawText}
             </span>
           </span>
@@ -4466,14 +4491,6 @@ export default function App() {
   };
 
   if (!isLoaded) return <div className="h-screen w-full flex items-center justify-center bg-bg text-white">Loading...</div>;
-  
-  if (!userId) {
-    return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-bg p-4 overflow-y-auto">
-        <SignIn routing="hash" />
-      </div>
-    );
-  }
 
   return (
     <>
@@ -4587,7 +4604,18 @@ export default function App() {
           <button onClick={() => setIsSettingsOpen(true)} className="text-muted hover:text-fg transition-colors p-1.5 rounded-lg hover:bg-surface cursor-pointer" title="Settings">
             <Settings size={18} />
           </button>
-          <UserButton />
+          {userId ? (
+            <UserButton />
+          ) : (
+            <SignInButton mode="modal">
+              <button 
+                type="button" 
+                className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-accent text-white hover:opacity-90 transition-opacity cursor-pointer shadow-xs shrink-0"
+              >
+                Sign In
+              </button>
+            </SignInButton>
+          )}
         </div>
 
         {/* SETTINGS MODAL */}
