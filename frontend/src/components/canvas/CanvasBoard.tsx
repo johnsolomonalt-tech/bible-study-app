@@ -2132,12 +2132,19 @@ function InnerCanvasBoard({
     }
 
     if (isActiveTab) {
-      setIsCreatePageActive(true);
+      if (!incomingNode) {
+        try {
+          const localList = localStorage.getItem(STORAGE_KEY_BOARDS_LIST);
+          if (!localList || localList === '[]') {
+            setIsCreatePageActive(true);
+          }
+        } catch {}
+      }
       if (typeof window !== 'undefined' && window.innerWidth >= 768) {
         setIsSidebarOpen(true);
       }
     }
-  }, [focusTrigger, isActiveTab]);
+  }, [focusTrigger, isActiveTab, incomingNode]);
 
   // Support ?importCanvas=... parameter and ?imported=1
   useEffect(() => {

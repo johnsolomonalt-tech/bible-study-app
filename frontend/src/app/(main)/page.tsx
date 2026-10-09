@@ -802,16 +802,21 @@ export default function App() {
   }, []);
   
   const fetchWithAuth = useCallback(async (url: string, options: RequestInit = {}) => {
-    if (!userId) {
-      return new Response(JSON.stringify({ error: 'Guest mode' }), { status: 401 });
+    let token: string | null = null;
+    if (userId) {
+      try {
+        token = await getToken();
+      } catch {}
     }
-    const token = await getToken();
+    const headers: Record<string, string> = {
+      ...((options.headers as Record<string, string>) || {}),
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
     return fetch(url, {
       ...options,
-      headers: {
-        ...options.headers,
-        Authorization: `Bearer ${token}`
-      }
+      headers
     });
   }, [getToken, userId]);
   const [activeTab, setActiveTab] = useState('study'); // study, notes, chats, tracker, devotional, canvas
@@ -2736,13 +2741,22 @@ export default function App() {
       }
 
       // Check if selected text touches or overlaps existing highlight(s)
-      const overlappingHighlights = highlights.filter(h => {
+      let overlappingHighlights = highlights.filter(h => {
         if (!isSameBook(h.book, activeBook.name) || Number(h.chapter) !== Number(activeChapter)) return false;
         if (Number(h.verse) < actualStart || Number(h.verse) > actualEnd) return false;
         const hNorm = h.text.trim().toLowerCase();
         const selNorm = rawText.trim().toLowerCase();
         return hNorm === selNorm || selNorm.includes(hNorm) || hNorm.includes(selNorm) || (actualStart !== actualEnd);
       });
+
+      if (overlappingHighlights.length === 0) {
+        overlappingHighlights = highlights.filter(h => 
+          isSameBook(h.book, activeBook.name) && 
+          Number(h.chapter) === Number(activeChapter) && 
+          Number(h.verse) >= actualStart && 
+          Number(h.verse) <= actualEnd
+        );
+      }
 
       setToolbarPosition({
         x,
@@ -3066,6 +3080,7 @@ export default function App() {
     // Switch to AI tab
     setMobileStudyView('ai');
     if (!showRightSidebar) setShowRightSidebar(true);
+    try { rightPanelRef.current?.expand(); } catch {}
     
     setToolbarPosition(null);
     setSelectionVerse(null);
@@ -3111,15 +3126,20 @@ export default function App() {
       return [...prev, newQuote];
     });
     
-    // Switch to AI tab
+    // Switch to AI tab / open right sidebar
     setMobileStudyView('ai');
-    if (!showRightSidebar) setShowRightSidebar(true);
+    setShowRightSidebar(true);
+    try { rightPanelRef.current?.expand(); } catch {}
     
     setToolbarPosition(null);
     setSelectionVerse(null);
     setEndVerseNumber(null);
     setSelectedText('');
     window.getSelection()?.removeAllRanges();
+
+    setTimeout(() => {
+      chatInputRef.current?.focus();
+    }, 100);
   };
 
   const addHighlightToCanvas = () => {
@@ -3180,9 +3200,10 @@ export default function App() {
     content: string;
     category: NodeCategory;
   }) => {
+    setIsVerseInterlinearOpen(false);
+    setActiveInterlinearWord(null);
     setCanvasIncomingNode(nodePayload);
     setActiveTab('canvas');
-    setActiveInterlinearWord(null);
   };
 
   const handleSaveLectioToNotes = async (title: string, content: string) => {
@@ -3283,7 +3304,7 @@ export default function App() {
 
   const renderTextWithInterlinear = (rawStr: string, verseNum: number) => {
     if (!isInterlinearMode) {
-      return rawStr;
+      return rawStr.replace(/\[\s*[HG]\d+\s*\]/g, '').replace(/<\/?em>/gi, '');
     }
     const verseRef = `${activeBook.name} ${activeChapter}:${verseNum}`;
     const taggedStr = strongsVersesMap[verseNum];
@@ -3407,7 +3428,7 @@ export default function App() {
               });
             }
           }}
-          className="inline-block text-center align-baseline cursor-pointer group px-0.5 select-none max-w-full break-inside-avoid"
+          className="inline-block text-center align-baseline cursor-pointer group px-0.5 select-text max-w-full break-inside-avoid"
           title={`${match.lemma} (${match.strongs}) - Click to inspect`}
         >
           <span className="block text-center leading-none mb-1 select-none pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity">
@@ -4198,35 +4219,42 @@ export default function App() {
 
     // Create a new chat automatically if none exists
     if (!targetChatId) {
+      let createdChatId = Date.now();
+      let newChat: any = {
+        id: createdChatId,
+        title: 'New Conversation',
+        messages: []
+      };
+
       try {
         const res = await fetchWithAuth(`${API_URL}/api/chats`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title: 'New Conversation' })
         });
-        if (!res.ok) {
-          setIsAiTyping(false);
-          alert('Failed to initialize conversation. Please check your connection and try again.');
-          return;
+        if (res.ok) {
+          const serverChat = await res.json();
+          if (serverChat && serverChat.id) {
+            newChat = serverChat;
+            createdChatId = serverChat.id;
+          }
         }
-        const newChat = await res.json();
-        targetChatId = newChat.id;
-        
-        const newMsg = { 
-          role: 'user', 
-          content: textToSend.trim(), 
-          imagePreview: currentAttached?.preview || currentImage?.preview,
-          attachedFile: optimisticAttached,
-        };
-        const chatWithOptimisticMsg = { ...newChat, messages: [newMsg] };
-        
-        setChats(prev => [chatWithOptimisticMsg, ...prev]);
-        setActiveChatId(newChat.id);
       } catch (err) {
-        setIsAiTyping(false);
-        console.error('Error creating chat:', err);
-        return;
+        console.warn('Chat initialized locally:', err);
       }
+
+      targetChatId = createdChatId;
+      
+      const newMsg = { 
+        role: 'user', 
+        content: textToSend.trim(), 
+        imagePreview: currentAttached?.preview || currentImage?.preview,
+        attachedFile: optimisticAttached,
+      };
+      const chatWithOptimisticMsg = { ...newChat, messages: [newMsg] };
+      
+      setChats(prev => [chatWithOptimisticMsg, ...prev]);
+      setActiveChatId(createdChatId);
     } else {
       const newMsg = { 
         role: 'user', 
