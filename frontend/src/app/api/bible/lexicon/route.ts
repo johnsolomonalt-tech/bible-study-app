@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
   const ip = getClientIp(req);
   const rateLimit = checkRateLimit(`bible_lexicon:${ip}`, {
     windowMs: 60 * 1000,
-    maxRequests: 180,
+    maxRequests: 1200,
   });
   if (!rateLimit.success) {
     return NextResponse.json(
@@ -201,4 +201,35 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({ success: false, error: 'Word not found in biblical lexicon' }, { status: 404 });
+}
+
+export async function POST(req: NextRequest) {
+  loadLexiconData();
+
+  try {
+    const body = await req.json();
+    const { ids, verseRef } = body;
+    if (Array.isArray(ids)) {
+      const words: Record<string, LexiconWordPayload> = {};
+      for (const rawId of ids) {
+        const uId = String(rawId).trim().toUpperCase();
+        let rawEntry: any = null;
+        if (uId.startsWith('H') && HEBREW_DATA) {
+          rawEntry = HEBREW_DATA[uId];
+        } else if (uId.startsWith('G') && GREEK_DATA) {
+          rawEntry = GREEK_DATA[uId];
+        }
+        if (rawEntry) {
+          words[uId] = {
+            ...rawEntry,
+            keyVerses: verseRef ? [verseRef] : [],
+          };
+        }
+      }
+      return NextResponse.json({ success: true, words });
+    }
+    return NextResponse.json({ error: 'ids array required' }, { status: 400 });
+  } catch (err) {
+    return NextResponse.json({ error: 'Failed to process request' }, { status: 500 });
+  }
 }

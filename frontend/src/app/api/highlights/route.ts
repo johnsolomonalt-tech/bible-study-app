@@ -113,3 +113,71 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
+export async function DELETE(request: Request) {
+  const { userId } = await auth();
+  if (!userId) {
+    return new NextResponse('Unauthorized', { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get('id');
+  const ids = searchParams.get('ids');
+  const book = searchParams.get('book');
+  const chapter = searchParams.get('chapter');
+  const verse = searchParams.get('verse');
+
+  try {
+    if (ids) {
+      const idList = ids.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n) && n < 1000000000000);
+      if (idList.length > 0) {
+        await prisma.highlight.deleteMany({
+          where: {
+            userId,
+            id: { in: idList }
+          }
+        });
+      }
+      return NextResponse.json({ success: true });
+    }
+
+    if (id) {
+      const parsedId = parseInt(id, 10);
+      if (!isNaN(parsedId) && parsedId < 1000000000000) {
+        await prisma.highlight.deleteMany({
+          where: {
+            userId,
+            id: parsedId
+          }
+        });
+      }
+      return NextResponse.json({ success: true });
+    }
+
+    if (book && chapter && verse) {
+      const numChapter = parseInt(chapter, 10);
+      const numVerse = parseInt(verse, 10);
+      const bookMeta = findCanonicalBook(book);
+      const possibleBooks = bookMeta 
+        ? Array.from(new Set([book, bookMeta.name, bookMeta.code, ...bookMeta.aliases]))
+        : [book];
+
+      await prisma.highlight.deleteMany({
+        where: {
+          userId,
+          chapter: numChapter,
+          verse: numVerse,
+          OR: possibleBooks.map(b => ({
+            book: { equals: b, mode: 'insensitive' }
+          }))
+        }
+      });
+      return NextResponse.json({ success: true });
+    }
+
+    return NextResponse.json({ error: 'Missing criteria for deletion' }, { status: 400 });
+  } catch (error) {
+    console.error('Failed to delete highlights:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

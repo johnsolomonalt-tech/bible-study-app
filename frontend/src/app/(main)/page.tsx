@@ -874,7 +874,7 @@ export default function App() {
   const [selectionVerse, setSelectionVerse] = useState<number | null>(null);
   const [endVerseNumber, setEndVerseNumber] = useState<number | null>(null);
   const [selectedText, setSelectedText] = useState<string>('');
-  const [toolbarPosition, setToolbarPosition] = useState<{x: number, y: number, highlightId?: number, isBelow?: boolean} | null>(null);
+  const [toolbarPosition, setToolbarPosition] = useState<{x: number, y: number, highlightId?: number, highlightIds?: number[], isBelow?: boolean} | null>(null);
   const [activeHighlightMenu, setActiveHighlightMenu] = useState<{id: number, x: number, y: number} | null>(null);
   
   const [activeBook, setActiveBook] = useState(OT_BOOKS[0]);
@@ -938,15 +938,15 @@ export default function App() {
   useEffect(() => {
     let isCancelled = false;
     getStrongsPassage(activeBook.name, activeChapter)
-      .then(async (ch) => {
+      .then((ch) => {
         if (ch && ch.verses) {
-          await preloadChapterLexicon(ch.verses);
           if (isCancelled) return;
           const map: Record<number, string> = {};
           ch.verses.forEach((v) => {
             map[v.verse] = v.text;
           });
           setStrongsVersesMap(map);
+          preloadChapterLexicon(ch.verses).catch(() => {});
         }
       })
       .catch(() => {});
@@ -2563,12 +2563,11 @@ export default function App() {
       }, 1500);
     });
 
-    // Check if this verse already has a whole-verse highlight in current chapter
-    const existingWholeHl = highlights.find(h => 
+    // Check if this verse has ANY highlight(s) in current chapter
+    const verseHighlights = highlights.filter(h => 
       isSameBook(h.book, activeBook.name) && 
       Number(h.chapter) === Number(activeChapter) && 
-      Number(h.verse) === Number(verseNum) &&
-      (h.text === cleanText || h.text.trim().length >= cleanText.trim().length * 0.8)
+      Number(h.verse) === Number(verseNum)
     );
 
     setSelectionVerse(verseNum);
@@ -2599,7 +2598,8 @@ export default function App() {
     setToolbarPosition({
       x,
       y,
-      highlightId: existingWholeHl?.id,
+      highlightId: verseHighlights.length > 0 ? verseHighlights[0].id : undefined,
+      highlightIds: verseHighlights.map(h => h.id),
       isBelow: isNearTop
     });
   };
@@ -2713,10 +2713,20 @@ export default function App() {
         y = Math.max(122, rect.top - 6);
       }
 
+      // Check if selected text touches or overlaps existing highlight(s)
+      const overlappingHighlights = highlights.filter(h => {
+        if (!isSameBook(h.book, activeBook.name) || Number(h.chapter) !== Number(activeChapter)) return false;
+        if (Number(h.verse) < actualStart || Number(h.verse) > actualEnd) return false;
+        const hNorm = h.text.trim().toLowerCase();
+        const selNorm = rawText.trim().toLowerCase();
+        return hNorm === selNorm || selNorm.includes(hNorm) || hNorm.includes(selNorm) || (actualStart !== actualEnd);
+      });
+
       setToolbarPosition({
         x,
         y,
-        highlightId: undefined, // New selection always applies a fresh highlight to the selected text
+        highlightId: overlappingHighlights.length > 0 ? overlappingHighlights[0].id : undefined,
+        highlightIds: overlappingHighlights.map(h => h.id),
         isBelow
       });
     }
@@ -2822,8 +2832,11 @@ export default function App() {
     
     if (toolbarPosition?.highlightId) {
       const existingId = toolbarPosition.highlightId;
+      const targetIds = toolbarPosition.highlightIds && toolbarPosition.highlightIds.length > 0 
+        ? toolbarPosition.highlightIds 
+        : [existingId];
       setHighlights(prev => {
-        const updated = prev.map(h => h.id === existingId ? { ...h, color, text: rawText || h.text } : h);
+        const updated = prev.map(h => targetIds.includes(h.id) ? { ...h, color, text: rawText || h.text } : h);
         saveLocalHighlights(updated);
         return updated;
       });
@@ -2834,14 +2847,18 @@ export default function App() {
       window.getSelection()?.removeAllRanges();
 
       if (isOnline) {
-        try {
-          await fetchWithAuth(`${API_URL}/api/highlights/${existingId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ color, text: rawText })
-          });
-        } catch (e) {
-          console.warn("Highlight saved locally (cloud sync pending)", e);
+        for (const tId of targetIds) {
+          if (tId < 1000000000000) {
+            try {
+              await fetchWithAuth(`${API_URL}/api/highlights/${tId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ color, text: rawText })
+              });
+            } catch (e) {
+              console.warn("Highlight saved locally (cloud sync pending)", e);
+            }
+          }
         }
       }
       return;
@@ -2963,23 +2980,42 @@ export default function App() {
     }
   };
 
-  const deleteHighlight = async (id: number) => {
+  const deleteHighlight = async (id: number, allIds?: number[]) => {
+    const idsToDelete = allIds && allIds.length > 0 ? allIds : [id];
+    const targetVerse = selectionVerse;
     setToolbarPosition(null);
     setSelectionVerse(null);
     setEndVerseNumber(null);
     setSelectedText('');
     window.getSelection()?.removeAllRanges();
+
+    // 1. Immediately remove from local state and update local storage
     setHighlights(prev => {
-      const updated = prev.filter(h => h.id !== id);
+      const updated = prev.filter(h => !idsToDelete.includes(h.id));
       saveLocalHighlights(updated);
       return updated;
     });
 
+    // 2. Sync deletion to database
     if (isOnline) {
-      try {
-        await fetchWithAuth(`${API_URL}/api/highlights/${id}`, { method: 'DELETE' });
-      } catch (e) {
-        console.warn("Deleted highlight locally", e);
+      for (const delId of idsToDelete) {
+        try {
+          if (delId < 1000000000000) {
+            await fetchWithAuth(`${API_URL}/api/highlights/${delId}`, { method: 'DELETE' });
+          }
+        } catch (e) {
+          console.warn("Deleted highlight locally", e);
+        }
+      }
+
+      // Also clean up by verse in database if criteria available
+      if (targetVerse) {
+        try {
+          await fetchWithAuth(
+            `${API_URL}/api/highlights?book=${encodeURIComponent(activeBook.name)}&chapter=${activeChapter}&verse=${targetVerse}`,
+            { method: 'DELETE' }
+          );
+        } catch {}
       }
     }
   };
@@ -3537,6 +3573,7 @@ export default function App() {
                   x: winWidth <= 420 ? winWidth / 2 : Math.max(toolbarHalfWidth + 12, Math.min(winWidth - toolbarHalfWidth - 12, verseCenterX)),
                   y,
                   highlightId: seg.highlight!.id,
+                  highlightIds: [seg.highlight!.id],
                   isBelow: isNearTop
                 });
               }}
@@ -3567,6 +3604,7 @@ export default function App() {
                   x: winWidth <= 420 ? winWidth / 2 : Math.max(toolbarHalfWidth + 12, Math.min(winWidth - toolbarHalfWidth - 12, verseCenterX)),
                   y,
                   highlightId: seg.highlight!.id,
+                  highlightIds: [seg.highlight!.id],
                   isBelow: isNearTop
                 });
               }}
@@ -5054,20 +5092,19 @@ export default function App() {
                             <span 
                               key={v.verse} 
                               data-verse={v.verse} 
-                              onClick={(e) => handleVerseClick(e, v.verse)}
-                              className={`inline rounded-sm px-0.5 transition-colors duration-200 cursor-pointer ${
+                              className={`inline rounded-sm px-0.5 transition-colors duration-200 ${
                                 currentSpeakingVerseIndex === index ? 'text-accent bg-accent/10' : ''
                               }`}
                             >
                               {showVerseNumbers && (
                                 <sup 
-                                  onClick={(e) => handleVerseClick(e, v.verse)}
-                                  onTouchEnd={(e) => handleVerseClick(e, v.verse)}
-                                  className={`verse-number select-none text-[11px] font-sans font-semibold mr-1 cursor-pointer hover:text-accent hover:underline align-baseline relative -top-0.5 inline-block shrink-0 transition-all ${
+                                  onClick={(e) => { e.stopPropagation(); handleVerseNumberClick(e, v.verse); }}
+                                  onTouchEnd={(e) => { e.stopPropagation(); handleVerseNumberClick(e, v.verse); }}
+                                  className={`verse-number select-none text-[11px] font-sans font-semibold mr-1 cursor-pointer hover:text-accent hover:scale-110 align-baseline relative -top-0.5 inline-block shrink-0 transition-all ${
                                     currentSpeakingVerseIndex === index ? 'text-accent' : 
                                     selectionVerse === v.verse ? 'text-accent font-bold scale-110' : 'text-muted/80'
                                   }`}
-                                  title={`Click verse ${v.verse} to highlight or study`}
+                                  title={`Click verse ${v.verse} number to highlight whole verse or study`}
                                 >
                                   {v.verse}
                                 </sup>
@@ -5117,20 +5154,19 @@ export default function App() {
                             <p 
                               key={v.verse} 
                               data-verse={v.verse} 
-                              onClick={(e) => handleVerseClick(e, v.verse)}
-                              className={`group relative rounded-lg py-1 px-1.5 sm:px-2 -mx-1 sm:-mx-2 transition-colors duration-200 break-words cursor-pointer ${
+                              className={`group relative rounded-lg py-1 px-1.5 sm:px-2 -mx-1 sm:-mx-2 transition-colors duration-200 break-words ${
                                 currentSpeakingVerseIndex === index ? 'text-accent bg-accent/5' : ''
                               }`}
                             >
                               {showVerseNumbers && (
                                 <sup 
-                                  onClick={(e) => handleVerseClick(e, v.verse)}
-                                  onTouchEnd={(e) => handleVerseClick(e, v.verse)}
-                                  className={`verse-number select-none text-[11px] font-sans font-semibold mr-1.5 cursor-pointer hover:text-accent hover:underline align-baseline relative -top-0.5 inline-block shrink-0 transition-all ${
+                                  onClick={(e) => { e.stopPropagation(); handleVerseNumberClick(e, v.verse); }}
+                                  onTouchEnd={(e) => { e.stopPropagation(); handleVerseNumberClick(e, v.verse); }}
+                                  className={`verse-number select-none text-[11px] font-sans font-semibold mr-1.5 cursor-pointer hover:text-accent hover:scale-110 align-baseline relative -top-0.5 inline-block shrink-0 transition-all ${
                                     currentSpeakingVerseIndex === index ? 'text-accent' : 
                                     selectionVerse === v.verse ? 'text-accent font-bold scale-110' : 'text-muted/80'
                                   }`}
-                                  title={`Click verse ${v.verse} to highlight or study`}
+                                  title={`Click verse ${v.verse} number to highlight whole verse or study`}
                                 >
                                   {v.verse}
                                 </sup>
@@ -5976,20 +6012,19 @@ export default function App() {
                             <span 
                               key={v.verse} 
                               data-verse={v.verse} 
-                              onClick={(e) => handleVerseClick(e, v.verse)}
-                              className={`inline rounded-sm px-0.5 transition-colors duration-200 cursor-pointer ${
+                              className={`inline rounded-sm px-0.5 transition-colors duration-200 ${
                                 currentSpeakingVerseIndex === index ? 'text-accent bg-accent/10' : ''
                               }`}
                             >
                               {showVerseNumbers && (
                                 <sup 
-                                  onClick={(e) => handleVerseClick(e, v.verse)}
-                                  onTouchEnd={(e) => handleVerseClick(e, v.verse)}
-                                  className={`verse-number select-none text-[11px] font-sans font-semibold mr-1 cursor-pointer hover:text-accent hover:underline align-baseline relative -top-0.5 inline-block shrink-0 transition-all ${
+                                  onClick={(e) => { e.stopPropagation(); handleVerseNumberClick(e, v.verse); }}
+                                  onTouchEnd={(e) => { e.stopPropagation(); handleVerseNumberClick(e, v.verse); }}
+                                  className={`verse-number select-none text-[11px] font-sans font-semibold mr-1 cursor-pointer hover:text-accent hover:scale-110 align-baseline relative -top-0.5 inline-block shrink-0 transition-all ${
                                     currentSpeakingVerseIndex === index ? 'text-accent' : 
                                     selectionVerse === v.verse ? 'text-accent font-bold scale-110' : 'text-muted/80'
                                   }`}
-                                  title={`Click verse ${v.verse} to highlight or study`}
+                                  title={`Click verse ${v.verse} number to highlight whole verse or study`}
                                 >
                                   {v.verse}
                                 </sup>
@@ -6039,20 +6074,19 @@ export default function App() {
                             <p 
                               key={v.verse} 
                               data-verse={v.verse} 
-                              onClick={(e) => handleVerseClick(e, v.verse)}
-                              className={`group relative rounded-lg py-1 px-2 -mx-2 transition-colors duration-300 break-words cursor-pointer ${
+                              className={`group relative rounded-lg py-1 px-2 -mx-2 transition-colors duration-300 break-words ${
                                 currentSpeakingVerseIndex === index ? 'text-accent bg-accent/5' : ''
                               }`}
                             >
                               {showVerseNumbers && (
                                 <sup 
-                                  onClick={(e) => handleVerseClick(e, v.verse)}
-                                  onTouchEnd={(e) => handleVerseClick(e, v.verse)}
-                                  className={`verse-number select-none text-[11px] font-sans font-semibold mr-1.5 cursor-pointer hover:text-accent hover:underline align-baseline relative -top-0.5 inline-block shrink-0 transition-all ${
+                                  onClick={(e) => { e.stopPropagation(); handleVerseNumberClick(e, v.verse); }}
+                                  onTouchEnd={(e) => { e.stopPropagation(); handleVerseNumberClick(e, v.verse); }}
+                                  className={`verse-number select-none text-[11px] font-sans font-semibold mr-1.5 cursor-pointer hover:text-accent hover:scale-110 align-baseline relative -top-0.5 inline-block shrink-0 transition-all ${
                                     currentSpeakingVerseIndex === index ? 'text-accent' : 
                                     selectionVerse === v.verse ? 'text-accent font-bold scale-110' : 'text-muted/80'
                                   }`}
-                                  title={`Click verse ${v.verse} to highlight or study`}
+                                  title={`Click verse ${v.verse} number to highlight whole verse or study`}
                                 >
                                   {v.verse}
                                 </sup>
@@ -6570,8 +6604,8 @@ export default function App() {
                 <button 
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
-                  onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); deleteHighlight(toolbarPosition.highlightId!); }}
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteHighlight(toolbarPosition.highlightId!); }} 
+                  onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); deleteHighlight(toolbarPosition.highlightId!, toolbarPosition.highlightIds); }}
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteHighlight(toolbarPosition.highlightId!, toolbarPosition.highlightIds); }} 
                   className="flex items-center justify-center h-7 sm:h-8 px-2 rounded-lg bg-surface border border-border-soft text-error hover:bg-error hover:text-white transition-all shadow-xs cursor-pointer shrink-0"
                   title="Delete Highlight"
                 >

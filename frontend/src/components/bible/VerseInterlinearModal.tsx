@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { InterlinearWord, getVerseInterlinearTokens, fetchInterlinearWord, preloadChapterLexicon } from '@/lib/interlinearData';
+import { InterlinearWord, getVerseInterlinearTokens, fetchInterlinearWord, preloadChapterLexicon, CLIENT_LEXICON_CACHE, STOPWORDS } from '@/lib/interlinearData';
 import { getStrongsPassage } from '@/lib/bibleProvider';
 import { NodeCategory } from '@/types/canvas';
 import {
@@ -82,15 +82,15 @@ export function VerseInterlinearModal({
 
     let isCancelled = false;
     getStrongsPassage(bookName, chapter)
-      .then(async (ch) => {
+      .then((ch) => {
         if (ch && ch.verses) {
-          await preloadChapterLexicon(ch.verses);
           if (isCancelled) return;
           const map: Record<number, string> = {};
           ch.verses.forEach((v) => {
             map[v.verse] = v.text;
           });
           setLocalStrongsMap(map);
+          preloadChapterLexicon(ch.verses).catch(() => {});
         }
       })
       .catch(() => {});
@@ -120,11 +120,47 @@ export function VerseInterlinearModal({
   // Asynchronously resolve authentic lexical data for all words in the verse
   useEffect(() => {
     if (!isOpen) return;
+
+    // 1. Batch fetch all Strong's tagged IDs present in this verse in a single request
+    const missingStrongIds: string[] = [];
     tokens.forEach((t) => {
-      if (t.isWord) {
-        fetchInterlinearWord(t.cleanWord || t.rawText, isOldTestament, `${bookName} ${chapter}:${currentVerseObj.verse}`, t.strongsId)
+      if (t.strongsId && !CLIENT_LEXICON_CACHE.has(t.strongsId)) {
+        missingStrongIds.push(t.strongsId);
+      }
+    });
+
+    if (missingStrongIds.length > 0) {
+      fetch('/api/bible/lexicon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ids: missingStrongIds,
+          verseRef: `${bookName} ${chapter}:${currentVerseObj.verse}`,
+        }),
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (data && data.words) {
+            const updates: Record<number, InterlinearWord> = {};
+            tokens.forEach((t) => {
+              if (t.strongsId && data.words[t.strongsId]) {
+                const w = data.words[t.strongsId];
+                CLIENT_LEXICON_CACHE.set(t.strongsId, w);
+                updates[t.index] = w;
+              }
+            });
+            setResolvedWords((prev) => ({ ...prev, ...updates }));
+          }
+        })
+        .catch(() => {});
+    }
+
+    // 2. Fetch individual non-tagged words
+    tokens.forEach((t) => {
+      if (t.isWord && !t.strongsId && t.cleanWord && !STOPWORDS.has(t.cleanWord.toLowerCase())) {
+        fetchInterlinearWord(t.cleanWord, isOldTestament, `${bookName} ${chapter}:${currentVerseObj.verse}`)
           .then((w) => {
-            if (w) {
+            if (w && w.lemma && w.lemma !== '—') {
               setResolvedWords((prev) => ({ ...prev, [t.index]: w }));
             }
           })
@@ -136,12 +172,23 @@ export function VerseInterlinearModal({
   // Only authentic words (filtering out plain punctuation spaces and unmapped stopwords)
   const wordTokens = useMemo(() => {
     return tokens
-      .filter((t) => t.isWord)
-      .map((t) => ({
-        ...t,
-        word: resolvedWords[t.index] || t.word
-      }))
-      .filter((t) => !!t.word && t.word.lemma && t.word.lemma !== '—');
+      .filter((t) => t.isWord && t.cleanWord)
+      .map((t) => {
+        const resolved =
+          resolvedWords[t.index] ||
+          (t.strongsId ? CLIENT_LEXICON_CACHE.get(t.strongsId) : undefined) ||
+          t.word;
+        return {
+          ...t,
+          word: resolved,
+        };
+      })
+      .filter((t) => {
+        if (!t.cleanWord) return false;
+        if (t.strongsId) return true;
+        if (t.word && t.word.lemma && t.word.lemma !== '—') return true;
+        return !STOPWORDS.has(t.cleanWord.toLowerCase());
+      });
   }, [tokens, resolvedWords]);
 
   const handleSpeak = (text: string) => {

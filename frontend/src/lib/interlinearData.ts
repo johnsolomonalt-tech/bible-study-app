@@ -1753,8 +1753,12 @@ export async function preloadChapterLexicon(verses: { text: string }[]): Promise
   if (ids.size === 0) return;
 
   try {
-    const idList = Array.from(ids).join(',');
-    const res = await fetch(`/api/bible/lexicon?ids=${idList}`);
+    const idsArray = Array.from(ids);
+    const res = await fetch('/api/bible/lexicon', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: idsArray })
+    });
     if (res.ok) {
       const data = await res.json();
       if (data.words) {
