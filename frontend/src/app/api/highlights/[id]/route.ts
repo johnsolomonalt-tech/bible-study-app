@@ -66,15 +66,20 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     }
     
     const body = await request.json();
-    const { color } = body;
+    const { color, text } = body;
     
     if (!color) {
       return NextResponse.json({ error: 'Color is required' }, { status: 400 });
     }
     
+    const updateData: any = { color };
+    if (typeof text === 'string') {
+      updateData.text = text;
+    }
+
     const highlight = await prisma.highlight.update({
       where: { id },
-      data: { color }
+      data: updateData
     });
     
     return NextResponse.json(highlight);

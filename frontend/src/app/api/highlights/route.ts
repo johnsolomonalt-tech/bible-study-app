@@ -57,13 +57,49 @@ export async function POST(request: Request) {
     if (!book || !chapter || !verse || !color) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
+
+    const numChapter = parseInt(chapter, 10);
+    const numVerse = parseInt(verse, 10);
+    const bookMeta = findCanonicalBook(book);
+    const bookNames = bookMeta 
+      ? Array.from(new Set([book, bookMeta.name, bookMeta.code, ...bookMeta.aliases]))
+      : [book];
+
+    // Find any existing highlights for this user on the same book, chapter, and verse
+    const existing = await prisma.highlight.findMany({
+      where: {
+        userId,
+        chapter: numChapter,
+        verse: numVerse,
+        OR: bookNames.map(b => ({
+          book: { equals: b, mode: 'insensitive' }
+        }))
+      }
+    });
+
+    const newNorm = (text || '').toLowerCase().trim();
+
+    // Clean up any existing highlights that are identical or superseded/overlapping
+    const toDeleteIds: number[] = [];
+    for (const ex of existing) {
+      const exNorm = (ex.text || '').toLowerCase().trim();
+      if (exNorm === newNorm || exNorm.includes(newNorm) || newNorm.includes(exNorm)) {
+        toDeleteIds.push(ex.id);
+      }
+    }
+
+    if (toDeleteIds.length > 0) {
+      await prisma.highlight.deleteMany({
+        where: { id: { in: toDeleteIds } }
+      });
+    }
     
     const highlight = await prisma.highlight.create({
       data: {
         userId,
         book,
-        chapter: parseInt(chapter, 10),
-        verse: parseInt(verse, 10),
+        chapter: numChapter,
+        verse: numVerse,
         text: text || '',
         color
       }

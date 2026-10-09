@@ -1167,9 +1167,10 @@ export default function App() {
     const toolbarHalfWidth = 195;
     const x = Math.max(toolbarHalfWidth + 12, Math.min(window.innerWidth - toolbarHalfWidth - 12, e.clientX));
     const isNearTop = e.clientY < 110;
-    const y = isNearTop ? e.clientY + 24 : e.clientY - 12;
+    let y = isNearTop ? e.clientY + 24 : e.clientY - 12;
+    y = Math.max(70, Math.min(window.innerHeight - 80, y));
 
-    const existingHighlight = highlights.find(
+    const wholeVerseHl = highlights.find(
       h => isSameBook(h.book, activeBook.name) &&
            Number(h.chapter) === Number(activeChapter) &&
            Number(h.verse) === Number(verseNum)
@@ -1178,7 +1179,7 @@ export default function App() {
     setToolbarPosition({
       x,
       y,
-      highlightId: existingHighlight?.id,
+      highlightId: wholeVerseHl?.id,
       isBelow: isNearTop,
     });
   }, [activeBook.name, activeChapter, bibleVerses, highlights]);
@@ -2352,15 +2353,10 @@ export default function App() {
       .then(data => {
         if (Array.isArray(data)) {
           setHighlights(prev => {
-            const map = new Map<string, typeof prev[0]>();
-            prev.forEach(h => {
-              const canon = findCanonicalBook(h.book)?.code || h.book?.toLowerCase();
-              map.set(`${canon}:${h.chapter}:${h.verse}:${h.text}`, h);
-            });
-            data.forEach(ch => {
-              const canon = findCanonicalBook(ch.book)?.code || ch.book?.toLowerCase();
-              map.set(`${canon}:${ch.chapter}:${ch.verse}:${ch.text}`, ch);
-            });
+            const map = new Map<number, typeof prev[0]>();
+            data.forEach(ch => map.set(ch.id, ch));
+            // Keep pending local items not yet assigned server IDs
+            prev.filter(h => h.id > 1000000000000).forEach(h => map.set(h.id, h));
             const merged = Array.from(map.values());
             saveLocalHighlights(merged);
             return merged;
@@ -2490,24 +2486,14 @@ export default function App() {
 
     e.stopPropagation();
 
-    // Find the visible verse element in DOM
-    const currentEl = e.currentTarget as HTMLElement | null;
-    let verseEl: HTMLElement | null = null;
-    if (currentEl) {
-      verseEl = (currentEl.hasAttribute('data-verse') ? currentEl : currentEl.closest('[data-verse]')) as HTMLElement | null;
-    }
-    if (!verseEl || verseEl.offsetParent === null) {
-      const candidates = document.querySelectorAll(`[data-verse="${verseNum}"]`);
-      verseEl = (Array.from(candidates).find(el => (el as HTMLElement).offsetParent !== null) as HTMLElement) || (candidates[0] as HTMLElement | null);
-    }
-
-    // Toggle off if currently selected and toolbar is open
+    // Toggle off if currently selected and toolbar is open for this verse
     if (toolbarPosition && selectionVerse === verseNum && (!endVerseNumber || endVerseNumber === verseNum)) {
       setToolbarPosition(null);
       setSelectionVerse(null);
       setEndVerseNumber(null);
       setSelectedText('');
-      if (verseEl) verseEl.classList.remove('verse-click-pulse');
+      const verseEls = document.querySelectorAll(`[data-verse="${verseNum}"]`);
+      verseEls.forEach(el => (el as HTMLElement).classList.remove('verse-click-pulse'));
       window.getSelection()?.removeAllRanges();
       return;
     }
@@ -2518,28 +2504,33 @@ export default function App() {
     const cleanText = parseVerseFootnote(vObj.text).mainText;
 
     // Trigger clean quick fade-in / smooth fade-out pulse animation on click (like verse links)
-    if (verseEl) {
-      verseEl.classList.remove('verse-click-pulse');
-      void verseEl.offsetWidth; // force reflow for smooth animation restart
-      verseEl.classList.add('verse-click-pulse');
+    const verseEls = document.querySelectorAll(`[data-verse="${verseNum}"]`);
+    verseEls.forEach(el => {
+      const hEl = el as HTMLElement;
+      hEl.classList.remove('verse-click-pulse');
+      void hEl.offsetWidth; // force reflow for smooth animation restart
+      hEl.classList.add('verse-click-pulse');
       setTimeout(() => {
-        verseEl?.classList.remove('verse-click-pulse');
-      }, 2000);
-    }
+        hEl.classList.remove('verse-click-pulse');
+      }, 1500);
+    });
 
-    // Check if this verse already has a highlight in current chapter
-    const existingHl = highlights.find(h => 
+    // Check if this verse already has a whole-verse highlight in current chapter
+    const existingWholeHl = highlights.find(h => 
       isSameBook(h.book, activeBook.name) && 
       Number(h.chapter) === Number(activeChapter) && 
-      Number(h.verse) === Number(verseNum)
+      Number(h.verse) === Number(verseNum) &&
+      (h.text === cleanText || h.text.trim().length >= cleanText.trim().length * 0.8)
     );
 
     setSelectionVerse(verseNum);
     setEndVerseNumber(verseNum);
     setSelectedText(cleanText);
 
-    const rect = verseEl ? verseEl.getBoundingClientRect() : null;
+    const visibleVerseEl = Array.from(verseEls).find(el => (el as HTMLElement).offsetParent !== null) as HTMLElement | undefined || (verseEls[0] as HTMLElement | undefined);
+    const rect = visibleVerseEl ? visibleVerseEl.getBoundingClientRect() : null;
     const winWidth = typeof window !== 'undefined' ? window.innerWidth : 1000;
+    const winHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
     const toolbarHalfWidth = 195;
 
     // Center toolbar horizontally over the center of the verse text (not pinned to the left or verse number)
@@ -2554,12 +2545,13 @@ export default function App() {
     }
 
     const isNearTop = rect ? rect.top < 130 : false;
-    const y = rect ? (isNearTop ? rect.bottom + 8 : Math.max(70, rect.top - 6)) : (typeof window !== 'undefined' ? window.innerHeight / 2 : 300);
+    let y = rect ? (isNearTop ? rect.bottom + 8 : Math.max(70, rect.top - 6)) : winHeight / 2;
+    y = Math.max(70, Math.min(winHeight - 80, y));
 
     setToolbarPosition({
       x,
       y,
-      highlightId: existingHl?.id,
+      highlightId: existingWholeHl?.id,
       isBelow: isNearTop
     });
   };
@@ -2583,6 +2575,15 @@ export default function App() {
     }
     if (rect.width === 0 && rect.height === 0) return;
     
+    // Resolve the active bible-reader-content container
+    const commonNode = range.commonAncestorContainer;
+    const commonEl = commonNode.nodeType === Node.ELEMENT_NODE ? (commonNode as HTMLElement) : commonNode.parentElement;
+    let readerRoot = commonEl?.closest('.bible-reader-content') as HTMLElement | null;
+    if (!readerRoot) {
+      const allReaders = document.querySelectorAll('.bible-reader-content');
+      readerRoot = (Array.from(allReaders).find(r => (r as HTMLElement).offsetParent !== null) as HTMLElement) || (allReaders[0] as HTMLElement | null);
+    }
+
     // Find the verse this selection belongs to by looking at parent elements or children
     const getVerseFromNode = (n: Node | null, offset?: number): number | null => {
       if (!n) return null;
@@ -2619,7 +2620,6 @@ export default function App() {
     let endVerse = getVerseFromNode(range.endContainer, range.endOffset) || startVerse;
 
     // Scan all [data-verse] elements in reader for multi-verse spans
-    const readerRoot = document.querySelector('.bible-reader-content');
     if (readerRoot) {
       const allVerseEls = readerRoot.querySelectorAll('[data-verse]');
       const matchedVerses: number[] = [];
@@ -2647,37 +2647,21 @@ export default function App() {
       setSelectionVerse(actualStart);
       setEndVerseNumber(actualEnd);
       setSelectedText(rawText);
-      
-      let activeHighlightId: number | undefined = undefined;
-      const commonAncestor = range.commonAncestorContainer;
-      const parentElement = commonAncestor.nodeType === 3 ? commonAncestor.parentElement : commonAncestor as HTMLElement;
-      
-      if (parentElement) {
-        if (parentElement.tagName === 'MARK' && parentElement.dataset.highlightId) {
-          activeHighlightId = parseInt(parentElement.dataset.highlightId, 10);
-        } else {
-          const marks = parentElement.querySelectorAll('mark');
-          for (let i = 0; i < marks.length; i++) {
-            if (window.getSelection()?.containsNode(marks[i], true)) {
-              activeHighlightId = parseInt(marks[i].dataset.highlightId!, 10);
-              break;
-            }
-          }
-        }
-      }
 
       const winWidth = typeof window !== 'undefined' ? window.innerWidth : 1000;
+      const winHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
       const toolbarHalfWidth = 195;
       const x = winWidth <= 420 
         ? winWidth / 2 
         : Math.max(toolbarHalfWidth + 12, Math.min(winWidth - toolbarHalfWidth - 12, rect.left + rect.width / 2));
       const isNearTop = rect.top < 130;
-      const y = isNearTop ? rect.bottom + 8 : Math.max(70, rect.top - 6);
+      let y = isNearTop ? rect.bottom + 8 : Math.max(70, rect.top - 6);
+      y = Math.max(70, Math.min(winHeight - 80, y));
 
       setToolbarPosition({
         x,
         y,
-        highlightId: activeHighlightId,
+        highlightId: undefined, // New selection always applies a fresh highlight to the selected text
         isBelow: isNearTop
       });
     }
@@ -2852,26 +2836,35 @@ export default function App() {
       });
     });
 
+    // Identify superseded highlights to remove locally and from the database
+    const supersededHighlights = highlights.filter(h => {
+      const isSamePassage = isSameBook(h.book, book) && Number(h.chapter) === Number(chapter);
+      if (!isSamePassage) return false;
+      return createdItems.some(ci => {
+        if (Number(ci.verse) !== Number(h.verse)) return false;
+        const ciNorm = ci.text.toLowerCase().trim();
+        const hNorm = h.text.toLowerCase().trim();
+        return ciNorm === hNorm || ciNorm.includes(hNorm) || hNorm.includes(ciNorm);
+      });
+    });
+    const supersededIds = supersededHighlights.map(h => h.id);
+
     // Optimistic UI and immediate local cache update
     setHighlights(prev => {
-      // Cleanly replace any exact, superseded, or conflicting highlights in these verses
-      const filtered = prev.filter(h => {
-        const isSamePassage = isSameBook(h.book, book) &&
-          Number(h.chapter) === Number(chapter);
-        if (!isSamePassage) return true;
-        return !createdItems.some(ci => {
-          if (Number(ci.verse) !== Number(h.verse)) return false;
-          const ciNorm = ci.text.toLowerCase().trim();
-          const hNorm = h.text.toLowerCase().trim();
-          return ciNorm === hNorm || ciNorm.includes(hNorm) || hNorm.includes(ciNorm);
-        });
-      });
+      const filtered = prev.filter(h => !supersededIds.includes(h.id));
       const updated = [...filtered, ...createdItems];
       saveLocalHighlights(updated);
       return updated;
     });
 
     if (isOnline) {
+      // Clean up superseded highlights from cloud database
+      for (const sId of supersededIds) {
+        if (sId < 1000000000000) {
+          fetchWithAuth(`${API_URL}/api/highlights/${sId}`, { method: 'DELETE' }).catch(() => {});
+        }
+      }
+
       for (const item of createdItems) {
         try {
           const res = await fetchWithAuth(`${API_URL}/api/highlights`, {
@@ -3333,53 +3326,58 @@ export default function App() {
     const normSeg = normalizeForMatch(segText);
     let normTarget = normalizeForMatch(targetText.trim());
 
+    // Clean leading verse number from target
+    normTarget = normTarget.replace(new RegExp('^\\s*' + verseNum + '\\s*'), '').trim();
+    if (!normTarget) return null;
+
     // 1. Direct normalized search (1-to-1 character matching preserves exact offsets)
     let idx = normSeg.indexOf(normTarget);
-    if (idx === -1) {
-      const cleaned = normTarget.replace(new RegExp('^\\s*' + verseNum + '\\s*'), '');
-      idx = normSeg.indexOf(cleaned);
-      if (idx !== -1) {
-        return { start: idx, end: idx + cleaned.length };
-      }
-    } else {
+    if (idx !== -1) {
       return { start: idx, end: idx + normTarget.length };
     }
 
-    // 2. Whitespace & punctuation flexible regex search
-    const words = targetText
-      .trim()
-      .replace(new RegExp('^\\s*' + verseNum + '\\s*'), '')
-      .split(/\s+/)
-      .map(w => w.replace(/[.,;:!?"'()\[\]{}]/g, '').trim())
-      .filter(w => w.length > 0)
-      .map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-                 .replace(/['’]/g, "['’]")
-                 .replace(/["“”]/g, '["“”]')
-                 .replace(/[-—–]/g, '[-—–]'));
+    // 2. Whitespace-flexible regex search
+    const targetWords = normTarget.split(/\s+/).filter(Boolean);
+    const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-    if (words.length > 0) {
+    if (targetWords.length > 0) {
       try {
-        const pattern = new RegExp(words.join('[\\s.,;:!?"\'()\\-]+'), 'i');
-        const match = segText.match(pattern);
+        const wsPattern = new RegExp(targetWords.map(escapeRegex).join('\\s+'));
+        const match = normSeg.match(wsPattern);
         if (match && typeof match.index === 'number') {
           return { start: match.index, end: match.index + match[0].length };
         }
       } catch {}
+
+      // 3. Punctuation-tolerant regex search
+      try {
+        const strippedWords = targetWords
+          .map(w => w.replace(/[.,;:!?"'()\[\]{}\-—–]/g, '').trim())
+          .filter(Boolean);
+        if (strippedWords.length > 0) {
+          const punctPattern = new RegExp(strippedWords.map(escapeRegex).join('[\\s.,;:!?"\'()\\-—–]+'));
+          const matchP = normSeg.match(punctPattern);
+          if (matchP && typeof matchP.index === 'number') {
+            return { start: matchP.index, end: matchP.index + matchP[0].length };
+          }
+        }
+      } catch {}
     }
 
-    // 3. Containment / Full-verse coverage
+    // 4. Full segment coverage: when target is a whole-verse or multi-verse highlight that completely covers this segment
     const trimmedNormSeg = normSeg.trim();
-    if (trimmedNormSeg.length > 0 && (normTarget.includes(trimmedNormSeg) || trimmedNormSeg.includes(normTarget))) {
-      return { start: 0, end: segText.length };
+    if (trimmedNormSeg.length >= 4 && normTarget.includes(trimmedNormSeg)) {
+      const segStart = normSeg.indexOf(trimmedNormSeg);
+      return { start: segStart, end: segStart + trimmedNormSeg.length };
     }
 
-    // 4. Overlap coverage (for cross-translation whole-verse highlights)
-    if (words.length >= 3) {
-      let matchedWords = 0;
-      for (const w of words) {
-        if (normSeg.includes(w.toLowerCase())) matchedWords++;
+    // 5. Cross-translation whole-verse fallback (only for full-verse targets with substantial word overlap)
+    if (targetWords.length >= 6 && normTarget.length >= normSeg.length * 0.5) {
+      let matchedCount = 0;
+      for (const tw of targetWords) {
+        if (normSeg.includes(tw)) matchedCount++;
       }
-      if (matchedWords / words.length >= 0.40) {
+      if (matchedCount / targetWords.length >= 0.65) {
         return { start: 0, end: segText.length };
       }
     }
@@ -3446,6 +3444,13 @@ export default function App() {
               data-highlight-id={seg.highlight.id}
               onClick={(e) => {
                 e.stopPropagation();
+                if (toolbarPosition && toolbarPosition.highlightId === seg.highlight?.id) {
+                  setToolbarPosition(null);
+                  setSelectionVerse(null);
+                  setEndVerseNumber(null);
+                  setSelectedText('');
+                  return;
+                }
                 const vObj = bibleVerses.find(bv => bv.verse === verse);
                 const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
                 setSelectionVerse(verse);
@@ -3453,18 +3458,29 @@ export default function App() {
                 setSelectedText(seg.text || (vObj ? parseVerseFootnote(vObj.text).mainText : ''));
                 
                 const winWidth = typeof window !== 'undefined' ? window.innerWidth : 1000;
+                const winHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
                 const toolbarHalfWidth = 195;
                 const verseCenterX = rect.left + rect.width / 2;
                 const isNearTop = rect.top < 130;
+                let y = isNearTop ? rect.bottom + 8 : Math.max(70, rect.top - 6);
+                y = Math.max(70, Math.min(winHeight - 80, y));
+
                 setToolbarPosition({
                   x: winWidth <= 420 ? winWidth / 2 : Math.max(toolbarHalfWidth + 12, Math.min(winWidth - toolbarHalfWidth - 12, verseCenterX)),
-                  y: isNearTop ? rect.bottom + 8 : Math.max(70, rect.top - 6),
+                  y,
                   highlightId: seg.highlight!.id,
                   isBelow: isNearTop
                 });
               }}
               onTouchEnd={(e) => {
                 e.stopPropagation();
+                if (toolbarPosition && toolbarPosition.highlightId === seg.highlight?.id) {
+                  setToolbarPosition(null);
+                  setSelectionVerse(null);
+                  setEndVerseNumber(null);
+                  setSelectedText('');
+                  return;
+                }
                 const vObj = bibleVerses.find(bv => bv.verse === verse);
                 const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
                 setSelectionVerse(verse);
@@ -3472,12 +3488,16 @@ export default function App() {
                 setSelectedText(seg.text || (vObj ? parseVerseFootnote(vObj.text).mainText : ''));
                 
                 const winWidth = typeof window !== 'undefined' ? window.innerWidth : 1000;
+                const winHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
                 const toolbarHalfWidth = 195;
                 const verseCenterX = rect.left + rect.width / 2;
                 const isNearTop = rect.top < 130;
+                let y = isNearTop ? rect.bottom + 8 : Math.max(70, rect.top - 6);
+                y = Math.max(70, Math.min(winHeight - 80, y));
+
                 setToolbarPosition({
                   x: winWidth <= 420 ? winWidth / 2 : Math.max(toolbarHalfWidth + 12, Math.min(winWidth - toolbarHalfWidth - 12, verseCenterX)),
-                  y: isNearTop ? rect.bottom + 8 : Math.max(70, rect.top - 6),
+                  y,
                   highlightId: seg.highlight!.id,
                   isBelow: isNearTop
                 });
@@ -3693,18 +3713,23 @@ export default function App() {
     fetchWithAuth(`${API_URL}/api/highlights?book=${encodeURIComponent(activeBook.name)}&chapter=${activeChapter}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => {
-        if (isMounted && Array.isArray(data) && data.length > 0) {
+        if (isMounted && Array.isArray(data)) {
           setHighlights(prev => {
-            const map = new Map<string, typeof prev[0]>();
-            prev.forEach(h => {
-              const canon = findCanonicalBook(h.book)?.code || h.book?.toLowerCase();
-              map.set(`${canon}:${h.chapter}:${h.verse}:${h.text}`, h);
-            });
-            data.forEach(ch => {
-              const canon = findCanonicalBook(ch.book)?.code || ch.book?.toLowerCase();
-              map.set(`${canon}:${ch.chapter}:${ch.verse}:${ch.text}`, ch);
-            });
-            const combined = Array.from(map.values());
+            // Keep highlights for all other chapters
+            const otherChapterHighlights = prev.filter(h => 
+              !isSameBook(h.book, activeBook.name) || Number(h.chapter) !== Number(activeChapter)
+            );
+            // Keep pending local highlights for this chapter (created offline or awaiting server ID)
+            const pendingLocal = prev.filter(h =>
+              isSameBook(h.book, activeBook.name) && 
+              Number(h.chapter) === Number(activeChapter) && 
+              h.id > 1000000000000
+            );
+            const currentChapterMap = new Map<number, typeof prev[0]>();
+            data.forEach(ch => currentChapterMap.set(ch.id, ch));
+            pendingLocal.forEach(h => currentChapterMap.set(h.id, h));
+
+            const combined = [...otherChapterHighlights, ...Array.from(currentChapterMap.values())];
             saveLocalHighlights(combined);
             return combined;
           });
