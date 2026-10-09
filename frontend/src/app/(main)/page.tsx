@@ -2654,15 +2654,22 @@ export default function App() {
       const x = winWidth <= 420 
         ? winWidth / 2 
         : Math.max(toolbarHalfWidth + 12, Math.min(winWidth - toolbarHalfWidth - 12, rect.left + rect.width / 2));
-      const isNearTop = rect.top < 130;
-      let y = isNearTop ? rect.bottom + 8 : Math.max(70, rect.top - 6);
-      y = Math.max(70, Math.min(winHeight - 80, y));
+      const isNearTop = rect.top < 122;
+      const isNearBottom = rect.bottom > winHeight - 80;
+      const isBelow = isNearTop && !isNearBottom;
+
+      let y: number;
+      if (isBelow) {
+        y = Math.min(winHeight - 80, rect.bottom + 6);
+      } else {
+        y = Math.max(122, rect.top - 6);
+      }
 
       setToolbarPosition({
         x,
         y,
         highlightId: undefined, // New selection always applies a fresh highlight to the selected text
-        isBelow: isNearTop
+        isBelow
       });
     }
   }, []);
@@ -2682,9 +2689,9 @@ export default function App() {
         return;
       }
       
-      // Do not dismiss if user is actively selecting text
+      // If user clicked inside the reader container but outside a verse, only keep if text is actively selected
       const selection = window.getSelection();
-      if (selection && !selection.isCollapsed && selection.toString().trim().length > 0) {
+      if (target.closest('.bible-reader-content') && selection && !selection.isCollapsed && selection.toString().trim().length > 0) {
         return;
       }
 
@@ -2692,6 +2699,7 @@ export default function App() {
       setSelectionVerse(null);
       setEndVerseNumber(null);
       setSelectedText('');
+      window.getSelection()?.removeAllRanges();
     };
 
     document.addEventListener('mousedown', handleDocumentClick);
@@ -2702,26 +2710,38 @@ export default function App() {
     };
   }, []);
 
-  // Listen to mobile selectionchange for seamless mobile text selection
+  // Trigger floating toolbar on left-click drag mouseup and mobile selectionchange
   useEffect(() => {
     let timeout: NodeJS.Timeout;
-    const onSelectionChange = () => {
-      clearTimeout(timeout);
-      timeout = setTimeout(() => {
-        const sel = window.getSelection();
-        if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) {
-          const range = sel.getRangeAt(0);
-          const el = range.startContainer.nodeType === Node.ELEMENT_NODE ? (range.startContainer as HTMLElement) : range.startContainer.parentElement;
-          if (el?.closest('.bible-reader-content')) {
-            handleSelection();
-          }
+
+    const checkAndTriggerSelection = () => {
+      const sel = window.getSelection();
+      if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) {
+        const range = sel.getRangeAt(0);
+        const el = range.startContainer.nodeType === Node.ELEMENT_NODE 
+          ? (range.startContainer as HTMLElement) 
+          : range.startContainer.parentElement;
+        if (el?.closest('.bible-reader-content')) {
+          handleSelection();
         }
-      }, 150);
+      }
     };
 
+    const onMouseUp = () => {
+      // Small timeout ensures selection bounding client rects are stabilized after drag release
+      setTimeout(checkAndTriggerSelection, 20);
+    };
+
+    const onSelectionChange = () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(checkAndTriggerSelection, 150);
+    };
+
+    document.addEventListener('mouseup', onMouseUp);
     document.addEventListener('selectionchange', onSelectionChange);
     return () => {
       clearTimeout(timeout);
+      document.removeEventListener('mouseup', onMouseUp);
       document.removeEventListener('selectionchange', onSelectionChange);
     };
   }, [handleSelection]);
@@ -4951,8 +4971,8 @@ export default function App() {
                 </div>
               </header>
 
-              <div className="bible-reader-content flex-1 overflow-y-auto custom-scroll p-4 sm:p-6 lg:p-10" onMouseUp={handleSelection} onTouchEnd={handleSelection} onContextMenu={handleReaderContextMenu}>
-                <article className="max-w-3xl mx-auto w-full break-words">
+              <div className="bible-reader-content select-text flex-1 overflow-y-auto custom-scroll p-4 sm:p-6 lg:p-10" onMouseUp={handleSelection} onTouchEnd={handleSelection} onContextMenu={handleReaderContextMenu}>
+                <article className="max-w-3xl mx-auto w-full break-words select-text">
                   {isInterlinearMode && (
                     <InterlinearModeRibbon
                       isOldTestament={isOldTestament}
@@ -5037,7 +5057,7 @@ export default function App() {
                                   <span>{chapterBacklinksMap.get(v.verse)!.totalCount}</span>
                                 </button>
                               )}
-                              <span className="verse-text break-words">
+                              <span className="verse-text break-words select-text cursor-text">
                                 {renderVerseContent(v.verse, v.text)}
                               </span>{" "}
                             </span>
@@ -5100,7 +5120,7 @@ export default function App() {
                                   <span>{chapterBacklinksMap.get(v.verse)!.totalCount}</span>
                                 </button>
                               )}
-                              <span className="verse-text break-words">
+                              <span className="verse-text break-words select-text cursor-text">
                                 {renderVerseContent(v.verse, v.text)}
                               </span>
                             </p>
@@ -5873,8 +5893,8 @@ export default function App() {
                       </div>
                     </div>
                   </header>
-              <div className="bible-reader-content flex-1 overflow-y-auto custom-scroll p-10 lg:p-16" onMouseUp={handleSelection} onTouchEnd={handleSelection} onContextMenu={handleReaderContextMenu}>
-                <article className="max-w-3xl mx-auto w-full break-words">
+              <div className="bible-reader-content select-text flex-1 overflow-y-auto custom-scroll p-10 lg:p-16" onMouseUp={handleSelection} onTouchEnd={handleSelection} onContextMenu={handleReaderContextMenu}>
+                <article className="max-w-3xl mx-auto w-full break-words select-text">
                   {isInterlinearMode && (
                     <InterlinearModeRibbon
                       isOldTestament={isOldTestament}
@@ -5959,7 +5979,7 @@ export default function App() {
                                   <span>{chapterBacklinksMap.get(v.verse)!.totalCount}</span>
                                 </button>
                               )}
-                              <span className="verse-text break-words">
+                              <span className="verse-text break-words select-text cursor-text">
                                 {renderVerseContent(v.verse, v.text)}
                               </span>{" "}
                             </span>
@@ -6022,7 +6042,7 @@ export default function App() {
                                   <span>{chapterBacklinksMap.get(v.verse)!.totalCount}</span>
                                 </button>
                               )}
-                              <span className="verse-text break-words">
+                              <span className="verse-text break-words select-text cursor-text">
                                 {renderVerseContent(v.verse, v.text)}
                               </span>
                             </p>

@@ -353,4 +353,37 @@ mark.hl-purple {
   border-bottom: 2px solid rgba(147, 51, 234, 0.6);
 }
 
+/* Enable smooth left-click and drag text selection in Bible Reader */
+.bible-reader-content,
+.bible-reader-content article,
+.bible-reader-content p,
+.bible-reader-content span.verse-text,
+.bible-reader-content mark.theologica-highlight {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+}
+
+.bible-reader-content span.verse-text {
+  cursor: text;
+}
+
+/* Blue temporary selection highlight when dragging across scripture text */
+.bible-reader-content ::selection,
+.bible-reader-content *::selection {
+  background-color: rgba(59, 130, 246, 0.40) !important;
+  color: inherit !important;
+}
+
+:root[data-theme='light'] .bible-reader-content ::selection,
+:root[data-theme='light'] .bible-reader-content *::selection {
+  background-color: rgba(59, 130, 246, 0.32) !important;
+  color: inherit !important;
+}
+
+:root[data-theme='sepia'] .bible-reader-content ::selection,
+:root[data-theme='sepia'] .bible-reader-content *::selection {
+  background-color: rgba(37, 99, 235, 0.28) !important;
+  color: inherit !important;
+}
+
 
