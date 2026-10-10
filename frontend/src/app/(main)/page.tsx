@@ -1354,48 +1354,193 @@ export default function App() {
     chatSwipeStartYRef.current = null;
   };
 
-  // Swipe gesture detection for Mobile Study Tab (Book Selector & Study AI)
-  const studySwipeStartXRef = useRef<number | null>(null);
-  const studySwipeStartYRef = useRef<number | null>(null);
+  // Mobile Sidebar Touch Dragging & Smooth Transitions
+  const [mobileDragSidebar, setMobileDragSidebar] = useState<'chapters' | 'ai' | null>(null);
+  const [mobileDragOffset, setMobileDragOffset] = useState<number>(0);
+  const [isMobileDragging, setIsMobileDragging] = useState<boolean>(false);
 
+  const mobileTouchStartXRef = useRef<number>(0);
+  const mobileTouchStartYRef = useRef<number>(0);
+  const mobileTouchTimeRef = useRef<number>(0);
+  const mobileDragLockedRef = useRef<'horizontal' | 'vertical' | null>(null);
+
+  // 1. Gesture on Reader: Swipe Left-to-Right to open Book Selector
+  const handleMobileReaderTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      mobileTouchStartXRef.current = e.touches[0].clientX;
+      mobileTouchStartYRef.current = e.touches[0].clientY;
+      mobileTouchTimeRef.current = Date.now();
+      mobileDragLockedRef.current = null;
+    }
+  };
+
+  const handleMobileReaderTouchMove = (e: React.TouchEvent) => {
+    if (mobileStudyView !== 'reader' || e.touches.length !== 1) return;
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+    const dx = currentX - mobileTouchStartXRef.current;
+    const dy = currentY - mobileTouchStartYRef.current;
+
+    if (mobileDragLockedRef.current === null) {
+      if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) {
+        mobileDragLockedRef.current = 'vertical';
+      } else if (dx > 10 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+        const sel = window.getSelection();
+        if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) return;
+        mobileDragLockedRef.current = 'horizontal';
+        setIsMobileDragging(true);
+        setMobileDragSidebar('chapters');
+      }
+    }
+
+    if (mobileDragLockedRef.current === 'horizontal') {
+      const winW = typeof window !== 'undefined' ? window.innerWidth : 380;
+      setMobileDragOffset(Math.max(0, Math.min(winW, dx)));
+    }
+  };
+
+  const handleMobileReaderTouchEnd = (e: React.TouchEvent) => {
+    if (mobileDragLockedRef.current === 'horizontal' && mobileDragSidebar === 'chapters') {
+      const winW = typeof window !== 'undefined' ? window.innerWidth : 380;
+      const dx = e.changedTouches[0].clientX - mobileTouchStartXRef.current;
+      const dt = Date.now() - mobileTouchTimeRef.current;
+      const velocity = dx / Math.max(1, dt);
+      const shouldOpen = dx > winW * 0.45 || (velocity > 0.35 && dx > 40);
+
+      setIsMobileDragging(false);
+      if (shouldOpen) {
+        setMobileDragOffset(winW);
+        setTimeout(() => {
+          setMobileStudyView('chapters');
+          setMobileDragSidebar(null);
+          setMobileDragOffset(0);
+        }, 260);
+      } else {
+        setMobileDragOffset(0);
+        setTimeout(() => {
+          setMobileDragSidebar(null);
+        }, 260);
+      }
+    }
+    mobileDragLockedRef.current = null;
+  };
+
+  // 2. Gesture on Book Selector Drawer: Swipe Right-to-Left to close
   const handleBookSelectorTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 1) {
-      studySwipeStartXRef.current = e.touches[0].clientX;
-      studySwipeStartYRef.current = e.touches[0].clientY;
+      mobileTouchStartXRef.current = e.touches[0].clientX;
+      mobileTouchStartYRef.current = e.touches[0].clientY;
+      mobileTouchTimeRef.current = Date.now();
+      mobileDragLockedRef.current = null;
+    }
+  };
+
+  const handleBookSelectorTouchMove = (e: React.TouchEvent) => {
+    if (mobileStudyView !== 'chapters' || e.touches.length !== 1) return;
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+    const dx = currentX - mobileTouchStartXRef.current;
+    const dy = currentY - mobileTouchStartYRef.current;
+
+    if (mobileDragLockedRef.current === null) {
+      if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) {
+        mobileDragLockedRef.current = 'vertical';
+      } else if (dx < -8 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+        mobileDragLockedRef.current = 'horizontal';
+        setIsMobileDragging(true);
+        setMobileDragSidebar('chapters');
+      }
+    }
+
+    if (mobileDragLockedRef.current === 'horizontal') {
+      const winW = typeof window !== 'undefined' ? window.innerWidth : 380;
+      setMobileDragOffset(Math.min(0, Math.max(-winW, dx)));
     }
   };
 
   const handleBookSelectorTouchEnd = (e: React.TouchEvent) => {
-    if (studySwipeStartXRef.current === null || studySwipeStartYRef.current === null) return;
-    const deltaX = e.changedTouches[0].clientX - studySwipeStartXRef.current;
-    const deltaY = e.changedTouches[0].clientY - studySwipeStartYRef.current;
+    if (mobileDragLockedRef.current === 'horizontal' && mobileDragSidebar === 'chapters') {
+      const winW = typeof window !== 'undefined' ? window.innerWidth : 380;
+      const dx = e.changedTouches[0].clientX - mobileTouchStartXRef.current;
+      const dt = Date.now() - mobileTouchTimeRef.current;
+      const velocity = dx / Math.max(1, dt);
+      const shouldClose = Math.abs(dx) > winW * 0.45 || (velocity < -0.35 && dx < -40);
 
-    // Swiping right-to-left collapses the book selector back to reader
-    if (deltaX < -45 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2) {
-      setMobileStudyView('reader');
+      setIsMobileDragging(false);
+      if (shouldClose) {
+        setMobileDragOffset(-winW);
+        setTimeout(() => {
+          setMobileStudyView('reader');
+          setMobileDragSidebar(null);
+          setMobileDragOffset(0);
+        }, 260);
+      } else {
+        setMobileDragOffset(0);
+        setTimeout(() => {
+          setMobileDragSidebar(null);
+        }, 260);
+      }
     }
-    studySwipeStartXRef.current = null;
-    studySwipeStartYRef.current = null;
+    mobileDragLockedRef.current = null;
   };
 
+  // 3. Gesture on Study AI Drawer: Swipe Left-to-Right to close
   const handleMobileStudyAiTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 1) {
-      studySwipeStartXRef.current = e.touches[0].clientX;
-      studySwipeStartYRef.current = e.touches[0].clientY;
+      mobileTouchStartXRef.current = e.touches[0].clientX;
+      mobileTouchStartYRef.current = e.touches[0].clientY;
+      mobileTouchTimeRef.current = Date.now();
+      mobileDragLockedRef.current = null;
+    }
+  };
+
+  const handleMobileStudyAiTouchMove = (e: React.TouchEvent) => {
+    if (mobileStudyView !== 'ai' || e.touches.length !== 1) return;
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+    const dx = currentX - mobileTouchStartXRef.current;
+    const dy = currentY - mobileTouchStartYRef.current;
+
+    if (mobileDragLockedRef.current === null) {
+      if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) {
+        mobileDragLockedRef.current = 'vertical';
+      } else if (dx > 8 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+        mobileDragLockedRef.current = 'horizontal';
+        setIsMobileDragging(true);
+        setMobileDragSidebar('ai');
+      }
+    }
+
+    if (mobileDragLockedRef.current === 'horizontal') {
+      const winW = typeof window !== 'undefined' ? window.innerWidth : 380;
+      setMobileDragOffset(Math.max(0, Math.min(winW, dx)));
     }
   };
 
   const handleMobileStudyAiTouchEnd = (e: React.TouchEvent) => {
-    if (studySwipeStartXRef.current === null || studySwipeStartYRef.current === null) return;
-    const deltaX = e.changedTouches[0].clientX - studySwipeStartXRef.current;
-    const deltaY = e.changedTouches[0].clientY - studySwipeStartYRef.current;
+    if (mobileDragLockedRef.current === 'horizontal' && mobileDragSidebar === 'ai') {
+      const winW = typeof window !== 'undefined' ? window.innerWidth : 380;
+      const dx = e.changedTouches[0].clientX - mobileTouchStartXRef.current;
+      const dt = Date.now() - mobileTouchTimeRef.current;
+      const velocity = dx / Math.max(1, dt);
+      const shouldClose = dx > winW * 0.45 || (velocity > 0.35 && dx > 40);
 
-    // Swiping left-to-right collapses the mobile Study AI back to reader
-    if (deltaX > 45 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2) {
-      setMobileStudyView('reader');
+      setIsMobileDragging(false);
+      if (shouldClose) {
+        setMobileDragOffset(winW);
+        setTimeout(() => {
+          setMobileStudyView('reader');
+          setMobileDragSidebar(null);
+          setMobileDragOffset(0);
+        }, 260);
+      } else {
+        setMobileDragOffset(0);
+        setTimeout(() => {
+          setMobileDragSidebar(null);
+        }, 260);
+      }
     }
-    studySwipeStartXRef.current = null;
-    studySwipeStartYRef.current = null;
+    mobileDragLockedRef.current = null;
   };
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -4697,6 +4842,48 @@ export default function App() {
     );
   }
 
+  // Dynamic CSS transforms for smooth mobile sidebar sliding
+  const isBookSelectorActive = mobileStudyView === 'chapters' || mobileDragSidebar === 'chapters';
+  const isStudyAiActive = mobileStudyView === 'ai' || mobileDragSidebar === 'ai';
+
+  let bookSelectorTransform = 'translateX(-100%)';
+  if (mobileStudyView === 'chapters') {
+    if (mobileDragSidebar === 'chapters') {
+      bookSelectorTransform = `translateX(${mobileDragOffset}px)`;
+    } else {
+      bookSelectorTransform = 'translateX(0px)';
+    }
+  } else if (mobileDragSidebar === 'chapters') {
+    bookSelectorTransform = `translateX(calc(-100% + ${mobileDragOffset}px))`;
+  }
+
+  let studyAiTransform = 'translateX(100%)';
+  if (mobileStudyView === 'ai') {
+    if (mobileDragSidebar === 'ai') {
+      studyAiTransform = `translateX(${mobileDragOffset}px)`;
+    } else {
+      studyAiTransform = 'translateX(0px)';
+    }
+  } else if (mobileDragSidebar === 'ai') {
+    studyAiTransform = `translateX(calc(100% - ${mobileDragOffset}px))`;
+  }
+
+  // Backdrop opacity calculation
+  let backdropOpacity = 0;
+  if (mobileStudyView === 'chapters') {
+    const winW = typeof window !== 'undefined' ? window.innerWidth : 380;
+    const progress = mobileDragSidebar === 'chapters' ? Math.max(0, 1 + mobileDragOffset / winW) : 1;
+    backdropOpacity = progress * 0.45;
+  } else if (mobileStudyView === 'ai') {
+    const winW = typeof window !== 'undefined' ? window.innerWidth : 380;
+    const progress = mobileDragSidebar === 'ai' ? Math.max(0, 1 - mobileDragOffset / winW) : 1;
+    backdropOpacity = progress * 0.45;
+  } else if (mobileDragSidebar === 'chapters') {
+    const winW = typeof window !== 'undefined' ? window.innerWidth : 380;
+    const progress = Math.max(0, mobileDragOffset / winW);
+    backdropOpacity = progress * 0.45;
+  }
+
   return (
     <>
       <div className="h-[100dvh] max-h-[100dvh] w-full flex flex-col bg-bg text-fg overflow-hidden select-none">
@@ -4879,14 +5066,21 @@ export default function App() {
       <main className="flex-1 overflow-hidden min-h-0 flex relative">
         
         
-        {/* MOBILE STUDY TAB (No Resizable Panels) */}
+        {/* MOBILE STUDY TAB (Finger-tracking smooth drawers & gestures) */}
         {activeTab === 'study' && (
-          <div className="lg:hidden flex w-full h-full">
-            {/* Mobile Left Sidebar: Navigation */}
+          <div className="lg:hidden relative w-full h-full overflow-hidden bg-bg">
+            {/* Mobile Left Sidebar: Navigation (Book & Chapter Selector) */}
             <aside 
               onTouchStart={handleBookSelectorTouchStart}
+              onTouchMove={handleBookSelectorTouchMove}
               onTouchEnd={handleBookSelectorTouchEnd}
-              className={`w-full border-r border-border bg-bg flex-col animate-in slide-in-from-left duration-300 ease-out ${mobileStudyView === 'chapters' ? 'flex' : 'hidden'}`}
+              style={{
+                transform: bookSelectorTransform,
+                transition: isMobileDragging ? 'none' : 'transform 0.28s cubic-bezier(0.25, 1, 0.5, 1)',
+                pointerEvents: isBookSelectorActive ? 'auto' : 'none',
+                visibility: isBookSelectorActive ? 'visible' : 'hidden',
+              }}
+              className="absolute inset-0 z-30 w-full h-full border-r border-border bg-bg flex flex-col shadow-2xl will-change-transform"
             >
               <header className="h-[60px] border-b border-border flex items-center justify-between px-4 shrink-0 bg-bg">
                 <div className="flex items-center gap-2">
@@ -5116,7 +5310,12 @@ export default function App() {
             </aside>
 
             {/* Mobile Center: Bible Reader */}
-            <section className={`flex-1 flex-col h-full bg-bg ${mobileStudyView === 'reader' ? 'flex' : 'hidden'}`}>
+            <section 
+              onTouchStart={handleMobileReaderTouchStart}
+              onTouchMove={handleMobileReaderTouchMove}
+              onTouchEnd={handleMobileReaderTouchEnd}
+              className="absolute inset-0 w-full h-full flex flex-col bg-bg z-10"
+            >
               <header className="h-[60px] border-b border-border flex items-center justify-between px-3 sm:px-4 bg-bg shrink-0 relative z-20">
                 {/* Left: Book & Chapter Selector Trigger */}
                 <div className="flex items-center gap-1 min-w-0 shrink">
@@ -5489,11 +5688,31 @@ export default function App() {
               </div>
             </section>
 
+            {/* Backdrop overlay for drawers */}
+            {(isBookSelectorActive || isStudyAiActive) && backdropOpacity > 0 && (
+              <div 
+                className="absolute inset-0 bg-black/45 z-20 transition-opacity duration-200"
+                style={{ opacity: backdropOpacity }}
+                onClick={() => {
+                  setMobileStudyView('reader');
+                  setMobileDragSidebar(null);
+                  setMobileDragOffset(0);
+                }}
+              />
+            )}
+
             {/* Mobile Right Sidebar: Study AI */}
             <aside 
               onTouchStart={handleMobileStudyAiTouchStart}
+              onTouchMove={handleMobileStudyAiTouchMove}
               onTouchEnd={handleMobileStudyAiTouchEnd}
-              className={`relative w-full border-l border-border bg-bg flex-col animate-in slide-in-from-right duration-300 ease-out ${mobileStudyView === 'ai' ? 'flex' : 'hidden'}`}
+              style={{
+                transform: studyAiTransform,
+                transition: isMobileDragging ? 'none' : 'transform 0.28s cubic-bezier(0.25, 1, 0.5, 1)',
+                pointerEvents: isStudyAiActive ? 'auto' : 'none',
+                visibility: isStudyAiActive ? 'visible' : 'hidden',
+              }}
+              className="absolute inset-0 z-30 w-full h-full border-l border-border bg-bg flex flex-col shadow-2xl will-change-transform"
               onDragEnter={handleChatDragEnter}
               onDragOver={handleChatDragOver}
               onDragLeave={handleChatDragLeave}
@@ -7833,7 +8052,16 @@ export default function App() {
                 }`}
               >
                 {isActive && (
-                  <span className="absolute top-0.5 w-6 h-0.5 rounded-full bg-accent" />
+                  <motion.span 
+                    layoutId="mobile-bottom-nav-active-indicator"
+                    className="absolute top-0.5 w-6 sm:w-7 h-0.5 rounded-full bg-accent shadow-xs" 
+                    transition={{
+                      type: "spring",
+                      stiffness: 550,
+                      damping: 35,
+                      mass: 0.6
+                    }}
+                  />
                 )}
                 <div className="relative">
                   {tab === 'study' && <Layout size={19} className="mb-0.5" />}
