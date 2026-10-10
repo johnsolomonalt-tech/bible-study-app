@@ -47,6 +47,8 @@ interface CanvasToolbarProps {
   hasActiveBoard?: boolean;
   onCreateBoard?: () => void;
   onNewCanvas?: () => void;
+  onCreateFromScratch?: () => void;
+  onCreateWithAi?: () => void;
 }
 
 const CATEGORY_ICONS: Record<NodeCategory, React.ElementType> = {
@@ -82,13 +84,17 @@ export function CanvasToolbar({
   hasActiveBoard = true,
   onCreateBoard,
   onNewCanvas,
+  onCreateFromScratch,
+  onCreateWithAi,
 }: CanvasToolbarProps) {
   const mod = useModifierKey();
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
+  const [isNewCanvasMenuOpen, setIsNewCanvasMenuOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState(boardTitle);
   const addMenuRef = useRef<HTMLDivElement>(null);
+  const newCanvasMenuRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const isDark = theme === 'dark';
 
@@ -101,15 +107,18 @@ export function CanvasToolbar({
       if (addMenuRef.current && !addMenuRef.current.contains(e.target as Node)) {
         setIsAddMenuOpen(false);
       }
+      if (newCanvasMenuRef.current && !newCanvasMenuRef.current.contains(e.target as Node)) {
+        setIsNewCanvasMenuOpen(false);
+      }
       if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node)) {
         setIsMobileMenuOpen(false);
       }
     };
-    if (isAddMenuOpen || isMobileMenuOpen) {
+    if (isAddMenuOpen || isNewCanvasMenuOpen || isMobileMenuOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isAddMenuOpen, isMobileMenuOpen]);
+  }, [isAddMenuOpen, isNewCanvasMenuOpen, isMobileMenuOpen]);
 
   const handleTitleSubmit = () => {
     setIsEditingTitle(false);
@@ -275,18 +284,71 @@ export function CanvasToolbar({
         </div>
 
 
-        {/* New Canvas Button (takes to Theologica AI creator start page) */}
-        {onNewCanvas && (
+        {/* New Canvas Dropdown Button */}
+        <div className="relative" ref={newCanvasMenuRef}>
           <button
             type="button"
-            onClick={onNewCanvas}
+            onClick={() => setIsNewCanvasMenuOpen(!isNewCanvasMenuOpen)}
             className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border border-border text-fg hover:border-accent hover:text-accent text-xs font-semibold shadow-xs active:scale-95 transition-all cursor-pointer"
-            title="Create a new canvas with Theologica AI"
+            title="Create a new canvas"
           >
             <Plus size={14} className="text-accent shrink-0" />
             <span className="hidden md:inline">New Canvas</span>
+            <ChevronDown size={12} className={`transition-transform duration-200 text-muted ${isNewCanvasMenuOpen ? 'rotate-180' : ''}`} />
           </button>
-        )}
+
+          {isNewCanvasMenuOpen && (
+            <div 
+              className="absolute right-0 sm:left-0 top-full mt-2 w-64 rounded-2xl shadow-2xl border border-border bg-surface text-fg p-2 z-50 animate-in fade-in-50 zoom-in-95 ring-1 ring-border/50"
+            >
+              <div className="text-[11px] font-bold text-muted uppercase tracking-wider px-3 py-1.5">
+                New Canvas
+              </div>
+              <div className="space-y-1">
+                {/* Make from Scratch */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsNewCanvasMenuOpen(false);
+                    if (onCreateFromScratch) onCreateFromScratch();
+                    else if (onCreateBoard) onCreateBoard();
+                  }}
+                  className="w-full flex items-start gap-2.5 px-3 py-2 rounded-xl text-left hover:bg-surface-hover text-fg transition-colors cursor-pointer group"
+                >
+                  <div className="w-7 h-7 rounded-lg bg-surface border border-border flex items-center justify-center shrink-0 mt-0.5 text-muted group-hover:text-accent group-hover:border-accent/40 transition-colors">
+                    <Plus size={15} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold text-fg">Make from Scratch</div>
+                    <div className="text-[10px] text-muted leading-tight mt-0.5">Start with a blank canvas and add cards</div>
+                  </div>
+                </button>
+
+                {/* Make with Theologica AI */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsNewCanvasMenuOpen(false);
+                    if (onCreateWithAi) onCreateWithAi();
+                    else if (onNewCanvas) onNewCanvas();
+                  }}
+                  className="w-full flex items-start gap-2.5 px-3 py-2 rounded-xl text-left hover:bg-surface-hover text-fg transition-colors cursor-pointer group"
+                >
+                  <div className="w-7 h-7 rounded-lg bg-accent/15 border border-accent/30 flex items-center justify-center shrink-0 mt-0.5 text-accent shadow-xs">
+                    <Sparkles size={14} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold text-fg flex items-center gap-1.5">
+                      <span>Make with Theologica AI</span>
+                      <span className="text-[9px] bg-accent/15 text-accent font-bold px-1.5 py-0.2 rounded-full uppercase">AI</span>
+                    </div>
+                    <div className="text-[10px] text-muted leading-tight mt-0.5">Generate an inductive study canvas from passage</div>
+                  </div>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Theologica AI Assistant Button */}
         <button

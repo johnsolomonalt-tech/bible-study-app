@@ -56,16 +56,8 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isConnectSubmenuOpen, setIsConnectSubmenuOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const titleTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const titleDivRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-
-  const adjustTitleHeight = () => {
-    const el = titleTextareaRef.current;
-    if (el) {
-      el.style.height = 'auto';
-      el.style.height = `${Math.max(26, el.scrollHeight)}px`;
-    }
-  };
 
   const theme = data.theme || 'dark';
   const isDark = theme === 'dark';
@@ -84,14 +76,10 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
   useEffect(() => {
     setEditContent(data.content || '');
     setEditTitle(data.title || '');
+    if (titleDivRef.current && document.activeElement !== titleDivRef.current) {
+      titleDivRef.current.textContent = data.title || '';
+    }
   }, [data.content, data.title]);
-
-  // Adjust title height automatically when text or card width changes
-  useEffect(() => {
-    adjustTitleHeight();
-    const frame = requestAnimationFrame(adjustTitleHeight);
-    return () => cancelAnimationFrame(frame);
-  }, [editTitle, width]);
 
   // Focus textarea on edit mode start
   useEffect(() => {
@@ -120,17 +108,21 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
 
   const commitChanges = () => {
     setIsEditing(false);
+    const finalTitle = (titleDivRef.current?.textContent || editTitle).trim() || 'Untitled Card';
+    setEditTitle(finalTitle);
     if (data.onUpdate) {
       data.onUpdate(id, {
         content: editContent,
-        title: editTitle.trim() || 'Untitled Card',
+        title: finalTitle,
       });
     }
   };
 
   const handleTitleBlur = () => {
-    if (data.onUpdate && editTitle !== data.title) {
-      data.onUpdate(id, { title: editTitle.trim() || 'Untitled Card' });
+    const finalTitle = (titleDivRef.current?.textContent || editTitle).trim() || 'Untitled Card';
+    setEditTitle(finalTitle);
+    if (data.onUpdate && finalTitle !== data.title) {
+      data.onUpdate(id, { title: finalTitle });
     }
   };
 
@@ -236,48 +228,53 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
       <div 
         className="flex items-start justify-between px-3.5 py-2.5 border-b border-border rounded-t-xl gap-2 bg-surface-warm/40"
       >
-        {/* Category Badge & Title Textarea */}
-        <div className="flex items-start gap-2 flex-1 min-w-0">
-          {/* Badge: if card title is a scripture reference, make it an interactive verse shortcut */}
-          {parsedTitleRef && data.onVerseClick ? (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                data.onVerseClick?.(parsedTitleRef.book, parsedTitleRef.chapter, parsedTitleRef.verse);
-              }}
-              className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold tracking-wide uppercase shrink-0 border mt-0.5 transition-all hover:scale-105 cursor-pointer shadow-xs ${
-                isDark
-                  ? `${categoryMeta.bgDark} ${categoryMeta.borderDark} ${categoryMeta.textDark} hover:brightness-125`
-                  : `${categoryMeta.bgLight} ${categoryMeta.borderLight} ${categoryMeta.textLight} hover:brightness-95`
-              }`}
-              style={{ borderColor: categoryMeta.accent }}
-              title={`Open ${parsedTitleRef.book} ${parsedTitleRef.chapter}:${parsedTitleRef.verse} in Bible reader`}
-            >
-              <CategoryIcon size={12} style={{ color: categoryMeta.accent }} />
-              <span>{categoryMeta.label}</span>
-              <ExternalLink size={10} className="opacity-75 ml-0.5" />
-            </button>
-          ) : (
-            <div 
-              className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold tracking-wide uppercase shrink-0 border mt-0.5 ${
-                isDark ? `${categoryMeta.bgDark} ${categoryMeta.borderDark} ${categoryMeta.textDark}` : `${categoryMeta.bgLight} ${categoryMeta.borderLight} ${categoryMeta.textLight}`
-              }`}
-              style={{ borderColor: categoryMeta.accent }}
-            >
-              <CategoryIcon size={12} style={{ color: categoryMeta.accent }} />
-              <span>{categoryMeta.label}</span>
-            </div>
-          )}
+        {/* Category Badge & Multi-Line Flowing Title */}
+        <div className="flex-1 min-w-0 after:content-[''] after:table after:clear-both">
+          {/* Floated Badge so multi-line titles wrap underneath into the open space on the left */}
+          <div className="float-left mr-2 mb-1 shrink-0">
+            {parsedTitleRef && data.onVerseClick ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  data.onVerseClick?.(parsedTitleRef.book, parsedTitleRef.chapter, parsedTitleRef.verse);
+                }}
+                className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold tracking-wide uppercase border transition-all hover:scale-105 cursor-pointer shadow-xs select-none ${
+                  isDark
+                    ? `${categoryMeta.bgDark} ${categoryMeta.borderDark} ${categoryMeta.textDark} hover:brightness-125`
+                    : `${categoryMeta.bgLight} ${categoryMeta.borderLight} ${categoryMeta.textLight} hover:brightness-95`
+                }`}
+                style={{ borderColor: categoryMeta.accent }}
+                title={`Open ${parsedTitleRef.book} ${parsedTitleRef.chapter}:${parsedTitleRef.verse} in Bible reader`}
+              >
+                <CategoryIcon size={12} style={{ color: categoryMeta.accent }} />
+                <span>{categoryMeta.label}</span>
+                <ExternalLink size={10} className="opacity-75 ml-0.5" />
+              </button>
+            ) : (
+              <div 
+                className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold tracking-wide uppercase border select-none ${
+                  isDark ? `${categoryMeta.bgDark} ${categoryMeta.borderDark} ${categoryMeta.textDark}` : `${categoryMeta.bgLight} ${categoryMeta.borderLight} ${categoryMeta.textLight}`
+                }`}
+                style={{ borderColor: categoryMeta.accent }}
+              >
+                <CategoryIcon size={12} style={{ color: categoryMeta.accent }} />
+                <span>{categoryMeta.label}</span>
+              </div>
+            )}
+          </div>
 
-          {/* Inline Multi-Line Title Input */}
-          <textarea
-            ref={titleTextareaRef}
-            rows={1}
-            value={editTitle}
-            onChange={(e) => {
-              setEditTitle(e.target.value);
-              adjustTitleHeight();
+          {/* Inline Multi-Line Flowing Title Input */}
+          <div
+            ref={titleDivRef}
+            contentEditable
+            suppressContentEditableWarning
+            role="textbox"
+            aria-multiline="true"
+            data-placeholder="Card Title..."
+            onInput={(e) => {
+              const val = e.currentTarget.textContent || '';
+              setEditTitle(val);
             }}
             onBlur={handleTitleBlur}
             onKeyDown={(e) => {
@@ -285,15 +282,10 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
               if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
                 e.preventDefault();
                 handleTitleBlur();
-                (e.target as HTMLTextAreaElement).blur();
+                (e.target as HTMLElement).blur();
               }
             }}
-            placeholder="Card Title..."
-            className="nodrag flex-1 min-w-0 bg-transparent text-[13px] font-semibold leading-snug focus:outline-none focus:ring-1 focus:ring-accent/50 rounded px-1.5 py-0.5 resize-none overflow-hidden break-words whitespace-pre-wrap text-fg placeholder:text-muted"
-            style={{
-              height: 'auto',
-              minHeight: '26px',
-            }}
+            className="nodrag text-[13px] font-semibold leading-snug focus:outline-none focus:ring-1 focus:ring-accent/50 rounded px-1 py-0.5 break-words whitespace-pre-wrap text-fg empty:before:content-[attr(data-placeholder)] empty:before:text-muted empty:before:pointer-events-none cursor-text select-text"
           />
         </div>
 

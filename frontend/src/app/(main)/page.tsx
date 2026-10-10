@@ -3,7 +3,7 @@ const API_URL = '';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuth, UserButton, SignIn, SignInButton } from '@clerk/nextjs';
-import { Send, Plus, Layout, Edit, Sparkles, Target, Check, Copy, ChevronRight, ChevronLeft, ChevronDown, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquare, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow, ShieldCheck, Heart, Layers, Languages, MoreVertical, Search, BookMarked, Quote, Compass, ArrowRight, Square, BrainCircuit, FileText, UploadCloud } from 'lucide-react';
+import { Send, Plus, Layout, Edit, Sparkles, Target, Check, Copy, ChevronRight, ChevronLeft, ChevronDown, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquare, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow, ShieldCheck, Heart, Layers, Languages, MoreVertical, Search, BookMarked, Quote, Compass, ArrowRight, Square, BrainCircuit, FileText, UploadCloud, Menu } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import TextareaAutosize from 'react-textarea-autosize';
 import { getDevotionalForDay, DevotionalEntry, getDevotionalBody } from '../../lib/devotionals';
@@ -7544,11 +7544,11 @@ export default function App() {
                 <div className="flex items-center min-w-0 mr-2">
                   <button 
                     onClick={() => setMobileChatView('list')} 
-                    className="lg:hidden p-2 mr-1 text-fg-2 hover:text-fg shrink-0 cursor-pointer flex items-center"
+                    className="lg:hidden p-2 mr-1 text-fg-2 hover:text-fg hover:bg-surface rounded-xl transition-colors shrink-0 cursor-pointer flex items-center"
                     title="Open Conversations"
                     aria-label="Open Conversations"
                   >
-                    <ChevronRight size={20} />
+                    <Menu size={20} />
                   </button>
                   <h2 className="text-[15px] sm:text-[18px] font-medium truncate max-w-[140px] xs:max-w-[220px] sm:max-w-md">
                     {activeChat.title || 'New Conversation'}

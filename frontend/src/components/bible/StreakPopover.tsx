@@ -28,6 +28,7 @@ import {
   STREAK_MILESTONES 
 } from '@/lib/streakService';
 import { SetMilestoneModal } from './SetMilestoneModal';
+import { AnimatedStreakFlame } from './AnimatedStreakFlame';
 
 export interface StreakPopoverProps {
   onNavigateToTab: (tab: string) => void;
@@ -104,19 +105,11 @@ export function StreakPopover({
         aria-label="Daily Reading Streak"
       >
         <div className="relative flex items-center justify-center">
-          <Flame 
+          <AnimatedStreakFlame 
             size={16} 
-            className={`transition-transform duration-300 ${
-              isGlowing 
-                ? 'fill-amber-500 text-amber-500 dark:fill-amber-400 dark:text-amber-400 animate-pulse' 
-                : streak > 0 
-                ? 'text-amber-500' 
-                : 'text-muted'
-            }`} 
+            streak={streak} 
+            isGlowing={isGlowing} 
           />
-          {isGlowing && (
-            <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-amber-400 rounded-full animate-ping opacity-75" />
-          )}
         </div>
         <span className="tabular-nums font-bold tracking-tight text-xs">
           {streak}
@@ -154,14 +147,11 @@ export function StreakPopover({
 
                 <div className="flex flex-col items-center text-center">
                   <div className="relative mb-3 flex flex-col items-center">
-                    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shadow-lg shadow-amber-500/15">
-                      <Flame 
-                        size={40} 
-                        className={`transition-all duration-500 ${
-                          isGlowing 
-                            ? 'fill-amber-500 text-amber-500 dark:fill-amber-400 dark:text-amber-400 filter drop-shadow' 
-                            : 'text-amber-500/70'
-                        }`} 
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shadow-lg shadow-amber-500/15 overflow-hidden">
+                      <AnimatedStreakFlame 
+                        size={42} 
+                        streak={streak} 
+                        isGlowing={isGlowing} 
                       />
                     </div>
                   </div>

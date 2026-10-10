@@ -126,93 +126,88 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
   ];
 
   return (
-    <div className={`flex flex-col items-center justify-center w-full ${isCompact ? 'py-4 px-2' : 'py-8 px-4 sm:px-6 max-w-4xl mx-auto'} animate-in fade-in duration-300`}>
+    <div className={`flex flex-col items-center justify-center w-full ${isCompact ? 'py-2 px-1' : 'py-3 sm:py-8 px-2 sm:px-6 max-w-4xl mx-auto'} animate-in fade-in duration-300`}>
       {/* Scriptorium Crest */}
-      <div className="relative flex items-center justify-center mb-4">
-        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-accent/10 border border-accent/25 flex items-center justify-center text-accent shadow-inner relative group">
-          <BookOpen size={24} className="sm:hidden" />
+      <div className="relative flex items-center justify-center mb-2 sm:mb-4">
+        <div className="w-10 h-10 sm:w-16 sm:h-16 rounded-2xl bg-accent/10 border border-accent/25 flex items-center justify-center text-accent shadow-inner relative group">
+          <BookOpen size={18} className="sm:hidden" />
           <BookOpen size={28} className="hidden sm:block" />
-          <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-surface border border-accent/40 flex items-center justify-center text-accent shadow-sm">
-            <Sparkles size={11} />
+          <div className="absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-surface border border-accent/40 flex items-center justify-center text-accent shadow-sm">
+            <Sparkles size={9} className="sm:hidden" />
+            <Sparkles size={11} className="hidden sm:block" />
           </div>
         </div>
       </div>
 
       {/* Hero Title & Subtitle */}
-      <h1 className={`${isCompact ? 'text-[17px]' : 'text-xl sm:text-2xl'} font-serif font-normal text-fg text-center mb-1.5`}>
+      <h1 className="text-[17px] sm:text-2xl font-serif font-normal text-fg text-center mb-1">
         Theologica Study AI
       </h1>
-      <p className={`${isCompact ? 'text-[12px]' : 'text-[13px] sm:text-[14px]'} text-muted text-center max-w-lg mb-5 sm:mb-6 leading-relaxed`}>
-        Examine Scripture in original languages, explore historic theological traditions, and discover Christ throughout the biblical canon.
+      <p className="text-[11px] sm:text-[14px] text-muted text-center max-w-sm sm:max-w-lg mb-3 sm:mb-6 leading-normal sm:leading-relaxed">
+        Examine Scripture in original languages, explore theology, and discover Christ throughout the biblical canon.
       </p>
 
-      {/* Active Scripture & Lens Banner */}
-      <div className={`w-full ${isCompact ? 'max-w-full' : 'max-w-xl'} mb-6 p-2.5 sm:p-3 rounded-xl bg-surface/70 border border-border-soft/70 shadow-sm flex items-center justify-between gap-3`}>
-        <div className="flex items-center gap-2.5 min-w-0">
+      {/* Active Scripture & Lens Context */}
+      <div className="w-full max-w-md sm:max-w-xl mb-3 sm:mb-6 p-2 sm:p-3 rounded-xl bg-surface/70 border border-border-soft/70 shadow-2xs flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: currentLensMeta.accentColor }} />
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[12px] sm:text-[13px] font-medium text-fg truncate">
-                {activeBook.name} {activeChapter}
-              </span>
-              <span className="text-[10px] uppercase font-bold text-muted bg-surface-hover px-1.5 py-0.5 rounded">
-                {translation}
-              </span>
-              <span className="text-[10px] text-muted hidden xs:inline">•</span>
-              <span className="text-[11px] font-medium truncate" style={{ color: currentLensMeta.accentColor }}>
-                {currentLensMeta.name} Lens
-              </span>
-            </div>
-            <p className="text-[11px] text-muted truncate mt-0.5">
-              {currentLensMeta.tagline}
-            </p>
+          <div className="min-w-0 flex items-center gap-1.5 flex-wrap">
+            <span className="text-[11px] sm:text-[13px] font-medium text-fg truncate">
+              {activeBook.name} {activeChapter}
+            </span>
+            <span className="text-[9px] sm:text-[10px] uppercase font-bold text-muted bg-surface-hover px-1.5 py-0.5 rounded">
+              {translation}
+            </span>
+            <span className="text-[10px] sm:text-[11px] font-medium truncate" style={{ color: currentLensMeta.accentColor }}>
+              · {currentLensMeta.name} Lens
+            </span>
           </div>
         </div>
 
         <button
           type="button"
           onClick={() => onSelectPrompt(`Please provide a comprehensive study of ${activeBook.name} ${activeChapter} (${translation}). Include original language root words, theological themes, and historical context.`)}
-          className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-accent/15 hover:bg-accent text-accent hover:text-white text-[11px] font-medium transition-all cursor-pointer shadow-xs"
+          className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-accent/15 hover:bg-accent text-accent hover:text-white text-[10px] sm:text-[11px] font-medium transition-all cursor-pointer shadow-2xs"
         >
           <span>Study Chapter</span>
-          <ArrowRight size={12} />
+          <ArrowRight size={11} />
         </button>
       </div>
 
       {/* Context-Aware Dynamic Starters */}
-      <div className="w-full mb-5">
-        <div className="flex items-center gap-2 mb-2.5 px-1">
-          <Sparkles size={12} className="text-accent" />
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">
-            Suggested for {activeBook.name} {activeChapter}
+      <div className="w-full max-w-md sm:max-w-xl mb-3 sm:mb-5">
+        <div className="flex items-center gap-1.5 mb-2 px-1">
+          <Sparkles size={11} className="text-accent" />
+          <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-muted">
+            Suggested Questions
           </span>
         </div>
 
-        <div className={`grid ${isCompact ? 'grid-cols-1 gap-2' : 'grid-cols-1 sm:grid-cols-2 gap-2.5'}`}>
-          {chapterStarters.map((item, idx) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2.5">
+          {chapterStarters.slice(0, 2).map((item, idx) => (
             <button
               key={idx}
               type="button"
               onClick={() => onSelectPrompt(item.prompt)}
-              className="group text-left p-3 rounded-xl bg-surface/60 hover:bg-surface border border-border-soft/60 hover:border-accent/50 transition-all cursor-pointer shadow-xs hover:shadow-sm flex flex-col justify-between"
+              className="group text-left p-2.5 sm:p-3 rounded-xl bg-surface/60 hover:bg-surface border border-border-soft/60 hover:border-accent/50 transition-all cursor-pointer shadow-2xs hover:shadow-xs flex items-center justify-between gap-2 active:scale-[0.99]"
             >
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] font-semibold tracking-wide uppercase text-accent bg-accent/10 px-2 py-0.5 rounded-md">
+              <div className="min-w-0 flex-1">
+                <span className="inline-block text-[9px] font-semibold tracking-wide uppercase text-accent bg-accent/10 px-1.5 py-0.5 rounded mb-1">
                   {item.subtitle}
                 </span>
-                <ArrowRight size={12} className="text-meta group-hover:text-accent group-hover:translate-x-0.5 transition-all" />
+                <p className="text-[11px] sm:text-[13px] text-fg font-medium line-clamp-1 sm:line-clamp-2 leading-snug">
+                  "{item.prompt}"
+                </p>
               </div>
-              <p className="text-[12px] sm:text-[13px] text-fg font-medium line-clamp-2 leading-snug">
-                "{item.prompt}"
-              </p>
+              <ArrowRight size={12} className="text-muted group-hover:text-accent group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
             </button>
           ))}
         </div>
       </div>
 
-      {/* Study Topics */}
+      {/* Study Topics (Desktop / Tablet only) */}
       {!isCompact && (
-        <div className="w-full">
+        <div className="hidden sm:block w-full max-w-xl">
           <div className="flex items-center gap-2 mb-2.5 px-1">
             <Compass size={12} className="text-muted" />
             <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">

@@ -254,6 +254,98 @@ function InnerCanvasBoard({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Canvas Mobile Pinch-to-Zoom Gesture Engine (Works seamlessly anywhere, including over text boxes/cards)
+  const canvasWrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = canvasWrapperRef.current;
+    if (!el) return;
+
+    let initialDistance = 0;
+    let initialViewport = { x: 0, y: 0, zoom: 1 };
+    let initialWorldPoint = { x: 0, y: 0 };
+    let isPinching = false;
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        const t0 = e.touches[0];
+        const t1 = e.touches[1];
+        const dx = t1.clientX - t0.clientX;
+        const dy = t1.clientY - t0.clientY;
+        const dist = Math.hypot(dx, dy);
+
+        if (dist > 8) {
+          isPinching = true;
+          initialDistance = dist;
+          const rect = el.getBoundingClientRect();
+          const midScreenX = (t0.clientX + t1.clientX) / 2;
+          const midScreenY = (t0.clientY + t1.clientY) / 2;
+          const canvasX = midScreenX - rect.left;
+          const canvasY = midScreenY - rect.top;
+
+          const vp = getViewport();
+          initialViewport = { ...vp };
+          initialWorldPoint = {
+            x: (canvasX - vp.x) / vp.zoom,
+            y: (canvasY - vp.y) / vp.zoom,
+          };
+
+          if (e.cancelable) e.preventDefault();
+          e.stopPropagation();
+        }
+      } else {
+        isPinching = false;
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2 && isPinching && initialDistance > 0) {
+        const t0 = e.touches[0];
+        const t1 = e.touches[1];
+        const dx = t1.clientX - t0.clientX;
+        const dy = t1.clientY - t0.clientY;
+        const dist = Math.hypot(dx, dy);
+
+        if (dist > 8) {
+          const scale = dist / initialDistance;
+          const targetZoom = Math.min(2.0, Math.max(0.2, initialViewport.zoom * scale));
+
+          const rect = el.getBoundingClientRect();
+          const midScreenX = (t0.clientX + t1.clientX) / 2;
+          const midScreenY = (t0.clientY + t1.clientY) / 2;
+          const currCanvasX = midScreenX - rect.left;
+          const currCanvasY = midScreenY - rect.top;
+
+          const nextX = currCanvasX - initialWorldPoint.x * targetZoom;
+          const nextY = currCanvasY - initialWorldPoint.y * targetZoom;
+
+          setViewport({ x: nextX, y: nextY, zoom: targetZoom });
+
+          if (e.cancelable) e.preventDefault();
+          e.stopPropagation();
+        }
+      }
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) {
+        isPinching = false;
+      }
+    };
+
+    el.addEventListener('touchstart', onTouchStart, { capture: true, passive: false });
+    el.addEventListener('touchmove', onTouchMove, { capture: true, passive: false });
+    el.addEventListener('touchend', onTouchEnd, { capture: true, passive: false });
+    el.addEventListener('touchcancel', onTouchEnd, { capture: true, passive: false });
+
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart, { capture: true });
+      el.removeEventListener('touchmove', onTouchMove, { capture: true });
+      el.removeEventListener('touchend', onTouchEnd, { capture: true });
+      el.removeEventListener('touchcancel', onTouchEnd, { capture: true });
+    };
+  }, [getViewport, setViewport]);
+
   // Pane Context Menu state
   const [paneContextMenu, setPaneContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [paneAddSubmenuOpen, setPaneAddSubmenuOpen] = useState(false);
@@ -2228,6 +2320,11 @@ function InnerCanvasBoard({
           setIsCreatePageActive(true);
           if (typeof window !== 'undefined' && window.innerWidth < 1024) setIsSidebarOpen(false);
         }}
+        onCreateFromScratch={() => {
+          handleCreateBoard();
+          setIsCreatePageActive(false);
+          if (typeof window !== 'undefined' && window.innerWidth < 1024) setIsSidebarOpen(false);
+        }}
         onRenameBoard={handleRenameBoard}
         onDeleteBoard={handleDeleteBoard}
         onOpenImportModal={() => {
@@ -2238,7 +2335,7 @@ function InnerCanvasBoard({
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 h-full relative overflow-hidden flex flex-col min-w-0">
+      <div ref={canvasWrapperRef} className="flex-1 h-full relative overflow-hidden flex flex-col min-w-0">
         {isCreatePageActive || (boards.length === 0 && !activeBoardId) ? (
           <CanvasStartPage
             onGenerateCanvas={handleGenerateFromStartPage}
@@ -2283,6 +2380,13 @@ function InnerCanvasBoard({
             onAddNode={handleAddNode}
             onOpenAi={() => setIsAiModalOpen(true)}
             onNewCanvas={() => setIsCreatePageActive(true)}
+            onCreateFromScratch={() => {
+              handleCreateBoard();
+              setIsCreatePageActive(false);
+            }}
+            onCreateWithAi={() => {
+              setIsCreatePageActive(true);
+            }}
             onExportStudyGuide={() => setIsExportGuideOpen(true)}
             onShareBoard={() => setIsShareModalOpen(true)}
             onUndo={handleUndo}

@@ -23,6 +23,7 @@ import {
   getTodayStreakQuote,
   getRandomStreakQuote
 } from '@/lib/streakService';
+import { AnimatedStreakFlame } from './AnimatedStreakFlame';
 import { EditPaceModal } from './EditPaceModal';
 
 export interface TrackerStreakHeroProps {
@@ -94,7 +95,7 @@ export function TrackerStreakHero({
                 ? 'bg-amber-500/20 text-amber-500 border-amber-500/40 shadow-amber-500/15'
                 : 'bg-surface text-muted border-border'
             }`}>
-              <Flame size={26} className={streakData.isCompletedToday ? 'fill-amber-500 text-amber-500' : ''} />
+              <AnimatedStreakFlame size={26} streak={streakData.currentStreak} isGlowing={streakData.isCompletedToday} />
             </div>
           </div>
 

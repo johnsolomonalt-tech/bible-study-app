@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Plus, 
   Workflow, 
@@ -13,7 +13,9 @@ import {
   Layers, 
   Clock, 
   ChevronRight,
-  Download
+  Download,
+  ChevronDown,
+  Sparkles
 } from 'lucide-react';
 import { CanvasBoardMetadata } from '@/types/canvas';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
@@ -25,6 +27,7 @@ interface CanvasSidebarProps {
   activeBoardId: string;
   onSelectBoard: (id: string) => void;
   onCreateBoard: () => void;
+  onCreateFromScratch?: () => void;
   onRenameBoard: (id: string, newTitle: string) => void;
   onDeleteBoard: (id: string) => void;
   onOpenImportModal?: () => void;
@@ -38,6 +41,7 @@ export function CanvasSidebar({
   activeBoardId,
   onSelectBoard,
   onCreateBoard,
+  onCreateFromScratch,
   onRenameBoard,
   onDeleteBoard,
   onOpenImportModal,
@@ -47,8 +51,22 @@ export function CanvasSidebar({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [boardToDelete, setBoardToDelete] = useState<CanvasBoardMetadata | null>(null);
+  const [isNewBoardMenuOpen, setIsNewBoardMenuOpen] = useState(false);
+  const newBoardMenuRef = useRef<HTMLDivElement>(null);
 
   const isDark = theme === 'dark';
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (newBoardMenuRef.current && !newBoardMenuRef.current.contains(e.target as Node)) {
+        setIsNewBoardMenuOpen(false);
+      }
+    };
+    if (isNewBoardMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isNewBoardMenuOpen]);
 
   const filteredBoards = boards.filter((b) =>
     (b.title || 'Untitled Canvas').toLowerCase().includes(searchQuery.toLowerCase())
@@ -146,14 +164,15 @@ export function CanvasSidebar({
 
       {/* Action Bar: New Board, Import & Search */}
       <div className="p-3 space-y-2 shrink-0">
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 relative" ref={newBoardMenuRef}>
           <button
             type="button"
-            onClick={() => onCreateBoard()}
+            onClick={() => setIsNewBoardMenuOpen(!isNewBoardMenuOpen)}
             className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-accent text-accent-on text-xs font-semibold hover:opacity-90 active:scale-[0.98] transition-all shadow-xs cursor-pointer"
           >
             <Plus size={15} />
             <span>New Canvas</span>
+            <ChevronDown size={13} className={`transition-transform duration-200 ${isNewBoardMenuOpen ? 'rotate-180' : ''}`} />
           </button>
           {onOpenImportModal && (
             <button
@@ -164,6 +183,53 @@ export function CanvasSidebar({
             >
               <Download size={15} />
             </button>
+          )}
+
+          {isNewBoardMenuOpen && (
+            <div className="absolute left-0 top-full mt-1.5 w-full rounded-2xl shadow-2xl border border-border bg-surface text-fg p-2 z-50 animate-in fade-in-50 zoom-in-95 ring-1 ring-border/50">
+              <div className="text-[10px] font-bold text-muted uppercase tracking-wider px-2 py-1">
+                New Canvas
+              </div>
+              <div className="space-y-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsNewBoardMenuOpen(false);
+                    if (onCreateFromScratch) onCreateFromScratch();
+                    else onCreateBoard();
+                  }}
+                  className="w-full flex items-start gap-2 px-2.5 py-2 rounded-xl text-left hover:bg-surface-hover text-fg transition-colors cursor-pointer group"
+                >
+                  <div className="w-6 h-6 rounded-lg bg-surface border border-border flex items-center justify-center shrink-0 mt-0.5 text-muted group-hover:text-accent group-hover:border-accent/40 transition-colors">
+                    <Plus size={13} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold text-fg">Make from Scratch</div>
+                    <div className="text-[10px] text-muted leading-tight mt-0.5">Start with a blank canvas</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsNewBoardMenuOpen(false);
+                    onCreateBoard();
+                  }}
+                  className="w-full flex items-start gap-2 px-2.5 py-2 rounded-xl text-left hover:bg-surface-hover text-fg transition-colors cursor-pointer group"
+                >
+                  <div className="w-6 h-6 rounded-lg bg-accent/15 border border-accent/30 flex items-center justify-center shrink-0 mt-0.5 text-accent shadow-xs">
+                    <Sparkles size={13} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold text-fg flex items-center gap-1">
+                      <span>Make with Theologica AI</span>
+                      <span className="text-[8px] bg-accent/15 text-accent font-bold px-1 rounded-full">AI</span>
+                    </div>
+                    <div className="text-[10px] text-muted leading-tight mt-0.5">Generate study canvas from scripture</div>
+                  </div>
+                </button>
+              </div>
+            </div>
           )}
         </div>
 
