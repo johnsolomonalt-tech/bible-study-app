@@ -771,19 +771,17 @@ const AiChatMessageView = ({
 };
 
 export default function App() {
+  const [authTimeout, setAuthTimeout] = useState(false);
   useEffect(() => {
-    const handleGlobalClick = (e: MouseEvent) => {
-      // Small timeout to allow the toolbar buttons to fire their click handlers first
-      setTimeout(() => {
-        const selection = window.getSelection();
-        if (!selection || selection.isCollapsed) {
-          setToolbarPosition(null);
-        }
-      }, 50);
-    };
-    document.addEventListener('mousedown', handleGlobalClick);
-    return () => document.removeEventListener('mousedown', handleGlobalClick);
+    const timer = setTimeout(() => {
+      setAuthTimeout(true);
+    }, 3500);
+    return () => clearTimeout(timer);
   }, []);
+
+  const toolbarTouchStartRef = useRef<{ x: number; y: number; time: number; hasMoved: boolean } | null>(null);
+  const lastTouchEndRef = useRef<number>(0);
+
   const { getToken, isLoaded, userId } = useAuth();
   
   const [isOnline, setIsOnline] = useState(true);
@@ -883,6 +881,7 @@ export default function App() {
   const [endVerseNumber, setEndVerseNumber] = useState<number | null>(null);
   const [selectedText, setSelectedText] = useState<string>('');
   const [toolbarPosition, setToolbarPosition] = useState<{x: number, y: number, highlightId?: number, highlightIds?: number[], isBelow?: boolean} | null>(null);
+  const [copiedHighlightToast, setCopiedHighlightToast] = useState(false);
   const [activeHighlightMenu, setActiveHighlightMenu] = useState<{id: number, x: number, y: number} | null>(null);
   
   const [activeBook, setActiveBook] = useState(OT_BOOKS[0]);
@@ -2530,7 +2529,13 @@ export default function App() {
       }
     }
 
-    // 3. Normalize multiple spaces / newlines
+    // 3. Remove any interlinear bracketed Strong's codes [H1234] or [G1234]
+    cleaned = cleaned.replace(/\[\s*[HG]\d+\s*\]/g, '');
+
+    // 4. Remove any HTML tags
+    cleaned = cleaned.replace(/<[^>]+>/g, '');
+
+    // 5. Normalize multiple spaces / newlines
     cleaned = cleaned.replace(/\s+/g, ' ');
 
     return cleaned.trim();
@@ -2538,6 +2543,14 @@ export default function App() {
 
   // Clicking or tapping a verse opens the floating toolbar to highlight or study that verse
   const handleVerseClick = (e: React.MouseEvent | React.TouchEvent, verseNum: number) => {
+    // If synthetic click fired right after touchend, ignore to prevent instant-toggle dismissal
+    if (e.type === 'click' && Date.now() - lastTouchEndRef.current < 450) {
+      return;
+    }
+    if (e.type === 'touchend') {
+      lastTouchEndRef.current = Date.now();
+    }
+
     // If user was actively selecting text (e.g. mouse drag selection), don't treat it as a whole-verse click
     const sel = typeof window !== 'undefined' ? window.getSelection() : null;
     if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) {
@@ -2557,6 +2570,8 @@ export default function App() {
     }
 
     e.stopPropagation();
+
+    console.log('[THEOLOGICA-HL] handleVerseClick triggered for verse:', verseNum);
 
     // Toggle off if currently selected and toolbar is open for this verse
     if (toolbarPosition && selectionVerse === verseNum && (!endVerseNumber || endVerseNumber === verseNum)) {
@@ -2606,29 +2621,43 @@ export default function App() {
     const rect = visibleVerseEl ? visibleVerseEl.getBoundingClientRect() : null;
     const winWidth = typeof window !== 'undefined' ? window.innerWidth : 1000;
     const winHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
-    const toolbarHalfWidth = 195;
+    const toolbarHalfWidth = winWidth <= 640 ? 155 : 195;
 
     // Center toolbar horizontally over the center of the verse text (not pinned to the left or verse number)
     let x: number;
     if (rect && rect.width > 0) {
       const verseCenterX = rect.left + rect.width / 2;
-      x = winWidth <= 420 
+      x = winWidth <= 640 
         ? winWidth / 2 
         : Math.max(toolbarHalfWidth + 12, Math.min(winWidth - toolbarHalfWidth - 12, verseCenterX));
     } else {
       x = winWidth / 2;
     }
 
+    const isTouch = typeof window !== 'undefined' && ('ontouchstart' in window || (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0) || winWidth <= 768);
     const isNearTop = rect ? rect.top < 130 : false;
-    let y = rect ? (isNearTop ? rect.bottom + 8 : Math.max(70, rect.top - 6)) : winHeight / 2;
-    y = Math.max(70, Math.min(winHeight - 80, y));
+    let y: number;
+    let isBelow: boolean;
+
+    if (isTouch) {
+      isBelow = isNearTop || (rect ? rect.top < 140 : false);
+      if (isBelow) {
+        y = rect ? Math.min(winHeight - (winWidth <= 768 ? 95 : 70), rect.bottom + 8) : winHeight / 2;
+      } else {
+        y = rect ? Math.max(70, rect.top - 8) : winHeight / 2;
+      }
+    } else {
+      isBelow = isNearTop;
+      y = rect ? (isNearTop ? rect.bottom + 8 : Math.max(70, rect.top - 6)) : winHeight / 2;
+      y = Math.max(70, Math.min(winHeight - 80, y));
+    }
 
     setToolbarPosition({
       x,
       y,
       highlightId: verseHighlights.length > 0 ? verseHighlights[0].id : undefined,
       highlightIds: verseHighlights.map(h => h.id),
-      isBelow: isNearTop
+      isBelow
     });
   };
 
@@ -2718,45 +2747,76 @@ export default function App() {
       const actualStart = Math.min(startVerse, endVerse || startVerse);
       const actualEnd = Math.max(startVerse, endVerse || startVerse);
 
-      setSelectionRange(range);
+      const sanitizedSel = cleanVerseText(rawText, actualStart, actualEnd);
+
+      setSelectionRange(range.cloneRange());
       setSelectionVerse(actualStart);
       setEndVerseNumber(actualEnd);
-      setSelectedText(rawText);
+      setSelectedText(sanitizedSel || rawText);
 
       const winWidth = typeof window !== 'undefined' ? window.innerWidth : 1000;
       const winHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
-      const toolbarHalfWidth = 195;
-      const x = winWidth <= 420 
+      const toolbarHalfWidth = winWidth <= 640 ? 155 : 195;
+      const x = winWidth <= 640 
         ? winWidth / 2 
         : Math.max(toolbarHalfWidth + 12, Math.min(winWidth - toolbarHalfWidth - 12, rect.left + rect.width / 2));
-      const isNearTop = rect.top < 122;
-      const isNearBottom = rect.bottom > winHeight - 80;
-      const isBelow = isNearTop && !isNearBottom;
-
+      const isTouch = typeof window !== 'undefined' && ('ontouchstart' in window || (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0) || winWidth <= 768);
+      let isBelow: boolean;
       let y: number;
-      if (isBelow) {
-        y = Math.min(winHeight - 80, rect.bottom + 6);
+
+      if (isTouch) {
+        const bottomBarPadding = winWidth <= 768 ? 95 : 70;
+        const hasRoomBelow = winHeight - rect.bottom >= 65;
+
+        if (rect.top >= 135) {
+          // On mobile iOS/Android, native callout is displayed ABOVE the selection (approx rect.top - 45px).
+          // To avoid colliding with the native callout:
+          if (hasRoomBelow) {
+            // Place Theologica's toolbar BELOW the selection
+            isBelow = true;
+            y = Math.min(winHeight - bottomBarPadding, rect.bottom + 8);
+          } else {
+            // Selection is near the bottom edge of viewport:
+            // Stack Theologica's toolbar cleanly ABOVE the native callout.
+            isBelow = false;
+            y = Math.max(70, rect.top - 50);
+          }
+        } else {
+          // Selection is near the top of the viewport (< 135px):
+          // iOS flips its native callout BELOW the selection (approx rect.bottom + 10px).
+          // Place Theologica's toolbar cleanly ABOVE the selection to avoid collision.
+          isBelow = false;
+          y = Math.max(65, rect.top - 8);
+        }
       } else {
-        y = Math.max(122, rect.top - 6);
+        // Desktop behavior: placed above unless near top of viewport
+        const isNearTop = rect.top < 122;
+        const isNearBottom = rect.bottom > winHeight - 80;
+        isBelow = isNearTop && !isNearBottom;
+        if (isBelow) {
+          y = Math.min(winHeight - 80, rect.bottom + 6);
+        } else {
+          y = Math.max(122, rect.top - 6);
+        }
       }
 
-      // Check if selected text touches or overlaps existing highlight(s)
-      let overlappingHighlights = highlights.filter(h => {
+      // Check if selected text is an exact match for an existing highlight
+      const selNorm = (sanitizedSel || rawText).trim().toLowerCase();
+      const overlappingHighlights = highlights.filter(h => {
         if (!isSameBook(h.book, activeBook.name) || Number(h.chapter) !== Number(activeChapter)) return false;
         if (Number(h.verse) < actualStart || Number(h.verse) > actualEnd) return false;
         const hNorm = h.text.trim().toLowerCase();
-        const selNorm = rawText.trim().toLowerCase();
-        return hNorm === selNorm || selNorm.includes(hNorm) || hNorm.includes(selNorm) || (actualStart !== actualEnd);
+        return hNorm === selNorm;
       });
 
-      if (overlappingHighlights.length === 0) {
-        overlappingHighlights = highlights.filter(h => 
-          isSameBook(h.book, activeBook.name) && 
-          Number(h.chapter) === Number(activeChapter) && 
-          Number(h.verse) >= actualStart && 
-          Number(h.verse) <= actualEnd
-        );
-      }
+      console.log('[THEOLOGICA-HL] handleSelection captured:', {
+        rawText,
+        sanitizedSel,
+        actualStart,
+        actualEnd,
+        rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+        exactMatchCount: overlappingHighlights.length
+      });
 
       setToolbarPosition({
         x,
@@ -2786,6 +2846,11 @@ export default function App() {
       const selection = window.getSelection();
       const hasActiveSelection = selection && !selection.isCollapsed && (selection.toString() || (selection.rangeCount > 0 ? selection.getRangeAt(0).toString() : '')).trim().length > 0;
       if (hasActiveSelection) {
+        return;
+      }
+
+      // On touchend, avoid clearing toolbar if user just tapped a verse or mark
+      if (e.type === 'touchend' && Date.now() - lastTouchEndRef.current < 450) {
         return;
       }
 
@@ -2867,16 +2932,29 @@ export default function App() {
 
   const saveHighlight = async (color: string) => {
     const rawText = selectedText || selectionRange?.toString().trim() || '';
-    if (!rawText || !selectionVerse) return;
+    console.log('[THEOLOGICA-HL] saveHighlight invoked:', {
+      color,
+      rawText,
+      selectionVerse,
+      endVerseNumber,
+      existingHighlightId: toolbarPosition?.highlightId
+    });
+
+    if (!rawText || !selectionVerse) {
+      console.warn('[THEOLOGICA-HL] saveHighlight aborted: missing rawText or selectionVerse', { rawText, selectionVerse });
+      return;
+    }
     
     if (toolbarPosition?.highlightId) {
       const existingId = toolbarPosition.highlightId;
       const targetIds = toolbarPosition.highlightIds && toolbarPosition.highlightIds.length > 0 
         ? toolbarPosition.highlightIds 
         : [existingId];
+      console.log('[THEOLOGICA-HL] Updating color for existing highlight(s):', { targetIds, color });
       setHighlights(prev => {
-        const updated = prev.map(h => targetIds.includes(h.id) ? { ...h, color, text: rawText || h.text } : h);
+        const updated = prev.map(h => targetIds.includes(h.id) ? { ...h, color } : h);
         saveLocalHighlights(updated);
+        console.log('[THEOLOGICA-HL] Highlight color updated in local storage and state');
         return updated;
       });
       setToolbarPosition(null);
@@ -2892,10 +2970,11 @@ export default function App() {
               await fetchWithAuth(`${API_URL}/api/highlights/${tId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ color, text: rawText })
+                body: JSON.stringify({ color })
               });
+              console.log('[THEOLOGICA-HL] Cloud highlight color updated for id:', tId);
             } catch (e) {
-              console.warn("Highlight saved locally (cloud sync pending)", e);
+              console.warn("[THEOLOGICA-HL] Highlight saved locally (cloud sync pending)", e);
             }
           }
         }
@@ -2938,7 +3017,10 @@ export default function App() {
       }
     }
 
-    if (versesToHighlight.length === 0) return;
+    if (versesToHighlight.length === 0) {
+      console.warn('[THEOLOGICA-HL] versesToHighlight is empty, aborting save');
+      return;
+    }
 
     setToolbarPosition(null);
     setSelectionVerse(null);
@@ -2960,7 +3042,9 @@ export default function App() {
       });
     });
 
-    // Identify superseded highlights to remove locally and from the database
+    console.log('[THEOLOGICA-HL] Created highlight items:', createdItems);
+
+    // Identify superseded highlights (only exact match replacements so distinct phrase highlights in same verse are preserved)
     const supersededHighlights = highlights.filter(h => {
       const isSamePassage = isSameBook(h.book, book) && Number(h.chapter) === Number(chapter);
       if (!isSamePassage) return false;
@@ -2968,7 +3052,7 @@ export default function App() {
         if (Number(ci.verse) !== Number(h.verse)) return false;
         const ciNorm = ci.text.toLowerCase().trim();
         const hNorm = h.text.toLowerCase().trim();
-        return ciNorm === hNorm || ciNorm.includes(hNorm) || hNorm.includes(ciNorm);
+        return ciNorm === hNorm;
       });
     });
     const supersededIds = supersededHighlights.map(h => h.id);
@@ -2978,6 +3062,7 @@ export default function App() {
       const filtered = prev.filter(h => !supersededIds.includes(h.id));
       const updated = [...filtered, ...createdItems];
       saveLocalHighlights(updated);
+      console.log('[THEOLOGICA-HL] Updated highlights state in memory & localStorage. Count:', updated.length);
       return updated;
     });
 
@@ -3099,6 +3184,41 @@ export default function App() {
     };
     setAttachedScripture(explicitScripture);
     handleSendMessage(undefined, query, explicitScripture);
+  };
+
+  const handleCopySelectedText = async () => {
+    const rawText = selectedText || selectionRange?.toString().trim() || '';
+    if (!rawText || !selectionVerse) return;
+
+    const startVerse = Math.min(selectionVerse, endVerseNumber || selectionVerse);
+    const endVerse = Math.max(selectionVerse, endVerseNumber || selectionVerse);
+    const refVerses = startVerse === endVerse 
+      ? `${startVerse}` 
+      : `${startVerse}-${endVerse}`;
+
+    const cleanText = cleanVerseText(rawText, startVerse, endVerse);
+    const reference = `${activeBook.name} ${activeChapter}:${refVerses}`;
+    const formattedCitation = `"${cleanText}" (${reference} ${translation.toUpperCase()})`;
+
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(formattedCitation);
+      }
+    } catch (e) {
+      console.warn("Failed to copy citation to clipboard", e);
+    }
+
+    setCopiedHighlightToast(true);
+    // Dismiss native text selection handles and callout immediately
+    window.getSelection()?.removeAllRanges();
+
+    setTimeout(() => {
+      setCopiedHighlightToast(false);
+      setToolbarPosition(null);
+      setSelectionVerse(null);
+      setEndVerseNumber(null);
+      setSelectedText('');
+    }, 1200);
   };
 
   const addHighlightToChat = () => {
@@ -3556,6 +3676,8 @@ export default function App() {
       );
     }
 
+    console.log(`[THEOLOGICA-HL] Rendering verse ${verse} with ${verseHighlights.length} highlight(s)`);
+
     // Sort so most recently added/updated highlights take rendering priority
     const sortedVerseHighlights = [...verseHighlights].sort((a, b) => b.id - a.id);
 
@@ -3594,6 +3716,8 @@ export default function App() {
               data-highlight-id={seg.highlight.id}
               onClick={(e) => {
                 e.stopPropagation();
+                if (Date.now() - lastTouchEndRef.current < 450) return;
+                console.log('[THEOLOGICA-HL] Mark clicked for highlight:', seg.highlight?.id);
                 if (toolbarPosition && toolbarPosition.highlightId === seg.highlight?.id) {
                   setToolbarPosition(null);
                   setSelectionVerse(null);
@@ -3609,22 +3733,38 @@ export default function App() {
                 
                 const winWidth = typeof window !== 'undefined' ? window.innerWidth : 1000;
                 const winHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
-                const toolbarHalfWidth = 195;
+                const isTouch = typeof window !== 'undefined' && ('ontouchstart' in window || (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0) || winWidth <= 768);
+                const toolbarHalfWidth = winWidth <= 640 ? 155 : 195;
                 const verseCenterX = rect.left + rect.width / 2;
                 const isNearTop = rect.top < 130;
-                let y = isNearTop ? rect.bottom + 8 : Math.max(70, rect.top - 6);
-                y = Math.max(70, Math.min(winHeight - 80, y));
+                let isBelow: boolean;
+                let y: number;
+
+                if (isTouch) {
+                  isBelow = isNearTop || rect.top < 140;
+                  if (isBelow) {
+                    y = Math.min(winHeight - (winWidth <= 768 ? 95 : 70), rect.bottom + 8);
+                  } else {
+                    y = Math.max(70, rect.top - 8);
+                  }
+                } else {
+                  isBelow = isNearTop;
+                  y = isNearTop ? rect.bottom + 8 : Math.max(70, rect.top - 6);
+                  y = Math.max(70, Math.min(winHeight - 80, y));
+                }
 
                 setToolbarPosition({
-                  x: winWidth <= 420 ? winWidth / 2 : Math.max(toolbarHalfWidth + 12, Math.min(winWidth - toolbarHalfWidth - 12, verseCenterX)),
+                  x: winWidth <= 640 ? winWidth / 2 : Math.max(toolbarHalfWidth + 12, Math.min(winWidth - toolbarHalfWidth - 12, verseCenterX)),
                   y,
                   highlightId: seg.highlight!.id,
                   highlightIds: [seg.highlight!.id],
-                  isBelow: isNearTop
+                  isBelow
                 });
               }}
               onTouchEnd={(e) => {
                 e.stopPropagation();
+                lastTouchEndRef.current = Date.now();
+                console.log('[THEOLOGICA-HL] Mark touched for highlight:', seg.highlight?.id);
                 if (toolbarPosition && toolbarPosition.highlightId === seg.highlight?.id) {
                   setToolbarPosition(null);
                   setSelectionVerse(null);
@@ -3640,18 +3780,32 @@ export default function App() {
                 
                 const winWidth = typeof window !== 'undefined' ? window.innerWidth : 1000;
                 const winHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
-                const toolbarHalfWidth = 195;
+                const isTouch = typeof window !== 'undefined' && ('ontouchstart' in window || (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0) || winWidth <= 768);
+                const toolbarHalfWidth = winWidth <= 640 ? 155 : 195;
                 const verseCenterX = rect.left + rect.width / 2;
                 const isNearTop = rect.top < 130;
-                let y = isNearTop ? rect.bottom + 8 : Math.max(70, rect.top - 6);
-                y = Math.max(70, Math.min(winHeight - 80, y));
+                let isBelow: boolean;
+                let y: number;
+
+                if (isTouch) {
+                  isBelow = isNearTop || rect.top < 140;
+                  if (isBelow) {
+                    y = Math.min(winHeight - (winWidth <= 768 ? 95 : 70), rect.bottom + 8);
+                  } else {
+                    y = Math.max(70, rect.top - 8);
+                  }
+                } else {
+                  isBelow = isNearTop;
+                  y = isNearTop ? rect.bottom + 8 : Math.max(70, rect.top - 6);
+                  y = Math.max(70, Math.min(winHeight - 80, y));
+                }
 
                 setToolbarPosition({
-                  x: winWidth <= 420 ? winWidth / 2 : Math.max(toolbarHalfWidth + 12, Math.min(winWidth - toolbarHalfWidth - 12, verseCenterX)),
+                  x: winWidth <= 640 ? winWidth / 2 : Math.max(toolbarHalfWidth + 12, Math.min(winWidth - toolbarHalfWidth - 12, verseCenterX)),
                   y,
                   highlightId: seg.highlight!.id,
                   highlightIds: [seg.highlight!.id],
-                  isBelow: isNearTop
+                  isBelow
                 });
               }}
               className={`theologica-highlight ${
@@ -4518,7 +4672,30 @@ export default function App() {
     queueStreakPush(fetchWithAuth, dailyChapterGoalRef.current, 100);
   };
 
-  if (!isLoaded) return <div className="h-screen w-full flex items-center justify-center bg-bg text-white">Loading...</div>;
+  if (!isLoaded && !authTimeout) {
+    return (
+      <div className="h-[100dvh] w-full flex flex-col items-center justify-center bg-bg text-fg px-4 select-none">
+        <noscript>
+          <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-sm max-w-md text-center">
+            JavaScript is required to run Theologica Study Workspace. Please enable JavaScript in your browser settings.
+          </div>
+        </noscript>
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div className="relative w-12 h-12 rounded-2xl overflow-hidden shadow-lg animate-pulse flex items-center justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-dark.png" alt="Theologica Logo" className="w-full h-full object-contain" />
+          </div>
+          <div className="space-y-1.5">
+            <h1 className="font-serif text-xl font-bold tracking-tight text-[#c96442]">Theologica</h1>
+            <p className="text-xs text-muted">Preparing Scripture study workspace...</p>
+          </div>
+          <div className="w-32 h-1 bg-surface-warm rounded-full overflow-hidden mt-2">
+            <div className="h-full bg-accent rounded-full animate-pulse w-1/2" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -6563,6 +6740,25 @@ export default function App() {
         {toolbarPosition && (
           <div 
             onMouseDown={(e) => e.preventDefault()}
+            onTouchStart={(e) => {
+              if (e.touches.length > 0) {
+                toolbarTouchStartRef.current = {
+                  x: e.touches[0].clientX,
+                  y: e.touches[0].clientY,
+                  time: Date.now(),
+                  hasMoved: false,
+                };
+              }
+            }}
+            onTouchMove={(e) => {
+              if (toolbarTouchStartRef.current && e.touches.length > 0) {
+                const dx = Math.abs(e.touches[0].clientX - toolbarTouchStartRef.current.x);
+                const dy = Math.abs(e.touches[0].clientY - toolbarTouchStartRef.current.y);
+                if (dx > 7 || dy > 7) {
+                  toolbarTouchStartRef.current.hasMoved = true;
+                }
+              }
+            }}
             className="floating-verse-toolbar fixed z-50 flex items-center gap-1 sm:gap-1.5 bg-surface/95 border border-border-soft p-1.5 rounded-xl shadow-xl backdrop-blur-md max-w-[calc(100vw-24px)] overflow-x-auto no-scrollbar custom-scroll transition-opacity"
             style={{ 
               left: Math.max(12, Math.min(typeof window !== 'undefined' ? window.innerWidth - 12 : 360, toolbarPosition.x)), 
@@ -6573,40 +6769,95 @@ export default function App() {
             <button 
               type="button" 
               onMouseDown={(e) => e.preventDefault()} 
-              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); saveHighlight('yellow'); }}
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); saveHighlight('yellow'); }} 
+              onTouchEnd={(e) => { 
+                e.stopPropagation(); 
+                if (toolbarTouchStartRef.current?.hasMoved) return;
+                lastTouchEndRef.current = Date.now();
+                saveHighlight('yellow'); 
+              }}
+              onClick={(e) => { 
+                e.preventDefault(); 
+                e.stopPropagation(); 
+                if (Date.now() - lastTouchEndRef.current < 450) return;
+                if (toolbarTouchStartRef.current?.hasMoved) return;
+                saveHighlight('yellow'); 
+              }} 
               className="w-5 h-5 sm:w-5.5 sm:h-5.5 min-w-[20px] sm:min-w-[22px] rounded-full bg-yellow-400 hover:scale-120 active:scale-90 transition-transform shadow-xs cursor-pointer ring-1 ring-black/10 dark:ring-white/10" 
               title="Highlight Yellow" 
             />
             <button 
               type="button" 
               onMouseDown={(e) => e.preventDefault()} 
-              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); saveHighlight('green'); }}
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); saveHighlight('green'); }} 
+              onTouchEnd={(e) => { 
+                e.stopPropagation(); 
+                if (toolbarTouchStartRef.current?.hasMoved) return;
+                lastTouchEndRef.current = Date.now();
+                saveHighlight('green'); 
+              }}
+              onClick={(e) => { 
+                e.preventDefault(); 
+                e.stopPropagation(); 
+                if (Date.now() - lastTouchEndRef.current < 450) return;
+                if (toolbarTouchStartRef.current?.hasMoved) return;
+                saveHighlight('green'); 
+              }} 
               className="w-5 h-5 sm:w-5.5 sm:h-5.5 min-w-[20px] sm:min-w-[22px] rounded-full bg-green-500 hover:scale-120 active:scale-90 transition-transform shadow-xs cursor-pointer ring-1 ring-black/10 dark:ring-white/10" 
               title="Highlight Green" 
             />
             <button 
               type="button" 
               onMouseDown={(e) => e.preventDefault()} 
-              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); saveHighlight('blue'); }}
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); saveHighlight('blue'); }} 
+              onTouchEnd={(e) => { 
+                e.stopPropagation(); 
+                if (toolbarTouchStartRef.current?.hasMoved) return;
+                lastTouchEndRef.current = Date.now();
+                saveHighlight('blue'); 
+              }}
+              onClick={(e) => { 
+                e.preventDefault(); 
+                e.stopPropagation(); 
+                if (Date.now() - lastTouchEndRef.current < 450) return;
+                if (toolbarTouchStartRef.current?.hasMoved) return;
+                saveHighlight('blue'); 
+              }} 
               className="w-5 h-5 sm:w-5.5 sm:h-5.5 min-w-[20px] sm:min-w-[22px] rounded-full bg-blue-500 hover:scale-120 active:scale-90 transition-transform shadow-xs cursor-pointer ring-1 ring-black/10 dark:ring-white/10" 
               title="Highlight Blue" 
             />
             <button 
               type="button" 
               onMouseDown={(e) => e.preventDefault()} 
-              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); saveHighlight('pink'); }}
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); saveHighlight('pink'); }} 
+              onTouchEnd={(e) => { 
+                e.stopPropagation(); 
+                if (toolbarTouchStartRef.current?.hasMoved) return;
+                lastTouchEndRef.current = Date.now();
+                saveHighlight('pink'); 
+              }}
+              onClick={(e) => { 
+                e.preventDefault(); 
+                e.stopPropagation(); 
+                if (Date.now() - lastTouchEndRef.current < 450) return;
+                if (toolbarTouchStartRef.current?.hasMoved) return;
+                saveHighlight('pink'); 
+              }} 
               className="w-5 h-5 sm:w-5.5 sm:h-5.5 min-w-[20px] sm:min-w-[22px] rounded-full bg-pink-400 hover:scale-120 active:scale-90 transition-transform shadow-xs cursor-pointer ring-1 ring-black/10 dark:ring-white/10" 
               title="Highlight Pink" 
             />
             <button 
               type="button" 
               onMouseDown={(e) => e.preventDefault()} 
-              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); saveHighlight('purple'); }}
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); saveHighlight('purple'); }} 
+              onTouchEnd={(e) => { 
+                e.stopPropagation(); 
+                if (toolbarTouchStartRef.current?.hasMoved) return;
+                lastTouchEndRef.current = Date.now();
+                saveHighlight('purple'); 
+              }}
+              onClick={(e) => { 
+                e.preventDefault(); 
+                e.stopPropagation(); 
+                if (Date.now() - lastTouchEndRef.current < 450) return;
+                if (toolbarTouchStartRef.current?.hasMoved) return;
+                saveHighlight('purple'); 
+              }} 
               className="w-5 h-5 sm:w-5.5 sm:h-5.5 min-w-[20px] sm:min-w-[22px] rounded-full bg-purple-400 hover:scale-120 active:scale-90 transition-transform shadow-xs cursor-pointer ring-1 ring-black/10 dark:ring-white/10" 
               title="Highlight Purple" 
             />
@@ -6614,58 +6865,144 @@ export default function App() {
             <button 
               type="button"
               onMouseDown={(e) => e.preventDefault()} 
-              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); askAiAboutHighlight(); }}
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); askAiAboutHighlight(); }} 
-              className="flex items-center justify-center h-7 sm:h-8 px-2.5 rounded-lg bg-accent text-white hover:bg-[#d87654] active:scale-95 transition-all text-xs font-semibold shadow-xs gap-1.5 cursor-pointer shrink-0"
+              onTouchEnd={(e) => { 
+                e.stopPropagation(); 
+                if (toolbarTouchStartRef.current?.hasMoved) return;
+                lastTouchEndRef.current = Date.now();
+                askAiAboutHighlight(); 
+              }}
+              onClick={(e) => { 
+                e.preventDefault(); 
+                e.stopPropagation(); 
+                if (Date.now() - lastTouchEndRef.current < 450) return;
+                if (toolbarTouchStartRef.current?.hasMoved) return;
+                askAiAboutHighlight(); 
+              }} 
+              className="flex items-center justify-center h-7 sm:h-8 w-7 sm:w-auto px-0 sm:px-2.5 rounded-lg bg-accent text-white hover:bg-[#d87654] active:scale-95 transition-all text-xs font-semibold shadow-xs gap-1.5 cursor-pointer shrink-0"
               title="Ask AI about this verse"
             >
-              <Sparkles size={13} /> <span>Ask AI</span>
+              <Sparkles size={14} /> <span className="hidden sm:inline">Ask AI</span>
             </button>
             <button 
               type="button"
               onMouseDown={(e) => e.preventDefault()} 
-              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); addHighlightToChat(); }}
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); addHighlightToChat(); }} 
-              className="flex items-center justify-center h-7 sm:h-8 px-2.5 rounded-lg bg-surface border border-border-soft text-fg hover:bg-border-soft active:scale-95 transition-all text-xs font-semibold shadow-xs gap-1.5 cursor-pointer shrink-0" 
+              onTouchEnd={(e) => { 
+                e.stopPropagation(); 
+                if (toolbarTouchStartRef.current?.hasMoved) return;
+                lastTouchEndRef.current = Date.now();
+                handleCopySelectedText(); 
+              }}
+              onClick={(e) => { 
+                e.preventDefault(); 
+                e.stopPropagation(); 
+                if (Date.now() - lastTouchEndRef.current < 450) return;
+                if (toolbarTouchStartRef.current?.hasMoved) return;
+                handleCopySelectedText(); 
+              }} 
+              className="flex items-center justify-center h-7 sm:h-8 w-7 sm:w-auto px-0 sm:px-2.5 rounded-lg bg-surface border border-border-soft text-fg hover:bg-border-soft active:scale-95 transition-all text-xs font-semibold shadow-xs gap-1.5 cursor-pointer shrink-0" 
+              title="Copy scripture citation to clipboard"
+            >
+              {copiedHighlightToast ? (
+                <>
+                  <Check size={14} className="text-emerald-500" />
+                  <span className="hidden sm:inline text-emerald-500">Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Copy size={14} />
+                  <span className="hidden sm:inline">Copy</span>
+                </>
+              )}
+            </button>
+            <button 
+              type="button"
+              onMouseDown={(e) => e.preventDefault()} 
+              onTouchEnd={(e) => { 
+                e.stopPropagation(); 
+                if (toolbarTouchStartRef.current?.hasMoved) return;
+                lastTouchEndRef.current = Date.now();
+                addHighlightToChat(); 
+              }}
+              onClick={(e) => { 
+                e.preventDefault(); 
+                e.stopPropagation(); 
+                if (Date.now() - lastTouchEndRef.current < 450) return;
+                if (toolbarTouchStartRef.current?.hasMoved) return;
+                addHighlightToChat(); 
+              }} 
+              className="flex items-center justify-center h-7 sm:h-8 w-7 sm:w-auto px-0 sm:px-2.5 rounded-lg bg-surface border border-border-soft text-fg hover:bg-border-soft active:scale-95 transition-all text-xs font-semibold shadow-xs gap-1.5 cursor-pointer shrink-0" 
               title="Add to Chat"
             >
-              <MessageSquarePlus size={13} />
-              <span>Quote</span>
+              <MessageSquarePlus size={14} />
+              <span className="hidden sm:inline">Quote</span>
             </button>
             <button 
               type="button"
               onMouseDown={(e) => e.preventDefault()} 
-              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); addHighlightToCanvas(); }}
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); addHighlightToCanvas(); }} 
-              className="flex items-center justify-center h-7 sm:h-8 px-2.5 rounded-lg bg-surface border border-border-soft text-fg hover:bg-border-soft active:scale-95 transition-all text-xs font-semibold shadow-xs gap-1.5 cursor-pointer shrink-0" 
+              onTouchEnd={(e) => { 
+                e.stopPropagation(); 
+                if (toolbarTouchStartRef.current?.hasMoved) return;
+                lastTouchEndRef.current = Date.now();
+                addHighlightToCanvas(); 
+              }}
+              onClick={(e) => { 
+                e.preventDefault(); 
+                e.stopPropagation(); 
+                if (Date.now() - lastTouchEndRef.current < 450) return;
+                if (toolbarTouchStartRef.current?.hasMoved) return;
+                addHighlightToCanvas(); 
+              }} 
+              className="flex items-center justify-center h-7 sm:h-8 w-7 sm:w-auto px-0 sm:px-2.5 rounded-lg bg-surface border border-border-soft text-fg hover:bg-border-soft active:scale-95 transition-all text-xs font-semibold shadow-xs gap-1.5 cursor-pointer shrink-0" 
               title="Send to Canvas"
             >
-              <Workflow size={13} />
-              <span>Canvas</span>
+              <Workflow size={14} />
+              <span className="hidden sm:inline">Canvas</span>
             </button>
             <button 
               type="button"
               onMouseDown={(e) => e.preventDefault()} 
-              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); handleSelectionWordStudy(); }}
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleSelectionWordStudy(); }} 
-              className="flex items-center justify-center h-7 sm:h-8 px-2.5 rounded-lg bg-surface border border-border-soft text-fg hover:bg-border-soft active:scale-95 transition-all text-xs font-semibold shadow-xs gap-1.5 cursor-pointer shrink-0" 
+              onTouchEnd={(e) => { 
+                e.stopPropagation(); 
+                if (toolbarTouchStartRef.current?.hasMoved) return;
+                lastTouchEndRef.current = Date.now();
+                handleSelectionWordStudy(); 
+              }}
+              onClick={(e) => { 
+                e.preventDefault(); 
+                e.stopPropagation(); 
+                if (Date.now() - lastTouchEndRef.current < 450) return;
+                if (toolbarTouchStartRef.current?.hasMoved) return;
+                handleSelectionWordStudy(); 
+              }} 
+              className="flex items-center justify-center h-7 sm:h-8 w-7 sm:w-auto px-0 sm:px-2.5 rounded-lg bg-surface border border-border-soft text-fg hover:bg-border-soft active:scale-95 transition-all text-xs font-semibold shadow-xs gap-1.5 cursor-pointer shrink-0" 
               title="Inspect Hebrew/Greek Word Study"
             >
-              <Languages size={13} className="text-accent" />
-              <span>Word Study</span>
+              <Languages size={14} className="text-accent" />
+              <span className="hidden sm:inline">Word Study</span>
             </button>
             {toolbarPosition.highlightId && (
               <>
                 <div className="w-[1px] h-5 bg-border-soft mx-0.5" />
                 <button 
                   type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); deleteHighlight(toolbarPosition.highlightId!, toolbarPosition.highlightIds); }}
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteHighlight(toolbarPosition.highlightId!, toolbarPosition.highlightIds); }} 
-                  className="flex items-center justify-center h-7 sm:h-8 px-2 rounded-lg bg-surface border border-border-soft text-error hover:bg-error hover:text-white transition-all shadow-xs cursor-pointer shrink-0"
+                  onMouseDown={(e) => e.preventDefault()} 
+                  onTouchEnd={(e) => { 
+                    e.stopPropagation(); 
+                    if (toolbarTouchStartRef.current?.hasMoved) return;
+                    lastTouchEndRef.current = Date.now();
+                    deleteHighlight(toolbarPosition.highlightId!, toolbarPosition.highlightIds); 
+                  }}
+                  onClick={(e) => { 
+                    e.preventDefault(); 
+                    e.stopPropagation(); 
+                    if (Date.now() - lastTouchEndRef.current < 450) return;
+                    if (toolbarTouchStartRef.current?.hasMoved) return;
+                    deleteHighlight(toolbarPosition.highlightId!, toolbarPosition.highlightIds); 
+                  }} 
+                  className="flex items-center justify-center h-7 sm:h-8 w-7 sm:w-8 px-0 sm:px-2 rounded-lg bg-surface border border-border-soft text-error hover:bg-error hover:text-white transition-all shadow-xs cursor-pointer shrink-0"
                   title="Delete Highlight"
                 >
-                  <Trash2 size={13} />
+                  <Trash2 size={14} />
                 </button>
               </>
             )}

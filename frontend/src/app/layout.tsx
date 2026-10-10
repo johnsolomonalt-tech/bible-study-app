@@ -5,18 +5,30 @@ import "./globals.css";
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
+  display: "swap",
+  adjustFontFallback: false,
 });
 
 const merriweather = Merriweather({
   variable: "--font-merriweather",
   subsets: ["latin"],
   weight: ["400", "700"],
+  display: "swap",
+  adjustFontFallback: false,
 });
 
-const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://theologica.app';
+const siteUrl = (
+  process.env.NEXT_PUBLIC_APP_URL ||
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : '') ||
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '') ||
+  'https://theologica-gamma.vercel.app'
+).replace(/\/$/, '');
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
+  alternates: {
+    canonical: siteUrl,
+  },
   title: {
     default: "Theologica Study Workspace",
     template: "%s | Theologica",
@@ -36,13 +48,13 @@ export const metadata: Metadata = {
     siteName: "Theologica",
     locale: "en_US",
     type: "website",
-    images: [{ url: "/logo-dark.png", width: 512, height: 512, alt: "Theologica Logo" }],
+    images: [{ url: `${siteUrl}/og-image.png`, width: 1200, height: 630, alt: "Theologica Study Workspace" }],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "Theologica Study Workspace",
     description: "Visual Scripture study workspace with inductive canvas, Greek/Hebrew interlinear, and theological AI.",
-    images: ["/logo-dark.png"],
+    images: [`${siteUrl}/og-image.png`],
   },
   appleWebApp: {
     capable: true,
@@ -70,6 +82,9 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en" suppressHydrationWarning>
       <head>
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="Theologica" />
         <link id="dynamic-favicon" rel="icon" href="/logo-dark.png" type="image/png" />
         <link id="dynamic-apple-icon" rel="apple-touch-icon" href="/logo-dark.png" type="image/png" />
         <script

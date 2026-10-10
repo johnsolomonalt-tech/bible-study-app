@@ -1,9 +1,12 @@
 {
   "name": "Theologica Study Workspace",
   "short_name": "Theologica",
-  "description": "Bible app with AI chat and notes",
+  "description": "An advanced, reverent visual Scripture study workspace featuring interactive interlinear lexicons, theological AI assistance, and inductive mind-mapping.",
   "start_url": "/",
+  "scope": "/",
+  "id": "/",
   "display": "standalone",
+  "orientation": "any",
   "background_color": "#141413",
   "theme_color": "#141413",
   "icons": [
@@ -16,7 +19,8 @@
     {
       "src": "/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }

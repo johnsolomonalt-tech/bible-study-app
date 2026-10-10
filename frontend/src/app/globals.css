@@ -401,4 +401,16 @@ mark.hl-purple {
   color: inherit !important;
 }
 
+/* Prevent iOS callout bubbles on buttons, toolbars, and verse indicators */
+.floating-verse-toolbar,
+.floating-verse-toolbar button,
+.verse-number,
+.verse-number-btn,
+sup,
+[data-footnote="true"],
+button {
+  -webkit-touch-callout: none !important;
+}
+
+
 

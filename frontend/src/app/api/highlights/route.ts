@@ -79,11 +79,11 @@ export async function POST(request: Request) {
 
     const newNorm = (text || '').toLowerCase().trim();
 
-    // Clean up any existing highlights that are identical or superseded/overlapping
+    // Clean up any existing highlights that are identical (same text) so color updates cleanly
     const toDeleteIds: number[] = [];
     for (const ex of existing) {
       const exNorm = (ex.text || '').toLowerCase().trim();
-      if (exNorm === newNorm || exNorm.includes(newNorm) || newNorm.includes(exNorm)) {
+      if (exNorm === newNorm) {
         toDeleteIds.push(ex.id);
       }
     }
