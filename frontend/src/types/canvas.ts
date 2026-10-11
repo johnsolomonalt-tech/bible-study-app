@@ -72,7 +72,7 @@ export const CATEGORY_METADATA: Record<
   }
 > = {
   scripture: {
-    label: 'Scripture',
+    label: 'Bible Verse',
     accent: '#F59E0B',
     borderDark: 'border-amber-500/40',
     borderLight: 'border-amber-400',

@@ -1269,6 +1269,25 @@ export default function App() {
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 
   // Notes State
+  const LOCAL_NOTES_KEY = 'theologica_local_notes_v1';
+
+  const getLocalNotes = useCallback((): NoteItem[] => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem(LOCAL_NOTES_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }, []);
+
+  const saveLocalNotes = useCallback((notesList: NoteItem[]) => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(LOCAL_NOTES_KEY, JSON.stringify(notesList));
+    } catch {}
+  }, []);
+
   const [notes, setNotes] = useState<NoteItem[]>([]);
   const [activeNoteId, setActiveNoteId] = useState<number | null>(null);
   const tempNoteIdRef = useRef<number | null>(null);
@@ -2514,33 +2533,90 @@ export default function App() {
       const lensMeta = THEOLOGICAL_LENS_OPTIONS.find(l => l.id === effectiveLens);
       const noteTitle = title ? `Study AI: ${title}` : `Study AI: ${activeBook?.name || 'Scripture'} ${activeChapter} (${lensMeta?.name || 'Study'})`;
       const contentWithTags = `${textContent}\n\n#aichat #studyai #${effectiveLens}`;
-      const res = await fetchWithAuth(`${API_URL}/api/notes`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: noteTitle,
-          content: contentWithTags,
-        }),
+      
+      const tempId = Date.now();
+      const localNote: NoteItem = {
+        id: tempId,
+        title: noteTitle,
+        content: contentWithTags,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Optimistically save to state and localStorage immediately
+      setNotes(prev => {
+        const next = [localNote, ...prev.filter(n => n.id !== tempId)];
+        saveLocalNotes(next);
+        return next;
       });
-      if (res.ok) {
-        const newNote = await res.json();
-        setNotes(prev => [newNote, ...prev]);
-        trackClientEvent('note_created_from_chat');
-        return true;
+      setActiveNoteId(tempId);
+      trackClientEvent('note_created_from_chat');
+
+      // Sync to API in background
+      try {
+        const res = await fetchWithAuth(`${API_URL}/api/notes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: noteTitle,
+            content: contentWithTags,
+          }),
+        });
+        if (res && res.ok) {
+          const serverNote = await res.json();
+          if (serverNote && serverNote.id) {
+            setNotes(prev => {
+              const next = prev.map(n => n.id === tempId ? serverNote : n);
+              saveLocalNotes(next);
+              return next;
+            });
+            setActiveNoteId(prevId => prevId === tempId ? serverNote.id : prevId);
+          }
+        }
+      } catch (syncErr) {
+        console.warn('Note API sync error (offline preserved):', syncErr);
       }
+
+      return true;
     } catch (err) {
       console.error('Failed to save chat insight to notes:', err);
+      return false;
     }
-    return false;
-  }, [fetchWithAuth, theologicalLens, activeBook, activeChapter]);
+  }, [fetchWithAuth, theologicalLens, activeBook, activeChapter, saveLocalNotes]);
 
   // Load Data & Sync Account Streak across devices
   useEffect(() => {
-    // Load local highlights immediately
+    // Load local highlights & notes immediately
     const localHls = getLocalHighlights();
     if (localHls.length > 0) {
       setHighlights(localHls);
     }
+    const localNotes = getLocalNotes();
+    if (localNotes.length > 0) {
+      setNotes(localNotes);
+      if (localNotes[0]?.id) {
+        setActiveNoteId(localNotes[0].id);
+      }
+    }
+
+    // Always fetch notes (supports guest in-memory and user cloud)
+    fetchWithAuth(`${API_URL}/api/notes`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (Array.isArray(data)) {
+          setNotes(prev => {
+            const map = new Map<number, NoteItem>();
+            data.forEach((n: NoteItem) => map.set(n.id, n));
+            prev.forEach((n: NoteItem) => {
+              if (!map.has(n.id)) map.set(n.id, n);
+            });
+            const merged = Array.from(map.values());
+            saveLocalNotes(merged);
+            return merged;
+          });
+        }
+      })
+      .catch(() => {});
 
     if (userId) {
       initSessionTracking(userId);
@@ -2566,13 +2642,6 @@ export default function App() {
           }
         })
         .catch(e => console.warn("Using local highlights cache", e));
-
-      fetchWithAuth(`${API_URL}/api/notes`)
-        .then(r => r.ok ? r.json() : null)
-        .then(data => {
-          if (Array.isArray(data)) setNotes(data);
-        })
-        .catch(() => {});
 
       fetchWithAuth(`${API_URL}/api/chats`)
         .then(r => r.ok ? r.json() : null)
@@ -3453,7 +3522,7 @@ export default function App() {
     setCanvasIncomingNode({
       title: cardTitle,
       content: textContent,
-      category: 'theological_point',
+      category: 'scripture',
       sourceChatId: resolvedChatId,
       chatTitle: resolvedChatTitle || 'Theological Study Canvas',
     });
@@ -3472,15 +3541,31 @@ export default function App() {
   };
 
   const handleSaveLectioToNotes = async (title: string, content: string) => {
+    const tempNote: NoteItem = {
+      id: Date.now(),
+      title: title || 'Lectio Divina Reflection',
+      content: content || '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setNotes((prev) => {
+      const next = [tempNote, ...prev];
+      saveLocalNotes(next);
+      return next;
+    });
     try {
       const res = await fetchWithAuth(`${API_URL}/api/notes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, content }),
+        body: JSON.stringify({ title: tempNote.title, content: tempNote.content }),
       });
-      if (res.ok) {
+      if (res && res.ok) {
         const newNote = await res.json();
-        setNotes((prev) => [newNote, ...prev]);
+        setNotes((prev) => {
+          const next = prev.map(n => n.id === tempNote.id ? newNote : n);
+          saveLocalNotes(next);
+          return next;
+        });
       }
     } catch (err) {
       console.error('Failed to save lectio note', err);
@@ -4394,7 +4479,11 @@ export default function App() {
 
 
   const updateNote = async (id: number, title: string, content: string) => {
-    setNotes(prev => prev.map(n => n.id === id ? { ...n, title, content } : n));
+    setNotes(prev => {
+      const next = prev.map(n => n.id === id ? { ...n, title, content, updatedAt: new Date().toISOString() } : n);
+      saveLocalNotes(next);
+      return next;
+    });
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     debounceTimerRef.current = setTimeout(async () => {
       try {
@@ -4450,13 +4539,21 @@ export default function App() {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
-    setNotes(prev => prev.filter(n => n.id !== id));
+    setNotes(prev => {
+      const next = prev.filter(n => n.id !== id);
+      saveLocalNotes(next);
+      return next;
+    });
     if (activeNoteId === id) {
       setActiveNoteId(null);
     }
-    await fetchWithAuth(`${API_URL}/api/notes/${id}`, {
-      method: 'DELETE'
-    });
+    try {
+      await fetchWithAuth(`${API_URL}/api/notes/${id}`, {
+        method: 'DELETE'
+      });
+    } catch (err) {
+      console.error('Failed to delete note', err);
+    }
   };
 
   const handleRenameNoteSidebar = (id: number, oldTitle: string, content: string) => {
@@ -5142,11 +5239,17 @@ export default function App() {
                       className="w-full flex items-center justify-between px-2.5 py-2 text-left rounded-xl hover:bg-surface/50 transition-colors group cursor-pointer"
                       title={isOtExpanded ? "Collapse Old Testament" : "Expand Old Testament"}
                     >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <ChevronDown
-                          size={13}
-                          className={`transition-transform duration-200 shrink-0 ${isOldTestament ? 'text-accent' : 'text-muted'} ${isOtExpanded ? '' : '-rotate-90'}`}
-                        />
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={`w-5 h-5 rounded-md flex items-center justify-center transition-all duration-200 shrink-0 ${
+                          isOtExpanded 
+                            ? (isOldTestament ? 'bg-accent/15 text-accent' : 'bg-surface-hover text-fg')
+                            : 'bg-surface text-muted group-hover:text-fg'
+                        }`}>
+                          <ChevronDown
+                            size={12}
+                            className={`transition-transform duration-200 ${isOtExpanded ? 'rotate-0' : '-rotate-90'}`}
+                          />
+                        </div>
                         <span className={`text-[11px] font-bold tracking-wider uppercase truncate ${isOldTestament ? 'text-accent' : 'text-muted group-hover:text-fg'}`}>
                           Old Testament
                         </span>
@@ -5233,11 +5336,17 @@ export default function App() {
                       className="w-full flex items-center justify-between px-2.5 py-2 text-left rounded-xl hover:bg-surface/50 transition-colors group cursor-pointer"
                       title={isNtExpanded ? "Collapse New Testament" : "Expand New Testament"}
                     >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <ChevronDown
-                          size={13}
-                          className={`transition-transform duration-200 shrink-0 ${!isOldTestament ? 'text-accent' : 'text-muted'} ${isNtExpanded ? '' : '-rotate-90'}`}
-                        />
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={`w-5 h-5 rounded-md flex items-center justify-center transition-all duration-200 shrink-0 ${
+                          isNtExpanded 
+                            ? (!isOldTestament ? 'bg-accent/15 text-accent' : 'bg-surface-hover text-fg')
+                            : 'bg-surface text-muted group-hover:text-fg'
+                        }`}>
+                          <ChevronDown
+                            size={12}
+                            className={`transition-transform duration-200 ${isNtExpanded ? 'rotate-0' : '-rotate-90'}`}
+                          />
+                        </div>
                         <span className={`text-[11px] font-bold tracking-wider uppercase truncate ${!isOldTestament ? 'text-accent' : 'text-muted group-hover:text-fg'}`}>
                           New Testament
                         </span>
@@ -6048,11 +6157,17 @@ export default function App() {
                       className="w-full flex items-center justify-between px-2.5 py-2 text-left rounded-xl hover:bg-surface/50 transition-colors group cursor-pointer"
                       title={isOtExpanded ? "Collapse Old Testament" : "Expand Old Testament"}
                     >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <ChevronDown
-                          size={13}
-                          className={`transition-transform duration-200 shrink-0 ${isOldTestament ? 'text-accent' : 'text-muted'} ${isOtExpanded ? '' : '-rotate-90'}`}
-                        />
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={`w-5 h-5 rounded-md flex items-center justify-center transition-all duration-200 shrink-0 ${
+                          isOtExpanded 
+                            ? (isOldTestament ? 'bg-accent/15 text-accent' : 'bg-surface-hover text-fg')
+                            : 'bg-surface text-muted group-hover:text-fg'
+                        }`}>
+                          <ChevronDown
+                            size={12}
+                            className={`transition-transform duration-200 ${isOtExpanded ? 'rotate-0' : '-rotate-90'}`}
+                          />
+                        </div>
                         <span className={`text-[11px] font-bold tracking-wider uppercase truncate ${isOldTestament ? 'text-accent' : 'text-muted group-hover:text-fg'}`}>
                           Old Testament
                         </span>
@@ -6134,11 +6249,17 @@ export default function App() {
                       className="w-full flex items-center justify-between px-2.5 py-2 text-left rounded-xl hover:bg-surface/50 transition-colors group cursor-pointer"
                       title={isNtExpanded ? "Collapse New Testament" : "Expand New Testament"}
                     >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <ChevronDown
-                          size={13}
-                          className={`transition-transform duration-200 shrink-0 ${!isOldTestament ? 'text-accent' : 'text-muted'} ${isNtExpanded ? '' : '-rotate-90'}`}
-                        />
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={`w-5 h-5 rounded-md flex items-center justify-center transition-all duration-200 shrink-0 ${
+                          isNtExpanded 
+                            ? (!isOldTestament ? 'bg-accent/15 text-accent' : 'bg-surface-hover text-fg')
+                            : 'bg-surface text-muted group-hover:text-fg'
+                        }`}>
+                          <ChevronDown
+                            size={12}
+                            className={`transition-transform duration-200 ${isNtExpanded ? 'rotate-0' : '-rotate-90'}`}
+                          />
+                        </div>
                         <span className={`text-[11px] font-bold tracking-wider uppercase truncate ${!isOldTestament ? 'text-accent' : 'text-muted group-hover:text-fg'}`}>
                           New Testament
                         </span>
@@ -7871,7 +7992,13 @@ export default function App() {
                         </div>
                       </div>
                       <div className="text-[13px] font-mono text-muted mr-3 sm:mr-4 shrink-0">{trackerFormat === 'percent' ? `${otPercent}%` : `${otCompleted}/${otTotal}`}</div>
-                      <div className="text-muted">{expandedTestaments.includes('OT') ? '▲' : '▼'}</div>
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-300 shrink-0 ${
+                        expandedTestaments.includes('OT') 
+                          ? 'bg-accent/15 text-accent rotate-180' 
+                          : 'bg-bg text-muted rotate-0'
+                      }`}>
+                        <ChevronDown size={16} className="transition-transform duration-300" />
+                      </div>
                   </button>
                   
                   {expandedTestaments.includes('OT') && (
@@ -7938,7 +8065,13 @@ export default function App() {
                         </div>
                       </div>
                       <div className="text-[13px] font-mono text-muted mr-3 sm:mr-4 shrink-0">{trackerFormat === 'percent' ? `${ntPercent}%` : `${ntCompleted}/${ntTotal}`}</div>
-                      <div className="text-muted">{expandedTestaments.includes('NT') ? '▲' : '▼'}</div>
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-300 shrink-0 ${
+                        expandedTestaments.includes('NT') 
+                          ? 'bg-accent/15 text-accent rotate-180' 
+                          : 'bg-bg text-muted rotate-0'
+                      }`}>
+                        <ChevronDown size={16} className="transition-transform duration-300" />
+                      </div>
                   </button>
                   
                   {expandedTestaments.includes('NT') && (
@@ -8002,17 +8135,38 @@ export default function App() {
             activeNoteId={activeNoteId}
             onSelectNote={setActiveNoteId}
             onCreateNote={async (initialData) => {
-              const res = await fetchWithAuth(`${API_URL}/api/notes`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                  title: initialData?.title || 'New Note', 
-                  content: initialData?.content || '' 
-                })
+              const tempNote: NoteItem = {
+                id: Date.now(),
+                title: initialData?.title || 'New Note',
+                content: initialData?.content || '',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              };
+              setNotes(prev => {
+                const next = [tempNote, ...prev];
+                saveLocalNotes(next);
+                return next;
               });
-              const newNote = await res.json();
-              setNotes(prev => [newNote, ...prev]);
-              return newNote;
+              try {
+                const res = await fetchWithAuth(`${API_URL}/api/notes`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ 
+                    title: tempNote.title, 
+                    content: tempNote.content 
+                  })
+                });
+                if (res && res.ok) {
+                  const newNote = await res.json();
+                  setNotes(prev => {
+                    const next = prev.map(n => n.id === tempNote.id ? newNote : n);
+                    saveLocalNotes(next);
+                    return next;
+                  });
+                  return newNote;
+                }
+              } catch {}
+              return tempNote;
             }}
             onUpdateNote={updateNote}
             onDeleteNote={handleDeleteNote}

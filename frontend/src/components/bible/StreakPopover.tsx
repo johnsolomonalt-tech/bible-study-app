@@ -14,7 +14,6 @@ import {
   Calendar,
   ShieldCheck,
   ArrowRight,
-  RefreshCw,
   Sliders,
   Target
 } from 'lucide-react';
@@ -22,7 +21,6 @@ import {
   getStreakData, 
   StreakData, 
   getTodayStreakQuote, 
-  getRandomStreakQuote,
   getEncouragingMessage,
   setTargetMilestoneDays,
   STREAK_MILESTONES 
@@ -40,9 +38,8 @@ export function StreakPopover({
   const [isOpen, setIsOpen] = useState(false);
   const [streakData, setStreakData] = useState<StreakData>(getStreakData());
   const [activeTab, setActiveTab] = useState<'rhythm' | 'milestones'>('rhythm');
-  const [currentQuote, setCurrentQuote] = useState(getTodayStreakQuote());
-  const [isQuoteSpinning, setIsQuoteSpinning] = useState(false);
-  const [encouragementSeed, setEncouragementSeed] = useState(0);
+  const [currentQuote] = useState(getTodayStreakQuote());
+  const [encouragementSeed] = useState(0);
   const [isSetMilestoneOpen, setIsSetMilestoneOpen] = useState(false);
 
   // Listen to streak changes across the app
@@ -76,14 +73,6 @@ export function StreakPopover({
     streak,
     encouragementSeed > 0 ? encouragementSeed : undefined
   );
-
-  const handleShuffleQuote = () => {
-    setIsQuoteSpinning(true);
-    const next = getRandomStreakQuote(currentQuote.index);
-    setCurrentQuote(next);
-    setEncouragementSeed((prev) => prev + 1);
-    setTimeout(() => setIsQuoteSpinning(false), 350);
-  };
 
   return (
     <>
@@ -390,15 +379,6 @@ export function StreakPopover({
                           <Sparkles size={11} className="text-accent" />
                           <span>Words of Scripture</span>
                         </span>
-                        <button
-                          type="button"
-                          onClick={handleShuffleQuote}
-                          className="px-2 py-0.5 rounded-lg hover:bg-fg/5 text-muted hover:text-accent transition-colors cursor-pointer flex items-center gap-1 text-[11px] font-medium"
-                          title="Read another inspiring verse"
-                        >
-                          <RefreshCw size={11} className={isQuoteSpinning ? "animate-spin text-accent" : ""} />
-                          <span>Another verse</span>
-                        </button>
                       </div>
                       <blockquote className="text-center space-y-1.5 pt-0.5">
                         <p className="text-xs sm:text-sm italic text-fg font-serif leading-relaxed">

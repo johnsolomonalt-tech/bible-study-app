@@ -1254,9 +1254,9 @@ function InnerCanvasBoard({
     const currentActive = activeBoardIdRef.current;
     const hasActiveInList = currentActive && mergedList.some((b) => b.id === currentActive);
 
-    // If no active board, or active board not in list, or current canvas is empty:
+    // If no active board, or active board not in list:
     // pick the first cloud board
-    if ((!currentActive || !hasActiveInList || nodesRef.current.length === 0) && mergedList.length > 0) {
+    if ((!currentActive || !hasActiveInList) && mergedList.length > 0) {
       const targetId = mergedList[0].id;
       activeBoardIdRef.current = targetId;
       setActiveBoardId(targetId);
@@ -1725,6 +1725,23 @@ function InnerCanvasBoard({
       }
     }
 
+    // Safely collect any existing cards from localStorage for targetBoardId to prevent card loss
+    if (targetBoardId) {
+      try {
+        const raw = localStorage.getItem(`${STORAGE_KEY_BOARD_PREFIX}${targetBoardId}`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed.nodes) && parsed.nodes.length > 0) {
+            const stored = parsed.nodes.map(prepareNode);
+            const nodeMap = new Map<string, Node<CanvasNodeData>>();
+            stored.forEach((n: Node<CanvasNodeData>) => nodeMap.set(n.id, n));
+            baseNodes.forEach((n: Node<CanvasNodeData>) => nodeMap.set(n.id, n));
+            baseNodes = Array.from(nodeMap.values());
+          }
+        }
+      } catch {}
+    }
+
     const timestamp = Date.now();
     const newId = `card-incoming-${timestamp}`;
 
@@ -1748,7 +1765,7 @@ function InnerCanvasBoard({
       data: {
         title: incomingNode.title || 'Insight',
         content: incomingNode.content || '',
-        category: incomingNode.category || 'theological_point',
+        category: incomingNode.category || 'scripture',
         theme,
         onVerseClick: onNavigateToVerse,
         onUpdate: handleUpdateNode,

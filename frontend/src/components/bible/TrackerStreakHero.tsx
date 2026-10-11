@@ -13,18 +13,17 @@ import {
   ChevronRight, 
   ShieldCheck, 
   Sparkles, 
-  Sliders, 
-  RefreshCw 
+  Sliders
 } from 'lucide-react';
 import { 
   getStreakData, 
   StreakData, 
   STREAK_MILESTONES,
-  getTodayStreakQuote,
-  getRandomStreakQuote
+  getTodayStreakQuote
 } from '@/lib/streakService';
 import { AnimatedStreakFlame } from './AnimatedStreakFlame';
 import { EditPaceModal } from './EditPaceModal';
+import { ReadingCalendarModal } from './ReadingCalendarModal';
 
 export interface TrackerStreakHeroProps {
   dailyChapterGoal: number;
@@ -41,15 +40,8 @@ export function TrackerStreakHero({
 }: TrackerStreakHeroProps) {
   const [streakData, setStreakData] = useState<StreakData>(getStreakData());
   const [isEditPaceOpen, setIsEditPaceOpen] = useState(false);
-  const [quote, setQuote] = useState(getTodayStreakQuote());
-  const [isQuoteSpinning, setIsQuoteSpinning] = useState(false);
-
-  const handleShuffleQuote = () => {
-    setIsQuoteSpinning(true);
-    const next = getRandomStreakQuote(quote.index);
-    setQuote(next);
-    setTimeout(() => setIsQuoteSpinning(false), 350);
-  };
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [quote] = useState(getTodayStreakQuote());
 
   useEffect(() => {
     const handleUpdate = () => setStreakData(getStreakData());
@@ -217,12 +209,22 @@ export function TrackerStreakHero({
       {/* 7-Day Week Calendar Strip Card */}
       <div className="p-5 sm:p-6 rounded-3xl bg-surface border border-border/80 ring-shadow">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
-          <div className="flex items-center gap-2">
-            <Calendar size={18} className="text-accent" />
-            <h3 className="text-sm sm:text-base font-bold text-fg">
-              This Week
-            </h3>
-          </div>
+          <button
+            type="button"
+            onClick={() => setIsCalendarOpen(true)}
+            className="flex items-center gap-2 group text-left cursor-pointer p-1 -m-1 rounded-xl hover:bg-surface-hover transition-colors"
+            title="Open complete Bible reading calendar"
+          >
+            <div className="w-8 h-8 rounded-xl bg-accent/10 border border-accent/25 flex items-center justify-center text-accent group-hover:scale-105 group-hover:bg-accent/20 transition-all shadow-xs">
+              <Calendar size={18} />
+            </div>
+            <div>
+              <h3 className="text-sm sm:text-base font-bold text-fg group-hover:text-accent transition-colors flex items-center gap-1.5">
+                <span>This Week</span>
+                <ChevronRight size={14} className="text-muted group-hover:text-accent group-hover:translate-x-0.5 transition-all" />
+              </h3>
+            </div>
+          </button>
 
           <div className="flex items-center gap-3 text-xs text-muted">
             <span>Best Streak: <strong className="text-fg">{streakData.longestStreak} {streakData.longestStreak === 1 ? 'day' : 'days'}</strong></span>
@@ -272,58 +274,51 @@ export function TrackerStreakHero({
         </div>
 
         {/* Quick Spiritual Action Links */}
-        <div className="mt-5 pt-4 border-t border-border/60 flex flex-wrap items-center justify-between gap-3">
-          <span className="text-xs font-semibold text-muted">
-            Jump to:
-          </span>
+        <div className="mt-5 pt-4 border-t border-border/60 flex flex-wrap items-center justify-end gap-2.5">
+          <button
+            type="button"
+            onClick={() => onNavigateToTab('study')}
+            className="px-3.5 py-2 rounded-xl bg-surface hover:bg-surface-hover text-fg text-xs font-bold border-2 border-border-strong hover:border-accent shadow-xs active:scale-95 transition-all cursor-pointer flex items-center gap-2"
+          >
+            <BookOpen size={14} className="text-accent" />
+            <span>Read Scripture</span>
+          </button>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => onNavigateToTab('study')}
-              className="px-3 py-1.5 rounded-xl bg-surface hover:bg-surface-hover text-fg text-xs font-semibold border border-border transition-colors cursor-pointer flex items-center gap-1.5"
-            >
-              <BookOpen size={13} className="text-accent" />
-              <span>Read Scripture</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onNavigateToTab('devotional')}
-              className="px-3 py-1.5 rounded-xl bg-surface hover:bg-surface-hover text-fg text-xs font-semibold border border-border transition-colors cursor-pointer flex items-center gap-1.5"
-            >
-              <Sun size={13} className="text-amber-500" />
-              <span>Today’s Devotional</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => onNavigateToTab('devotional')}
+            className="px-3.5 py-2 rounded-xl bg-surface hover:bg-surface-hover text-fg text-xs font-bold border-2 border-border-strong hover:border-amber-500 shadow-xs active:scale-95 transition-all cursor-pointer flex items-center gap-2"
+          >
+            <Sun size={14} className="text-amber-500" />
+            <span>Today’s Devotional</span>
+          </button>
         </div>
 
         {/* Scripture Encouragement Bar */}
-        <div className="mt-4 pt-4 border-t border-border/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-7 h-7 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center shrink-0 text-accent">
-              <Sparkles size={13} />
-            </div>
-            <div className="min-w-0">
-              <p className="italic text-fg font-serif truncate sm:whitespace-normal text-xs leading-relaxed">
-                &ldquo;{quote.text}&rdquo;
-              </p>
-              <span className="text-[11px] font-semibold text-accent not-italic">
-                — {quote.reference}
-              </span>
-            </div>
+        <div className="mt-4 pt-4 border-t border-border/50 flex items-center gap-2.5 text-xs">
+          <div className="w-7 h-7 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center shrink-0 text-accent">
+            <Sparkles size={13} />
           </div>
-          <button
-            type="button"
-            onClick={handleShuffleQuote}
-            className="self-end sm:self-center shrink-0 px-2.5 py-1 rounded-xl border border-border bg-surface hover:bg-surface-hover text-muted hover:text-fg text-[11px] font-medium transition-colors flex items-center gap-1 cursor-pointer"
-            title="Read another inspiring verse"
-          >
-            <RefreshCw size={11} className={isQuoteSpinning ? "animate-spin text-accent" : ""} />
-            <span>Another verse</span>
-          </button>
+          <div className="min-w-0">
+            <p className="italic text-fg font-serif truncate sm:whitespace-normal text-xs leading-relaxed">
+              &ldquo;{quote.text}&rdquo;
+            </p>
+            <span className="text-[11px] font-semibold text-accent not-italic">
+              — {quote.reference}
+            </span>
+          </div>
         </div>
       </div>
+
+      {/* Reading Calendar Modal */}
+      <ReadingCalendarModal
+        isOpen={isCalendarOpen}
+        onClose={() => setIsCalendarOpen(false)}
+        activeDates={streakData.activeDates}
+        currentStreak={streakData.currentStreak}
+        longestStreak={streakData.longestStreak}
+        totalActiveDays={streakData.totalActiveDays}
+      />
 
       {/* Edit Pace / Goals Modal */}
       {onUpdateDailyChapterGoal && (
