@@ -212,11 +212,11 @@ export function TrackerStreakHero({
           <button
             type="button"
             onClick={() => setIsCalendarOpen(true)}
-            className="flex items-center gap-2 group text-left cursor-pointer p-1 -m-1 rounded-xl hover:bg-surface-hover transition-colors"
+            className="flex items-center gap-2.5 group text-left cursor-pointer p-1 -m-1 rounded-xl hover:bg-surface-hover transition-colors"
             title="Open streak calendar"
           >
-            <div className="w-8 h-8 rounded-xl bg-accent/10 border border-accent/25 flex items-center justify-center text-accent group-hover:scale-105 group-hover:bg-accent/20 transition-all shadow-xs">
-              <Calendar size={18} />
+            <div className="w-8 h-8 rounded-xl bg-accent/15 border border-accent/30 flex items-center justify-center text-accent group-hover:scale-105 group-hover:bg-accent/25 transition-all shadow-xs">
+              <Calendar size={16} />
             </div>
             <div>
               <h3 className="text-sm sm:text-base font-bold text-fg group-hover:text-accent transition-colors flex items-center gap-1.5">
@@ -236,28 +236,31 @@ export function TrackerStreakHero({
         {/* 7 Day Indicators */}
         <div className="grid grid-cols-7 gap-1.5 sm:gap-3 text-center">
           {streakData.weeklyActivity.map((day) => (
-            <div
+            <button
               key={day.date}
-              className={`p-2 sm:p-3 rounded-2xl border transition-all flex flex-col items-center gap-1.5 ${
+              type="button"
+              onClick={() => setIsCalendarOpen(true)}
+              className={`p-2 sm:p-3 rounded-2xl border transition-all flex flex-col items-center gap-1.5 cursor-pointer group hover:scale-[1.02] ${
                 day.isToday
                   ? 'bg-accent/10 border-accent/40 shadow-xs'
                   : day.isCompleted
-                  ? 'bg-amber-500/10 border-amber-500/30'
-                  : 'bg-bg/60 border-border/50'
+                  ? 'bg-amber-500/10 border-amber-500/30 hover:border-amber-500/50'
+                  : 'bg-bg/60 border-border/60 hover:border-border-soft'
               }`}
+              title={`View ${day.dayName} in Streak Calendar`}
             >
               <span className={`text-[11px] font-bold ${
-                day.isToday ? 'text-accent' : 'text-muted'
+                day.isToday ? 'text-accent' : 'text-muted group-hover:text-fg'
               }`}>
                 {day.dayName}
               </span>
 
               <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all ${
                 day.isCompleted
-                  ? 'bg-amber-500 text-white shadow-xs'
+                  ? 'bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-xs shadow-amber-500/25'
                   : day.isToday
-                  ? 'border border-dashed border-accent text-fg'
-                  : 'bg-surface text-muted border border-border/40'
+                  ? 'bg-accent/20 border border-accent text-accent font-bold'
+                  : 'bg-surface text-muted border border-border/40 group-hover:text-fg'
               }`}>
                 {day.isCompleted ? (
                   <Flame size={18} className="fill-white" />
@@ -266,10 +269,12 @@ export function TrackerStreakHero({
                 )}
               </div>
 
-              <span className="text-[10px] font-semibold text-muted">
+              <span className={`text-[10px] font-semibold ${
+                day.isCompleted ? 'text-amber-500 font-bold' : day.isToday ? 'text-accent font-bold' : 'text-muted'
+              }`}>
                 {day.isCompleted ? 'Done' : day.isToday ? 'Today' : '-'}
               </span>
-            </div>
+            </button>
           ))}
         </div>
 
@@ -278,16 +283,16 @@ export function TrackerStreakHero({
           <button
             type="button"
             onClick={() => onNavigateToTab('study')}
-            className="px-3.5 py-2 rounded-xl bg-surface hover:bg-surface-hover text-fg text-xs font-bold border-2 border-border-strong hover:border-accent shadow-xs active:scale-95 transition-all cursor-pointer flex items-center gap-2"
+            className="px-4 py-2 rounded-xl bg-accent hover:bg-[#b5583b] text-accent-on text-xs font-semibold shadow-xs hover:shadow transition-all cursor-pointer flex items-center gap-2 active:scale-95"
           >
-            <BookOpen size={14} className="text-accent" />
+            <BookOpen size={14} className="text-accent-on" />
             <span>Read Scripture</span>
           </button>
 
           <button
             type="button"
             onClick={() => onNavigateToTab('devotional')}
-            className="px-3.5 py-2 rounded-xl bg-surface hover:bg-surface-hover text-fg text-xs font-bold border-2 border-border-strong hover:border-amber-500 shadow-xs active:scale-95 transition-all cursor-pointer flex items-center gap-2"
+            className="px-4 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-500 border border-amber-500/35 text-xs font-semibold shadow-xs hover:shadow transition-all cursor-pointer flex items-center gap-2 active:scale-95"
           >
             <Sun size={14} className="text-amber-500" />
             <span>Today’s Devotional</span>
