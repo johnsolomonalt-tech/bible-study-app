@@ -213,7 +213,7 @@ export function TrackerStreakHero({
             type="button"
             onClick={() => setIsCalendarOpen(true)}
             className="flex items-center gap-2 group text-left cursor-pointer p-1 -m-1 rounded-xl hover:bg-surface-hover transition-colors"
-            title="Open complete Bible reading calendar"
+            title="Open streak calendar"
           >
             <div className="w-8 h-8 rounded-xl bg-accent/10 border border-accent/25 flex items-center justify-center text-accent group-hover:scale-105 group-hover:bg-accent/20 transition-all shadow-xs">
               <Calendar size={18} />

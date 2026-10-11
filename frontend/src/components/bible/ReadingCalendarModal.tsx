@@ -123,7 +123,7 @@ export function ReadingCalendarModal({
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-fg flex items-center gap-2">
-                      <span>Practice Calendar</span>
+                      <span>Streak Calendar</span>
                     </h3>
                     <p className="text-xs text-muted mt-0.5">
                       Days you spent in God’s Word & prayer
@@ -135,7 +135,7 @@ export function ReadingCalendarModal({
                   type="button"
                   onClick={onClose}
                   className="w-8 h-8 rounded-full flex items-center justify-center text-muted hover:text-fg hover:bg-surface-hover transition-colors cursor-pointer shrink-0"
-                  aria-label="Close practice calendar"
+                  aria-label="Close streak calendar"
                 >
                   <X size={18} />
                 </button>
