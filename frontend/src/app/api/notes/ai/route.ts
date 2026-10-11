@@ -182,6 +182,7 @@ FORMATTING INSTRUCTIONS:
         contents: systemPrompt,
         config: {
           temperature: 0.35,
+          thinkingConfig: { thinkingBudget: 0 },
         },
       });
       return response.text ?? '';

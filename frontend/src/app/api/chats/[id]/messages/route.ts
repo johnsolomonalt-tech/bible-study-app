@@ -289,7 +289,10 @@ async function processAiMessage({
         ai.models.generateContent({
           model,
           contents: `Does the following image request relate to the Bible, Christianity, or biblical history/theology? Respond strictly with "YES" or "NO".\n\nRequest: "${content}"`,
-          config: { temperature: 0.1 }
+          config: { 
+            temperature: 0.1,
+            thinkingConfig: { thinkingBudget: 0 }
+          }
         })
       );
 
@@ -496,7 +499,10 @@ Do NOT inject original Hebrew/Greek characters, Strong's concordance numbers, or
     const chatSession = ai.chats.create({
       model,
       history,
-      config: { systemInstruction: effectiveSystemInstruction },
+      config: { 
+        systemInstruction: effectiveSystemInstruction,
+        thinkingConfig: { thinkingBudget: 0 }
+      },
     });
 
     onStatusUpdate?.('Formulating theological reasoning & exegesis...');
@@ -545,6 +551,11 @@ Do NOT inject original Hebrew/Greek characters, Strong's concordance numbers, or
         }
       }
     }
+
+    if (!accumulated || accumulated.trim().length < 20) {
+      throw new Error(`Model ${model} returned empty or incomplete response`);
+    }
+
     return accumulated;
   });
 

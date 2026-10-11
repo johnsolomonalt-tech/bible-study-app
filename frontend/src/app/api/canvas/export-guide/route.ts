@@ -190,6 +190,7 @@ MANDATORY RULES:
           config: {
             systemInstruction: systemPrompt,
             temperature: 0.35,
+            thinkingConfig: { thinkingBudget: 0 },
           }
         });
         return (response.text ?? '').trim();

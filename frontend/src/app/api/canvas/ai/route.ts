@@ -266,6 +266,7 @@ JSON Format:
         config: {
           temperature: 0.3,
           responseMimeType: 'application/json',
+          thinkingConfig: { thinkingBudget: 0 },
         },
       });
       return response.text ?? '';

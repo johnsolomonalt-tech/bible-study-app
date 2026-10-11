@@ -56,6 +56,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         const result = await ai.models.generateContent({
           model,
           contents: `Generate a very short, concise title (3-6 words max) for a Bible study conversation that started with this message: "${userMessage}". Only return the title itself, no quotes, no punctuation at the end, no extra text.`,
+          config: {
+            thinkingConfig: { thinkingBudget: 0 }
+          }
         });
         title = (result.text ?? '').trim().replace(/^["']|["']$/g, '');
         break;
