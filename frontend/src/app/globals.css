@@ -412,5 +412,178 @@ button {
   -webkit-touch-callout: none !important;
 }
 
+/* =============================================================================
+   CLERK AUTHENTICATION COMPONENT OVERRIDES & HARDENING
+   Ensures seamless unified card layout, proper contrast, and brand alignment.
+============================================================================= */
+.cl-rootBox {
+  width: 100% !important;
+  display: flex !important;
+  justify-content: center !important;
+}
+
+.cl-cardBox {
+  width: 100% !important;
+  max-width: 440px !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.cl-card {
+  background-color: var(--surface) !important;
+  border: 1px solid var(--border-soft) !important;
+  border-radius: 1.5rem !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+  overflow: hidden !important;
+  width: 100% !important;
+}
+
+.cl-main {
+  background-color: transparent !important;
+  padding: 2.25rem 2.25rem 1.75rem !important;
+}
+
+/* Eliminate split-color card footer */
+.cl-footer {
+  background-color: transparent !important;
+  border-top: 1px solid var(--border-soft) !important;
+  padding: 1.25rem 2.25rem !important;
+}
+
+.cl-footerActionText {
+  color: var(--muted) !important;
+  font-size: 0.8125rem !important;
+}
+
+.cl-footerActionLink {
+  color: var(--accent) !important;
+  font-weight: 600 !important;
+  font-size: 0.8125rem !important;
+  margin-left: 0.25rem !important;
+}
+
+.cl-footerActionLink:hover {
+  text-decoration: underline !important;
+}
+
+.cl-headerTitle {
+  font-family: var(--font-merriweather), serif !important;
+  font-size: 1.5rem !important;
+  font-weight: 700 !important;
+  color: var(--fg) !important;
+  letter-spacing: -0.025em !important;
+  text-align: center !important;
+  margin-bottom: 0.25rem !important;
+}
+
+.cl-headerSubtitle {
+  color: var(--muted) !important;
+  font-size: 0.8125rem !important;
+  text-align: center !important;
+  margin-top: 0.25rem !important;
+  line-height: 1.4 !important;
+}
+
+.cl-formFieldLabel {
+  color: var(--fg-2) !important;
+  font-size: 0.6875rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  margin-bottom: 0.375rem !important;
+}
+
+.cl-formFieldInput {
+  background-color: var(--bg) !important;
+  color: var(--fg) !important;
+  border: 1px solid var(--border-soft) !important;
+  border-radius: 0.75rem !important;
+  padding: 0.75rem 1rem !important;
+  font-size: 0.875rem !important;
+  transition: all 0.15s ease-in-out !important;
+}
+
+.cl-formFieldInput:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px rgba(201, 100, 66, 0.25) !important;
+}
+
+.cl-formFieldInput::placeholder {
+  color: var(--muted) !important;
+  opacity: 0.7 !important;
+}
+
+.cl-formButtonPrimary {
+  background-color: var(--accent) !important;
+  color: var(--accent-on) !important;
+  font-weight: 600 !important;
+  border-radius: 0.75rem !important;
+  padding: 0.75rem 1.25rem !important;
+  font-size: 0.875rem !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+  transition: all 0.15s ease-in-out !important;
+}
+
+.cl-formButtonPrimary:hover {
+  background-color: #b5583b !important;
+  opacity: 0.95 !important;
+}
+
+.cl-formButtonPrimary:active {
+  transform: scale(0.99) !important;
+}
+
+/* Fix dark text on dark background in Google / Social Button */
+.cl-socialButtonsBlockButton {
+  background-color: var(--surface-warm) !important;
+  border: 1px solid var(--border-soft) !important;
+  border-radius: 0.75rem !important;
+  color: var(--fg) !important;
+  padding: 0.75rem 1rem !important;
+  position: relative !important;
+  transition: all 0.15s ease-in-out !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+}
+
+.cl-socialButtonsBlockButton:hover {
+  background-color: var(--surface-hover) !important;
+  border-color: var(--border) !important;
+}
+
+.cl-socialButtonsBlockButtonText {
+  color: var(--fg) !important;
+  font-weight: 600 !important;
+  font-size: 0.875rem !important;
+}
+
+/* Fix floating "Last used" pill */
+.cl-lastAuthenticationStrategyBadge {
+  background-color: rgba(201, 100, 66, 0.15) !important;
+  color: var(--accent) !important;
+  border: 1px solid rgba(201, 100, 66, 0.3) !important;
+  font-size: 0.625rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  border-radius: 9999px !important;
+  padding: 0.125rem 0.5rem !important;
+}
+
+.cl-dividerLine {
+  background-color: var(--border-soft) !important;
+}
+
+.cl-dividerText {
+  color: var(--muted) !important;
+  font-size: 0.6875rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.1em !important;
+}
+
+
 
 
