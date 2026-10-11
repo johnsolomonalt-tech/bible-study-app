@@ -1,9 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-
-// In-memory fallback for local/guest users or when Prisma/database is not configured
-const memoryChats = new Map<string, any[]>();
+import { getMemoryChats, addMemoryChat } from '@/lib/memoryChatStore';
 
 export async function GET() {
   let userId: string | null = null;
@@ -27,7 +25,7 @@ export async function GET() {
     }
   }
 
-  const list = memoryChats.get(effectiveUserId) || [];
+  const list = getMemoryChats(effectiveUserId);
   return NextResponse.json(list);
 }
 
@@ -68,8 +66,7 @@ export async function POST(req: Request) {
     messages: []
   };
 
-  const current = memoryChats.get(effectiveUserId) || [];
-  memoryChats.set(effectiveUserId, [guestChat, ...current]);
+  addMemoryChat(effectiveUserId, guestChat);
 
   return NextResponse.json(guestChat, { status: 201 });
 }

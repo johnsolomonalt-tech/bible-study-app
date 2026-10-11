@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { GoogleGenAI } from '@google/genai';
+import { isValidDbId, updateMemoryChatTitle } from '@/lib/memoryChatStore';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 const NAME_MODELS = [
@@ -66,7 +67,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const finalTitle = title || 'New Conversation';
 
-    if (userId && process.env.DATABASE_URL) {
+    updateMemoryChatTitle(chatId, finalTitle);
+
+    if (userId && process.env.DATABASE_URL && isValidDbId(chatId)) {
       try {
         await prisma.chat.update({
           where: { id: chatId, userId },

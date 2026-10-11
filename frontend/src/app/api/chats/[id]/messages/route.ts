@@ -6,6 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import { findCanonicalBook } from '@/lib/bibleCanon';
 import { BIBLE_VERSE_REGEX } from '@/lib/bibleReferences';
+import { isValidDbId, getMemoryMessages, addMemoryMessage, MemoryMessage } from '@/lib/memoryChatStore';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
@@ -193,20 +194,22 @@ You are guiding the user with a gentle, prayerful, contemplative heart focused o
 };
 
 async function saveOrMockMessage(data: { content: string; role: string; chatId: number }) {
-  if (process.env.DATABASE_URL) {
+  if (process.env.DATABASE_URL && isValidDbId(data.chatId)) {
     try {
       return await prisma.message.create({ data });
     } catch (e) {
       console.warn('Prisma message write skipped:', e);
     }
   }
-  return {
+  const mock: MemoryMessage = {
     id: Date.now() + Math.floor(Math.random() * 1000),
     content: data.content,
     role: data.role,
     chatId: data.chatId,
     createdAt: new Date(),
   };
+  addMemoryMessage(data.chatId, mock);
+  return mock;
 }
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -217,8 +220,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     userId = authResult?.userId || null;
   } catch {}
 
-  const chatId = parseInt(id);
-  if (userId && process.env.DATABASE_URL) {
+  const chatId = parseInt(id) || 0;
+  if (userId && process.env.DATABASE_URL && isValidDbId(chatId)) {
     try {
       const chat = await prisma.chat.findUnique({
         where: { id: chatId, userId }
@@ -233,7 +236,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     } catch {}
   }
 
-  return NextResponse.json([]);
+  return NextResponse.json(getMemoryMessages(chatId));
 }
 
 interface ProcessAiMessageParams {
@@ -363,10 +366,20 @@ async function processAiMessage({
   }
 
   // --- Route: Normal Text / Vision Response ---
-  const pastMessages = await prisma.message.findMany({
-    where: { chatId },
-    orderBy: { createdAt: 'asc' },
-  });
+  let pastMessages: { id: number; content: string; role: string }[] = [];
+  if (process.env.DATABASE_URL && isValidDbId(chatId)) {
+    try {
+      pastMessages = await prisma.message.findMany({
+        where: { chatId },
+        orderBy: { createdAt: 'asc' },
+      });
+    } catch (err) {
+      console.warn('Prisma message retrieval skipped:', err);
+      pastMessages = getMemoryMessages(chatId);
+    }
+  } else {
+    pastMessages = getMemoryMessages(chatId);
+  }
 
   const history = pastMessages
     .filter(m => m.id !== userMessage.id)
@@ -589,7 +602,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     recordAnalyticsEvent('chat_file_upload', userId || ip, { feature: 'chat' }).catch(() => {});
   }
 
-  if (userId && process.env.DATABASE_URL) {
+  if (userId && process.env.DATABASE_URL && isValidDbId(chatId)) {
     try {
       const chat = await prisma.chat.findUnique({
         where: { id: chatId, userId }

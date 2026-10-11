@@ -4647,6 +4647,7 @@ export default function App() {
         const decoder = new TextDecoder();
         let buffer = '';
         let streamResult: { userMessage?: any; aiMessage?: any } | null = null;
+        let streamError: string | null = null;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -4667,6 +4668,7 @@ export default function App() {
                   streamResult = payload;
                 } else if (payload.type === 'error') {
                   console.error('Server chat stream error:', payload.error);
+                  streamError = payload.error;
                 }
               } catch {
                 // ignore chunk parse failure
@@ -4685,6 +4687,19 @@ export default function App() {
               const lastUserIdx = [...msgs].reverse().findIndex(m => m.role === 'user');
               const sliceEnd = lastUserIdx >= 0 ? msgs.length - lastUserIdx : msgs.length;
               return { ...c, messages: [...msgs.slice(0, sliceEnd - 1), { ...msgs[sliceEnd - 1], ...data.userMessage }, data.aiMessage] };
+            }
+            return c;
+          }));
+        } else if (streamError) {
+          const errorMsg = { 
+            id: Date.now(), 
+            chatId: targetChatId, 
+            role: 'model', 
+            content: `**Error:** ${streamError}. Please try sending your message again.` 
+          };
+          setChats(prev => prev.map(c => {
+            if (c.id === targetChatId) {
+              return { ...c, messages: [...c.messages, errorMsg] };
             }
             return c;
           }));
