@@ -2,6 +2,7 @@
 const API_URL = '';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import Link from 'next/link';
 import { useAuth, UserButton, SignIn, SignInButton } from '@clerk/nextjs';
 import { Send, Plus, Layout, Edit, Sparkles, Target, Check, Copy, ChevronRight, ChevronLeft, ChevronDown, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquare, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow, ShieldCheck, Heart, Layers, Languages, MoreVertical, Search, BookMarked, Quote, Compass, ArrowRight, Square, BrainCircuit, FileText, UploadCloud, Menu } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -5111,14 +5112,13 @@ export default function App() {
           {userId ? (
             <UserButton />
           ) : (
-            <SignInButton mode="modal">
-              <button 
-                type="button" 
-                className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-accent text-white hover:opacity-90 transition-opacity cursor-pointer shadow-xs shrink-0"
-              >
-                Sign In
-              </button>
-            </SignInButton>
+            <Link 
+              href="/sign-in"
+              className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-accent text-accent-on hover:opacity-90 transition-opacity cursor-pointer shadow-xs shrink-0 inline-flex items-center active:scale-95"
+              title="Sign in to Theologica"
+            >
+              Sign In
+            </Link>
           )}
         </div>
 

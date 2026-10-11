@@ -67,6 +67,8 @@ export const metadata: Metadata = {
 import type { Viewport } from 'next';
 import { ClerkProvider } from '@clerk/nextjs';
 
+import { theologicaClerkAppearance } from '@/lib/clerkTheme';
+
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
@@ -79,7 +81,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
+    <ClerkProvider
+      signInUrl="/sign-in"
+      signUpUrl="/sign-up"
+      signInFallbackRedirectUrl="/"
+      signUpFallbackRedirectUrl="/"
+      appearance={theologicaClerkAppearance}
+    >
       <html lang="en" suppressHydrationWarning>
       <head>
         <meta name="apple-mobile-web-app-capable" content="yes" />
