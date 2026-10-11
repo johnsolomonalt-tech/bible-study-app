@@ -540,6 +540,9 @@ export function TheologicaAiCanvasModal({
                     </button>
                   </div>
                 </div>
+                <p className="text-[10px] text-meta text-center mt-1.5 select-none leading-tight">
+                  Theologica AI can produce inaccuracies. Always cross-reference with Scripture and verify primary sources.
+                </p>
               </div>
 
               {/* Theological Perspective Lens Bar */}

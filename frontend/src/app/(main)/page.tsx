@@ -6098,6 +6098,9 @@ export default function App() {
                         <Send size={15} />
                       </button>
                     </div>
+                    <p className="text-[10px] text-meta text-center mt-1.5 px-1 select-none leading-tight">
+                      Theologica AI can produce inaccuracies. Always cross-reference with Scripture and verify primary sources.
+                    </p>
                   </div>
                 </form>
               </div>
@@ -7082,6 +7085,9 @@ export default function App() {
                         <Send size={15} />
                       </button>
                     </div>
+                    <p className="text-[10px] sm:text-[11px] text-meta text-center mt-1.5 px-1 select-none leading-tight">
+                      Theologica AI can produce inaccuracies. Always cross-reference with Scripture and verify primary sources.
+                    </p>
                   </div>
                 </form>
               </Panel>
@@ -7929,6 +7935,9 @@ export default function App() {
                       <Send size={16} />
                     </button>
                   </div>
+                  <p className="text-[11px] sm:text-[12px] text-meta text-center mt-2 px-3 select-none leading-tight">
+                    Theologica AI can produce inaccuracies. Always cross-reference with Scripture and verify primary sources.
+                  </p>
                 </div>
               </form>
             </section>

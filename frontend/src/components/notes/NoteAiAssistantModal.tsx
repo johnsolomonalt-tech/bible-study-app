@@ -314,8 +314,8 @@ export function NoteAiAssistantModal({
 
         {/* Footer */}
         <footer className="px-6 py-3.5 border-t border-border flex items-center justify-between bg-surface/40 shrink-0">
-          <p className="text-[12px] text-meta">
-            Answers are grounded in Scripture and historical Christian theology.
+          <p className="text-[11px] text-meta">
+            Theologica AI can produce inaccuracies. Always cross-reference with Scripture.
           </p>
           <div className="flex items-center gap-2.5">
             <button
