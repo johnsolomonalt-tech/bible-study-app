@@ -5151,8 +5151,8 @@ export default function App() {
               className="absolute inset-0 z-30 w-full h-full border-r border-border bg-bg flex flex-col shadow-2xl will-change-transform"
             >
               <header 
-                className="min-h-[calc(3.25rem+env(safe-area-inset-top,0px))] border-b border-border/60 flex items-center justify-between px-4 shrink-0 bg-bg"
-                style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+                className="min-h-[calc(3.75rem+env(safe-area-inset-top,0px))] border-b border-border/60 flex items-center justify-between px-4 shrink-0 bg-bg"
+                style={{ paddingTop: 'calc(10px + env(safe-area-inset-top, 0px))' }}
               >
                 <div className="flex items-center gap-1.5">
                   <button onClick={() => setMobileStudyView('reader')} className="min-w-[44px] min-h-[44px] flex items-center justify-center -ml-2 p-2.5 text-fg-2 hover:text-fg rounded-xl hover:bg-surface cursor-pointer" title="Back to reader">
@@ -5400,8 +5400,8 @@ export default function App() {
               className="absolute inset-0 w-full h-full flex flex-col bg-bg z-10"
             >
               <header 
-                className="min-h-[calc(3.25rem+env(safe-area-inset-top,0px))] h-[calc(3.25rem+env(safe-area-inset-top,0px))] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 bg-bg shrink-0 relative z-20"
-                style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+                className="min-h-[calc(3.75rem+env(safe-area-inset-top,0px))] h-[calc(3.75rem+env(safe-area-inset-top,0px))] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 bg-bg shrink-0 relative z-20"
+                style={{ paddingTop: 'calc(10px + env(safe-area-inset-top, 0px))' }}
               >
                 {/* Left: Book & Chapter Selector Trigger */}
                 <div className="flex items-center gap-1 min-w-0 shrink">
@@ -5885,8 +5885,8 @@ export default function App() {
                 </div>
               )}
               <header 
-                className="min-h-[calc(3.25rem+env(safe-area-inset-top,0px))] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 text-[15px] font-medium text-fg shrink-0 gap-2 bg-bg"
-                style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+                className="min-h-[calc(3.75rem+env(safe-area-inset-top,0px))] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 text-[15px] font-medium text-fg shrink-0 gap-2 bg-bg"
+                style={{ paddingTop: 'calc(10px + env(safe-area-inset-top, 0px))' }}
               >
                 <div className="flex items-center gap-1.5 min-w-0">
                   <button onClick={() => setMobileStudyView('reader')} className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2.5 -ml-1 text-fg-2 hover:text-fg rounded-xl hover:bg-surface shrink-0 cursor-pointer" title="Back to reader">
@@ -7524,8 +7524,8 @@ export default function App() {
           <div className="flex-1 flex flex-col w-full h-full min-h-0 bg-bg overflow-hidden">
             {/* Mobile Native App Bar */}
             <header 
-              className="lg:hidden min-h-[calc(3.25rem+env(safe-area-inset-top,0px))] border-b border-border/60 flex items-center justify-between px-3.5 sm:px-4 bg-bg shrink-0 z-20"
-              style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+              className="lg:hidden min-h-[calc(3.75rem+env(safe-area-inset-top,0px))] border-b border-border/60 flex items-center justify-between px-3.5 sm:px-4 bg-bg shrink-0 z-20"
+              style={{ paddingTop: 'calc(10px + env(safe-area-inset-top, 0px))' }}
             >
               <div className="flex items-center gap-2">
                 <Sun size={18} className="text-accent" />
@@ -7763,7 +7763,7 @@ export default function App() {
               }`}
             >
               <header 
-                className="min-h-[calc(3.25rem+env(safe-area-inset-top,0px))] lg:min-h-[60px] border-b border-border flex items-center justify-between px-4 sm:px-5 shrink-0 bg-bg pt-[env(safe-area-inset-top,0px)] lg:pt-0"
+                className="min-h-[calc(3.75rem+env(safe-area-inset-top,0px))] lg:min-h-[60px] border-b border-border flex items-center justify-between px-4 sm:px-5 shrink-0 bg-bg pt-[calc(10px+env(safe-area-inset-top,0px))] lg:pt-0"
               >
                 <span className="text-[15px] font-medium text-fg">Conversations</span>
                 <div className="flex items-center gap-1">
@@ -7869,7 +7869,7 @@ export default function App() {
                 </div>
               )}
               <header 
-                className="min-h-[calc(3.25rem+env(safe-area-inset-top,0px))] lg:min-h-[60px] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 lg:px-8 shrink-0 bg-bg pt-[env(safe-area-inset-top,0px)] lg:pt-0"
+                className="min-h-[calc(3.75rem+env(safe-area-inset-top,0px))] lg:min-h-[60px] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 lg:px-8 shrink-0 bg-bg pt-[calc(10px+env(safe-area-inset-top,0px))] lg:pt-0"
               >
                 <div className="flex items-center min-w-0 mr-2">
                   <button 
@@ -8159,8 +8159,8 @@ export default function App() {
             <div className="flex-1 flex flex-col w-full h-full min-h-0 bg-bg overflow-hidden">
               {/* Mobile Native App Bar */}
               <header 
-                className="lg:hidden min-h-[calc(3.25rem+env(safe-area-inset-top,0px))] border-b border-border/60 flex items-center justify-between px-3.5 sm:px-4 bg-bg shrink-0 z-20"
-                style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+                className="lg:hidden min-h-[calc(3.75rem+env(safe-area-inset-top,0px))] border-b border-border/60 flex items-center justify-between px-3.5 sm:px-4 bg-bg shrink-0 z-20"
+                style={{ paddingTop: 'calc(10px + env(safe-area-inset-top, 0px))' }}
               >
                 <div className="flex items-center gap-2">
                   <Target size={18} className="text-accent" />
@@ -8434,12 +8434,12 @@ export default function App() {
         {/* Mobile Bottom Navigation (6 direct thumb-friendly native tabs - No 'More' button) */}
         <nav 
           aria-label="Mobile Navigation"
-          className={`lg:hidden shrink-0 bg-bg/90 backdrop-blur-xl border-t border-border/50 flex items-center justify-around px-1 z-40 w-full transition-all duration-200 select-none ${
+          className={`lg:hidden shrink-0 bg-bg/95 backdrop-blur-xl border-t border-border/40 flex items-center justify-around px-1 z-40 w-full transition-all duration-200 select-none ${
             (isMobileTyping && activeTab !== 'canvas') ? 'hidden pointer-events-none' : 'flex'
           }`}
           style={{ 
-            height: 'calc(52px + max(env(safe-area-inset-bottom, 0px), 12px))',
-            paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 12px)'
+            height: 'calc(48px + env(safe-area-inset-bottom, 0px))',
+            paddingBottom: 'env(safe-area-inset-bottom, 0px)'
           }}
         >
           {[
@@ -8468,7 +8468,7 @@ export default function App() {
                     setMobileChatView('chat');
                   }
                 }}
-                className={`flex-1 flex flex-col items-center justify-center min-h-[44px] h-[50px] py-1 transition-colors relative cursor-pointer active:scale-95 touch-manipulation ${
+                className={`flex-1 flex flex-col items-center justify-center h-full py-1 transition-colors relative cursor-pointer active:scale-95 touch-manipulation ${
                   isTabActive ? 'text-accent font-semibold' : 'text-muted hover:text-fg font-medium'
                 }`}
                 title={tab.label}
