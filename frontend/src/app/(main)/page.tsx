@@ -6145,8 +6145,8 @@ export default function App() {
                         <Send size={16} />
                       </button>
                     </div>
-                    <p className="text-[10px] text-meta text-center mt-1.5 px-1 select-none leading-tight">
-                      Theologica AI can produce inaccuracies. Always cross-reference with Scripture and verify primary sources.
+                    <p className="text-[10px] text-meta text-center mt-1 px-1 select-none leading-tight truncate">
+                      Theologica AI can produce inaccuracies. Always cross-reference with Scripture.
                     </p>
                   </div>
                 </form>
@@ -8149,7 +8149,7 @@ export default function App() {
                       }}
                       onKeyDown={handleChatKeyDown}
                       disabled={cooldown > 0}
-                      placeholder={cooldown > 0 ? `Study AI is resting... (${cooldown}s remaining)` : "Message Study AI (type / for exegesis & language commands)..."}
+                      placeholder={cooldown > 0 ? `Study AI is resting... (${cooldown}s)` : "Ask anything (type / for commands)..."}
                       className="flex-1 bg-transparent text-fg pl-1 pr-14 py-2.5 text-[16px] focus:outline-none disabled:opacity-50 transition-all placeholder:text-meta resize-none"
                     />
                     <button 

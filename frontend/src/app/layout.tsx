@@ -124,7 +124,7 @@ export default function RootLayout({
                 if (appleFav) appleFav.href = iconPath;
 
                 // Evict obsolete PWA service worker and clear stale cache across deployments
-                var BUILD_REV = '20261012-mobile-rev7';
+                var BUILD_REV = '20261012-mobile-rev8';
                 var lastRev = localStorage.getItem('theologica_build_rev');
                 if (lastRev !== BUILD_REV) {
                   localStorage.setItem('theologica_build_rev', BUILD_REV);
