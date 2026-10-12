@@ -60,6 +60,7 @@ import { StreakPopover } from '@/components/bible/StreakPopover';
 import { TrackerStreakHero } from '@/components/bible/TrackerStreakHero';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { PromptModal } from '@/components/ui/PromptModal';
+import { DailyVerseModal } from '@/components/bible/DailyVerseModal';
 import { 
   recordHabitActivity, 
   unmarkChapterActivity,
@@ -832,6 +833,15 @@ export default function App() {
   const [chatToDelete, setChatToDelete] = useState<{ id: number; title: string } | null>(null);
   const [chatToRename, setChatToRename] = useState<{ id: number; title: string } | null>(null);
   const [noteToRename, setNoteToRename] = useState<{ id: number; title: string; content: string } | null>(null);
+  const [dailyVerseModal, setDailyVerseModal] = useState<{
+    isOpen: boolean;
+    verseRef: string;
+    excerpt?: string;
+  }>({
+    isOpen: false,
+    verseRef: '',
+    excerpt: '',
+  });
 
   // Synchronize activeTab to URL query params & cookies/storage for reliable refresh & bookmarking
   useEffect(() => {
@@ -5151,8 +5161,8 @@ export default function App() {
               className="absolute inset-0 z-30 w-full h-full border-r border-border bg-bg flex flex-col shadow-2xl will-change-transform"
             >
               <header 
-                className="min-h-[calc(4.25rem+env(safe-area-inset-top,0px))] border-b border-border/60 flex items-center justify-between px-4 shrink-0 bg-bg pb-2"
-                style={{ paddingTop: 'calc(22px + env(safe-area-inset-top, 0px))' }}
+                className="min-h-[calc(4.25rem+max(env(safe-area-inset-top,0px),48px))] border-b border-border/60 flex items-center justify-between px-4 shrink-0 bg-bg pb-2"
+                style={{ paddingTop: 'calc(max(env(safe-area-inset-top, 0px), 48px) + 8px)' }}
               >
                 <div className="flex items-center gap-1.5">
                   <button onClick={() => setMobileStudyView('reader')} className="min-w-[44px] min-h-[44px] flex items-center justify-center -ml-2 p-2.5 text-fg-2 hover:text-fg rounded-xl hover:bg-surface cursor-pointer" title="Back to reader">
@@ -5400,8 +5410,8 @@ export default function App() {
               className="absolute inset-0 w-full h-full flex flex-col bg-bg z-10"
             >
               <header 
-                className="min-h-[calc(4.25rem+env(safe-area-inset-top,0px))] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 bg-bg shrink-0 relative z-20 pb-2"
-                style={{ paddingTop: 'calc(22px + env(safe-area-inset-top, 0px))' }}
+                className="min-h-[calc(4.25rem+max(env(safe-area-inset-top,0px),48px))] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 bg-bg shrink-0 relative z-20 pb-2"
+                style={{ paddingTop: 'calc(max(env(safe-area-inset-top, 0px), 48px) + 8px)' }}
               >
                 {/* Left: Book & Chapter Selector Trigger */}
                 <div className="flex items-center gap-1 min-w-0 shrink">
@@ -5441,6 +5451,7 @@ export default function App() {
                   {/* Streak Popover */}
                   <StreakPopover 
                     onNavigateToTab={setActiveTab} 
+                    onNavigateToVerse={navigateToVerse}
                   />
 
                   {/* Reverse Interlinear Quick Button (Visible on tablet screens where there is room) */}
@@ -5885,8 +5896,8 @@ export default function App() {
                 </div>
               )}
               <header 
-                className="min-h-[calc(4.25rem+env(safe-area-inset-top,0px))] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 text-[15px] font-medium text-fg shrink-0 gap-2 bg-bg pb-2"
-                style={{ paddingTop: 'calc(22px + env(safe-area-inset-top, 0px))' }}
+                className="min-h-[calc(4.25rem+max(env(safe-area-inset-top,0px),48px))] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 text-[15px] font-medium text-fg shrink-0 gap-2 bg-bg pb-2"
+                style={{ paddingTop: 'calc(max(env(safe-area-inset-top, 0px), 48px) + 8px)' }}
               >
                 <div className="flex items-center gap-1.5 min-w-0">
                   <button onClick={() => setMobileStudyView('reader')} className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2.5 -ml-1 text-fg-2 hover:text-fg rounded-xl hover:bg-surface shrink-0 cursor-pointer" title="Back to reader">
@@ -7524,15 +7535,15 @@ export default function App() {
           <div className="flex-1 flex flex-col w-full h-full min-h-0 bg-bg overflow-hidden">
             {/* Mobile Native App Bar */}
             <header 
-              className="lg:hidden min-h-[calc(4.25rem+env(safe-area-inset-top,0px))] border-b border-border/60 flex items-center justify-between px-3.5 sm:px-4 bg-bg shrink-0 z-20 pb-2"
-              style={{ paddingTop: 'calc(22px + env(safe-area-inset-top, 0px))' }}
+              className="lg:hidden min-h-[calc(4.25rem+max(env(safe-area-inset-top,0px),48px))] border-b border-border/60 flex items-center justify-between px-3.5 sm:px-4 bg-bg shrink-0 z-20 pb-2"
+              style={{ paddingTop: 'calc(max(env(safe-area-inset-top, 0px), 48px) + 8px)' }}
             >
               <div className="flex items-center gap-2">
                 <Sun size={18} className="text-accent" />
                 <span className="font-serif font-bold text-[17px] text-fg">Daily Devotional</span>
               </div>
               <div className="flex items-center gap-1 sm:gap-1.5">
-                <StreakPopover onNavigateToTab={setActiveTab} />
+                <StreakPopover onNavigateToTab={setActiveTab} onNavigateToVerse={navigateToVerse} />
                 <button 
                   onClick={() => setIsSettingsOpen(true)}
                   className="w-9 h-9 flex items-center justify-center rounded-full bg-surface/60 hover:bg-surface border border-border-soft/40 text-muted hover:text-fg active:scale-95 transition-all cursor-pointer"
@@ -7651,31 +7662,49 @@ export default function App() {
                               </div>
                               <h2 
                                 onClick={() => {
-                                  if (parsedVerse) {
-                                    navigateToVerse(parsedVerse.book, parsedVerse.chapter, parsedVerse.verse);
-                                  }
+                                  setDailyVerseModal({
+                                    isOpen: true,
+                                    verseRef: citation || currentVerse,
+                                    excerpt: quote,
+                                  });
                                 }}
-                                className={`font-display text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-fg transition-colors break-words ${
-                                  parsedVerse ? 'cursor-pointer hover:text-accent' : ''
-                                }`}
-                                title={parsedVerse ? `Open ${parsedVerse.book} ${parsedVerse.chapter}:${parsedVerse.verse} in Bible reader` : undefined}
+                                className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-fg transition-colors break-words cursor-pointer hover:text-accent group/devo-title"
+                                title="Click to read full scripture verse"
                               >
                                 {quote}
                               </h2>
                               {citation && (
-                                <div className="pt-0.5">
+                                <div className="flex flex-wrap items-center gap-2 pt-0.5">
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      if (parsedVerse) {
-                                        navigateToVerse(parsedVerse.book, parsedVerse.chapter, parsedVerse.verse);
-                                      }
+                                      setDailyVerseModal({
+                                        isOpen: true,
+                                        verseRef: citation,
+                                        excerpt: quote,
+                                      });
                                     }}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-accent/10 hover:bg-accent/20 text-accent text-sm sm:text-base font-semibold border border-accent/25 hover:border-accent/40 transition-all cursor-pointer group/devo-verse"
-                                    title={parsedVerse ? `Open ${parsedVerse.book} ${parsedVerse.chapter}:${parsedVerse.verse} in Bible reader` : undefined}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent/10 hover:bg-accent/20 text-accent text-sm sm:text-base font-semibold border border-accent/25 hover:border-accent/40 transition-all cursor-pointer group/devo-verse active:scale-95 shadow-2xs"
+                                    title="Click to view full scripture verse"
                                   >
                                     <span>{citation}</span>
-                                    <BookOpen size={15} className="opacity-70 group-hover/devo-verse:opacity-100 transition-opacity" />
+                                    <Sparkles size={14} className="text-accent" />
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setDailyVerseModal({
+                                        isOpen: true,
+                                        verseRef: citation,
+                                        excerpt: quote,
+                                      });
+                                    }}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface/70 hover:bg-surface text-fg-2 hover:text-fg text-xs font-medium border border-border-soft/50 transition-all cursor-pointer active:scale-95"
+                                    title="Read full verse text and context"
+                                  >
+                                    <BookOpen size={13} className="text-accent" />
+                                    <span>Full Verse</span>
                                   </button>
                                 </div>
                               )}
@@ -7763,7 +7792,7 @@ export default function App() {
               }`}
             >
               <header 
-                className="min-h-[calc(4.25rem+env(safe-area-inset-top,0px))] lg:min-h-[60px] border-b border-border flex items-center justify-between px-4 sm:px-5 shrink-0 bg-bg pt-[calc(22px+env(safe-area-inset-top,0px))] pb-2 lg:pt-0 lg:pb-0"
+                className="min-h-[calc(4.25rem+max(env(safe-area-inset-top,0px),48px))] lg:min-h-[60px] border-b border-border flex items-center justify-between px-4 sm:px-5 shrink-0 bg-bg pt-[calc(max(env(safe-area-inset-top,0px),48px)+8px)] pb-2 lg:pt-0 lg:pb-0"
               >
                 <span className="text-[15px] font-medium text-fg">Conversations</span>
                 <div className="flex items-center gap-1">
@@ -7869,7 +7898,7 @@ export default function App() {
                 </div>
               )}
               <header 
-                className="min-h-[calc(4.25rem+env(safe-area-inset-top,0px))] lg:min-h-[60px] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 lg:px-8 shrink-0 bg-bg pt-[calc(22px+env(safe-area-inset-top,0px))] pb-2 lg:pt-0 lg:pb-0"
+                className="min-h-[calc(4.25rem+max(env(safe-area-inset-top,0px),48px))] lg:min-h-[60px] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 lg:px-8 shrink-0 bg-bg pt-[calc(max(env(safe-area-inset-top,0px),48px)+8px)] pb-2 lg:pt-0 lg:pb-0"
               >
                 <div className="flex items-center min-w-0 mr-2 flex-1">
                   <button 
@@ -8159,15 +8188,15 @@ export default function App() {
             <div className="flex-1 flex flex-col w-full h-full min-h-0 bg-bg overflow-hidden">
               {/* Mobile Native App Bar */}
               <header 
-                className="lg:hidden min-h-[calc(4.25rem+env(safe-area-inset-top,0px))] border-b border-border/60 flex items-center justify-between px-3.5 sm:px-4 bg-bg shrink-0 z-20 pb-2"
-                style={{ paddingTop: 'calc(22px + env(safe-area-inset-top, 0px))' }}
+                className="lg:hidden min-h-[calc(4.25rem+max(env(safe-area-inset-top,0px),48px))] border-b border-border/60 flex items-center justify-between px-3.5 sm:px-4 bg-bg shrink-0 z-20 pb-2"
+                style={{ paddingTop: 'calc(max(env(safe-area-inset-top, 0px), 48px) + 8px)' }}
               >
                 <div className="flex items-center gap-2">
                   <Target size={18} className="text-accent" />
                   <span className="font-serif font-bold text-[17px] text-fg">Reading Tracker</span>
                 </div>
                 <div className="flex items-center gap-1 sm:gap-1.5">
-                  <StreakPopover onNavigateToTab={setActiveTab} />
+                  <StreakPopover onNavigateToTab={setActiveTab} onNavigateToVerse={navigateToVerse} />
                   <button 
                     onClick={() => setIsSettingsOpen(true)}
                     className="w-9 h-9 flex items-center justify-center rounded-full bg-surface/60 hover:bg-surface border border-border-soft/40 text-muted hover:text-fg active:scale-95 transition-all cursor-pointer"
@@ -8202,6 +8231,7 @@ export default function App() {
                   dailyChapterGoal={dailyChapterGoal}
                   totalChaptersCompleted={completedCount}
                   onNavigateToTab={setActiveTab}
+                  onNavigateToVerse={navigateToVerse}
                   onUpdateDailyChapterGoal={handleDailyChapterGoalChange}
                 />
 
@@ -8532,6 +8562,20 @@ export default function App() {
           onExportData={handleExportData}
           onImportData={handleImportData}
           onResetPreferences={handleResetPreferences}
+        />
+
+        {/* DAILY VERSE FULL SCRIPTURE MODAL */}
+        <DailyVerseModal
+          isOpen={dailyVerseModal.isOpen}
+          onClose={() => setDailyVerseModal(prev => ({ ...prev, isOpen: false }))}
+          verseRef={dailyVerseModal.verseRef}
+          initialExcerpt={dailyVerseModal.excerpt}
+          translation={translation}
+          theme={theme as 'dark' | 'light'}
+          onNavigateToVerse={(book, chapter, verse) => {
+            setDailyVerseModal(prev => ({ ...prev, isOpen: false }));
+            navigateToVerse(book, chapter, verse);
+          }}
         />
 
         <PWAInstallPrompt />

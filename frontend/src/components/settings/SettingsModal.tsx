@@ -223,7 +223,7 @@ export function SettingsModal(props: SettingsModalProps) {
 
   return (
     <div 
-      className="fixed inset-0 bg-black/65 backdrop-blur-sm z-[100] flex items-center justify-center p-3 sm:p-5 animate-in fade-in-50 duration-200"
+      className="fixed inset-0 bg-black/65 backdrop-blur-sm z-[100] flex items-center justify-center modal-safe-overlay animate-in fade-in-50 duration-200"
       onClick={onClose}
     >
       <div 
@@ -231,7 +231,7 @@ export function SettingsModal(props: SettingsModalProps) {
         aria-modal="true"
         aria-labelledby="settings-dialog-title"
         onClick={(e) => e.stopPropagation()}
-        className="bg-bg text-fg w-full max-w-3xl h-[88vh] max-h-[720px] rounded-[24px] sm:rounded-[28px] shadow-2xl ring-1 ring-border flex flex-col overflow-hidden"
+        className="bg-bg text-fg w-full max-w-3xl modal-safe-content max-h-[720px] rounded-[24px] sm:rounded-[28px] shadow-2xl ring-1 ring-border flex flex-col overflow-hidden"
       >
         {/* Header */}
         <header className="px-5 sm:px-6 py-4 border-b border-border flex items-center justify-between shrink-0 bg-surface/40">

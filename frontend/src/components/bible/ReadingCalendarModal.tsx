@@ -95,7 +95,7 @@ export function ReadingCalendarModal({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-5 select-none overflow-y-auto">
+        <div className="fixed inset-0 z-[120] flex items-center justify-center modal-safe-overlay select-none overflow-y-auto">
           {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -112,7 +112,7 @@ export function ReadingCalendarModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-            className="relative w-full max-w-lg bg-surface border border-border/80 rounded-3xl shadow-2xl overflow-hidden z-10 my-auto"
+            className="relative w-full max-w-lg bg-surface border border-border/80 rounded-3xl shadow-2xl overflow-hidden z-10 my-auto modal-safe-content"
           >
             {/* Header */}
             <div className="p-5 sm:p-6 pb-4 border-b border-border/60">

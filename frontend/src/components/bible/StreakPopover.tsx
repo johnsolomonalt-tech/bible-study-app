@@ -27,13 +27,16 @@ import {
 } from '@/lib/streakService';
 import { SetMilestoneModal } from './SetMilestoneModal';
 import { AnimatedStreakFlame } from './AnimatedStreakFlame';
+import { DailyVerseModal } from './DailyVerseModal';
 
 export interface StreakPopoverProps {
   onNavigateToTab: (tab: string) => void;
+  onNavigateToVerse?: (book: string, chapter: number, verse: number) => void;
 }
 
 export function StreakPopover({
   onNavigateToTab,
+  onNavigateToVerse,
 }: StreakPopoverProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [streakData, setStreakData] = useState<StreakData>(getStreakData());
@@ -41,6 +44,7 @@ export function StreakPopover({
   const [currentQuote] = useState(getTodayStreakQuote());
   const [encouragementSeed] = useState(0);
   const [isSetMilestoneOpen, setIsSetMilestoneOpen] = useState(false);
+  const [isDailyVerseOpen, setIsDailyVerseOpen] = useState(false);
 
   // Listen to streak changes across the app
   useEffect(() => {
@@ -112,7 +116,7 @@ export function StreakPopover({
       <AnimatePresence>
         {isOpen && (
           <div 
-            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center modal-safe-overlay bg-black/60 backdrop-blur-sm"
             onClick={() => setIsOpen(false)}
           >
             <motion.div
@@ -121,7 +125,7 @@ export function StreakPopover({
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
               transition={{ duration: 0.2, ease: "easeOut" }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-lg bg-surface border border-border/80 rounded-3xl shadow-2xl overflow-hidden ring-1 ring-black/10 flex flex-col max-h-[90dvh]"
+              className="w-full max-w-lg bg-surface border border-border/80 rounded-3xl shadow-2xl overflow-hidden ring-1 ring-black/10 flex flex-col modal-safe-content"
             >
               {/* Top Hero Flame Header */}
               <div className="relative p-6 sm:p-8 bg-gradient-to-b from-amber-500/10 via-amber-500/5 to-transparent border-b border-border/60">
@@ -373,11 +377,19 @@ export function StreakPopover({
                     </div>
 
                     {/* Daily Scripture Quote */}
-                    <div className="p-3.5 sm:p-4 rounded-2xl bg-surface/60 border border-border/60 space-y-2 relative">
+                    <div 
+                      onClick={() => setIsDailyVerseOpen(true)}
+                      className="p-3.5 sm:p-4 rounded-2xl bg-surface/60 hover:bg-surface border border-border/60 hover:border-accent/40 space-y-2 relative cursor-pointer transition-all active:scale-[0.99] group/scripture"
+                      title="Tap to read full scripture verse"
+                    >
                       <div className="flex items-center justify-between text-muted pb-1 border-b border-border/40">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-muted flex items-center gap-1.5">
                           <Sparkles size={11} className="text-accent" />
                           <span>Words of Scripture</span>
+                        </span>
+                        <span className="text-[10px] text-accent font-semibold flex items-center gap-1 group-hover/scripture:underline">
+                          <span>Read Full Verse</span>
+                          <ChevronRight size={11} />
                         </span>
                       </div>
                       <blockquote className="text-center space-y-1.5 pt-0.5">
@@ -505,6 +517,23 @@ export function StreakPopover({
           setStreakData(getStreakData());
         }}
         onClose={() => setIsSetMilestoneOpen(false)}
+      />
+
+      {/* Daily Scripture Verse Full Modal */}
+      <DailyVerseModal
+        isOpen={isDailyVerseOpen}
+        verseRef={currentQuote.reference}
+        initialExcerpt={currentQuote.text}
+        onClose={() => setIsDailyVerseOpen(false)}
+        onNavigateToVerse={(book, chapter, verse) => {
+          setIsDailyVerseOpen(false);
+          setIsOpen(false);
+          if (onNavigateToVerse) {
+            onNavigateToVerse(book, chapter, verse);
+          } else {
+            onNavigateToTab('reader');
+          }
+        }}
       />
     </>
   );

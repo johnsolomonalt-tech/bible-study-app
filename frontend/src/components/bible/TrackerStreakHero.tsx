@@ -24,11 +24,13 @@ import {
 import { AnimatedStreakFlame } from './AnimatedStreakFlame';
 import { EditPaceModal } from './EditPaceModal';
 import { ReadingCalendarModal } from './ReadingCalendarModal';
+import { DailyVerseModal } from './DailyVerseModal';
 
 export interface TrackerStreakHeroProps {
   dailyChapterGoal: number;
   totalChaptersCompleted: number;
   onNavigateToTab: (tab: string) => void;
+  onNavigateToVerse?: (book: string, chapter: number, verse: number) => void;
   onUpdateDailyChapterGoal?: (goal: number) => void;
 }
 
@@ -36,11 +38,13 @@ export function TrackerStreakHero({
   dailyChapterGoal,
   totalChaptersCompleted,
   onNavigateToTab,
+  onNavigateToVerse,
   onUpdateDailyChapterGoal,
 }: TrackerStreakHeroProps) {
   const [streakData, setStreakData] = useState<StreakData>(getStreakData());
   const [isEditPaceOpen, setIsEditPaceOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [isDailyVerseOpen, setIsDailyVerseOpen] = useState(false);
   const [quote] = useState(getTodayStreakQuote());
 
   useEffect(() => {
@@ -300,17 +304,26 @@ export function TrackerStreakHero({
         </div>
 
         {/* Scripture Encouragement Bar */}
-        <div className="mt-4 pt-4 border-t border-border/50 flex items-center gap-2.5 text-xs">
-          <div className="w-7 h-7 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center shrink-0 text-accent">
+        <div 
+          onClick={() => setIsDailyVerseOpen(true)}
+          className="mt-4 pt-4 border-t border-border/50 flex items-center gap-2.5 text-xs cursor-pointer hover:opacity-90 transition-opacity group/tracker-quote"
+          title="Tap to read full scripture verse"
+        >
+          <div className="w-7 h-7 rounded-xl bg-accent/10 group-hover/tracker-quote:bg-accent/20 border border-accent/20 flex items-center justify-center shrink-0 text-accent transition-colors">
             <Sparkles size={13} />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="italic text-fg font-serif truncate sm:whitespace-normal text-xs leading-relaxed">
               &ldquo;{quote.text}&rdquo;
             </p>
-            <span className="text-[11px] font-semibold text-accent not-italic">
-              — {quote.reference}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold text-accent not-italic">
+                — {quote.reference}
+              </span>
+              <span className="text-[10px] text-muted group-hover/tracker-quote:text-accent transition-colors font-medium">
+                • Tap to read full verse
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -337,6 +350,22 @@ export function TrackerStreakHero({
           onClose={() => setIsEditPaceOpen(false)}
         />
       )}
+
+      {/* Daily Scripture Verse Full Modal */}
+      <DailyVerseModal
+        isOpen={isDailyVerseOpen}
+        verseRef={quote.reference}
+        initialExcerpt={quote.text}
+        onClose={() => setIsDailyVerseOpen(false)}
+        onNavigateToVerse={(book, chapter, verse) => {
+          setIsDailyVerseOpen(false);
+          if (onNavigateToVerse) {
+            onNavigateToVerse(book, chapter, verse);
+          } else {
+            onNavigateToTab('reader');
+          }
+        }}
+      />
     </div>
   );
 }

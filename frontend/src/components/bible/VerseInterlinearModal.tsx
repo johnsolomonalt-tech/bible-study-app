@@ -254,11 +254,11 @@ export function VerseInterlinearModal({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-6 bg-black/60 backdrop-blur-md animate-in fade-in duration-200"
+      className="fixed inset-0 z-[60] flex items-center justify-center modal-safe-overlay bg-black/60 backdrop-blur-md animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className={`w-full max-w-4xl max-h-[92vh] rounded-2xl sm:rounded-3xl border shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 ${
+        className={`w-full max-w-4xl modal-safe-content rounded-2xl sm:rounded-3xl border shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 ${
           isDark
             ? 'bg-[#18181e] border-zinc-700/80 text-zinc-100 shadow-[0_25px_60px_rgba(0,0,0,0.8)]'
             : 'bg-white border-zinc-200 text-zinc-900 shadow-[0_25px_60px_rgba(0,0,0,0.15)]'

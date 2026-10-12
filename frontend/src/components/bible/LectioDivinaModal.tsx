@@ -192,11 +192,11 @@ export function LectioDivinaModal({
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-md animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center modal-safe-overlay bg-black/60 backdrop-blur-md animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div 
-        className="w-full max-w-2xl rounded-3xl shadow-2xl border border-border bg-bg text-fg overflow-hidden flex flex-col max-h-[92vh] ring-1 ring-border transition-all"
+        className="w-full max-w-2xl rounded-3xl shadow-2xl border border-border bg-bg text-fg overflow-hidden flex flex-col modal-safe-content ring-1 ring-border transition-all"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

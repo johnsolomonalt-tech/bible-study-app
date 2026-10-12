@@ -598,6 +598,27 @@ button {
   letter-spacing: 0.1em !important;
 }
 
+/* Mobile safe area modal backdrop and content sizing for iPhone Dynamic Island, notch, and home bar */
+.modal-safe-overlay {
+  padding-top: calc(max(env(safe-area-inset-top, 0px), 48px) + 14px);
+  padding-bottom: calc(max(env(safe-area-inset-bottom, 0px), 16px) + 14px);
+  padding-left: max(env(safe-area-inset-left, 0px), 12px);
+  padding-right: max(env(safe-area-inset-right, 0px), 12px);
+}
+@media (min-width: 640px) {
+  .modal-safe-overlay {
+    padding-top: 1.5rem;
+    padding-bottom: 1.5rem;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
 
-
-
+.modal-safe-content {
+  max-height: 100%;
+}
+@media (min-width: 640px) {
+  .modal-safe-content {
+    max-height: 88vh;
+  }
+}

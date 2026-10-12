@@ -101,7 +101,7 @@ export function SetMilestoneModal({
   return (
     <AnimatePresence>
       <div 
-        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm"
+        className="fixed inset-0 z-50 flex items-center justify-center modal-safe-overlay bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       >
         <motion.div
@@ -110,7 +110,7 @@ export function SetMilestoneModal({
           exit={{ opacity: 0, scale: 0.95, y: 12 }}
           transition={{ duration: 0.2, ease: "easeOut" }}
           onClick={(e) => e.stopPropagation()}
-          className="w-full max-w-lg bg-surface border border-border/80 rounded-3xl shadow-2xl overflow-hidden ring-1 ring-black/10 flex flex-col max-h-[92vh]"
+          className="w-full max-w-lg bg-surface border border-border/80 rounded-3xl shadow-2xl overflow-hidden ring-1 ring-black/10 flex flex-col modal-safe-content"
         >
           {/* Header */}
           <div className="flex items-center justify-between p-5 sm:p-6 border-b border-border/70 shrink-0 bg-surface">
