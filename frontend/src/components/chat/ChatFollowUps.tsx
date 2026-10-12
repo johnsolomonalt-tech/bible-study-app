@@ -98,82 +98,45 @@ export function extractTailoredFollowUps(content: string, currentLens: Theologic
 export const ChatFollowUps: React.FC<ChatFollowUpsProps> = ({
   questions,
   messageContent,
-  currentLens = 'canonical',
+  currentLens = 'standard',
   onSelectQuestion,
-  onSelectLensComparison,
-  isCompact = false,
 }) => {
   const followUps = (questions && questions.length > 0)
     ? questions.slice(0, 3)
     : extractTailoredFollowUps(messageContent, currentLens);
 
-  // Other theological lenses to compare against
-  const otherLenses = THEOLOGICAL_LENS_OPTIONS.filter(l => l.id !== currentLens);
-
-  if (followUps.length === 0 && otherLenses.length === 0) return null;
+  if (followUps.length === 0) return null;
 
   return (
     <div className="w-full mt-2.5 pt-2.5 border-t border-border/30 space-y-2.5 animate-in fade-in duration-200">
       {/* Follow-up question bubbles side-by-side */}
-      {followUps.length > 0 && (
-        <div>
-          <div className="flex items-center gap-1.5 mb-1.5 select-none">
-            <Sparkles size={11} className="text-accent shrink-0" />
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted">
-              Tailored Follow-Ups
-            </span>
-          </div>
-
-          <div className={`grid gap-1.5 sm:gap-2 ${followUps.length === 1 ? 'grid-cols-1' : followUps.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
-            {followUps.map((q, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => onSelectQuestion(q)}
-                title={q}
-                className="group relative flex flex-col justify-between p-2 sm:p-2.5 rounded-xl sm:rounded-2xl bg-surface/50 hover:bg-surface border border-border-soft/60 hover:border-accent/40 shadow-2xs hover:shadow-xs text-left transition-all duration-150 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer min-w-0"
-              >
-                <span className="text-[10.5px] sm:text-[11.5px] font-medium leading-tight sm:leading-snug text-fg-hover group-hover:text-fg line-clamp-3 break-words">
-                  {q}
-                </span>
-                <div className="flex items-center justify-end mt-1 text-meta/50 group-hover:text-accent transition-colors">
-                  <ArrowRight size={10} className="sm:size-[11px] group-hover:translate-x-0.5 transition-transform shrink-0" />
-                </div>
-              </button>
-            ))}
-          </div>
+      <div>
+        <div className="flex items-center gap-1.5 mb-1.5 select-none">
+          <Sparkles size={11} className="text-accent shrink-0" />
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-muted">
+            Tailored Follow-Ups
+          </span>
         </div>
-      )}
 
-      {/* Multi-Lens Comparison Row */}
-      {!isCompact && (
-        <div className="pt-0.5">
-          <div className="flex items-center gap-1.5 mb-1.5 select-none">
-            <Compass size={11} className="text-muted shrink-0" />
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-meta">
-              Explore Another Tradition
-            </span>
-          </div>
-
-          <div className="flex flex-wrap gap-1.5">
-            {otherLenses.slice(0, 4).map((lens) => (
-              <button
-                key={lens.id}
-                type="button"
-                onClick={() => {
-                  const prompt = `Re-examine the theological points discussed above specifically through the ${lens.name} lens (${lens.tagline}). Highlight distinctive historic insights from this tradition.`;
-                  onSelectLensComparison(lens.id, prompt);
-                }}
-                className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-surface/30 hover:bg-surface border border-border-soft/40 hover:border-border text-[10.5px] sm:text-[11px] text-muted hover:text-fg transition-all cursor-pointer group"
-                title={lens.description}
-              >
-                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: lens.accentColor }} />
-                <span>{lens.name} View</span>
-              </button>
-            ))}
-          </div>
+        <div className={`grid gap-1.5 sm:gap-2 ${followUps.length === 1 ? 'grid-cols-1' : followUps.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+          {followUps.map((q, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => onSelectQuestion(q)}
+              title={q}
+              className="group relative flex flex-col justify-between p-2 sm:p-2.5 rounded-xl sm:rounded-2xl bg-surface/50 hover:bg-surface border border-border-soft/60 hover:border-accent/40 shadow-2xs hover:shadow-xs text-left transition-all duration-150 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer min-w-0"
+            >
+              <span className="text-[10.5px] sm:text-[11.5px] font-medium leading-tight sm:leading-snug text-fg-hover group-hover:text-fg line-clamp-3 break-words">
+                {q}
+              </span>
+              <div className="flex items-center justify-end mt-1 text-meta/50 group-hover:text-accent transition-colors">
+                <ArrowRight size={10} className="sm:size-[11px] group-hover:translate-x-0.5 transition-transform shrink-0" />
+              </div>
+            </button>
+          ))}
         </div>
-      )}
+      </div>
     </div>
   );
 };

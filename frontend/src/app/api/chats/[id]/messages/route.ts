@@ -257,7 +257,7 @@ async function processAiMessage({
   image,
   scriptureContext,
   translation,
-  theologicalLens = 'canonical',
+  theologicalLens = 'standard',
   includeOriginalRoots = false,
   onStatusUpdate,
   onThoughtUpdate,

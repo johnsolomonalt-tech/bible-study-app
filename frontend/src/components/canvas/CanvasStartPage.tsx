@@ -66,7 +66,7 @@ export function CanvasStartPage({
   const isDark = theme === 'dark';
   const [prompt, setPrompt] = useState('');
   const [mode, setMode] = useState<CanvasMode>('generate');
-  const [selectedLens, setSelectedLens] = useState<'canonical' | 'patristic' | 'reformation' | 'scholarly' | 'contemplative'>('canonical');
+  const [selectedLens, setSelectedLens] = useState<'standard' | 'canonical' | 'patristic' | 'reformation' | 'scholarly' | 'contemplative'>('standard');
   const [validationError, setValidationError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -113,7 +113,7 @@ export function CanvasStartPage({
 
   return (
     <div 
-      className="w-full h-full overflow-y-auto custom-scroll flex flex-col justify-between p-4 sm:p-6 md:p-8 select-none animate-in fade-in duration-200 bg-bg text-fg pt-[calc(1rem+env(safe-area-inset-top,0px))] lg:pt-6"
+      className="w-full h-full overflow-y-auto custom-scroll flex flex-col justify-between p-4 sm:p-6 md:p-8 select-none animate-in fade-in duration-200 bg-bg text-fg pt-3 lg:pt-6"
       style={{
         backgroundColor: 'var(--bg)',
       }}
@@ -286,6 +286,7 @@ export function CanvasStartPage({
                     onChange={(e) => setSelectedLens(e.target.value as any)}
                     className="text-xs font-medium px-2 py-1 rounded-lg border border-border text-fg bg-surface-warm focus:outline-none cursor-pointer"
                   >
+                    <option value="standard">General (Balanced)</option>
                     <option value="canonical">Canonical Biblical</option>
                     <option value="patristic">Patristic & Early Church</option>
                     <option value="reformation">Reformed & Protestant</option>

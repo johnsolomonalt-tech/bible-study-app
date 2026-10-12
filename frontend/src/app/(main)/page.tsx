@@ -606,7 +606,7 @@ const AiChatMessageView = ({
   onSelectLensComparison,
   chatTitle,
   chatId,
-  activeLens = 'canonical',
+  activeLens = 'standard',
   translation = 'BSB',
   isFullView,
 }: {
@@ -757,14 +757,14 @@ const AiChatMessageView = ({
         onSaveToNotes={onSaveToNotes}
       />
 
-      {/* Tailored Follow-Ups and Multi-Lens Comparison */}
-      {isLast && onSelectPrompt && onSelectLensComparison && (
+      {/* Tailored Follow-Ups */}
+      {isLast && onSelectPrompt && (
         <ChatFollowUps
           questions={suggestedFollowUps}
           messageContent={textContent}
           currentLens={effectiveLens}
           onSelectQuestion={onSelectPrompt}
-          onSelectLensComparison={onSelectLensComparison}
+          onSelectLensComparison={onSelectLensComparison || (() => {})}
           isCompact={!isFullView}
         />
       )}
@@ -1727,9 +1727,14 @@ export default function App() {
     const savedAutoAdvance = getPreference(PREF_KEYS.AUDIO_AUTO_ADVANCE);
     if (savedAutoAdvance !== '') setAutoAdvanceAudio(savedAutoAdvance === 'true');
 
-    // 10. Study & AI
-    const savedLens = getPreference(PREF_KEYS.THEOLOGICAL_LENS) as TheologicalLensType;
-    if (savedLens && THEOLOGICAL_LENS_OPTIONS.some(o => o.id === savedLens)) setTheologicalLens(savedLens);
+    // 10. Study & AI — default to 'standard' (General Balanced AI) unless user explicitly changed it in Settings
+    const savedUserLens = getPreference(PREF_KEYS.USER_DEFAULT_LENS) as TheologicalLensType;
+    if (savedUserLens && THEOLOGICAL_LENS_OPTIONS.some(o => o.id === savedUserLens)) {
+      setTheologicalLens(savedUserLens);
+    } else {
+      setTheologicalLens('standard');
+      setPreference(PREF_KEYS.THEOLOGICAL_LENS, 'standard');
+    }
 
     // 11. Tracker Collections
     const savedTestaments = getPreference(PREF_KEYS.TRACKER_EXPANDED_TESTAMENTS);
@@ -2129,6 +2134,7 @@ export default function App() {
   const handleTheologicalLensChange = (lens: TheologicalLensType) => {
     setTheologicalLens(lens);
     setPreference(PREF_KEYS.THEOLOGICAL_LENS, lens);
+    setPreference(PREF_KEYS.USER_DEFAULT_LENS, lens);
   };
 
   const handleDailyChapterGoalChange = (goal: number) => {
@@ -2353,7 +2359,7 @@ export default function App() {
     handleTtsVoiceChange('');
     handleToggleAutoScrollAudio(true);
     handleToggleAutoAdvanceAudio(false);
-    handleTheologicalLensChange('canonical');
+    handleTheologicalLensChange('standard');
     handleTrackerFormatChange('percent');
     handleDailyChapterGoalChange(3);
     setShowLeftSidebar(true);
@@ -5139,6 +5145,51 @@ export default function App() {
           )}
         </div>
       </header>
+
+      {/* Subtle Global Mobile Top Bar across every tab */}
+      <header 
+        className="lg:hidden border-b border-border/40 flex items-center justify-between px-3.5 sm:px-4 bg-bg/95 backdrop-blur-xs shrink-0 z-30 pb-1.5"
+        style={{ paddingTop: 'calc(max(env(safe-area-inset-top, 0px), 48px) + 4px)' }}
+      >
+        <div className="flex items-center gap-1.5 min-w-0">
+          {activeTab === 'study' && <Layout size={13} className="text-muted/80 shrink-0" />}
+          {activeTab === 'canvas' && <Workflow size={13} className="text-muted/80 shrink-0" />}
+          {activeTab === 'devotional' && <Sun size={13} className="text-muted/80 shrink-0" />}
+          {activeTab === 'notes' && <Edit size={13} className="text-muted/80 shrink-0" />}
+          {activeTab === 'chats' && <Sparkles size={13} className="text-muted/80 shrink-0" />}
+          {activeTab === 'tracker' && <Target size={13} className="text-muted/80 shrink-0" />}
+          <span className="font-sans text-[12px] font-medium tracking-wider uppercase text-muted/85 truncate">
+            {activeTab === 'study' ? 'Scripture Study' :
+             activeTab === 'canvas' ? 'Study Canvas' :
+             activeTab === 'devotional' ? 'Daily Devotional' :
+             activeTab === 'notes' ? 'Study Notes' :
+             activeTab === 'chats' ? 'Study AI' : 'Reading Tracker'}
+          </span>
+        </div>
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+          <StreakPopover onNavigateToTab={setActiveTab} onNavigateToVerse={navigateToVerse} />
+          <button 
+            onClick={() => setIsSettingsOpen(true)}
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-surface/60 hover:bg-surface border border-border-soft/40 text-muted hover:text-fg active:scale-95 transition-all cursor-pointer"
+            title="Settings"
+            aria-label="Settings"
+          >
+            <Settings size={15} />
+          </button>
+          {userId ? (
+            <div className="min-w-[32px] min-h-[32px] flex items-center justify-center scale-90">
+              <UserButton />
+            </div>
+          ) : (
+            <Link 
+              href="/sign-in"
+              className="px-2.5 py-1 text-[11px] font-semibold rounded-full bg-accent text-accent-on hover:opacity-90 transition-opacity cursor-pointer shadow-xs active:scale-95"
+            >
+              Sign In
+            </Link>
+          )}
+        </div>
+      </header>
       
       {/* Main Viewport */}
       <main className="flex-1 overflow-hidden min-h-0 flex relative">
@@ -5161,14 +5212,13 @@ export default function App() {
               className="absolute inset-0 z-30 w-full h-full border-r border-border bg-bg flex flex-col shadow-2xl will-change-transform"
             >
               <header 
-                className="min-h-[calc(4.25rem+max(env(safe-area-inset-top,0px),48px))] border-b border-border/60 flex items-center justify-between px-4 shrink-0 bg-bg pb-2"
-                style={{ paddingTop: 'calc(max(env(safe-area-inset-top, 0px), 48px) + 8px)' }}
+                className="min-h-[46px] border-b border-border/60 flex items-center justify-between px-4 shrink-0 bg-bg py-1.5"
               >
                 <div className="flex items-center gap-1.5">
-                  <button onClick={() => setMobileStudyView('reader')} className="min-w-[44px] min-h-[44px] flex items-center justify-center -ml-2 p-2.5 text-fg-2 hover:text-fg rounded-xl hover:bg-surface cursor-pointer" title="Back to reader">
-                    <ChevronLeft size={22} />
+                  <button onClick={() => setMobileStudyView('reader')} className="min-w-[40px] min-h-[40px] flex items-center justify-center -ml-2 p-2 text-fg-2 hover:text-fg rounded-xl hover:bg-surface cursor-pointer" title="Back to reader">
+                    <ChevronLeft size={20} />
                   </button>
-                  <span className="font-semibold text-fg text-[17px]">Select Book & Chapter</span>
+                  <span className="font-semibold text-fg text-[16px]">Select Book & Chapter</span>
                 </div>
                 <div className="text-xs text-muted font-medium pr-1">
                   {isOldTestament ? 'Old Testament' : 'New Testament'}
@@ -5410,8 +5460,7 @@ export default function App() {
               className="absolute inset-0 w-full h-full flex flex-col bg-bg z-10"
             >
               <header 
-                className="min-h-[calc(4.25rem+max(env(safe-area-inset-top,0px),48px))] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 bg-bg shrink-0 relative z-20 pb-2"
-                style={{ paddingTop: 'calc(max(env(safe-area-inset-top, 0px), 48px) + 8px)' }}
+                className="min-h-[46px] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 bg-bg shrink-0 relative z-20 py-1.5"
               >
                 {/* Left: Book & Chapter Selector Trigger */}
                 <div className="flex items-center gap-1 min-w-0 shrink">
@@ -5446,12 +5495,6 @@ export default function App() {
                     currentTranslation={translation} 
                     onSelectTranslation={setTranslation}
                     theme={theme as 'dark' | 'light'}
-                  />
-
-                  {/* Streak Popover */}
-                  <StreakPopover 
-                    onNavigateToTab={setActiveTab} 
-                    onNavigateToVerse={navigateToVerse}
                   />
 
                   {/* Reverse Interlinear Quick Button (Visible on tablet screens where there is room) */}
@@ -5616,40 +5659,6 @@ export default function App() {
                               </span>
                             )}
                           </button>
-
-                          {/* App Settings & Display Preferences */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setIsSettingsOpen(true);
-                              setIsMobileMoreMenuOpen(false);
-                            }}
-                            className="w-full min-h-[48px] flex items-center justify-between px-3.5 py-3 rounded-xl hover:bg-fg/5 text-sm font-medium cursor-pointer transition-colors text-fg"
-                          >
-                            <div className="flex items-center gap-3">
-                              <Settings size={18} className="text-fg-2" />
-                              <span>Settings & Display</span>
-                            </div>
-                            <ChevronRight size={16} className="text-muted" />
-                          </button>
-
-                          {/* Account & Profile */}
-                          <div className="pt-2 border-t border-border/40">
-                            {userId ? (
-                              <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-surface/60 border border-border/40">
-                                <span className="text-sm font-medium text-fg">Account</span>
-                                <UserButton />
-                              </div>
-                            ) : (
-                              <Link 
-                                href="/sign-in"
-                                onClick={() => setIsMobileMoreMenuOpen(false)}
-                                className="w-full min-h-[44px] flex items-center justify-center gap-2 rounded-xl bg-accent text-accent-on font-semibold text-sm transition-opacity hover:opacity-90 active:scale-98"
-                              >
-                                Sign In
-                              </Link>
-                            )}
-                          </div>
                         </div>
                       </>
                     )}
@@ -5896,8 +5905,7 @@ export default function App() {
                 </div>
               )}
               <header 
-                className="min-h-[calc(4.25rem+max(env(safe-area-inset-top,0px),48px))] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 text-[15px] font-medium text-fg shrink-0 gap-2 bg-bg pb-2"
-                style={{ paddingTop: 'calc(max(env(safe-area-inset-top, 0px), 48px) + 8px)' }}
+                className="min-h-[46px] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 text-[15px] font-medium text-fg shrink-0 gap-2 bg-bg py-1.5"
               >
                 <div className="flex items-center gap-1.5 min-w-0">
                   <button onClick={() => setMobileStudyView('reader')} className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2.5 -ml-1 text-fg-2 hover:text-fg rounded-xl hover:bg-surface shrink-0 cursor-pointer" title="Back to reader">
@@ -7533,39 +7541,6 @@ export default function App() {
         {/* DEVOTIONAL TAB */}
         {activeTab === 'devotional' && (
           <div className="flex-1 flex flex-col w-full h-full min-h-0 bg-bg overflow-hidden">
-            {/* Mobile Native App Bar */}
-            <header 
-              className="lg:hidden min-h-[calc(4.25rem+max(env(safe-area-inset-top,0px),48px))] border-b border-border/60 flex items-center justify-between px-3.5 sm:px-4 bg-bg shrink-0 z-20 pb-2"
-              style={{ paddingTop: 'calc(max(env(safe-area-inset-top, 0px), 48px) + 8px)' }}
-            >
-              <div className="flex items-center gap-2">
-                <Sun size={18} className="text-accent" />
-                <span className="font-serif font-bold text-[17px] text-fg">Daily Devotional</span>
-              </div>
-              <div className="flex items-center gap-1 sm:gap-1.5">
-                <StreakPopover onNavigateToTab={setActiveTab} onNavigateToVerse={navigateToVerse} />
-                <button 
-                  onClick={() => setIsSettingsOpen(true)}
-                  className="w-9 h-9 flex items-center justify-center rounded-full bg-surface/60 hover:bg-surface border border-border-soft/40 text-muted hover:text-fg active:scale-95 transition-all cursor-pointer"
-                  title="Settings"
-                >
-                  <Settings size={16} />
-                </button>
-                {userId ? (
-                  <div className="min-w-[36px] min-h-[36px] flex items-center justify-center">
-                    <UserButton />
-                  </div>
-                ) : (
-                  <Link 
-                    href="/sign-in"
-                    className="px-3 py-1.5 text-xs font-semibold rounded-full bg-accent text-accent-on hover:opacity-90 transition-opacity cursor-pointer shadow-xs active:scale-95"
-                  >
-                    Sign In
-                  </Link>
-                )}
-              </div>
-            </header>
-
             <div className="flex-1 flex flex-col items-center overflow-y-auto custom-scroll p-4 sm:p-6 lg:p-10 pb-28 lg:pb-10 bg-bg">
             <div className="w-full max-w-4xl xl:max-w-5xl space-y-6">
               {/* Day navigation & Time toggle header */}
@@ -7792,7 +7767,7 @@ export default function App() {
               }`}
             >
               <header 
-                className="min-h-[calc(4.25rem+max(env(safe-area-inset-top,0px),48px))] lg:min-h-[60px] border-b border-border flex items-center justify-between px-4 sm:px-5 shrink-0 bg-bg pt-[calc(max(env(safe-area-inset-top,0px),48px)+8px)] pb-2 lg:pt-0 lg:pb-0"
+                className="min-h-[46px] lg:min-h-[60px] border-b border-border flex items-center justify-between px-4 sm:px-5 shrink-0 bg-bg py-1.5 lg:py-0"
               >
                 <span className="text-[15px] font-medium text-fg">Conversations</span>
                 <div className="flex items-center gap-1">
@@ -7898,7 +7873,7 @@ export default function App() {
                 </div>
               )}
               <header 
-                className="min-h-[calc(4.25rem+max(env(safe-area-inset-top,0px),48px))] lg:min-h-[60px] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 lg:px-8 shrink-0 bg-bg pt-[calc(max(env(safe-area-inset-top,0px),48px)+8px)] pb-2 lg:pt-0 lg:pb-0"
+                className="min-h-[46px] lg:min-h-[60px] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 lg:px-8 shrink-0 bg-bg py-1.5 lg:py-0"
               >
                 <div className="flex items-center min-w-0 mr-2 flex-1">
                   <button 
@@ -7921,13 +7896,6 @@ export default function App() {
                     onToggleOriginalRoots={handleToggleOriginalRoots} 
                     compact 
                   />
-                  <button 
-                    onClick={() => setIsSettingsOpen(true)}
-                    className="lg:hidden min-w-[40px] min-h-[40px] flex items-center justify-center p-2 rounded-xl text-fg-2 hover:text-fg hover:bg-surface transition-colors cursor-pointer"
-                    title="Settings"
-                  >
-                    <Settings size={18} />
-                  </button>
                 </div>
               </header>
               <div className={`flex-1 ${activeChat.messages.length === 0 && !isAiTyping ? 'overflow-hidden justify-center' : 'overflow-y-auto custom-scroll space-y-6 sm:space-y-8'} p-2.5 sm:p-8 lg:p-12 flex flex-col`}>
@@ -8186,39 +8154,6 @@ export default function App() {
 
           return (
             <div className="flex-1 flex flex-col w-full h-full min-h-0 bg-bg overflow-hidden">
-              {/* Mobile Native App Bar */}
-              <header 
-                className="lg:hidden min-h-[calc(4.25rem+max(env(safe-area-inset-top,0px),48px))] border-b border-border/60 flex items-center justify-between px-3.5 sm:px-4 bg-bg shrink-0 z-20 pb-2"
-                style={{ paddingTop: 'calc(max(env(safe-area-inset-top, 0px), 48px) + 8px)' }}
-              >
-                <div className="flex items-center gap-2">
-                  <Target size={18} className="text-accent" />
-                  <span className="font-serif font-bold text-[17px] text-fg">Reading Tracker</span>
-                </div>
-                <div className="flex items-center gap-1 sm:gap-1.5">
-                  <StreakPopover onNavigateToTab={setActiveTab} onNavigateToVerse={navigateToVerse} />
-                  <button 
-                    onClick={() => setIsSettingsOpen(true)}
-                    className="w-9 h-9 flex items-center justify-center rounded-full bg-surface/60 hover:bg-surface border border-border-soft/40 text-muted hover:text-fg active:scale-95 transition-all cursor-pointer"
-                    title="Settings"
-                  >
-                    <Settings size={16} />
-                  </button>
-                  {userId ? (
-                    <div className="min-w-[36px] min-h-[36px] flex items-center justify-center">
-                      <UserButton />
-                    </div>
-                  ) : (
-                    <Link 
-                      href="/sign-in"
-                      className="px-3 py-1.5 text-xs font-semibold rounded-full bg-accent text-accent-on hover:opacity-90 transition-opacity cursor-pointer shadow-xs active:scale-95"
-                    >
-                      Sign In
-                    </Link>
-                  )}
-                </div>
-              </header>
-
               <div className="flex-1 overflow-y-auto custom-scroll p-4 sm:p-10 lg:p-16 pb-28 lg:pb-16 bg-bg">
               <div className="max-w-5xl mx-auto">
                 <header className="hidden lg:block mb-6 sm:mb-8">
