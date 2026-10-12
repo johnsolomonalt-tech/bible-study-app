@@ -8202,10 +8202,13 @@ export default function App() {
         {/* Mobile Bottom Navigation */}
         <nav 
           aria-label="Mobile Navigation"
-          className={`lg:hidden shrink-0 h-[calc(60px+env(safe-area-inset-bottom))] bg-bg/95 backdrop-blur-md border-t border-border flex items-center justify-around px-1 z-40 w-full transition-all duration-200 select-none ${
+          className={`lg:hidden shrink-0 bg-bg/95 backdrop-blur-md border-t border-border flex items-start justify-around px-1 pt-1.5 z-40 w-full transition-all duration-200 select-none ${
             (isMobileTyping && activeTab !== 'canvas') ? 'hidden pointer-events-none' : 'flex'
           }`}
-          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+          style={{ 
+            height: 'calc(54px + max(env(safe-area-inset-bottom, 0px), 14px) + 8px)',
+            paddingBottom: 'calc(max(env(safe-area-inset-bottom, 0px), 14px) + 8px)'
+          }}
         >
           {['study', 'canvas', 'devotional', 'notes', 'chats', 'tracker'].map(tab => {
             const isActive = activeTab === tab;
@@ -8225,14 +8228,14 @@ export default function App() {
                     setMobileChatView('chat');
                   }
                 }}
-                className={`flex-1 flex flex-col items-center justify-center h-full min-h-[44px] py-1 transition-colors relative cursor-pointer active:scale-95 touch-manipulation ${
+                className={`flex-1 flex flex-col items-center justify-start h-[48px] py-0.5 transition-colors relative cursor-pointer active:scale-95 touch-manipulation ${
                   isActive ? 'text-accent font-semibold' : 'text-muted hover:text-fg font-medium'
                 }`}
               >
                 {isActive && (
                   <motion.span 
                     layoutId="mobile-bottom-nav-active-indicator"
-                    className="absolute top-0.5 w-6 sm:w-7 h-0.5 rounded-full bg-accent shadow-xs" 
+                    className="absolute -top-1.5 w-6 sm:w-7 h-0.5 rounded-full bg-accent shadow-xs" 
                     transition={{
                       type: "spring",
                       stiffness: 550,
@@ -8249,7 +8252,7 @@ export default function App() {
                   {tab === 'chats' && <Sparkles size={19} className="mb-0.5" />}
                   {tab === 'tracker' && <Target size={19} className="mb-0.5" />}
                 </div>
-                <span className="text-[10px] tracking-tight capitalize truncate max-w-full px-0.5">
+                <span className="text-[10px] tracking-tight capitalize truncate max-w-full px-0.5 leading-tight">
                   {tab === 'chats' ? 'Chats' : tab === 'devotional' ? 'Devotion' : tab}
                 </span>
               </button>
