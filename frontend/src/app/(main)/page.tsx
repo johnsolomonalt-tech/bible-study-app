@@ -5009,7 +5009,7 @@ export default function App() {
 
   return (
     <>
-      <div className="h-[100dvh] max-h-[100dvh] w-full flex flex-col bg-bg text-fg overflow-hidden select-none">
+      <div className="fixed inset-0 w-full h-full flex flex-col bg-bg text-fg overflow-hidden select-none">
         {/* Top Navbar (Desktop only - Mobile has dedicated clean native app bars per view) */}
         <header className="hidden lg:flex sticky top-0 z-40 min-h-14 h-[calc(3.5rem+env(safe-area-inset-top,0px))] border-b border-border items-center justify-between px-4 sm:px-6 bg-bg shrink-0" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         
@@ -5914,8 +5914,8 @@ export default function App() {
                   compact 
                 />
               </header>
-              <div className="flex-1 flex flex-col h-[calc(100%-60px)]">
-                <div className="flex-1 overflow-y-auto custom-scroll p-4 space-y-4">
+              <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                <div className={`flex-1 ${activeChat.messages.length === 0 && !isAiTyping ? 'overflow-hidden flex flex-col justify-center' : 'overflow-y-auto custom-scroll space-y-4'} p-3 sm:p-4`}>
                   {activeChat.messages.length === 0 ? (
                     <ChatEmptyState
                       activeBook={activeBook}
@@ -6901,7 +6901,7 @@ export default function App() {
                   compact 
                 />
               </header>
-              <div className="flex-1 overflow-y-auto custom-scroll p-5 space-y-6">
+              <div className={`flex-1 ${activeChat.messages.length === 0 && !isAiTyping ? 'overflow-hidden flex flex-col justify-center' : 'overflow-y-auto custom-scroll space-y-6'} p-4`}>
                 {activeChat.messages.length === 0 ? (
                   <ChatEmptyState
                     activeBook={activeBook}
@@ -7930,7 +7930,7 @@ export default function App() {
                   </button>
                 </div>
               </header>
-              <div className="flex-1 overflow-y-auto custom-scroll p-4 sm:p-8 lg:p-12 space-y-6 sm:space-y-8 flex flex-col">
+              <div className={`flex-1 ${activeChat.messages.length === 0 && !isAiTyping ? 'overflow-hidden justify-center' : 'overflow-y-auto custom-scroll space-y-6 sm:space-y-8'} p-2.5 sm:p-8 lg:p-12 flex flex-col`}>
                 {activeChat.messages.length === 0 ? (
                   <ChatEmptyState
                     activeBook={activeBook}
@@ -7969,11 +7969,11 @@ export default function App() {
                 )}
                 <div ref={messagesEndRef} />
               </div>
-              <form onSubmit={handleSendMessage} className="p-3 sm:p-6 border-t border-border w-full shrink-0">
+              <form onSubmit={handleSendMessage} className="p-2 sm:p-5 border-t border-border w-full shrink-0">
                 <div className="flex flex-col max-w-4xl mx-auto w-full relative">
                   {/* Scripture Context Pill */}
                   {attachedScripture ? (
-                    <div className="mb-2.5 flex items-center justify-between px-3 py-1.5 rounded-xl bg-surface border border-border-soft text-[12px] text-muted shadow-2xs">
+                    <div className="mb-1.5 sm:mb-2.5 flex items-center justify-between px-3 py-1 rounded-xl bg-surface border border-border-soft text-[11px] sm:text-[12px] text-muted shadow-2xs">
                       <div className="flex items-center gap-2 truncate">
                         <BookOpen size={13} className="text-accent shrink-0" />
                         <span className="font-medium text-fg truncate">Attached: {attachedScripture.reference}</span>
@@ -7990,7 +7990,7 @@ export default function App() {
                       </button>
                     </div>
                   ) : (
-                    <div className="mb-2.5 flex items-center gap-2 flex-wrap">
+                    <div className="mb-1.5 sm:mb-2.5 flex items-center gap-1.5 sm:gap-2 flex-wrap">
                       <button
                         type="button"
                         onClick={() => {
@@ -8161,8 +8161,8 @@ export default function App() {
                       <Send size={16} />
                     </button>
                   </div>
-                  <p className="text-[11px] sm:text-[12px] text-meta text-center mt-2 px-3 select-none leading-tight">
-                    Theologica AI can produce inaccuracies. Always cross-reference with Scripture and verify primary sources.
+                  <p className="text-[10px] sm:text-[12px] text-meta text-center mt-1 sm:mt-2 px-2 select-none leading-tight truncate">
+                    Theologica AI can produce inaccuracies. Always cross-reference with Scripture.
                   </p>
                 </div>
               </form>
@@ -8461,15 +8461,16 @@ export default function App() {
           />
         </div>
       </main>
-        {/* Mobile Bottom Navigation (6 direct thumb-friendly native tabs - No 'More' button) */}
+        {/* Mobile Bottom Navigation — Ultra-thin Duolingo-style icon bar anchored above iOS swipe-up indicator */}
         <nav 
           aria-label="Mobile Navigation"
-          className={`lg:hidden shrink-0 bg-bg/90 backdrop-blur-2xl border-t border-border/30 flex items-center justify-around px-1 z-40 w-full transition-all duration-200 select-none ${
+          className={`lg:hidden shrink-0 bg-bg/95 backdrop-blur-2xl border-t border-border/50 flex items-center justify-around px-2 z-40 w-full transition-all duration-200 select-none ${
             (isMobileTyping && activeTab !== 'canvas') ? 'hidden pointer-events-none' : 'flex'
           }`}
           style={{ 
-            height: 'calc(48px + max(4px, calc(env(safe-area-inset-bottom, 0px) - 20px)))',
-            paddingBottom: 'max(4px, calc(env(safe-area-inset-bottom, 0px) - 20px))'
+            height: '50px',
+            paddingTop: '4px',
+            paddingBottom: '12px'
           }}
         >
           {[
@@ -8498,16 +8499,18 @@ export default function App() {
                     setMobileChatView('chat');
                   }
                 }}
-                className={`flex-1 flex flex-col items-center justify-center h-full pt-1 pb-0.5 transition-all relative cursor-pointer active:scale-90 touch-manipulation ${
-                  isTabActive ? 'text-accent' : 'text-muted/70 hover:text-fg'
-                }`}
+                className="flex-1 flex items-center justify-center h-full transition-all relative cursor-pointer active:scale-90 touch-manipulation"
                 title={tab.label}
+                aria-label={tab.label}
               >
-                <div className={`flex flex-col items-center justify-center transition-all duration-150 ${isTabActive ? 'scale-105' : 'scale-100 opacity-80'}`}>
-                  <tab.icon size={20} className="mb-0.5" strokeWidth={isTabActive ? 2.4 : 1.8} />
-                  <span className={`text-[10px] tracking-tight truncate max-w-full leading-none ${isTabActive ? 'font-semibold text-accent' : 'font-medium text-muted'}`}>
-                    {tab.label}
-                  </span>
+                <div 
+                  className={`w-10 h-[34px] rounded-xl flex items-center justify-center transition-all duration-150 ${
+                    isTabActive 
+                      ? 'bg-accent/15 border-2 border-accent text-accent shadow-2xs' 
+                      : 'text-muted hover:text-fg border-2 border-transparent opacity-80'
+                  }`}
+                >
+                  <tab.icon size={20} strokeWidth={isTabActive ? 2.4 : 1.9} />
                 </div>
               </button>
             );
