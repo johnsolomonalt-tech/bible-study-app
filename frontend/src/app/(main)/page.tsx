@@ -972,7 +972,6 @@ export default function App() {
     backlinks: null,
   });
   const [isMobileMoreMenuOpen, setIsMobileMoreMenuOpen] = useState(false);
-  const [isMobileMoreSheetOpen, setIsMobileMoreSheetOpen] = useState(false);
   const [isMobileTyping, setIsMobileTyping] = useState(false);
   const activeTabRef = useRef(activeTab);
   useEffect(() => {
@@ -5001,8 +5000,8 @@ export default function App() {
   return (
     <>
       <div className="h-[100dvh] max-h-[100dvh] w-full flex flex-col bg-bg text-fg overflow-hidden select-none">
-        {/* Top Navbar */}
-        <header className="sticky top-0 z-40 min-h-14 h-[calc(3.5rem+env(safe-area-inset-top,0px))] border-b border-border flex items-center justify-between px-4 sm:px-6 bg-bg shrink-0" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+        {/* Top Navbar (Desktop only - Mobile has dedicated clean native app bars per view) */}
+        <header className="hidden lg:flex sticky top-0 z-40 min-h-14 h-[calc(3.5rem+env(safe-area-inset-top,0px))] border-b border-border items-center justify-between px-4 sm:px-6 bg-bg shrink-0" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         
         {/* Left: Logo */}
         <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
@@ -5129,57 +5128,6 @@ export default function App() {
             </Link>
           )}
         </div>
-
-        {/* SETTINGS MODAL */}
-        <SettingsModal
-          isOpen={isSettingsOpen}
-          onClose={() => setIsSettingsOpen(false)}
-          theme={theme}
-          onThemeChange={handleThemeChange}
-          accentColor={accentColor}
-          onAccentColorChange={handleAccentColorChange}
-          showLeftSidebar={showLeftSidebar}
-          onToggleLeftSidebar={setShowLeftSidebar}
-          showRightSidebar={showRightSidebar}
-          onToggleRightSidebar={setShowRightSidebar}
-          showBottomNotes={showBottomNotes}
-          onToggleBottomNotes={setShowBottomNotes}
-          readerFontFamily={readerFontFamily}
-          onReaderFontFamilyChange={handleReaderFontFamilyChange}
-          readerFontSize={readerFontSize}
-          onReaderFontSizeChange={handleReaderFontSizeChange}
-          readerLineHeight={readerLineHeight}
-          onReaderLineHeightChange={handleReaderLineHeightChange}
-          readerLayout={readerLayout}
-          onReaderLayoutChange={handleReaderLayoutChange}
-          showVerseNumbers={showVerseNumbers}
-          onToggleVerseNumbers={handleToggleVerseNumbers}
-          showFootnotes={showFootnotes}
-          onToggleFootnotes={handleToggleFootnotes}
-          showBacklinksBadges={showBacklinksBadges}
-          onToggleBacklinksBadges={handleToggleBacklinksBadges}
-          ttsSpeed={ttsSpeed}
-          onTtsSpeedChange={handleTtsSpeedChange}
-          ttsVoice={ttsVoice}
-          onTtsVoiceChange={handleTtsVoiceChange}
-          availableVoices={voices}
-          autoScrollAudio={autoScrollAudio}
-          onToggleAutoScrollAudio={handleToggleAutoScrollAudio}
-          autoAdvanceAudio={autoAdvanceAudio}
-          onToggleAutoAdvanceAudio={handleToggleAutoAdvanceAudio}
-          defaultTranslation={translation}
-          onDefaultTranslationChange={handleDefaultTranslationChange}
-          theologicalLens={theologicalLens}
-          onTheologicalLensChange={handleTheologicalLensChange}
-          trackerFormat={trackerFormat}
-          onTrackerFormatChange={handleTrackerFormatChange}
-          dailyChapterGoal={dailyChapterGoal}
-          onDailyChapterGoalChange={handleDailyChapterGoalChange}
-          onExportData={handleExportData}
-          onImportData={handleImportData}
-          onResetPreferences={handleResetPreferences}
-        />
-        
       </header>
       
       {/* Main Viewport */}
@@ -5202,7 +5150,10 @@ export default function App() {
               }}
               className="absolute inset-0 z-30 w-full h-full border-r border-border bg-bg flex flex-col shadow-2xl will-change-transform"
             >
-              <header className="h-[60px] border-b border-border flex items-center justify-between px-4 shrink-0 bg-bg">
+              <header 
+                className="min-h-[calc(3.25rem+env(safe-area-inset-top,0px))] border-b border-border/60 flex items-center justify-between px-4 shrink-0 bg-bg"
+                style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+              >
                 <div className="flex items-center gap-1.5">
                   <button onClick={() => setMobileStudyView('reader')} className="min-w-[44px] min-h-[44px] flex items-center justify-center -ml-2 p-2.5 text-fg-2 hover:text-fg rounded-xl hover:bg-surface cursor-pointer" title="Back to reader">
                     <ChevronLeft size={22} />
@@ -5448,16 +5399,19 @@ export default function App() {
               onTouchEnd={handleMobileReaderTouchEnd}
               className="absolute inset-0 w-full h-full flex flex-col bg-bg z-10"
             >
-              <header className="h-[60px] border-b border-border flex items-center justify-between px-3.5 sm:px-4 bg-bg shrink-0 relative z-20">
+              <header 
+                className="min-h-[calc(3.25rem+env(safe-area-inset-top,0px))] h-[calc(3.25rem+env(safe-area-inset-top,0px))] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 bg-bg shrink-0 relative z-20"
+                style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+              >
                 {/* Left: Book & Chapter Selector Trigger */}
                 <div className="flex items-center gap-1 min-w-0 shrink">
                   <button 
                     onClick={() => setMobileStudyView('chapters')} 
-                    className="min-h-[44px] flex items-center gap-1.5 py-2 px-2.5 rounded-xl text-fg hover:bg-surface transition-colors shrink min-w-0 cursor-pointer" 
+                    className="min-h-[44px] flex items-center gap-1.5 py-1.5 px-2 rounded-xl text-fg hover:bg-surface transition-colors shrink min-w-0 cursor-pointer active:scale-95" 
                     title="Choose Book & Chapter"
                   >
-                    <Layout size={18} className="text-accent shrink-0" />
-                    <span className="font-display text-[16px] sm:text-[18px] font-semibold truncate">
+                    <BookOpen size={18} className="text-accent shrink-0" />
+                    <span className="font-display text-[16px] sm:text-[18px] font-semibold truncate max-w-[125px] xs:max-w-none">
                       {activeBook.name} {activeChapter}
                     </span>
                     <ChevronDown size={14} className="text-muted shrink-0 opacity-60" />
@@ -5470,7 +5424,7 @@ export default function App() {
                   {isSpeaking && (
                     <button 
                       onClick={toggleSpeech} 
-                      className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-xl bg-accent/15 text-accent animate-pulse cursor-pointer shrink-0" 
+                      className="min-w-[40px] min-h-[40px] flex items-center justify-center p-2 rounded-xl bg-accent/15 text-accent animate-pulse cursor-pointer shrink-0" 
                       title="Stop reading chapter"
                     >
                       <VolumeX size={18} />
@@ -5482,6 +5436,11 @@ export default function App() {
                     currentTranslation={translation} 
                     onSelectTranslation={setTranslation}
                     theme={theme as 'dark' | 'light'}
+                  />
+
+                  {/* Streak Popover */}
+                  <StreakPopover 
+                    onNavigateToTab={setActiveTab} 
                   />
 
                   {/* Reverse Interlinear Quick Button (Visible on tablet screens where there is room) */}
@@ -5498,12 +5457,12 @@ export default function App() {
                   {/* Study AI Button */}
                   <button 
                     onClick={() => setMobileStudyView('ai')} 
-                    className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 text-fg-2 hover:text-fg relative rounded-xl hover:bg-surface transition-colors cursor-pointer shrink-0" 
+                    className="min-w-[40px] min-h-[40px] flex items-center justify-center p-2 text-fg-2 hover:text-fg relative rounded-xl hover:bg-surface transition-colors cursor-pointer shrink-0" 
                     title="Study AI Assistant"
                   >
                     <Sparkles size={18} className="text-accent" />
                     {chatQuotes.length > 0 && (
-                      <span className="absolute top-1.5 right-1.5 min-w-[16px] h-4 px-1 bg-accent text-accent-on text-[10px] font-bold rounded-full flex items-center justify-center shadow-xs">
+                      <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 bg-accent text-accent-on text-[10px] font-bold rounded-full flex items-center justify-center shadow-xs">
                         {chatQuotes.length}
                       </span>
                     )}
@@ -5646,6 +5605,40 @@ export default function App() {
                               </span>
                             )}
                           </button>
+
+                          {/* App Settings & Display Preferences */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsSettingsOpen(true);
+                              setIsMobileMoreMenuOpen(false);
+                            }}
+                            className="w-full min-h-[48px] flex items-center justify-between px-3.5 py-3 rounded-xl hover:bg-fg/5 text-sm font-medium cursor-pointer transition-colors text-fg"
+                          >
+                            <div className="flex items-center gap-3">
+                              <Settings size={18} className="text-fg-2" />
+                              <span>Settings & Display</span>
+                            </div>
+                            <ChevronRight size={16} className="text-muted" />
+                          </button>
+
+                          {/* Account & Profile */}
+                          <div className="pt-2 border-t border-border/40">
+                            {userId ? (
+                              <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-surface/60 border border-border/40">
+                                <span className="text-sm font-medium text-fg">Account</span>
+                                <UserButton />
+                              </div>
+                            ) : (
+                              <Link 
+                                href="/sign-in"
+                                onClick={() => setIsMobileMoreMenuOpen(false)}
+                                className="w-full min-h-[44px] flex items-center justify-center gap-2 rounded-xl bg-accent text-accent-on font-semibold text-sm transition-opacity hover:opacity-90 active:scale-98"
+                              >
+                                Sign In
+                              </Link>
+                            )}
+                          </div>
                         </div>
                       </>
                     )}
@@ -5891,7 +5884,10 @@ export default function App() {
                   <div className="text-[12px] text-muted mt-1 max-w-xs">Supports images, study PDFs, and notes</div>
                 </div>
               )}
-              <header className="h-[60px] border-b border-border flex items-center justify-between px-3 sm:px-4 text-[15px] font-medium text-fg shrink-0 gap-2">
+              <header 
+                className="min-h-[calc(3.25rem+env(safe-area-inset-top,0px))] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 text-[15px] font-medium text-fg shrink-0 gap-2 bg-bg"
+                style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+              >
                 <div className="flex items-center gap-1.5 min-w-0">
                   <button onClick={() => setMobileStudyView('reader')} className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2.5 -ml-1 text-fg-2 hover:text-fg rounded-xl hover:bg-surface shrink-0 cursor-pointer" title="Back to reader">
                     <ChevronLeft size={22} />
@@ -7525,7 +7521,41 @@ export default function App() {
 
         {/* DEVOTIONAL TAB */}
         {activeTab === 'devotional' && (
-          <div className="flex-1 flex flex-col items-center overflow-y-auto custom-scroll p-4 sm:p-6 lg:p-10 pb-24 lg:pb-10 bg-bg">
+          <div className="flex-1 flex flex-col w-full h-full min-h-0 bg-bg overflow-hidden">
+            {/* Mobile Native App Bar */}
+            <header 
+              className="lg:hidden min-h-[calc(3.25rem+env(safe-area-inset-top,0px))] border-b border-border/60 flex items-center justify-between px-3.5 sm:px-4 bg-bg shrink-0 z-20"
+              style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+            >
+              <div className="flex items-center gap-2">
+                <Sun size={18} className="text-accent" />
+                <span className="font-serif font-bold text-[17px] text-fg">Daily Devotional</span>
+              </div>
+              <div className="flex items-center gap-1 sm:gap-1.5">
+                <StreakPopover onNavigateToTab={setActiveTab} />
+                <button 
+                  onClick={() => setIsSettingsOpen(true)}
+                  className="min-w-[40px] min-h-[40px] flex items-center justify-center p-2 rounded-xl text-fg-2 hover:text-fg hover:bg-surface transition-colors cursor-pointer"
+                  title="Settings"
+                >
+                  <Settings size={18} />
+                </button>
+                {userId ? (
+                  <div className="min-w-[36px] min-h-[36px] flex items-center justify-center">
+                    <UserButton />
+                  </div>
+                ) : (
+                  <Link 
+                    href="/sign-in"
+                    className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-accent text-accent-on hover:opacity-90 transition-opacity cursor-pointer"
+                  >
+                    Sign In
+                  </Link>
+                )}
+              </div>
+            </header>
+
+            <div className="flex-1 flex flex-col items-center overflow-y-auto custom-scroll p-4 sm:p-6 lg:p-10 pb-24 lg:pb-10 bg-bg">
             <div className="w-full max-w-4xl xl:max-w-5xl space-y-6">
               {/* Day navigation & Time toggle header */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4 shrink-0 pb-3 border-b border-border/50">
@@ -7708,6 +7738,7 @@ export default function App() {
                 </article>
               )}
             </div>
+            </div>
           </div>
         )}
 
@@ -7731,7 +7762,9 @@ export default function App() {
                   : '-translate-x-full lg:translate-x-0 pointer-events-none lg:pointer-events-auto'
               }`}
             >
-              <header className="h-[60px] border-b border-border flex items-center justify-between px-4 sm:px-5 shrink-0">
+              <header 
+                className="min-h-[calc(3.25rem+env(safe-area-inset-top,0px))] lg:min-h-[60px] border-b border-border flex items-center justify-between px-4 sm:px-5 shrink-0 bg-bg pt-[env(safe-area-inset-top,0px)] lg:pt-0"
+              >
                 <span className="text-[15px] font-medium text-fg">Conversations</span>
                 <div className="flex items-center gap-1">
                   <button 
@@ -7835,7 +7868,9 @@ export default function App() {
                   </div>
                 </div>
               )}
-              <header className="h-[60px] border-b border-border flex items-center justify-between px-3 sm:px-4 lg:px-8 shrink-0">
+              <header 
+                className="min-h-[calc(3.25rem+env(safe-area-inset-top,0px))] lg:min-h-[60px] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 lg:px-8 shrink-0 bg-bg pt-[env(safe-area-inset-top,0px)] lg:pt-0"
+              >
                 <div className="flex items-center min-w-0 mr-2">
                   <button 
                     onClick={() => setMobileChatView('list')} 
@@ -7845,17 +7880,26 @@ export default function App() {
                   >
                     <Menu size={20} />
                   </button>
-                  <h2 className="text-[15px] sm:text-[18px] font-medium truncate max-w-[140px] xs:max-w-[220px] sm:max-w-md">
+                  <h2 className="text-[15px] sm:text-[18px] font-medium truncate max-w-[130px] xs:max-w-[200px] sm:max-w-md">
                     {activeChat.title || 'New Conversation'}
                   </h2>
                 </div>
-                <TheologicalLensSelector 
-                  currentLens={theologicalLens} 
-                  onSelectLens={setTheologicalLens} 
-                  includeOriginalRoots={includeOriginalRoots} 
-                  onToggleOriginalRoots={handleToggleOriginalRoots} 
-                  compact 
-                />
+                <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+                  <TheologicalLensSelector 
+                    currentLens={theologicalLens} 
+                    onSelectLens={setTheologicalLens} 
+                    includeOriginalRoots={includeOriginalRoots} 
+                    onToggleOriginalRoots={handleToggleOriginalRoots} 
+                    compact 
+                  />
+                  <button 
+                    onClick={() => setIsSettingsOpen(true)}
+                    className="lg:hidden min-w-[40px] min-h-[40px] flex items-center justify-center p-2 rounded-xl text-fg-2 hover:text-fg hover:bg-surface transition-colors cursor-pointer"
+                    title="Settings"
+                  >
+                    <Settings size={18} />
+                  </button>
+                </div>
               </header>
               <div className="flex-1 overflow-y-auto custom-scroll p-4 sm:p-8 lg:p-12 space-y-6 sm:space-y-8 flex flex-col">
                 {activeChat.messages.length === 0 ? (
@@ -8112,7 +8156,41 @@ export default function App() {
 
 
           return (
-            <div className="flex-1 overflow-y-auto custom-scroll p-4 sm:p-10 lg:p-16 pb-24 lg:pb-16 bg-bg">
+            <div className="flex-1 flex flex-col w-full h-full min-h-0 bg-bg overflow-hidden">
+              {/* Mobile Native App Bar */}
+              <header 
+                className="lg:hidden min-h-[calc(3.25rem+env(safe-area-inset-top,0px))] border-b border-border/60 flex items-center justify-between px-3.5 sm:px-4 bg-bg shrink-0 z-20"
+                style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+              >
+                <div className="flex items-center gap-2">
+                  <Target size={18} className="text-accent" />
+                  <span className="font-serif font-bold text-[17px] text-fg">Reading Tracker</span>
+                </div>
+                <div className="flex items-center gap-1 sm:gap-1.5">
+                  <StreakPopover onNavigateToTab={setActiveTab} />
+                  <button 
+                    onClick={() => setIsSettingsOpen(true)}
+                    className="min-w-[40px] min-h-[40px] flex items-center justify-center p-2 rounded-xl text-fg-2 hover:text-fg hover:bg-surface transition-colors cursor-pointer"
+                    title="Settings"
+                  >
+                    <Settings size={18} />
+                  </button>
+                  {userId ? (
+                    <div className="min-w-[36px] min-h-[36px] flex items-center justify-center">
+                      <UserButton />
+                    </div>
+                  ) : (
+                    <Link 
+                      href="/sign-in"
+                      className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-accent text-accent-on hover:opacity-90 transition-opacity cursor-pointer"
+                    >
+                      Sign In
+                    </Link>
+                  )}
+                </div>
+              </header>
+
+              <div className="flex-1 overflow-y-auto custom-scroll p-4 sm:p-10 lg:p-16 pb-24 lg:pb-16 bg-bg">
               <div className="max-w-5xl mx-auto">
                 <header className="mb-6 sm:mb-8">
                   <h1 className="text-2xl sm:text-[40px] font-display text-fg mb-2 sm:mb-3">Reading Tracker</h1>
@@ -8287,6 +8365,7 @@ export default function App() {
                 </div>
               </div>
             </div>
+            </div>
           );
         })()}
 
@@ -8352,37 +8431,31 @@ export default function App() {
           />
         </div>
       </main>
-        {/* Mobile Bottom Navigation (Clean 5-Tab thumb-friendly bar) */}
+        {/* Mobile Bottom Navigation (6 direct thumb-friendly native tabs - No 'More' button) */}
         <nav 
           aria-label="Mobile Navigation"
-          className={`lg:hidden shrink-0 bg-bg/95 backdrop-blur-md border-t border-border flex items-start justify-around px-2 pt-1.5 z-40 w-full transition-all duration-200 select-none ${
+          className={`lg:hidden shrink-0 bg-bg/90 backdrop-blur-xl border-t border-border/50 flex items-center justify-around px-1 z-40 w-full transition-all duration-200 select-none ${
             (isMobileTyping && activeTab !== 'canvas') ? 'hidden pointer-events-none' : 'flex'
           }`}
           style={{ 
-            height: 'calc(54px + max(env(safe-area-inset-bottom, 0px), 14px) + 8px)',
-            paddingBottom: 'calc(max(env(safe-area-inset-bottom, 0px), 14px) + 8px)'
+            height: 'calc(52px + max(env(safe-area-inset-bottom, 0px), 12px))',
+            paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 12px)'
           }}
         >
           {[
-            { id: 'study', label: 'Study', icon: Layout },
-            { id: 'chats', label: 'Chats', icon: Sparkles },
-            { id: 'notes', label: 'Notes', icon: Edit },
+            { id: 'study', label: 'Bible', icon: BookOpen },
+            { id: 'devotional', label: 'Devotion', icon: Sun },
+            { id: 'chats', label: 'AI', icon: Sparkles },
+            { id: 'notes', label: 'Notes', icon: FileText },
+            { id: 'tracker', label: 'Tracker', icon: Target },
             { id: 'canvas', label: 'Canvas', icon: Workflow },
-            { id: 'more', label: 'More', icon: MoreHorizontal },
           ].map(tab => {
-            const isTabActive = tab.id === 'more' 
-              ? (activeTab === 'devotional' || activeTab === 'tracker' || isMobileMoreSheetOpen)
-              : activeTab === tab.id;
+            const isTabActive = activeTab === tab.id;
 
             return (
               <button 
                 key={tab.id} 
                 onClick={() => {
-                  if (tab.id === 'more') {
-                    setIsMobileMoreSheetOpen(prev => !prev);
-                    return;
-                  }
-                  setIsMobileMoreSheetOpen(false);
                   setActiveTab(tab.id as ValidTab);
                   if (tab.id === 'notes') {
                     setActiveNoteId(null);
@@ -8395,14 +8468,15 @@ export default function App() {
                     setMobileChatView('chat');
                   }
                 }}
-                className={`flex-1 flex flex-col items-center justify-start min-h-[44px] h-[48px] py-0.5 transition-colors relative cursor-pointer active:scale-95 touch-manipulation ${
+                className={`flex-1 flex flex-col items-center justify-center min-h-[44px] h-[50px] py-1 transition-colors relative cursor-pointer active:scale-95 touch-manipulation ${
                   isTabActive ? 'text-accent font-semibold' : 'text-muted hover:text-fg font-medium'
                 }`}
+                title={tab.label}
               >
                 {isTabActive && (
                   <motion.span 
                     layoutId="mobile-bottom-nav-active-indicator"
-                    className="absolute -top-1.5 w-6 sm:w-7 h-0.5 rounded-full bg-accent shadow-xs" 
+                    className="absolute top-0 w-6 h-0.5 rounded-full bg-accent shadow-xs" 
                     transition={{
                       type: "spring",
                       stiffness: 550,
@@ -8411,151 +8485,64 @@ export default function App() {
                     }}
                   />
                 )}
-                <div className="relative">
-                  <tab.icon size={20} className="mb-0.5" />
-                  {tab.id === 'more' && (activeTab === 'devotional' || activeTab === 'tracker') && (
-                    <span className="absolute -top-0.5 -right-1 w-2 h-2 rounded-full bg-accent" />
-                  )}
-                </div>
-                <span className="text-[11px] tracking-tight capitalize truncate max-w-full px-0.5 leading-tight">
-                  {tab.id === 'more' && activeTab === 'devotional' ? 'Devotion' : 
-                   tab.id === 'more' && activeTab === 'tracker' ? 'Tracker' : 
-                   tab.label}
+                <tab.icon size={19} className="mb-0.5" />
+                <span className="text-[10px] tracking-tight truncate max-w-full leading-none">
+                  {tab.label}
                 </span>
               </button>
             );
           })}
         </nav>
 
-        {/* Mobile Slide-Up "More" Sheet */}
-        {isMobileMoreSheetOpen && (
-          <>
-            <div 
-              className="lg:hidden fixed inset-0 bg-black/50 z-50 backdrop-blur-xs transition-opacity duration-200"
-              onClick={() => setIsMobileMoreSheetOpen(false)}
-            />
-            <div 
-              className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-bg border-t border-border rounded-t-3xl shadow-2xl p-4 space-y-3 animate-in slide-in-from-bottom duration-200 max-h-[85dvh] overflow-y-auto"
-              style={{ paddingBottom: 'calc(max(env(safe-area-inset-bottom, 0px), 16px) + 12px)' }}
-            >
-              <div className="w-12 h-1 bg-border rounded-full mx-auto mb-1" />
-              <div className="flex items-center justify-between px-1 pb-2 border-b border-border/40">
-                <div>
-                  <h3 className="font-semibold text-fg text-[16px]">More Tools</h3>
-                  <p className="text-xs text-muted">Devotionals, tracker & app settings</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsMobileMoreSheetOpen(false)}
-                  className="min-w-[44px] min-h-[44px] flex items-center justify-center text-muted hover:text-fg rounded-full cursor-pointer -mr-2"
-                  title="Close menu"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div className="space-y-1.5 pt-1">
-                {/* Daily Devotional */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab('devotional');
-                    setIsMobileMoreSheetOpen(false);
-                  }}
-                  className={`w-full min-h-[56px] flex items-center justify-between p-3.5 rounded-2xl transition-all cursor-pointer ${
-                    activeTab === 'devotional'
-                      ? 'bg-accent/15 border border-accent/30 text-accent font-semibold shadow-xs'
-                      : 'bg-surface hover:bg-surface-hover border border-border/60 text-fg'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-accent/15 text-accent flex items-center justify-center shrink-0">
-                      <BookOpen size={20} />
-                    </div>
-                    <div className="text-left min-w-0">
-                      <div className="text-sm font-semibold truncate">Daily Devotional</div>
-                      <div className="text-xs text-muted truncate">Morning & evening readings with Spurgeon</div>
-                    </div>
-                  </div>
-                  {activeTab === 'devotional' && (
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-accent text-accent-on shrink-0">
-                      Active
-                    </span>
-                  )}
-                </button>
-
-                {/* Reading Tracker */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab('tracker');
-                    setIsMobileMoreSheetOpen(false);
-                  }}
-                  className={`w-full min-h-[56px] flex items-center justify-between p-3.5 rounded-2xl transition-all cursor-pointer ${
-                    activeTab === 'tracker'
-                      ? 'bg-accent/15 border border-accent/30 text-accent font-semibold shadow-xs'
-                      : 'bg-surface hover:bg-surface-hover border border-border/60 text-fg'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-accent/15 text-accent flex items-center justify-center shrink-0">
-                      <Target size={20} />
-                    </div>
-                    <div className="text-left min-w-0">
-                      <div className="text-sm font-semibold truncate">Reading Tracker</div>
-                      <div className="text-xs text-muted truncate">Streaks, goals & 66-book progress</div>
-                    </div>
-                  </div>
-                  <span className="text-xs font-mono font-medium text-muted bg-surface-warm px-2 py-1 rounded-lg border border-border/40 shrink-0">
-                    {completedChapters.length} / 1189
-                  </span>
-                </button>
-
-                {/* Lectio Divina */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsLectioModalOpen(true);
-                    setIsMobileMoreSheetOpen(false);
-                  }}
-                  className="w-full min-h-[56px] flex items-center justify-between p-3.5 rounded-2xl bg-surface hover:bg-surface-hover border border-border/60 text-fg transition-all cursor-pointer"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-rose-500/15 text-rose-400 flex items-center justify-center shrink-0">
-                      <Heart size={20} />
-                    </div>
-                    <div className="text-left min-w-0">
-                      <div className="text-sm font-semibold truncate">Lectio Divina</div>
-                      <div className="text-xs text-muted truncate">Guided meditative prayer on current chapter</div>
-                    </div>
-                  </div>
-                  <ChevronRight size={16} className="text-muted shrink-0" />
-                </button>
-
-                {/* App Settings */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsSettingsOpen(true);
-                    setIsMobileMoreSheetOpen(false);
-                  }}
-                  className="w-full min-h-[56px] flex items-center justify-between p-3.5 rounded-2xl bg-surface hover:bg-surface-hover border border-border/60 text-fg transition-all cursor-pointer"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-surface-warm text-fg-2 flex items-center justify-center shrink-0 border border-border/40">
-                      <Settings size={20} />
-                    </div>
-                    <div className="text-left min-w-0">
-                      <div className="text-sm font-semibold truncate">Settings & Preferences</div>
-                      <div className="text-xs text-muted truncate">Fonts, layout, lens, audio & themes</div>
-                    </div>
-                  </div>
-                  <ChevronRight size={16} className="text-muted shrink-0" />
-                </button>
-              </div>
-            </div>
-          </>
-        )}
+        {/* SETTINGS MODAL */}
+        <SettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          theme={theme}
+          onThemeChange={handleThemeChange}
+          accentColor={accentColor}
+          onAccentColorChange={handleAccentColorChange}
+          showLeftSidebar={showLeftSidebar}
+          onToggleLeftSidebar={setShowLeftSidebar}
+          showRightSidebar={showRightSidebar}
+          onToggleRightSidebar={setShowRightSidebar}
+          showBottomNotes={showBottomNotes}
+          onToggleBottomNotes={setShowBottomNotes}
+          readerFontFamily={readerFontFamily}
+          onReaderFontFamilyChange={handleReaderFontFamilyChange}
+          readerFontSize={readerFontSize}
+          onReaderFontSizeChange={handleReaderFontSizeChange}
+          readerLineHeight={readerLineHeight}
+          onReaderLineHeightChange={handleReaderLineHeightChange}
+          readerLayout={readerLayout}
+          onReaderLayoutChange={handleReaderLayoutChange}
+          showVerseNumbers={showVerseNumbers}
+          onToggleVerseNumbers={handleToggleVerseNumbers}
+          showFootnotes={showFootnotes}
+          onToggleFootnotes={handleToggleFootnotes}
+          showBacklinksBadges={showBacklinksBadges}
+          onToggleBacklinksBadges={handleToggleBacklinksBadges}
+          ttsSpeed={ttsSpeed}
+          onTtsSpeedChange={handleTtsSpeedChange}
+          ttsVoice={ttsVoice}
+          onTtsVoiceChange={handleTtsVoiceChange}
+          availableVoices={voices}
+          autoScrollAudio={autoScrollAudio}
+          onToggleAutoScrollAudio={handleToggleAutoScrollAudio}
+          autoAdvanceAudio={autoAdvanceAudio}
+          onToggleAutoAdvanceAudio={handleToggleAutoAdvanceAudio}
+          defaultTranslation={translation}
+          onDefaultTranslationChange={handleDefaultTranslationChange}
+          theologicalLens={theologicalLens}
+          onTheologicalLensChange={handleTheologicalLensChange}
+          trackerFormat={trackerFormat}
+          onTrackerFormatChange={handleTrackerFormatChange}
+          dailyChapterGoal={dailyChapterGoal}
+          onDailyChapterGoalChange={handleDailyChapterGoalChange}
+          onExportData={handleExportData}
+          onImportData={handleImportData}
+          onResetPreferences={handleResetPreferences}
+        />
 
         <PWAInstallPrompt />
         <CookieConsentPrompt theme={theme as 'dark' | 'light'} />

@@ -113,7 +113,7 @@ export function CanvasStartPage({
 
   return (
     <div 
-      className="w-full h-full overflow-y-auto custom-scroll flex flex-col justify-between p-4 sm:p-6 md:p-8 select-none animate-in fade-in duration-200 bg-bg text-fg"
+      className="w-full h-full overflow-y-auto custom-scroll flex flex-col justify-between p-4 sm:p-6 md:p-8 select-none animate-in fade-in duration-200 bg-bg text-fg pt-[calc(1rem+env(safe-area-inset-top,0px))] lg:pt-6"
       style={{
         backgroundColor: 'var(--bg)',
       }}

@@ -765,7 +765,7 @@ export function NotesWorkspace({
         }`}
       >
         {/* Sidebar Header with Notes vs Backlinks vs Templates Tabs */}
-        <header className="h-[56px] border-b border-border/70 flex items-center justify-between px-3 sm:px-4 shrink-0 bg-surface/25 backdrop-blur-sm gap-2">
+        <header className="min-h-[calc(3.25rem+env(safe-area-inset-top,0px))] lg:min-h-[56px] h-[calc(3.25rem+env(safe-area-inset-top,0px))] lg:h-[56px] border-b border-border/70 flex items-center justify-between px-3 sm:px-4 shrink-0 bg-surface/25 backdrop-blur-sm gap-2 pt-[env(safe-area-inset-top,0px)] lg:pt-0">
           {/* Tabs Segmented Control Pill Container (Always intact rounded corners, smooth edge fade) */}
           <div className="relative flex-1 min-w-0 flex items-center bg-surface/80 rounded-xl border border-border/60 p-0.5 overflow-hidden shadow-2xs">
             {/* Left fade gradient for smooth cutoff */}
@@ -878,7 +878,7 @@ export function NotesWorkspace({
         {activeNote ? (
           <>
             {/* Note Top Header */}
-            <header className="h-[58px] border-b border-border flex items-center justify-between px-3 sm:px-4 lg:px-8 shrink-0 bg-surface/10">
+            <header className="min-h-[calc(3.25rem+env(safe-area-inset-top,0px))] lg:min-h-[58px] h-[calc(3.25rem+env(safe-area-inset-top,0px))] lg:h-[58px] border-b border-border flex items-center justify-between px-3 sm:px-4 lg:px-8 shrink-0 bg-surface/10 pt-[env(safe-area-inset-top,0px)] lg:pt-0">
               <div className="flex items-center gap-2 flex-1 min-w-0 mr-4">
                 <button 
                   onClick={() => handleSelectNote(null)} 

@@ -206,7 +206,7 @@ export function CanvasToolbar({
   return (
     <div 
       ref={toolbarContainerRef} 
-      className="absolute top-4 left-4 right-4 z-20 flex items-center justify-between pointer-events-none gap-2"
+      className="absolute top-3 sm:top-4 left-3 sm:left-4 right-3 sm:right-4 z-20 flex items-center justify-between pointer-events-none gap-2 pt-[env(safe-area-inset-top,0px)] lg:pt-0"
     >
       {/* Left: Sidebar Toggle & Board Title */}
       <div 
