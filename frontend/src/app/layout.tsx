@@ -123,19 +123,22 @@ export default function RootLayout({
                 var appleFav = document.getElementById('dynamic-apple-icon') || document.querySelector("link[rel~='apple-touch-icon']");
                 if (appleFav) appleFav.href = iconPath;
 
-                // Evict obsolete PWA service worker and clear stale cache if on localhost/dev or if old hashes exist
-                if ('serviceWorker' in navigator && (location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
-                  navigator.serviceWorker.getRegistrations().then(function(regs) {
-                    for (var r of regs) {
-                      r.unregister();
-                    }
-                  }).catch(function() {});
+                // Evict obsolete PWA service worker and clear stale cache across deployments
+                var BUILD_REV = '20261012-mobile-rev3';
+                var lastRev = localStorage.getItem('theologica_build_rev');
+                if (lastRev !== BUILD_REV) {
+                  localStorage.setItem('theologica_build_rev', BUILD_REV);
+                  if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.getRegistrations().then(function(regs) {
+                      for (var r of regs) {
+                        r.unregister();
+                      }
+                    }).catch(function() {});
+                  }
                   if ('caches' in window) {
                     caches.keys().then(function(keys) {
                       for (var k of keys) {
-                        if (k.indexOf('workbox') !== -1 || k.indexOf('pages') !== -1 || k.indexOf('next-') !== -1) {
-                          caches.delete(k);
-                        }
+                        caches.delete(k);
                       }
                     }).catch(function() {});
                   }

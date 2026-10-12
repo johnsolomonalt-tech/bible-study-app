@@ -5151,8 +5151,8 @@ export default function App() {
               className="absolute inset-0 z-30 w-full h-full border-r border-border bg-bg flex flex-col shadow-2xl will-change-transform"
             >
               <header 
-                className="min-h-[calc(3.75rem+env(safe-area-inset-top,0px))] border-b border-border/60 flex items-center justify-between px-4 shrink-0 bg-bg"
-                style={{ paddingTop: 'calc(10px + env(safe-area-inset-top, 0px))' }}
+                className="min-h-[calc(4.25rem+env(safe-area-inset-top,0px))] border-b border-border/60 flex items-center justify-between px-4 shrink-0 bg-bg pb-2"
+                style={{ paddingTop: 'calc(22px + env(safe-area-inset-top, 0px))' }}
               >
                 <div className="flex items-center gap-1.5">
                   <button onClick={() => setMobileStudyView('reader')} className="min-w-[44px] min-h-[44px] flex items-center justify-center -ml-2 p-2.5 text-fg-2 hover:text-fg rounded-xl hover:bg-surface cursor-pointer" title="Back to reader">
@@ -5400,21 +5400,21 @@ export default function App() {
               className="absolute inset-0 w-full h-full flex flex-col bg-bg z-10"
             >
               <header 
-                className="min-h-[calc(3.75rem+env(safe-area-inset-top,0px))] h-[calc(3.75rem+env(safe-area-inset-top,0px))] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 bg-bg shrink-0 relative z-20"
-                style={{ paddingTop: 'calc(10px + env(safe-area-inset-top, 0px))' }}
+                className="min-h-[calc(4.25rem+env(safe-area-inset-top,0px))] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 bg-bg shrink-0 relative z-20 pb-2"
+                style={{ paddingTop: 'calc(22px + env(safe-area-inset-top, 0px))' }}
               >
                 {/* Left: Book & Chapter Selector Trigger */}
                 <div className="flex items-center gap-1 min-w-0 shrink">
                   <button 
                     onClick={() => setMobileStudyView('chapters')} 
-                    className="min-h-[44px] flex items-center gap-1.5 py-1.5 px-2 rounded-xl text-fg hover:bg-surface transition-colors shrink min-w-0 cursor-pointer active:scale-95" 
+                    className="min-h-[38px] flex items-center gap-1.5 py-1 px-3 rounded-full bg-surface/75 hover:bg-surface border border-border-soft/50 shadow-2xs text-fg transition-all cursor-pointer active:scale-95 shrink min-w-0" 
                     title="Choose Book & Chapter"
                   >
-                    <BookOpen size={18} className="text-accent shrink-0" />
-                    <span className="font-display text-[16px] sm:text-[18px] font-semibold truncate max-w-[125px] xs:max-w-none">
+                    <BookOpen size={16} className="text-accent shrink-0" />
+                    <span className="font-display text-[15px] sm:text-[17px] font-semibold truncate max-w-[130px] xs:max-w-none">
                       {activeBook.name} {activeChapter}
                     </span>
-                    <ChevronDown size={14} className="text-muted shrink-0 opacity-60" />
+                    <ChevronDown size={13} className="text-muted shrink-0 opacity-60" />
                   </button>
                 </div>
 
@@ -5457,12 +5457,12 @@ export default function App() {
                   {/* Study AI Button */}
                   <button 
                     onClick={() => setMobileStudyView('ai')} 
-                    className="min-w-[40px] min-h-[40px] flex items-center justify-center p-2 text-fg-2 hover:text-fg relative rounded-xl hover:bg-surface transition-colors cursor-pointer shrink-0" 
+                    className="w-9 h-9 flex items-center justify-center rounded-full bg-accent/10 border border-accent/25 text-accent hover:bg-accent/20 active:scale-95 transition-all cursor-pointer shrink-0 relative" 
                     title="Study AI Assistant"
                   >
-                    <Sparkles size={18} className="text-accent" />
+                    <Sparkles size={16} />
                     {chatQuotes.length > 0 && (
-                      <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 bg-accent text-accent-on text-[10px] font-bold rounded-full flex items-center justify-center shadow-xs">
+                      <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 bg-accent text-accent-on text-[10px] font-bold rounded-full flex items-center justify-center shadow-xs">
                         {chatQuotes.length}
                       </span>
                     )}
@@ -5473,13 +5473,13 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => setIsMobileMoreMenuOpen(prev => !prev)}
-                      className={`min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-xl text-fg-2 hover:text-fg hover:bg-surface transition-colors cursor-pointer ${
+                      className={`w-9 h-9 flex items-center justify-center rounded-full bg-surface/70 hover:bg-surface border border-border-soft/50 text-muted hover:text-fg active:scale-95 transition-all cursor-pointer ${
                         isMobileMoreMenuOpen ? 'bg-surface text-fg' : ''
                       }`}
                       title="More study tools & options"
                       aria-label="More study options"
                     >
-                      <MoreVertical size={18} className="pointer-events-none" />
+                      <MoreVertical size={16} className="pointer-events-none" />
                     </button>
 
                     {isMobileMoreMenuOpen && (
@@ -5646,7 +5646,7 @@ export default function App() {
                 </div>
               </header>
 
-              <div className="bible-reader-content select-text flex-1 overflow-y-auto custom-scroll p-4 sm:p-6 lg:p-10" onMouseUp={handleSelection} onTouchEnd={handleSelection} onContextMenu={handleReaderContextMenu}>
+              <div className="bible-reader-content select-text flex-1 overflow-y-auto custom-scroll px-4.5 sm:px-6 lg:px-10 py-5 sm:py-6 lg:py-10 pb-32 sm:pb-36 lg:pb-12" onMouseUp={handleSelection} onTouchEnd={handleSelection} onContextMenu={handleReaderContextMenu}>
                 <article className="max-w-3xl mx-auto w-full break-words select-text">
                   {isInterlinearMode && (
                     <InterlinearModeRibbon
@@ -5885,8 +5885,8 @@ export default function App() {
                 </div>
               )}
               <header 
-                className="min-h-[calc(3.75rem+env(safe-area-inset-top,0px))] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 text-[15px] font-medium text-fg shrink-0 gap-2 bg-bg"
-                style={{ paddingTop: 'calc(10px + env(safe-area-inset-top, 0px))' }}
+                className="min-h-[calc(4.25rem+env(safe-area-inset-top,0px))] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 text-[15px] font-medium text-fg shrink-0 gap-2 bg-bg pb-2"
+                style={{ paddingTop: 'calc(22px + env(safe-area-inset-top, 0px))' }}
               >
                 <div className="flex items-center gap-1.5 min-w-0">
                   <button onClick={() => setMobileStudyView('reader')} className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2.5 -ml-1 text-fg-2 hover:text-fg rounded-xl hover:bg-surface shrink-0 cursor-pointer" title="Back to reader">
@@ -7524,8 +7524,8 @@ export default function App() {
           <div className="flex-1 flex flex-col w-full h-full min-h-0 bg-bg overflow-hidden">
             {/* Mobile Native App Bar */}
             <header 
-              className="lg:hidden min-h-[calc(3.75rem+env(safe-area-inset-top,0px))] border-b border-border/60 flex items-center justify-between px-3.5 sm:px-4 bg-bg shrink-0 z-20"
-              style={{ paddingTop: 'calc(10px + env(safe-area-inset-top, 0px))' }}
+              className="lg:hidden min-h-[calc(4.25rem+env(safe-area-inset-top,0px))] border-b border-border/60 flex items-center justify-between px-3.5 sm:px-4 bg-bg shrink-0 z-20 pb-2"
+              style={{ paddingTop: 'calc(22px + env(safe-area-inset-top, 0px))' }}
             >
               <div className="flex items-center gap-2">
                 <Sun size={18} className="text-accent" />
@@ -7535,10 +7535,10 @@ export default function App() {
                 <StreakPopover onNavigateToTab={setActiveTab} />
                 <button 
                   onClick={() => setIsSettingsOpen(true)}
-                  className="min-w-[40px] min-h-[40px] flex items-center justify-center p-2 rounded-xl text-fg-2 hover:text-fg hover:bg-surface transition-colors cursor-pointer"
+                  className="w-9 h-9 flex items-center justify-center rounded-full bg-surface/60 hover:bg-surface border border-border-soft/40 text-muted hover:text-fg active:scale-95 transition-all cursor-pointer"
                   title="Settings"
                 >
-                  <Settings size={18} />
+                  <Settings size={16} />
                 </button>
                 {userId ? (
                   <div className="min-w-[36px] min-h-[36px] flex items-center justify-center">
@@ -7547,7 +7547,7 @@ export default function App() {
                 ) : (
                   <Link 
                     href="/sign-in"
-                    className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-accent text-accent-on hover:opacity-90 transition-opacity cursor-pointer"
+                    className="px-3 py-1.5 text-xs font-semibold rounded-full bg-accent text-accent-on hover:opacity-90 transition-opacity cursor-pointer shadow-xs active:scale-95"
                   >
                     Sign In
                   </Link>
@@ -7555,7 +7555,7 @@ export default function App() {
               </div>
             </header>
 
-            <div className="flex-1 flex flex-col items-center overflow-y-auto custom-scroll p-4 sm:p-6 lg:p-10 pb-24 lg:pb-10 bg-bg">
+            <div className="flex-1 flex flex-col items-center overflow-y-auto custom-scroll p-4 sm:p-6 lg:p-10 pb-28 lg:pb-10 bg-bg">
             <div className="w-full max-w-4xl xl:max-w-5xl space-y-6">
               {/* Day navigation & Time toggle header */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4 shrink-0 pb-3 border-b border-border/50">
@@ -7763,7 +7763,7 @@ export default function App() {
               }`}
             >
               <header 
-                className="min-h-[calc(3.75rem+env(safe-area-inset-top,0px))] lg:min-h-[60px] border-b border-border flex items-center justify-between px-4 sm:px-5 shrink-0 bg-bg pt-[calc(10px+env(safe-area-inset-top,0px))] lg:pt-0"
+                className="min-h-[calc(4.25rem+env(safe-area-inset-top,0px))] lg:min-h-[60px] border-b border-border flex items-center justify-between px-4 sm:px-5 shrink-0 bg-bg pt-[calc(22px+env(safe-area-inset-top,0px))] pb-2 lg:pt-0 lg:pb-0"
               >
                 <span className="text-[15px] font-medium text-fg">Conversations</span>
                 <div className="flex items-center gap-1">
@@ -7869,19 +7869,19 @@ export default function App() {
                 </div>
               )}
               <header 
-                className="min-h-[calc(3.75rem+env(safe-area-inset-top,0px))] lg:min-h-[60px] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 lg:px-8 shrink-0 bg-bg pt-[calc(10px+env(safe-area-inset-top,0px))] lg:pt-0"
+                className="min-h-[calc(4.25rem+env(safe-area-inset-top,0px))] lg:min-h-[60px] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 lg:px-8 shrink-0 bg-bg pt-[calc(22px+env(safe-area-inset-top,0px))] pb-2 lg:pt-0 lg:pb-0"
               >
-                <div className="flex items-center min-w-0 mr-2">
+                <div className="flex items-center min-w-0 mr-2 flex-1">
                   <button 
                     onClick={() => setMobileChatView('list')} 
-                    className="lg:hidden min-w-[44px] min-h-[44px] p-2 mr-1 text-fg-2 hover:text-fg hover:bg-surface rounded-xl transition-colors shrink-0 cursor-pointer flex items-center justify-center"
+                    className="lg:hidden w-9 h-9 p-1.5 mr-2 text-fg-2 hover:text-fg hover:bg-surface rounded-full transition-colors shrink-0 cursor-pointer flex items-center justify-center active:scale-95"
                     title="Open Conversations"
                     aria-label="Open Conversations"
                   >
-                    <Menu size={20} />
+                    <Menu size={18} />
                   </button>
-                  <h2 className="text-[15px] sm:text-[18px] font-medium truncate max-w-[130px] xs:max-w-[200px] sm:max-w-md">
-                    {activeChat.title || 'New Conversation'}
+                  <h2 className="text-[15px] sm:text-[18px] font-semibold text-fg truncate">
+                    {activeChat.title ? activeChat.title : 'Study AI'}
                   </h2>
                 </div>
                 <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
@@ -8159,8 +8159,8 @@ export default function App() {
             <div className="flex-1 flex flex-col w-full h-full min-h-0 bg-bg overflow-hidden">
               {/* Mobile Native App Bar */}
               <header 
-                className="lg:hidden min-h-[calc(3.75rem+env(safe-area-inset-top,0px))] border-b border-border/60 flex items-center justify-between px-3.5 sm:px-4 bg-bg shrink-0 z-20"
-                style={{ paddingTop: 'calc(10px + env(safe-area-inset-top, 0px))' }}
+                className="lg:hidden min-h-[calc(4.25rem+env(safe-area-inset-top,0px))] border-b border-border/60 flex items-center justify-between px-3.5 sm:px-4 bg-bg shrink-0 z-20 pb-2"
+                style={{ paddingTop: 'calc(22px + env(safe-area-inset-top, 0px))' }}
               >
                 <div className="flex items-center gap-2">
                   <Target size={18} className="text-accent" />
@@ -8170,10 +8170,10 @@ export default function App() {
                   <StreakPopover onNavigateToTab={setActiveTab} />
                   <button 
                     onClick={() => setIsSettingsOpen(true)}
-                    className="min-w-[40px] min-h-[40px] flex items-center justify-center p-2 rounded-xl text-fg-2 hover:text-fg hover:bg-surface transition-colors cursor-pointer"
+                    className="w-9 h-9 flex items-center justify-center rounded-full bg-surface/60 hover:bg-surface border border-border-soft/40 text-muted hover:text-fg active:scale-95 transition-all cursor-pointer"
                     title="Settings"
                   >
-                    <Settings size={18} />
+                    <Settings size={16} />
                   </button>
                   {userId ? (
                     <div className="min-w-[36px] min-h-[36px] flex items-center justify-center">
@@ -8182,7 +8182,7 @@ export default function App() {
                   ) : (
                     <Link 
                       href="/sign-in"
-                      className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-accent text-accent-on hover:opacity-90 transition-opacity cursor-pointer"
+                      className="px-3 py-1.5 text-xs font-semibold rounded-full bg-accent text-accent-on hover:opacity-90 transition-opacity cursor-pointer shadow-xs active:scale-95"
                     >
                       Sign In
                     </Link>
@@ -8190,9 +8190,9 @@ export default function App() {
                 </div>
               </header>
 
-              <div className="flex-1 overflow-y-auto custom-scroll p-4 sm:p-10 lg:p-16 pb-24 lg:pb-16 bg-bg">
+              <div className="flex-1 overflow-y-auto custom-scroll p-4 sm:p-10 lg:p-16 pb-28 lg:pb-16 bg-bg">
               <div className="max-w-5xl mx-auto">
-                <header className="mb-6 sm:mb-8">
+                <header className="hidden lg:block mb-6 sm:mb-8">
                   <h1 className="text-2xl sm:text-[40px] font-display text-fg mb-2 sm:mb-3">Reading Tracker</h1>
                   <p className="text-sm sm:text-[16px] text-muted">Track your reading streak, daily goals, and progress through all 66 books.</p>
                 </header>
@@ -8434,11 +8434,11 @@ export default function App() {
         {/* Mobile Bottom Navigation (6 direct thumb-friendly native tabs - No 'More' button) */}
         <nav 
           aria-label="Mobile Navigation"
-          className={`lg:hidden shrink-0 bg-bg/95 backdrop-blur-xl border-t border-border/40 flex items-center justify-around px-1 z-40 w-full transition-all duration-200 select-none ${
+          className={`lg:hidden shrink-0 bg-bg/90 backdrop-blur-2xl border-t border-border/30 flex items-center justify-around px-1 z-40 w-full transition-all duration-200 select-none ${
             (isMobileTyping && activeTab !== 'canvas') ? 'hidden pointer-events-none' : 'flex'
           }`}
           style={{ 
-            height: 'calc(48px + env(safe-area-inset-bottom, 0px))',
+            height: 'calc(50px + env(safe-area-inset-bottom, 0px))',
             paddingBottom: 'env(safe-area-inset-bottom, 0px)'
           }}
         >
@@ -8468,27 +8468,17 @@ export default function App() {
                     setMobileChatView('chat');
                   }
                 }}
-                className={`flex-1 flex flex-col items-center justify-center h-full py-1 transition-colors relative cursor-pointer active:scale-95 touch-manipulation ${
-                  isTabActive ? 'text-accent font-semibold' : 'text-muted hover:text-fg font-medium'
+                className={`flex-1 flex flex-col items-center justify-center h-full py-1 transition-all relative cursor-pointer active:scale-90 touch-manipulation ${
+                  isTabActive ? 'text-accent' : 'text-muted/70 hover:text-fg'
                 }`}
                 title={tab.label}
               >
-                {isTabActive && (
-                  <motion.span 
-                    layoutId="mobile-bottom-nav-active-indicator"
-                    className="absolute top-0 w-6 h-0.5 rounded-full bg-accent shadow-xs" 
-                    transition={{
-                      type: "spring",
-                      stiffness: 550,
-                      damping: 35,
-                      mass: 0.6
-                    }}
-                  />
-                )}
-                <tab.icon size={19} className="mb-0.5" />
-                <span className="text-[10px] tracking-tight truncate max-w-full leading-none">
-                  {tab.label}
-                </span>
+                <div className={`flex flex-col items-center justify-center transition-all duration-150 ${isTabActive ? 'scale-105' : 'scale-100 opacity-80'}`}>
+                  <tab.icon size={20} className="mb-0.5" strokeWidth={isTabActive ? 2.4 : 1.8} />
+                  <span className={`text-[10px] tracking-tight truncate max-w-full leading-none ${isTabActive ? 'font-semibold text-accent' : 'font-medium text-muted'}`}>
+                    {tab.label}
+                  </span>
+                </div>
               </button>
             );
           })}
