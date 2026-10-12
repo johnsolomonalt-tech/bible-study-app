@@ -8438,8 +8438,8 @@ export default function App() {
             (isMobileTyping && activeTab !== 'canvas') ? 'hidden pointer-events-none' : 'flex'
           }`}
           style={{ 
-            height: 'calc(50px + env(safe-area-inset-bottom, 0px))',
-            paddingBottom: 'env(safe-area-inset-bottom, 0px)'
+            height: 'calc(48px + max(4px, calc(env(safe-area-inset-bottom, 0px) - 20px)))',
+            paddingBottom: 'max(4px, calc(env(safe-area-inset-bottom, 0px) - 20px))'
           }}
         >
           {[
@@ -8468,7 +8468,7 @@ export default function App() {
                     setMobileChatView('chat');
                   }
                 }}
-                className={`flex-1 flex flex-col items-center justify-center h-full py-1 transition-all relative cursor-pointer active:scale-90 touch-manipulation ${
+                className={`flex-1 flex flex-col items-center justify-center h-full pt-1 pb-0.5 transition-all relative cursor-pointer active:scale-90 touch-manipulation ${
                   isTabActive ? 'text-accent' : 'text-muted/70 hover:text-fg'
                 }`}
                 title={tab.label}

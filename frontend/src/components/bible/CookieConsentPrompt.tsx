@@ -45,7 +45,7 @@ export function CookieConsentPrompt({
     <aside
       aria-label="Cookie and storage notice"
       role="region"
-      className="fixed z-[99] bottom-[calc(56px+env(safe-area-inset-bottom,0px))] left-3 right-3 md:bottom-6 md:left-6 md:right-auto md:max-w-[390px] rounded-2xl p-3.5 md:p-4 border shadow-2xl transition-all duration-200 animate-in slide-in-from-bottom-4 fade-in"
+      className="fixed z-[99] bottom-[calc(52px+max(4px,calc(env(safe-area-inset-bottom,0px)-20px)))] left-3 right-3 md:bottom-6 md:left-6 md:right-auto md:max-w-[390px] rounded-2xl p-3.5 md:p-4 border shadow-2xl transition-all duration-200 animate-in slide-in-from-bottom-4 fade-in"
       style={{
         backgroundColor: isDark ? '#1e1e22' : '#ffffff',
         borderColor: isDark ? '#323238' : '#e4e4e7',
