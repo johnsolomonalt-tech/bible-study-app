@@ -309,9 +309,6 @@ export function CanvasStartPage({
                 </div>
               </div>
             </div>
-            <p className="text-[10px] sm:text-[11px] text-meta text-center -mt-1 select-none leading-tight">
-              Theologica AI can produce inaccuracies. Always cross-reference with Scripture and verify primary sources.
-            </p>
 
             {/* Validation Error Message */}
             {validationError && (

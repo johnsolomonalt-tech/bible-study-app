@@ -244,11 +244,6 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
           </div>
         </div>
       )}
-
-      {/* Watermark / Source Verification Disclaimer */}
-      <p className="text-[10px] sm:text-[11px] text-meta text-center mt-3 sm:mt-5 select-none leading-tight">
-        Theologica AI can produce inaccuracies. Always cross-reference with Scripture and verify primary sources.
-      </p>
     </div>
   );
 };
