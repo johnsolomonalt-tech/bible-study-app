@@ -36,7 +36,7 @@ export async function recordAnalyticsEvent(
   const safeMetadata: Record<string, any> = {};
   if (metadata && typeof metadata === 'object') {
     // Only allow specific approved operational flags
-    const allowedKeys = ['feature', 'screen', 'action', 'mode', 'translation', 'platform', 'path', 'book', 'chapter'];
+    const allowedKeys = ['feature', 'screen', 'action', 'mode', 'translation', 'platform', 'path', 'book', 'chapter', 'streak', 'habit'];
     for (const key of allowedKeys) {
       if (metadata[key] !== undefined && typeof metadata[key] !== 'object') {
         safeMetadata[key] = String(metadata[key]).substring(0, 50); // limit string length
@@ -125,6 +125,10 @@ export async function getAnalyticsDashboardStats(rangeDays: number = 7) {
     session_start: 0,
     page_view: 0,
     scripture_read: 0,
+    streak_updated: 0,
+    streak_calendar_opened: 0,
+    devotional_read: 0,
+    prayer_checked: 0,
     ai_chat_prompt: 0,
     ai_chat_opened: 0,
     chat_file_upload: 0,

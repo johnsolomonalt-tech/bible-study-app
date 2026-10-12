@@ -48,6 +48,13 @@ import {
   Phone,
   UserCheck,
   Search,
+  Trophy,
+  TrendingUp,
+  Heart,
+  CheckSquare,
+  Square,
+  Filter,
+  ChevronRight,
 } from 'lucide-react';
 import { DEV_API_BASE, DEV_PORTAL_PATH } from '@/lib/devConfig';
 
@@ -120,6 +127,74 @@ interface ActivityEvent {
   timestamp: string;
 }
 
+interface DevUserStreakInfo {
+  currentStreak: number;
+  longestStreak: number;
+  lastActiveDate: string | null;
+  activeDatesCount: number;
+  isCompletedToday: boolean;
+  isGraceActive: boolean;
+  dailyChapterGoal: number;
+  targetMilestoneDays: number;
+  todayGoals: {
+    scripture: boolean;
+    devotional: boolean;
+    prayer: boolean;
+    chaptersCompletedToday: number;
+  };
+  totalChaptersRead: number;
+  totalNotes: number;
+  totalCanvases: number;
+  totalHighlights: number;
+}
+
+interface DevStreakAggregates {
+  totalTrackedUsers: number;
+  activeStreaksCount: number;
+  topPlatformStreak: number;
+  averageActiveStreak: number;
+  usersCompletedToday: number;
+  usersInGrace: number;
+  milestoneDistribution: {
+    oneToThree: number;
+    fourToSeven: number;
+    eightToFourteen: number;
+    fifteenToThirty: number;
+    thirtyPlus: number;
+  };
+  todayHabitBreakdown: {
+    scriptureCount: number;
+    devotionalCount: number;
+    prayerCount: number;
+  };
+  platformTotals: {
+    totalChaptersRead: number;
+    totalNotesCreated: number;
+    totalCanvasesCreated: number;
+    totalHighlightsCreated: number;
+    totalChatsCreated: number;
+  };
+  leaderboard: Array<{
+    id: string;
+    username: string | null;
+    fullName: string | null;
+    email: string | null;
+    imageUrl: string | null;
+    currentStreak: number;
+    longestStreak: number;
+    activeDatesCount: number;
+    lastActiveDate: string | null;
+    isCompletedToday: boolean;
+    isGraceActive: boolean;
+    todayGoals: {
+      scripture: boolean;
+      devotional: boolean;
+      prayer: boolean;
+      chaptersCompletedToday: number;
+    };
+  }>;
+}
+
 interface DevUserAccount {
   id: string;
   username: string | null;
@@ -131,6 +206,7 @@ interface DevUserAccount {
   lastSignInAt: string | null;
   lastActiveAt: string | null;
   lastUsedAt: string | null;
+  streak?: DevUserStreakInfo;
 }
 
 interface AdminSettings {
@@ -154,18 +230,21 @@ export default function DevDashboardPage() {
   // Dashboard Data State
   const [timeRange, setTimeRange] = useState<'24h' | '7d' | '30d'>('7d');
   const [stats, setStats] = useState<AnalyticsStats | null>(null);
+  const [streakStats, setStreakStats] = useState<DevStreakAggregates | null>(null);
   const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null);
   const [recentEvents, setRecentEvents] = useState<ActivityEvent[]>([]);
   const [adminSettings, setAdminSettings] = useState<AdminSettings | null>(null);
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [isAutoRefresh, setIsAutoRefresh] = useState(true);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date>(new Date());
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'features' | 'activity' | 'health' | 'security'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'streaks' | 'users' | 'features' | 'activity' | 'health' | 'security'>('overview');
   const [feedFilter, setFeedFilter] = useState<string>('all');
 
   // Registered Users Directory State
   const [usersList, setUsersList] = useState<DevUserAccount[]>([]);
   const [totalUsersCount, setTotalUsersCount] = useState<number>(0);
+  const [userStreakFilter, setUserStreakFilter] = useState<'all' | 'active_streak' | 'read_today' | 'grace' | 'seven_plus' | 'has_content'>('all');
+  const [selectedUserDetail, setSelectedUserDetail] = useState<DevUserAccount | null>(null);
   const [isLoadingUsers, setIsLoadingUsers] = useState<boolean>(false);
   const [usersError, setUsersError] = useState<string | null>(null);
   const [userSearchQuery, setUserSearchQuery] = useState<string>('');
@@ -221,6 +300,7 @@ export default function DevDashboardPage() {
       const settingsData = await settingsRes.json();
 
       setStats(statsData.stats);
+      setStreakStats(statsData.streakStats || null);
       setRecentEvents(eventsData.events || []);
       setAdminSettings(settingsData.settings || null);
       if (healthRes.ok) {
@@ -497,9 +577,29 @@ export default function DevDashboardPage() {
 
   // Filtered Users
   const filteredUsers = useMemo(() => {
-    if (!userSearchQuery.trim()) return usersList;
+    let list = usersList;
+
+    if (userStreakFilter === 'active_streak') {
+      list = list.filter((u) => (u.streak?.currentStreak ?? 0) > 0);
+    } else if (userStreakFilter === 'read_today') {
+      list = list.filter((u) => Boolean(u.streak?.isCompletedToday));
+    } else if (userStreakFilter === 'grace') {
+      list = list.filter((u) => Boolean(u.streak?.isGraceActive));
+    } else if (userStreakFilter === 'seven_plus') {
+      list = list.filter((u) => (u.streak?.currentStreak ?? 0) >= 7);
+    } else if (userStreakFilter === 'has_content') {
+      list = list.filter(
+        (u) =>
+          (u.streak?.totalNotes ?? 0) > 0 ||
+          (u.streak?.totalCanvases ?? 0) > 0 ||
+          (u.streak?.totalHighlights ?? 0) > 0 ||
+          (u.streak?.totalChaptersRead ?? 0) > 0
+      );
+    }
+
+    if (!userSearchQuery.trim()) return list;
     const q = userSearchQuery.toLowerCase().trim();
-    return usersList.filter((u) => {
+    return list.filter((u) => {
       const email = (u.email || '').toLowerCase();
       const username = (u.username || '').toLowerCase();
       const fullName = (u.fullName || '').toLowerCase();
@@ -513,7 +613,7 @@ export default function DevDashboardPage() {
         id.includes(q)
       );
     });
-  }, [usersList, userSearchQuery]);
+  }, [usersList, userSearchQuery, userStreakFilter]);
 
   // Aggregate User Directory Metrics
   const userMetrics = useMemo(() => {
@@ -525,10 +625,22 @@ export default function DevDashboardPage() {
     let activePast7Days = 0;
     let withPhone = 0;
     let signedUpPast30Days = 0;
+    let withActiveStreak = 0;
+    let completedToday = 0;
+    let inGrace = 0;
 
     for (const u of usersList) {
       if (u.phoneNumber && u.phoneNumber.trim()) {
         withPhone++;
+      }
+      if (u.streak && u.streak.currentStreak > 0) {
+        withActiveStreak++;
+      }
+      if (u.streak && u.streak.isCompletedToday) {
+        completedToday++;
+      }
+      if (u.streak && u.streak.isGraceActive) {
+        inGrace++;
       }
       if (u.lastUsedAt) {
         const time = new Date(u.lastUsedAt).getTime();
@@ -549,6 +661,9 @@ export default function DevDashboardPage() {
       activePast7Days,
       withPhone,
       signedUpPast30Days,
+      withActiveStreak,
+      completedToday,
+      inGrace,
     };
   }, [usersList, totalUsersCount]);
 
@@ -588,6 +703,10 @@ export default function DevDashboardPage() {
 
     const map: Record<string, string> = {
       scripture_read: 'Scripture Reading & Study',
+      streak_updated: 'Reading Streaks & Rhythms',
+      streak_calendar_opened: 'Streak Calendar',
+      devotional_read: "Today's Devotional",
+      prayer_checked: 'Daily Prayer Checklist',
       ai_chat_prompt: 'AI Theological Chat',
       chat_file_upload: 'Chat File Uploads',
       canvas_ai_generate: 'AI Canvas Generator',
@@ -854,6 +973,22 @@ export default function DevDashboardPage() {
             <span>Usage & Retention</span>
           </button>
           <button
+            onClick={() => setActiveTab('streaks')}
+            className={`pb-3 border-b-2 flex items-center gap-2 cursor-pointer transition-colors whitespace-nowrap ${
+              activeTab === 'streaks'
+                ? 'border-amber-500 text-amber-400 font-semibold'
+                : 'border-transparent text-[var(--muted)] hover:text-[var(--fg)]'
+            }`}
+          >
+            <Flame size={16} className={(streakStats?.activeStreaksCount ?? 0) > 0 ? 'text-amber-500 animate-pulse' : 'text-amber-400'} />
+            <span>Streaks & Rhythms</span>
+            {(streakStats?.activeStreaksCount ?? 0) > 0 && (
+              <span className="ml-0.5 px-1.5 py-0.5 text-[10px] rounded-full bg-amber-500/15 border border-amber-500/30 font-mono text-amber-400 font-bold">
+                {streakStats?.activeStreaksCount} active
+              </span>
+            )}
+          </button>
+          <button
             onClick={() => setActiveTab('users')}
             className={`pb-3 border-b-2 flex items-center gap-2 cursor-pointer transition-colors whitespace-nowrap ${
               activeTab === 'users'
@@ -921,7 +1056,7 @@ export default function DevDashboardPage() {
         {activeTab === 'overview' && (
           <div className="space-y-6 sm:space-y-8">
             {/* Top Stat Cards Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               {/* Card 1: Sessions Today */}
               <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm relative overflow-hidden">
                 <div className="flex items-center justify-between">
@@ -956,7 +1091,7 @@ export default function DevDashboardPage() {
               {/* Card 2: Daily Active Users (DAU) */}
               <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm relative overflow-hidden">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-[var(--muted)]">Daily Active Users (DAU)</span>
+                  <span className="text-xs font-medium text-[var(--muted)]">Active Users (DAU)</span>
                   <div className="p-2 rounded-xl bg-blue-500/15 text-blue-400">
                     <Users size={16} />
                   </div>
@@ -966,56 +1101,229 @@ export default function DevDashboardPage() {
                     {stats?.dauToday ?? 0}
                   </span>
                   <span className="text-xs text-[var(--muted)]">
-                    {stats?.dauYesterday ?? 0} yesterday
+                    vs {stats?.dauYesterday ?? 0} yesterday
                   </span>
                 </div>
                 <p className="mt-2 text-[11px] text-[var(--muted)]">
-                  Unique anonymous study sessions today
+                  Unique study sessions today
                 </p>
               </div>
 
-              {/* Card 3: Active Users (Period) */}
+              {/* Card 3: Active Reading Streaks */}
               <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm relative overflow-hidden">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-[var(--muted)]">
-                    {timeRange === '24h' ? '24h' : timeRange === '7d' ? '7-Day' : '30-Day'} Active Count
-                  </span>
-                  <div className="p-2 rounded-xl bg-emerald-500/15 text-emerald-400">
-                    <Calendar size={16} />
+                  <span className="text-xs font-medium text-[var(--muted)]">Active Streaks</span>
+                  <div className="p-2 rounded-xl bg-amber-500/15 text-amber-400">
+                    <Flame size={16} />
                   </div>
                 </div>
                 <div className="mt-3 flex items-baseline gap-2">
-                  <span className="text-3xl font-bold font-mono tracking-tight text-[var(--fg)]">
-                    {stats?.activeUsersPeriod ?? 0}
+                  <span className="text-3xl font-bold font-mono tracking-tight text-amber-400">
+                    {streakStats?.activeStreaksCount ?? 0}
                   </span>
-                  <span className="text-xs text-[var(--muted)]">unique visitors</span>
+                  <span className="text-xs text-[var(--muted)] font-mono">
+                    Top: {streakStats?.topPlatformStreak ?? 0}d
+                  </span>
+                </div>
+                <button
+                  onClick={() => setActiveTab('streaks')}
+                  className="mt-2 text-[11px] text-amber-400 hover:underline flex items-center gap-1 cursor-pointer font-medium"
+                >
+                  <span>View leaderboard</span>
+                  <ChevronRight size={11} />
+                </button>
+              </div>
+
+              {/* Card 4: Habits Completed Today */}
+              <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm relative overflow-hidden">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-[var(--muted)]">Read / Practiced Today</span>
+                  <div className="p-2 rounded-xl bg-emerald-500/15 text-emerald-400">
+                    <CheckCircle2 size={16} />
+                  </div>
+                </div>
+                <div className="mt-3 flex items-baseline gap-2">
+                  <span className="text-3xl font-bold font-mono tracking-tight text-emerald-400">
+                    {streakStats?.usersCompletedToday ?? 0}
+                  </span>
+                  <span className="text-xs text-[var(--muted)]">
+                    users
+                  </span>
                 </div>
                 <p className="mt-2 text-[11px] text-[var(--muted)]">
-                  {stats?.totalEvents ?? 0} operational events logged
+                  {streakStats?.usersInGrace ? `${streakStats.usersInGrace} in grace window` : 'Consecutive practice'}
                 </p>
               </div>
 
-              {/* Card 4: Top Feature */}
+              {/* Card 5: Top Feature */}
               <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm relative overflow-hidden">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-[var(--muted)]">Top Engaged Feature</span>
+                  <span className="text-xs font-medium text-[var(--muted)]">Top Feature</span>
                   <div className="p-2 rounded-xl bg-purple-500/15 text-purple-400">
                     <Sparkles size={16} />
                   </div>
                 </div>
                 <div className="mt-3">
-                  <span className="text-xl font-bold text-[var(--fg)] truncate block">
+                  <span className="text-lg font-bold text-[var(--fg)] truncate block">
                     {topFeature}
                   </span>
                 </div>
-                <p className="mt-2 text-[11px] text-[var(--muted)] flex items-center gap-1.5">
-                  <Clock size={11} />
-                  {topFeatureCount > 0 ? (
-                    <span>{topFeatureCount} action events in selected period</span>
-                  ) : (
-                    <span>Core scripture study mode active</span>
-                  )}
+                <p className="mt-2 text-[11px] text-[var(--muted)] truncate">
+                  {topFeatureCount > 0 ? `${topFeatureCount} engagements` : 'Scripture study active'}
                 </p>
+              </div>
+            </div>
+
+            {/* Spiritual Habits & Library Content Overview */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Habits Breakdown */}
+              <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-amber-500/15 text-amber-400">
+                      <Flame size={16} />
+                    </div>
+                    <span className="text-xs font-semibold text-[var(--fg)]">
+                      Today&apos;s Spiritual Habits Completion
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setActiveTab('streaks')}
+                    className="text-xs text-amber-400 hover:underline flex items-center gap-1 cursor-pointer font-medium"
+                  >
+                    <span>Leaderboard</span>
+                    <ChevronRight size={12} />
+                  </button>
+                </div>
+                <div className="space-y-2.5 pt-1">
+                  <div>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-[var(--muted)] flex items-center gap-1.5">
+                        <BookOpen size={12} className="text-amber-400" />
+                        Scripture Chapter Study
+                      </span>
+                      <span className="font-mono font-medium text-[var(--fg)]">
+                        {streakStats?.todayHabitBreakdown?.scriptureCount ?? 0} users
+                      </span>
+                    </div>
+                    <div className="w-full bg-[var(--border-soft)] h-1.5 rounded-full overflow-hidden">
+                      <div
+                        className="bg-amber-400 h-full rounded-full transition-all"
+                        style={{
+                          width: `${Math.min(
+                            Math.round(
+                              ((streakStats?.todayHabitBreakdown?.scriptureCount ?? 0) /
+                                Math.max(userMetrics.total || 1, 1)) *
+                                100
+                            ),
+                            100
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-[var(--muted)] flex items-center gap-1.5">
+                        <Heart size={12} className="text-rose-400" />
+                        Today&apos;s Devotional
+                      </span>
+                      <span className="font-mono font-medium text-[var(--fg)]">
+                        {streakStats?.todayHabitBreakdown?.devotionalCount ?? 0} users
+                      </span>
+                    </div>
+                    <div className="w-full bg-[var(--border-soft)] h-1.5 rounded-full overflow-hidden">
+                      <div
+                        className="bg-rose-400 h-full rounded-full transition-all"
+                        style={{
+                          width: `${Math.min(
+                            Math.round(
+                              ((streakStats?.todayHabitBreakdown?.devotionalCount ?? 0) /
+                                Math.max(userMetrics.total || 1, 1)) *
+                                100
+                            ),
+                            100
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-[var(--muted)] flex items-center gap-1.5">
+                        <CheckSquare size={12} className="text-emerald-400" />
+                        Daily Prayer Reflection
+                      </span>
+                      <span className="font-mono font-medium text-[var(--fg)]">
+                        {streakStats?.todayHabitBreakdown?.prayerCount ?? 0} users
+                      </span>
+                    </div>
+                    <div className="w-full bg-[var(--border-soft)] h-1.5 rounded-full overflow-hidden">
+                      <div
+                        className="bg-emerald-400 h-full rounded-full transition-all"
+                        style={{
+                          width: `${Math.min(
+                            Math.round(
+                              ((streakStats?.todayHabitBreakdown?.prayerCount ?? 0) /
+                                Math.max(userMetrics.total || 1, 1)) *
+                                100
+                            ),
+                            100
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Platform Totals */}
+              <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-accent/15 text-accent">
+                      <Layers size={16} />
+                    </div>
+                    <span className="text-xs font-semibold text-[var(--fg)]">
+                      Community Library & Content Totals
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-mono text-[var(--muted)]">Platform Lifetime</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
+                  <div className="p-2.5 rounded-xl bg-[var(--surface-raised)] border border-[var(--border)]">
+                    <span className="text-[10px] text-[var(--muted)] block">Chapters Read</span>
+                    <span className="text-base font-bold font-mono text-[var(--fg)]">
+                      {streakStats?.platformTotals?.totalChaptersRead ?? 0}
+                    </span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-[var(--surface-raised)] border border-[var(--border)]">
+                    <span className="text-[10px] text-[var(--muted)] block">Study Notes</span>
+                    <span className="text-base font-bold font-mono text-[var(--fg)]">
+                      {streakStats?.platformTotals?.totalNotesCreated ?? 0}
+                    </span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-[var(--surface-raised)] border border-[var(--border)]">
+                    <span className="text-[10px] text-[var(--muted)] block">Visual Canvases</span>
+                    <span className="text-base font-bold font-mono text-[var(--fg)]">
+                      {streakStats?.platformTotals?.totalCanvasesCreated ?? 0}
+                    </span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-[var(--surface-raised)] border border-[var(--border)]">
+                    <span className="text-[10px] text-[var(--muted)] block">Verse Highlights</span>
+                    <span className="text-base font-bold font-mono text-[var(--fg)]">
+                      {streakStats?.platformTotals?.totalHighlightsCreated ?? 0}
+                    </span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-[var(--surface-raised)] border border-[var(--border)] col-span-2 sm:col-span-2">
+                    <span className="text-[10px] text-[var(--muted)] block">AI Theological Chats</span>
+                    <span className="text-base font-bold font-mono text-accent">
+                      {streakStats?.platformTotals?.totalChatsCreated ?? 0}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1134,6 +1442,564 @@ export default function DevDashboardPage() {
                     );
                   })}
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ============================================================== */}
+        {/* TAB: STREAKS & SPIRITUAL RHYTHMS                               */}
+        {/* ============================================================== */}
+        {activeTab === 'streaks' && (
+          <div className="space-y-6 sm:space-y-8">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                    <Flame size={22} className="animate-pulse" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--fg)]">
+                      Spiritual Streaks & Daily Rhythms
+                    </h2>
+                    <p className="text-xs sm:text-sm text-[var(--muted)] mt-0.5">
+                      Live telemetry tracking Scripture reading streaks, prayer commitments, and daily devotional consistency.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2.5">
+                <button
+                  onClick={() => loadDashboardData()}
+                  disabled={isLoadingStats}
+                  className="px-3.5 py-2 text-xs font-medium rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--fg)] hover:bg-[var(--surface-raised)] transition-all flex items-center gap-2 cursor-pointer shadow-sm disabled:opacity-50"
+                >
+                  <RefreshCw size={13} className={isLoadingStats ? 'animate-spin text-accent' : ''} />
+                  <span>Refresh Streaks</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Streak Summary Metrics Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Card 1: Active Streaks */}
+              <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm relative overflow-hidden">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-[var(--muted)]">Active Streaks (&gt;0 Days)</span>
+                  <div className="p-2 rounded-xl bg-amber-500/15 text-amber-400">
+                    <Flame size={16} />
+                  </div>
+                </div>
+                <div className="mt-3 flex items-baseline gap-2">
+                  <span className="text-3xl font-bold font-mono tracking-tight text-amber-400">
+                    {streakStats?.activeStreaksCount ?? 0}
+                  </span>
+                  <span className="text-xs text-[var(--muted)]">
+                    of {userMetrics.total} users
+                  </span>
+                </div>
+                <p className="mt-2 text-[11px] text-[var(--muted)]">
+                  Maintaining regular Scripture rhythm
+                </p>
+              </div>
+
+              {/* Card 2: Top Platform Streak */}
+              <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm relative overflow-hidden">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-[var(--muted)]">Top Platform Streak</span>
+                  <div className="p-2 rounded-xl bg-yellow-500/15 text-yellow-400">
+                    <Trophy size={16} />
+                  </div>
+                </div>
+                <div className="mt-3 flex items-baseline gap-2">
+                  <span className="text-3xl font-bold font-mono tracking-tight text-yellow-400">
+                    {streakStats?.topPlatformStreak ?? 0}
+                  </span>
+                  <span className="text-xs text-[var(--muted)]">days record</span>
+                </div>
+                <p className="mt-2 text-[11px] text-[var(--muted)]">
+                  Longest consecutive daily practice
+                </p>
+              </div>
+
+              {/* Card 3: Completed Today */}
+              <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm relative overflow-hidden">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-[var(--muted)]">Read / Practiced Today</span>
+                  <div className="p-2 rounded-xl bg-emerald-500/15 text-emerald-400">
+                    <CheckCircle2 size={16} />
+                  </div>
+                </div>
+                <div className="mt-3 flex items-baseline gap-2">
+                  <span className="text-3xl font-bold font-mono tracking-tight text-emerald-400">
+                    {streakStats?.usersCompletedToday ?? 0}
+                  </span>
+                  <span className="text-xs text-[var(--muted)]">
+                    {userMetrics.total > 0
+                      ? `${Math.round(((streakStats?.usersCompletedToday ?? 0) / userMetrics.total) * 100)}% of members`
+                      : 'completed'}
+                  </span>
+                </div>
+                <p className="mt-2 text-[11px] text-[var(--muted)]">
+                  Completed Scripture, devotional, or prayer today
+                </p>
+              </div>
+
+              {/* Card 4: Grace Period Protected */}
+              <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm relative overflow-hidden">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-[var(--muted)]">In Grace Period</span>
+                  <div className="p-2 rounded-xl bg-blue-500/15 text-blue-400">
+                    <Shield size={16} />
+                  </div>
+                </div>
+                <div className="mt-3 flex items-baseline gap-2">
+                  <span className="text-3xl font-bold font-mono tracking-tight text-blue-400">
+                    {streakStats?.usersInGrace ?? 0}
+                  </span>
+                  <span className="text-xs text-[var(--muted)]">users protected</span>
+                </div>
+                <p className="mt-2 text-[11px] text-[var(--muted)]">
+                  1-day forgiveness window before streak resets
+                </p>
+              </div>
+            </div>
+
+            {/* Today's Spiritual Habits Grid */}
+            <div className="p-6 rounded-3xl bg-[var(--surface)] border border-[var(--border)] shadow-sm space-y-4">
+              <div>
+                <h3 className="text-base font-bold text-[var(--fg)]">
+                  Daily Spiritual Habits Breakdown (Today)
+                </h3>
+                <p className="text-xs text-[var(--muted)]">
+                  Active engagement across Theologica&apos;s three spiritual practice rhythms
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+                {/* Habit 1: Scripture Reading */}
+                <div className="p-4 rounded-2xl bg-[var(--surface-raised)] border border-[var(--border)] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 rounded-xl bg-amber-500/15 text-amber-400">
+                        <BookOpen size={18} />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-semibold text-[var(--fg)]">Scripture Reading</h4>
+                        <p className="text-[11px] text-[var(--muted)]">Daily Bible chapter goal</p>
+                      </div>
+                    </div>
+                    <span className="text-2xl font-bold font-mono text-[var(--fg)]">
+                      {streakStats?.todayHabitBreakdown?.scriptureCount ?? 0}
+                    </span>
+                  </div>
+                  <div className="w-full bg-[var(--border-soft)] h-2 rounded-full overflow-hidden">
+                    <div
+                      className="bg-amber-400 h-full rounded-full transition-all"
+                      style={{
+                        width: `${Math.min(
+                          Math.round(
+                            ((streakStats?.todayHabitBreakdown?.scriptureCount ?? 0) /
+                              Math.max(userMetrics.total || 1, 1)) *
+                              100
+                          ),
+                          100
+                        )}%`,
+                      }}
+                    />
+                  </div>
+                  <p className="text-[11px] text-[var(--muted)]">
+                    {userMetrics.total > 0
+                      ? `${Math.round(((streakStats?.todayHabitBreakdown?.scriptureCount ?? 0) / userMetrics.total) * 100)}% of members read Scripture today`
+                      : 'Active chapter readers'}
+                  </p>
+                </div>
+
+                {/* Habit 2: Daily Devotional */}
+                <div className="p-4 rounded-2xl bg-[var(--surface-raised)] border border-[var(--border)] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 rounded-xl bg-rose-500/15 text-rose-400">
+                        <Heart size={18} />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-semibold text-[var(--fg)]">Today&apos;s Devotional</h4>
+                        <p className="text-[11px] text-[var(--muted)]">Guided reflection & meditation</p>
+                      </div>
+                    </div>
+                    <span className="text-2xl font-bold font-mono text-[var(--fg)]">
+                      {streakStats?.todayHabitBreakdown?.devotionalCount ?? 0}
+                    </span>
+                  </div>
+                  <div className="w-full bg-[var(--border-soft)] h-2 rounded-full overflow-hidden">
+                    <div
+                      className="bg-rose-400 h-full rounded-full transition-all"
+                      style={{
+                        width: `${Math.min(
+                          Math.round(
+                            ((streakStats?.todayHabitBreakdown?.devotionalCount ?? 0) /
+                              Math.max(userMetrics.total || 1, 1)) *
+                              100
+                          ),
+                          100
+                        )}%`,
+                      }}
+                    />
+                  </div>
+                  <p className="text-[11px] text-[var(--muted)]">
+                    {userMetrics.total > 0
+                      ? `${Math.round(((streakStats?.todayHabitBreakdown?.devotionalCount ?? 0) / userMetrics.total) * 100)}% completed today's devotional reading`
+                      : 'Contemplative readers'}
+                  </p>
+                </div>
+
+                {/* Habit 3: Daily Prayer */}
+                <div className="p-4 rounded-2xl bg-[var(--surface-raised)] border border-[var(--border)] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 rounded-xl bg-emerald-500/15 text-emerald-400">
+                        <CheckSquare size={18} />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-semibold text-[var(--fg)]">Daily Prayer Checklist</h4>
+                        <p className="text-[11px] text-[var(--muted)]">Prayer intentions checked</p>
+                      </div>
+                    </div>
+                    <span className="text-2xl font-bold font-mono text-[var(--fg)]">
+                      {streakStats?.todayHabitBreakdown?.prayerCount ?? 0}
+                    </span>
+                  </div>
+                  <div className="w-full bg-[var(--border-soft)] h-2 rounded-full overflow-hidden">
+                    <div
+                      className="bg-emerald-400 h-full rounded-full transition-all"
+                      style={{
+                        width: `${Math.min(
+                          Math.round(
+                            ((streakStats?.todayHabitBreakdown?.prayerCount ?? 0) /
+                              Math.max(userMetrics.total || 1, 1)) *
+                              100
+                          ),
+                          100
+                        )}%`,
+                      }}
+                    />
+                  </div>
+                  <p className="text-[11px] text-[var(--muted)]">
+                    {userMetrics.total > 0
+                      ? `${Math.round(((streakStats?.todayHabitBreakdown?.prayerCount ?? 0) / userMetrics.total) * 100)}% checked off daily prayers`
+                      : 'Faithful prayers logged'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Streak Milestone Distribution */}
+            <div className="p-6 rounded-3xl bg-[var(--surface)] border border-[var(--border)] shadow-sm space-y-4">
+              <div>
+                <h3 className="text-base font-bold text-[var(--fg)]">
+                  Streak Milestone Progression Distribution
+                </h3>
+                <p className="text-xs text-[var(--muted)]">
+                  How users are progressing along their spiritual habit journey
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pt-1">
+                {/* Tier 1 */}
+                <div className="p-4 rounded-2xl bg-[var(--surface-raised)] border border-[var(--border)] text-center space-y-1.5">
+                  <span className="text-2xl">🌱</span>
+                  <div className="text-xs font-semibold text-[var(--fg)]">1 - 3 Days</div>
+                  <div className="text-[11px] text-[var(--muted)]">Seedling</div>
+                  <div className="text-xl font-bold font-mono text-emerald-400">
+                    {streakStats?.milestoneDistribution?.oneToThree ?? 0}
+                  </div>
+                  <span className="text-[10px] text-[var(--muted)]">users</span>
+                </div>
+
+                {/* Tier 2 */}
+                <div className="p-4 rounded-2xl bg-[var(--surface-raised)] border border-[var(--border)] text-center space-y-1.5">
+                  <span className="text-2xl">🌿</span>
+                  <div className="text-xs font-semibold text-[var(--fg)]">4 - 7 Days</div>
+                  <div className="text-[11px] text-[var(--muted)]">1 Week Habit</div>
+                  <div className="text-xl font-bold font-mono text-emerald-400">
+                    {streakStats?.milestoneDistribution?.fourToSeven ?? 0}
+                  </div>
+                  <span className="text-[10px] text-[var(--muted)]">users</span>
+                </div>
+
+                {/* Tier 3 */}
+                <div className="p-4 rounded-2xl bg-[var(--surface-raised)] border border-[var(--border)] text-center space-y-1.5">
+                  <span className="text-2xl">🌳</span>
+                  <div className="text-xs font-semibold text-[var(--fg)]">8 - 14 Days</div>
+                  <div className="text-[11px] text-[var(--muted)]">2 Weeks Dedicated</div>
+                  <div className="text-xl font-bold font-mono text-amber-400">
+                    {streakStats?.milestoneDistribution?.eightToFourteen ?? 0}
+                  </div>
+                  <span className="text-[10px] text-[var(--muted)]">users</span>
+                </div>
+
+                {/* Tier 4 */}
+                <div className="p-4 rounded-2xl bg-[var(--surface-raised)] border border-[var(--border)] text-center space-y-1.5">
+                  <span className="text-2xl">🏛️</span>
+                  <div className="text-xs font-semibold text-[var(--fg)]">15 - 30 Days</div>
+                  <div className="text-[11px] text-[var(--muted)]">1 Month Rooted</div>
+                  <div className="text-xl font-bold font-mono text-amber-400">
+                    {streakStats?.milestoneDistribution?.fifteenToThirty ?? 0}
+                  </div>
+                  <span className="text-[10px] text-[var(--muted)]">users</span>
+                </div>
+
+                {/* Tier 5 */}
+                <div className="p-4 rounded-2xl bg-[var(--surface-raised)] border border-[var(--border)] text-center space-y-1.5 col-span-2 sm:col-span-1">
+                  <span className="text-2xl">👑</span>
+                  <div className="text-xs font-semibold text-[var(--fg)]">30+ Days</div>
+                  <div className="text-[11px] text-[var(--muted)]">Theological Pillar</div>
+                  <div className="text-xl font-bold font-mono text-yellow-400">
+                    {streakStats?.milestoneDistribution?.thirtyPlus ?? 0}
+                  </div>
+                  <span className="text-[10px] text-[var(--muted)]">users</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Streaks Leaderboard */}
+            <div className="p-6 rounded-3xl bg-[var(--surface)] border border-[var(--border)] shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-base font-bold text-[var(--fg)] flex items-center gap-2">
+                    <Trophy size={18} className="text-yellow-400" />
+                    <span>Community Reading Streaks Leaderboard</span>
+                  </h3>
+                  <p className="text-xs text-[var(--muted)]">
+                    Ranked by active reading streak, platform longevity, and daily consistency
+                  </p>
+                </div>
+                <span className="text-xs text-[var(--muted)] font-mono">
+                  Top {streakStats?.leaderboard?.length ?? 0} Streakers
+                </span>
+              </div>
+
+              <div className="rounded-2xl border border-[var(--border)] overflow-hidden">
+                {streakStats?.leaderboard && streakStats.leaderboard.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs sm:text-sm border-collapse">
+                      <thead>
+                        <tr className="border-b border-[var(--border)] bg-[var(--surface-raised)]/50 text-[var(--muted)] text-[11px] font-semibold uppercase tracking-wider">
+                          <th className="py-3.5 px-4">Rank</th>
+                          <th className="py-3.5 px-4">User</th>
+                          <th className="py-3.5 px-4">Current Streak</th>
+                          <th className="py-3.5 px-4">Longest Streak</th>
+                          <th className="py-3.5 px-4">Today&apos;s Status</th>
+                          <th className="py-3.5 px-4">Today&apos;s Habits</th>
+                          <th className="py-3.5 px-4">Active Days</th>
+                          <th className="py-3.5 px-4 text-right">Details</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--border)]">
+                        {streakStats.leaderboard.map((leader, index) => {
+                          const fullUser = usersList.find((u) => u.id === leader.id);
+                          return (
+                            <tr
+                              key={leader.id}
+                              className="hover:bg-[var(--surface-raised)]/40 transition-colors"
+                            >
+                              {/* Rank */}
+                              <td className="py-3.5 px-4">
+                                <div className="flex items-center gap-1.5 font-bold font-mono text-sm">
+                                  {index === 0 ? (
+                                    <span className="text-yellow-400 flex items-center gap-1">
+                                      🥇 #1
+                                    </span>
+                                  ) : index === 1 ? (
+                                    <span className="text-slate-300 flex items-center gap-1">
+                                      🥈 #2
+                                    </span>
+                                  ) : index === 2 ? (
+                                    <span className="text-amber-600 flex items-center gap-1">
+                                      🥉 #3
+                                    </span>
+                                  ) : (
+                                    <span className="text-[var(--muted)]">#{index + 1}</span>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* User Profile */}
+                              <td className="py-3.5 px-4">
+                                <div className="flex items-center gap-2.5">
+                                  {leader.imageUrl ? (
+                                    <img
+                                      src={leader.imageUrl}
+                                      alt={leader.fullName || leader.username || 'User'}
+                                      className="w-8 h-8 rounded-full object-cover border border-[var(--border)] shrink-0"
+                                    />
+                                  ) : (
+                                    <div className="w-8 h-8 rounded-full bg-amber-500/15 text-amber-400 flex items-center justify-center font-bold text-xs shrink-0 border border-amber-500/20">
+                                      {(leader.fullName?.[0] || leader.username?.[0] || leader.email?.[0] || 'U').toUpperCase()}
+                                    </div>
+                                  )}
+                                  <div className="min-w-0">
+                                    <div className="font-semibold text-[var(--fg)] truncate text-xs flex items-center gap-1">
+                                      <span>{leader.fullName || leader.username || 'Anonymous User'}</span>
+                                      {leader.username && leader.fullName && (
+                                        <span className="text-[10px] text-[var(--muted)] font-normal">
+                                          @{leader.username}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className="font-mono text-[10px] text-[var(--muted)] truncate block">
+                                      {leader.email || leader.id}
+                                    </span>
+                                  </div>
+                                </div>
+                              </td>
+
+                              {/* Current Streak */}
+                              <td className="py-3.5 px-4">
+                                {leader.currentStreak > 0 ? (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold font-mono bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                                    <Flame size={13} className="animate-pulse" />
+                                    <span>{leader.currentStreak} Days</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono bg-[var(--surface-raised)] border border-[var(--border)] text-[var(--muted)]">
+                                    0 Days
+                                  </span>
+                                )}
+                              </td>
+
+                              {/* Longest Streak */}
+                              <td className="py-3.5 px-4">
+                                <span className="font-mono text-xs text-[var(--fg)] font-semibold flex items-center gap-1">
+                                  <Trophy size={12} className="text-yellow-400" />
+                                  <span>{leader.longestStreak} Days</span>
+                                </span>
+                              </td>
+
+                              {/* Today's Status */}
+                              <td className="py-3.5 px-4">
+                                {leader.isCompletedToday ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                    <CheckCircle2 size={11} />
+                                    <span>Done Today</span>
+                                  </span>
+                                ) : leader.isGraceActive ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-blue-500/15 text-blue-400 border border-blue-500/30">
+                                    <Shield size={11} />
+                                    <span>In Grace</span>
+                                  </span>
+                                ) : leader.currentStreak > 0 ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                                    <Clock size={11} />
+                                    <span>Pending Today</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-[11px] text-[var(--muted)] italic">
+                                    Inactive
+                                  </span>
+                                )}
+                              </td>
+
+                              {/* Today's Habits */}
+                              <td className="py-3.5 px-4">
+                                <div className="flex items-center gap-1.5 text-[11px]">
+                                  <span
+                                    title={`Scripture Reading: ${leader.todayGoals.scripture ? 'Completed' : 'Pending'}`}
+                                    className={`p-1 rounded-md border text-[11px] ${
+                                      leader.todayGoals.scripture
+                                        ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                                        : 'bg-[var(--surface-raised)] text-[var(--muted)]/50 border-[var(--border)]'
+                                    }`}
+                                  >
+                                    📖
+                                  </span>
+                                  <span
+                                    title={`Devotional: ${leader.todayGoals.devotional ? 'Completed' : 'Pending'}`}
+                                    className={`p-1 rounded-md border text-[11px] ${
+                                      leader.todayGoals.devotional
+                                        ? 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+                                        : 'bg-[var(--surface-raised)] text-[var(--muted)]/50 border-[var(--border)]'
+                                    }`}
+                                  >
+                                    🕊️
+                                  </span>
+                                  <span
+                                    title={`Prayer: ${leader.todayGoals.prayer ? 'Completed' : 'Pending'}`}
+                                    className={`p-1 rounded-md border text-[11px] ${
+                                      leader.todayGoals.prayer
+                                        ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                                        : 'bg-[var(--surface-raised)] text-[var(--muted)]/50 border-[var(--border)]'
+                                    }`}
+                                  >
+                                    🙏
+                                  </span>
+                                </div>
+                              </td>
+
+                              {/* Active Days */}
+                              <td className="py-3.5 px-4 font-mono text-xs text-[var(--muted)]">
+                                {leader.activeDatesCount} days
+                              </td>
+
+                              {/* Action */}
+                              <td className="py-3.5 px-4 text-right">
+                                <button
+                                  onClick={() => {
+                                    if (fullUser) {
+                                      setSelectedUserDetail(fullUser);
+                                    } else {
+                                      setSelectedUserDetail({
+                                        id: leader.id,
+                                        username: leader.username,
+                                        fullName: leader.fullName,
+                                        email: leader.email,
+                                        phoneNumber: null,
+                                        imageUrl: leader.imageUrl,
+                                        createdAt: new Date().toISOString(),
+                                        lastSignInAt: null,
+                                        lastActiveAt: null,
+                                        lastUsedAt: leader.lastActiveDate,
+                                        streak: {
+                                          currentStreak: leader.currentStreak,
+                                          longestStreak: leader.longestStreak,
+                                          lastActiveDate: leader.lastActiveDate,
+                                          activeDatesCount: leader.activeDatesCount,
+                                          isCompletedToday: leader.isCompletedToday,
+                                          isGraceActive: leader.isGraceActive,
+                                          dailyChapterGoal: 3,
+                                          targetMilestoneDays: 7,
+                                          todayGoals: {
+                                            scripture: leader.todayGoals.scripture,
+                                            devotional: leader.todayGoals.devotional,
+                                            prayer: leader.todayGoals.prayer,
+                                            chaptersCompletedToday: leader.todayGoals.chaptersCompletedToday,
+                                          },
+                                          totalChaptersRead: 0,
+                                          totalNotes: 0,
+                                          totalCanvases: 0,
+                                          totalHighlights: 0,
+                                        },
+                                      });
+                                    }
+                                  }}
+                                  className="px-2.5 py-1 text-xs rounded-lg bg-[var(--surface-raised)] hover:bg-accent hover:text-white border border-[var(--border)] text-[var(--fg-2)] transition-colors cursor-pointer"
+                                >
+                                  Inspect
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="p-8 text-center text-xs text-[var(--muted)]">
+                    No streak activity records found yet.
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1266,38 +2132,67 @@ export default function DevDashboardPage() {
               </div>
             </div>
 
-            {/* Search Toolbar */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm">
-              <div className="relative flex-1">
-                <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
-                <input
-                  type="text"
-                  value={userSearchQuery}
-                  onChange={(e) => setUserSearchQuery(e.target.value)}
-                  placeholder="Filter users by email, username, name, phone, or Clerk ID..."
-                  className="w-full pl-9 pr-8 py-2 text-xs sm:text-sm bg-[var(--surface-raised)] border border-[var(--border)] rounded-xl text-[var(--fg)] placeholder-[var(--muted)] focus:outline-none focus:border-accent transition-colors"
-                />
-                {userSearchQuery && (
-                  <button
-                    onClick={() => setUserSearchQuery('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--fg)] p-0.5 cursor-pointer"
-                  >
-                    <X size={14} />
-                  </button>
-                )}
+            {/* Search & Streak Quick Filters Toolbar */}
+            <div className="p-3 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm space-y-2.5">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                <div className="relative flex-1">
+                  <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
+                  <input
+                    type="text"
+                    value={userSearchQuery}
+                    onChange={(e) => setUserSearchQuery(e.target.value)}
+                    placeholder="Filter users by email, username, name, phone, or Clerk ID..."
+                    className="w-full pl-9 pr-8 py-2 text-xs sm:text-sm bg-[var(--surface-raised)] border border-[var(--border)] rounded-xl text-[var(--fg)] placeholder-[var(--muted)] focus:outline-none focus:border-accent transition-colors"
+                  />
+                  {userSearchQuery && (
+                    <button
+                      onClick={() => setUserSearchQuery('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--fg)] p-0.5 cursor-pointer"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+                <div className="text-xs text-[var(--muted)] px-2 shrink-0 flex items-center justify-between sm:justify-end gap-2">
+                  <span>
+                    Showing <strong className="text-[var(--fg)]">{filteredUsers.length}</strong> of {userMetrics.total} users
+                  </span>
+                  {(userSearchQuery || userStreakFilter !== 'all') && (
+                    <button
+                      onClick={() => {
+                        setUserSearchQuery('');
+                        setUserStreakFilter('all');
+                      }}
+                      className="text-xs text-accent hover:underline cursor-pointer font-medium"
+                    >
+                      Reset all
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="text-xs text-[var(--muted)] px-2 shrink-0 flex items-center justify-between sm:justify-end gap-2">
-                <span>
-                  Showing <strong className="text-[var(--fg)]">{filteredUsers.length}</strong> of {userMetrics.total} users
-                </span>
-                {userSearchQuery && (
+
+              {/* Quick Streak & Habit Filter Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1 border-t border-[var(--border-soft)]">
+                {[
+                  { id: 'all', label: `All Users (${userMetrics.total})` },
+                  { id: 'active_streak', label: `🔥 Active Streaks (${userMetrics.withActiveStreak})` },
+                  { id: 'read_today', label: `✅ Read Today (${userMetrics.completedToday})` },
+                  { id: 'grace', label: `🛡️ In Grace (${userMetrics.inGrace})` },
+                  { id: 'seven_plus', label: '🏆 7+ Days Streak' },
+                  { id: 'has_content', label: '📝 Has Notes / Canvases' },
+                ].map((filter) => (
                   <button
-                    onClick={() => setUserSearchQuery('')}
-                    className="text-xs text-accent hover:underline cursor-pointer"
+                    key={filter.id}
+                    onClick={() => setUserStreakFilter(filter.id as any)}
+                    className={`px-2.5 py-1 text-xs rounded-lg transition-colors cursor-pointer whitespace-nowrap font-medium ${
+                      userStreakFilter === filter.id
+                        ? 'bg-accent text-white shadow-sm font-semibold'
+                        : 'bg-[var(--surface-raised)] border border-[var(--border)] text-[var(--fg-2)] hover:text-[var(--fg)]'
+                    }`}
                   >
-                    Reset filter
+                    {filter.label}
                   </button>
-                )}
+                ))}
               </div>
             </div>
 
@@ -1325,10 +2220,13 @@ export default function DevDashboardPage() {
                     <thead>
                       <tr className="border-b border-[var(--border)] bg-[var(--surface-raised)]/50 text-[var(--muted)] text-[11px] font-semibold uppercase tracking-wider">
                         <th className="py-3.5 px-4 sm:px-6">User Account</th>
-                        <th className="py-3.5 px-4 sm:px-6">Email Address</th>
-                        <th className="py-3.5 px-4 sm:px-6">Phone Number</th>
+                        <th className="py-3.5 px-4 sm:px-6">Reading Streak</th>
+                        <th className="py-3.5 px-4 sm:px-6">Today&apos;s Habits</th>
+                        <th className="py-3.5 px-4 sm:px-6">Library Activity</th>
+                        <th className="py-3.5 px-4 sm:px-6">Contact Info</th>
                         <th className="py-3.5 px-4 sm:px-6">Signed Up</th>
                         <th className="py-3.5 px-4 sm:px-6">Last Active</th>
+                        <th className="py-3.5 px-4 sm:px-6 text-right">Details</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--border)]">
@@ -1386,56 +2284,135 @@ export default function DevDashboardPage() {
                               </div>
                             </td>
 
-                            {/* Email Address */}
+                            {/* Reading Streak */}
                             <td className="py-4 px-4 sm:px-6">
-                              {account.email ? (
-                                <div className="flex items-center gap-1.5">
-                                  <Mail size={13} className="text-[var(--muted)] shrink-0" />
-                                  <span className="text-xs text-[var(--fg)] truncate max-w-[180px] sm:max-w-[220px]">
-                                    {account.email}
+                              <div className="space-y-1">
+                                {account.streak && account.streak.currentStreak > 0 ? (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                                    <Flame size={12} className="animate-pulse" />
+                                    <span>{account.streak.currentStreak} Days</span>
                                   </span>
-                                  <button
-                                    onClick={() => handleCopyUserField(account.email!, 'email')}
-                                    className="text-[var(--muted)] hover:text-accent p-0.5 cursor-pointer transition-colors shrink-0"
-                                    title="Copy email"
-                                  >
-                                    {copiedEmail === account.email ? (
-                                      <Check size={11} className="text-emerald-400" />
-                                    ) : (
-                                      <Copy size={11} />
-                                    )}
-                                  </button>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono bg-[var(--surface-raised)] border border-[var(--border)] text-[var(--muted)]">
+                                    0 Days
+                                  </span>
+                                )}
+                                <div className="flex items-center gap-2 text-[10px] text-[var(--muted)] font-mono">
+                                  <span>Best: {account.streak?.longestStreak || 0}d</span>
+                                  {account.streak?.isCompletedToday ? (
+                                    <span className="text-emerald-400 font-semibold flex items-center gap-0.5">
+                                      <CheckCircle2 size={10} />
+                                      Today
+                                    </span>
+                                  ) : account.streak?.isGraceActive ? (
+                                    <span className="text-blue-400 font-semibold flex items-center gap-0.5">
+                                      <Shield size={10} />
+                                      Grace
+                                    </span>
+                                  ) : null}
                                 </div>
-                              ) : (
-                                <span className="text-xs text-[var(--muted)] italic">No email</span>
-                              )}
+                              </div>
                             </td>
 
-                            {/* Phone Number */}
+                            {/* Today's Habits */}
                             <td className="py-4 px-4 sm:px-6">
-                              {account.phoneNumber ? (
-                                <div className="flex items-center gap-1.5">
-                                  <Phone size={13} className="text-accent shrink-0" />
-                                  <span className="font-mono text-xs text-[var(--fg)]">
-                                    {account.phoneNumber}
-                                  </span>
-                                  <button
-                                    onClick={() => handleCopyUserField(account.phoneNumber!, 'phone')}
-                                    className="text-[var(--muted)] hover:text-accent p-0.5 cursor-pointer transition-colors shrink-0"
-                                    title="Copy phone number"
-                                  >
-                                    {copiedPhone === account.phoneNumber ? (
-                                      <Check size={11} className="text-emerald-400" />
-                                    ) : (
-                                      <Copy size={11} />
-                                    )}
-                                  </button>
-                                </div>
-                              ) : (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] bg-[var(--surface-raised)] border border-[var(--border)] text-[var(--muted)] italic">
-                                  None provided
+                              <div className="flex items-center gap-1 text-[11px]">
+                                <span
+                                  title={`Scripture Reading: ${account.streak?.todayGoals?.scripture ? 'Completed' : 'Pending'}`}
+                                  className={`p-1 rounded-md border text-[11px] ${
+                                    account.streak?.todayGoals?.scripture
+                                      ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                                      : 'bg-[var(--surface-raised)] text-[var(--muted)]/40 border-[var(--border)]'
+                                  }`}
+                                >
+                                  📖
                                 </span>
-                              )}
+                                <span
+                                  title={`Devotional: ${account.streak?.todayGoals?.devotional ? 'Completed' : 'Pending'}`}
+                                  className={`p-1 rounded-md border text-[11px] ${
+                                    account.streak?.todayGoals?.devotional
+                                      ? 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+                                      : 'bg-[var(--surface-raised)] text-[var(--muted)]/40 border-[var(--border)]'
+                                  }`}
+                                >
+                                  🕊️
+                                </span>
+                                <span
+                                  title={`Prayer: ${account.streak?.todayGoals?.prayer ? 'Completed' : 'Pending'}`}
+                                  className={`p-1 rounded-md border text-[11px] ${
+                                    account.streak?.todayGoals?.prayer
+                                      ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                                      : 'bg-[var(--surface-raised)] text-[var(--muted)]/40 border-[var(--border)]'
+                                  }`}
+                                >
+                                  🙏
+                                </span>
+                              </div>
+                            </td>
+
+                            {/* Library Activity */}
+                            <td className="py-4 px-4 sm:px-6">
+                              <div className="flex flex-wrap items-center gap-1.5 font-mono text-[11px] text-[var(--muted)]">
+                                <span
+                                  title="Completed Chapters"
+                                  className="px-1.5 py-0.5 rounded bg-[var(--surface-raised)] border border-[var(--border)] text-[var(--fg-2)]"
+                                >
+                                  ✓ {account.streak?.totalChaptersRead ?? 0}
+                                </span>
+                                <span
+                                  title="Notes Created"
+                                  className="px-1.5 py-0.5 rounded bg-[var(--surface-raised)] border border-[var(--border)] text-[var(--fg-2)]"
+                                >
+                                  📝 {account.streak?.totalNotes ?? 0}
+                                </span>
+                                <span
+                                  title="Canvases Created"
+                                  className="px-1.5 py-0.5 rounded bg-[var(--surface-raised)] border border-[var(--border)] text-[var(--fg-2)]"
+                                >
+                                  🎨 {account.streak?.totalCanvases ?? 0}
+                                </span>
+                                <span
+                                  title="Highlights Saved"
+                                  className="px-1.5 py-0.5 rounded bg-[var(--surface-raised)] border border-[var(--border)] text-[var(--fg-2)]"
+                                >
+                                  🖍️ {account.streak?.totalHighlights ?? 0}
+                                </span>
+                              </div>
+                            </td>
+
+                            {/* Contact Info (Email & Phone) */}
+                            <td className="py-4 px-4 sm:px-6">
+                              <div className="space-y-1">
+                                {account.email ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <Mail size={12} className="text-[var(--muted)] shrink-0" />
+                                    <span className="text-xs text-[var(--fg)] truncate max-w-[150px] sm:max-w-[180px]">
+                                      {account.email}
+                                    </span>
+                                    <button
+                                      onClick={() => handleCopyUserField(account.email!, 'email')}
+                                      className="text-[var(--muted)] hover:text-accent p-0.5 cursor-pointer transition-colors shrink-0"
+                                      title="Copy email"
+                                    >
+                                      {copiedEmail === account.email ? (
+                                        <Check size={11} className="text-emerald-400" />
+                                      ) : (
+                                        <Copy size={11} />
+                                      )}
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span className="text-[11px] text-[var(--muted)] italic">No email</span>
+                                )}
+                                {account.phoneNumber && (
+                                  <div className="flex items-center gap-1.5">
+                                    <Phone size={12} className="text-accent shrink-0" />
+                                    <span className="font-mono text-[11px] text-[var(--fg)]">
+                                      {account.phoneNumber}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
                             </td>
 
                             {/* Signed Up */}
@@ -1483,6 +2460,16 @@ export default function DevDashboardPage() {
                                 </div>
                               </div>
                             </td>
+
+                            {/* Inspect Action */}
+                            <td className="py-4 px-4 sm:px-6 text-right">
+                              <button
+                                onClick={() => setSelectedUserDetail(account)}
+                                className="px-2.5 py-1 text-xs rounded-lg bg-[var(--surface-raised)] hover:bg-accent hover:text-white border border-[var(--border)] text-[var(--fg-2)] transition-colors cursor-pointer"
+                              >
+                                Inspect
+                              </button>
+                            </td>
                           </tr>
                         );
                       })}
@@ -1493,24 +2480,249 @@ export default function DevDashboardPage() {
                 <div className="p-12 text-center text-xs text-[var(--muted)] space-y-2">
                   <Users size={28} className="mx-auto text-[var(--muted)]/50 mb-2" />
                   <p className="font-semibold text-sm text-[var(--fg)]">
-                    {userSearchQuery ? 'No matching users found' : 'No registered users found'}
+                    {userSearchQuery || userStreakFilter !== 'all' ? 'No matching users found' : 'No registered users found'}
                   </p>
                   <p className="text-xs text-[var(--muted)]">
-                    {userSearchQuery
-                      ? `No registered accounts match "${userSearchQuery}". Try a different email, username, or phone number.`
-                      : 'When new users register via Clerk, their account credentials and last active timestamps will appear here.'}
+                    {userSearchQuery || userStreakFilter !== 'all'
+                      ? 'No accounts match the current search query and filter criteria.'
+                      : 'When new users register via Clerk, their account credentials and streak stats will appear here.'}
                   </p>
-                  {userSearchQuery && (
+                  {(userSearchQuery || userStreakFilter !== 'all') && (
                     <button
-                      onClick={() => setUserSearchQuery('')}
+                      onClick={() => {
+                        setUserSearchQuery('');
+                        setUserStreakFilter('all');
+                      }}
                       className="mt-3 px-3 py-1.5 text-xs rounded-xl bg-accent text-white font-medium cursor-pointer"
                     >
-                      Clear search filter
+                      Clear search & filter
                     </button>
                   )}
                 </div>
               )}
             </div>
+
+            {/* Modal: Selected User Account Inspector */}
+            {selectedUserDetail && (
+              <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+                <div className="w-full max-w-xl bg-[var(--surface)] border border-[var(--border)] rounded-3xl p-6 shadow-2xl relative space-y-5 max-h-[90vh] overflow-y-auto">
+                  {/* Modal Header */}
+                  <div className="flex items-start justify-between gap-3 pb-3 border-b border-[var(--border)]">
+                    <div className="flex items-center gap-3">
+                      {selectedUserDetail.imageUrl ? (
+                        <img
+                          src={selectedUserDetail.imageUrl}
+                          alt={selectedUserDetail.fullName || 'User'}
+                          className="w-12 h-12 rounded-full object-cover border border-[var(--border)]"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-accent/15 text-accent flex items-center justify-center font-bold text-base border border-accent/20">
+                          {(selectedUserDetail.fullName?.[0] || selectedUserDetail.username?.[0] || 'U').toUpperCase()}
+                        </div>
+                      )}
+                      <div>
+                        <h3 className="text-base font-bold text-[var(--fg)]">
+                          {selectedUserDetail.fullName || selectedUserDetail.username || 'Anonymous User'}
+                        </h3>
+                        {selectedUserDetail.username && (
+                          <p className="text-xs text-[var(--muted)]">@{selectedUserDetail.username}</p>
+                        )}
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="font-mono text-[10px] text-[var(--muted)]">
+                            {selectedUserDetail.id}
+                          </span>
+                          <button
+                            onClick={() => handleCopyUserField(selectedUserDetail.id, 'userId')}
+                            className="text-[var(--muted)] hover:text-accent p-0.5 cursor-pointer"
+                            title="Copy Clerk ID"
+                          >
+                            {copiedUserId === selectedUserDetail.id ? (
+                              <Check size={11} className="text-emerald-400" />
+                            ) : (
+                              <Copy size={11} />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setSelectedUserDetail(null)}
+                      className="p-1.5 rounded-xl bg-[var(--surface-raised)] hover:bg-[var(--surface-hover)] border border-[var(--border)] text-[var(--muted)] hover:text-[var(--fg)] transition-colors cursor-pointer"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+
+                  {/* Streak Card */}
+                  <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/25 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Flame size={18} className="text-amber-400" />
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400">
+                          Spiritual Reading Streak
+                        </h4>
+                      </div>
+                      {selectedUserDetail.streak?.isCompletedToday ? (
+                        <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                          Completed Today
+                        </span>
+                      ) : selectedUserDetail.streak?.isGraceActive ? (
+                        <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-500/15 text-blue-400 border border-blue-500/30">
+                          Grace Day Active
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[var(--surface-raised)] text-[var(--muted)] border border-[var(--border)]">
+                          Pending Today
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 font-mono text-center">
+                      <div className="p-2 rounded-xl bg-[var(--surface)] border border-[var(--border)]">
+                        <span className="text-[10px] text-[var(--muted)] block">Current Streak</span>
+                        <span className="text-lg font-bold text-amber-400">
+                          {selectedUserDetail.streak?.currentStreak ?? 0}d
+                        </span>
+                      </div>
+                      <div className="p-2 rounded-xl bg-[var(--surface)] border border-[var(--border)]">
+                        <span className="text-[10px] text-[var(--muted)] block">Longest Streak</span>
+                        <span className="text-lg font-bold text-yellow-400">
+                          {selectedUserDetail.streak?.longestStreak ?? 0}d
+                        </span>
+                      </div>
+                      <div className="p-2 rounded-xl bg-[var(--surface)] border border-[var(--border)]">
+                        <span className="text-[10px] text-[var(--muted)] block">Active Dates</span>
+                        <span className="text-lg font-bold text-[var(--fg)]">
+                          {selectedUserDetail.streak?.activeDatesCount ?? 0}d
+                        </span>
+                      </div>
+                      <div className="p-2 rounded-xl bg-[var(--surface)] border border-[var(--border)]">
+                        <span className="text-[10px] text-[var(--muted)] block">Daily Goal</span>
+                        <span className="text-lg font-bold text-[var(--fg)]">
+                          {selectedUserDetail.streak?.dailyChapterGoal ?? 3} ch
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Today's Habits */}
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-semibold text-[var(--fg)]">
+                      Today&apos;s Spiritual Rhythms Checklist
+                    </h4>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className={`p-3 rounded-xl border flex items-center gap-2.5 ${
+                        selectedUserDetail.streak?.todayGoals?.scripture
+                          ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                          : 'bg-[var(--surface-raised)] border-[var(--border)] text-[var(--muted)]'
+                      }`}>
+                        <BookOpen size={16} />
+                        <div>
+                          <span className="text-xs font-medium block">Scripture</span>
+                          <span className="text-[10px] font-mono">
+                            {selectedUserDetail.streak?.todayGoals?.scripture ? 'Completed' : 'Pending'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className={`p-3 rounded-xl border flex items-center gap-2.5 ${
+                        selectedUserDetail.streak?.todayGoals?.devotional
+                          ? 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                          : 'bg-[var(--surface-raised)] border-[var(--border)] text-[var(--muted)]'
+                      }`}>
+                        <Heart size={16} />
+                        <div>
+                          <span className="text-xs font-medium block">Devotional</span>
+                          <span className="text-[10px] font-mono">
+                            {selectedUserDetail.streak?.todayGoals?.devotional ? 'Completed' : 'Pending'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className={`p-3 rounded-xl border flex items-center gap-2.5 ${
+                        selectedUserDetail.streak?.todayGoals?.prayer
+                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                          : 'bg-[var(--surface-raised)] border-[var(--border)] text-[var(--muted)]'
+                      }`}>
+                        <CheckSquare size={16} />
+                        <div>
+                          <span className="text-xs font-medium block">Prayer</span>
+                          <span className="text-[10px] font-mono">
+                            {selectedUserDetail.streak?.todayGoals?.prayer ? 'Completed' : 'Pending'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Content Created & Activity */}
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-semibold text-[var(--fg)]">
+                      User Study Library & Content Creation
+                    </h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-center">
+                      <div className="p-2.5 rounded-xl bg-[var(--surface-raised)] border border-[var(--border)]">
+                        <span className="text-[10px] text-[var(--muted)] block">Chapters Read</span>
+                        <span className="text-base font-bold text-[var(--fg)]">
+                          {selectedUserDetail.streak?.totalChaptersRead ?? 0}
+                        </span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-[var(--surface-raised)] border border-[var(--border)]">
+                        <span className="text-[10px] text-[var(--muted)] block">Study Notes</span>
+                        <span className="text-base font-bold text-[var(--fg)]">
+                          {selectedUserDetail.streak?.totalNotes ?? 0}
+                        </span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-[var(--surface-raised)] border border-[var(--border)]">
+                        <span className="text-[10px] text-[var(--muted)] block">Visual Canvases</span>
+                        <span className="text-base font-bold text-[var(--fg)]">
+                          {selectedUserDetail.streak?.totalCanvases ?? 0}
+                        </span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-[var(--surface-raised)] border border-[var(--border)]">
+                        <span className="text-[10px] text-[var(--muted)] block">Highlights</span>
+                        <span className="text-base font-bold text-[var(--fg)]">
+                          {selectedUserDetail.streak?.totalHighlights ?? 0}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Account Lifecycle Details */}
+                  <div className="space-y-2 pt-2 border-t border-[var(--border)] text-xs text-[var(--muted)]">
+                    <div className="flex items-center justify-between">
+                      <span>Primary Email</span>
+                      <span className="font-mono text-[var(--fg)]">{selectedUserDetail.email || 'None'}</span>
+                    </div>
+                    {selectedUserDetail.phoneNumber && (
+                      <div className="flex items-center justify-between">
+                        <span>Phone Number</span>
+                        <span className="font-mono text-[var(--fg)]">{selectedUserDetail.phoneNumber}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between">
+                      <span>Account Created</span>
+                      <span className="font-mono text-[var(--fg)]">{formatFullDateTime(selectedUserDetail.createdAt)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Last App Activity</span>
+                      <span className="font-mono text-[var(--fg)]">
+                        {selectedUserDetail.lastUsedAt ? formatFullDateTime(selectedUserDetail.lastUsedAt) : 'None recorded'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Close Action */}
+                  <div className="pt-2 flex justify-end">
+                    <button
+                      onClick={() => setSelectedUserDetail(null)}
+                      className="px-4 py-2 text-xs font-semibold rounded-xl bg-[var(--surface-raised)] hover:bg-[var(--surface-hover)] border border-[var(--border)] text-[var(--fg)] transition-colors cursor-pointer"
+                    >
+                      Close Inspector
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1529,6 +2741,102 @@ export default function DevDashboardPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Feature: Reading Streaks */}
+              <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-amber-500/15 text-amber-400">
+                      <Flame size={18} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-[var(--fg)]">Reading Streaks</h3>
+                      <p className="text-[11px] text-[var(--muted)]">Streak syncs & updates</p>
+                    </div>
+                  </div>
+                  <span className="font-mono text-2xl font-bold text-[var(--fg)]">
+                    {stats?.featureCounts?.streak_updated ?? 0}
+                  </span>
+                </div>
+                <div className="w-full bg-[var(--border-soft)] h-2 rounded-full overflow-hidden">
+                  <div
+                    className="bg-amber-400 h-full rounded-full transition-all"
+                    style={{
+                      width: `${Math.min(
+                        Math.round(((stats?.featureCounts?.streak_updated ?? 0) / Math.max(stats?.totalEvents ?? 1, 1)) * 100),
+                        100
+                      )}%`,
+                    }}
+                  />
+                </div>
+                <p className="text-[11px] text-[var(--muted)]">
+                  Consecutive daily reading events logged
+                </p>
+              </div>
+
+              {/* Feature: Streak Calendar Modal */}
+              <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-blue-500/15 text-blue-400">
+                      <Calendar size={18} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-[var(--fg)]">Streak Calendar</h3>
+                      <p className="text-[11px] text-[var(--muted)]">Interactive rhythm calendar</p>
+                    </div>
+                  </div>
+                  <span className="font-mono text-2xl font-bold text-[var(--fg)]">
+                    {stats?.featureCounts?.streak_calendar_opened ?? 0}
+                  </span>
+                </div>
+                <div className="w-full bg-[var(--border-soft)] h-2 rounded-full overflow-hidden">
+                  <div
+                    className="bg-blue-400 h-full rounded-full transition-all"
+                    style={{
+                      width: `${Math.min(
+                        Math.round(((stats?.featureCounts?.streak_calendar_opened ?? 0) / Math.max(stats?.totalEvents ?? 1, 1)) * 100),
+                        100
+                      )}%`,
+                    }}
+                  />
+                </div>
+                <p className="text-[11px] text-[var(--muted)]">
+                  Users inspecting monthly streak calendar
+                </p>
+              </div>
+
+              {/* Feature: Daily Devotionals & Prayers */}
+              <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-rose-500/15 text-rose-400">
+                      <Heart size={18} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-[var(--fg)]">Devotionals & Prayers</h3>
+                      <p className="text-[11px] text-[var(--muted)]">Spiritual habits checked</p>
+                    </div>
+                  </div>
+                  <span className="font-mono text-2xl font-bold text-[var(--fg)]">
+                    {(stats?.featureCounts?.devotional_read ?? 0) + (stats?.featureCounts?.prayer_checked ?? 0)}
+                  </span>
+                </div>
+                <div className="w-full bg-[var(--border-soft)] h-2 rounded-full overflow-hidden">
+                  <div
+                    className="bg-rose-400 h-full rounded-full transition-all"
+                    style={{
+                      width: `${Math.min(
+                        Math.round((((stats?.featureCounts?.devotional_read ?? 0) + (stats?.featureCounts?.prayer_checked ?? 0)) / Math.max(stats?.totalEvents ?? 1, 1)) * 100),
+                        100
+                      )}%`,
+                    }}
+                  />
+                </div>
+                <p className="text-[11px] text-[var(--muted)]">
+                  Devotionals: <span className="font-mono text-[var(--fg)]">{stats?.featureCounts?.devotional_read ?? 0}</span> • Prayers: <span className="font-mono text-[var(--fg)]">{stats?.featureCounts?.prayer_checked ?? 0}</span>
+                </p>
+              </div>
+
               {/* Feature 0: Scripture Reading & Study */}
               <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-sm space-y-3">
                 <div className="flex items-center justify-between">
@@ -1969,6 +3277,10 @@ export default function DevDashboardPage() {
                   { id: 'all', label: 'All Events' },
                   { id: 'session_start', label: 'Sessions' },
                   { id: 'scripture_read', label: 'Scripture Read' },
+                  { id: 'streak_updated', label: 'Streaks' },
+                  { id: 'streak_calendar_opened', label: 'Streak Calendar' },
+                  { id: 'devotional_read', label: 'Devotionals' },
+                  { id: 'prayer_checked', label: 'Prayers' },
                   { id: 'ai_chat_prompt', label: 'AI Chat' },
                   { id: 'chat_file_upload', label: 'Chat Files' },
                   { id: 'canvas_opened', label: 'Canvas' },
@@ -2009,6 +3321,14 @@ export default function DevDashboardPage() {
                         return 'App Session Started';
                       case 'scripture_read':
                         return 'Scripture Chapter Read';
+                      case 'streak_updated':
+                        return 'Reading Streak Updated';
+                      case 'streak_calendar_opened':
+                        return 'Streak Calendar Inspected';
+                      case 'devotional_read':
+                        return "Today's Devotional Read";
+                      case 'prayer_checked':
+                        return 'Daily Prayer Intention Completed';
                       case 'ai_chat_prompt':
                         return 'AI Theological Chat Initiated';
                       case 'ai_chat_opened':
@@ -2052,6 +3372,14 @@ export default function DevDashboardPage() {
                         return <Activity size={14} className="text-emerald-400" />;
                       case 'scripture_read':
                         return <BookOpen size={14} className="text-amber-400" />;
+                      case 'streak_updated':
+                        return <Flame size={14} className="text-amber-400" />;
+                      case 'streak_calendar_opened':
+                        return <Calendar size={14} className="text-blue-400" />;
+                      case 'devotional_read':
+                        return <Heart size={14} className="text-rose-400" />;
+                      case 'prayer_checked':
+                        return <CheckSquare size={14} className="text-emerald-400" />;
                       case 'ai_chat_prompt':
                       case 'ai_chat_opened':
                         return <Sparkles size={14} className="text-accent" />;

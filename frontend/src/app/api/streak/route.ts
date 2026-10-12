@@ -1,6 +1,7 @@
 import { auth, clerkClient } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { recordAnalyticsEvent } from '@/lib/analyticsService';
 
 function getLocalDateString(d: Date = new Date()): string {
   const year = d.getFullYear();
@@ -250,6 +251,13 @@ export async function POST(req: Request) {
         console.warn('Clerk user metadata update warning:', saveErr);
       }
     }
+
+    // Record anonymous telemetry
+    recordAnalyticsEvent('streak_updated', userId, {
+      feature: 'streak',
+      streak: currentStreak,
+      action: isCompletedToday ? 'completed_today' : 'synced',
+    }).catch(() => {});
 
     return NextResponse.json({
       streak: {
