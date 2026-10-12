@@ -91,141 +91,141 @@ export function NoteFormattingToolbar({
   }
 
   return (
-    <div className="border-b border-border bg-surface/30 px-3 py-1.5 flex flex-wrap items-center justify-between gap-1.5 shrink-0 select-none">
+    <div className="border-b border-border bg-surface/30 px-2.5 sm:px-3 py-1.5 flex items-center justify-between gap-1.5 sm:gap-2 shrink-0 select-none overflow-x-auto no-scrollbar sm:flex-wrap">
       {/* Left Formatting Group */}
-      <div className="flex items-center gap-0.5 flex-wrap">
+      <div className="flex items-center gap-1 flex-nowrap sm:flex-wrap shrink-0">
         {/* Headings */}
         <button
           type="button"
           onClick={() => insertLinePrefix('# ')}
           title="Heading 1 (# )"
-          className="p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface transition-colors cursor-pointer"
+          className="min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0 p-2 sm:p-1.5 rounded-xl text-muted hover:text-fg hover:bg-surface transition-colors cursor-pointer flex items-center justify-center shrink-0"
         >
-          <Heading1 size={16} />
+          <Heading1 size={17} />
         </button>
         <button
           type="button"
           onClick={() => insertLinePrefix('## ')}
           title="Heading 2 (## )"
-          className="p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface transition-colors cursor-pointer"
+          className="min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0 p-2 sm:p-1.5 rounded-xl text-muted hover:text-fg hover:bg-surface transition-colors cursor-pointer flex items-center justify-center shrink-0"
         >
-          <Heading2 size={16} />
+          <Heading2 size={17} />
         </button>
         <button
           type="button"
           onClick={() => insertLinePrefix('### ')}
           title="Heading 3 (### )"
-          className="p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface transition-colors cursor-pointer"
+          className="min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0 p-2 sm:p-1.5 rounded-xl text-muted hover:text-fg hover:bg-surface transition-colors cursor-pointer flex items-center justify-center shrink-0"
         >
-          <Heading3 size={16} />
+          <Heading3 size={17} />
         </button>
 
-        <div className="w-px h-4 bg-border/60 mx-1" />
+        <div className="w-px h-5 bg-border/60 mx-1 shrink-0" />
 
         {/* Inline styles */}
         <button
           type="button"
           onClick={() => insertFormat('**', '**', 'bold text')}
           title="Bold (Ctrl+B / ⌘B)"
-          className="p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface transition-colors cursor-pointer"
+          className="min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0 p-2 sm:p-1.5 rounded-xl text-muted hover:text-fg hover:bg-surface transition-colors cursor-pointer flex items-center justify-center shrink-0"
         >
-          <Bold size={16} />
+          <Bold size={17} />
         </button>
         <button
           type="button"
           onClick={() => insertFormat('*', '*', 'italic text')}
           title="Italic (Ctrl+I / ⌘I)"
-          className="p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface transition-colors cursor-pointer"
+          className="min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0 p-2 sm:p-1.5 rounded-xl text-muted hover:text-fg hover:bg-surface transition-colors cursor-pointer flex items-center justify-center shrink-0"
         >
-          <Italic size={16} />
+          <Italic size={17} />
         </button>
         <button
           type="button"
           onClick={() => insertFormat('~~', '~~', 'strikethrough')}
           title="Strikethrough"
-          className="p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface transition-colors cursor-pointer"
+          className="min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0 p-2 sm:p-1.5 rounded-xl text-muted hover:text-fg hover:bg-surface transition-colors cursor-pointer flex items-center justify-center shrink-0"
         >
-          <Strikethrough size={16} />
+          <Strikethrough size={17} />
         </button>
         <button
           type="button"
           onClick={() => insertFormat('`', '`', 'code')}
           title="Inline Code"
-          className="p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface transition-colors cursor-pointer"
+          className="min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0 p-2 sm:p-1.5 rounded-xl text-muted hover:text-fg hover:bg-surface transition-colors cursor-pointer flex items-center justify-center shrink-0"
         >
-          <Code size={16} />
+          <Code size={17} />
         </button>
 
-        <div className="w-px h-4 bg-border/60 mx-1" />
+        <div className="w-px h-5 bg-border/60 mx-1 shrink-0" />
 
         {/* Lists & Checkboxes */}
         <button
           type="button"
           onClick={() => insertLinePrefix('- ')}
           title="Bullet List (- )"
-          className="p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface transition-colors cursor-pointer"
+          className="min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0 p-2 sm:p-1.5 rounded-xl text-muted hover:text-fg hover:bg-surface transition-colors cursor-pointer flex items-center justify-center shrink-0"
         >
-          <List size={16} />
+          <List size={17} />
         </button>
         <button
           type="button"
           onClick={() => insertLinePrefix('1. ')}
           title="Numbered List (1. )"
-          className="p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface transition-colors cursor-pointer"
+          className="min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0 p-2 sm:p-1.5 rounded-xl text-muted hover:text-fg hover:bg-surface transition-colors cursor-pointer flex items-center justify-center shrink-0"
         >
-          <ListOrdered size={16} />
+          <ListOrdered size={17} />
         </button>
         <button
           type="button"
           onClick={() => insertLinePrefix('- [ ] ')}
           title="Checklist / To-Do (- [ ])"
-          className="p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface transition-colors cursor-pointer"
+          className="min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0 p-2 sm:p-1.5 rounded-xl text-muted hover:text-fg hover:bg-surface transition-colors cursor-pointer flex items-center justify-center shrink-0"
         >
-          <CheckSquare size={16} />
+          <CheckSquare size={17} />
         </button>
 
-        <div className="w-px h-4 bg-border/60 mx-1" />
+        <div className="w-px h-5 bg-border/60 mx-1 shrink-0" />
 
         {/* Blockquote & Divider */}
         <button
           type="button"
           onClick={() => insertLinePrefix('> ')}
           title="Scripture / Quote Block (> )"
-          className="p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface transition-colors cursor-pointer"
+          className="min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0 p-2 sm:p-1.5 rounded-xl text-muted hover:text-fg hover:bg-surface transition-colors cursor-pointer flex items-center justify-center shrink-0"
         >
-          <Quote size={16} />
+          <Quote size={17} />
         </button>
         <button
           type="button"
           onClick={() => insertFormat('\n\n---\n\n')}
           title="Horizontal Divider (---)"
-          className="p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface transition-colors cursor-pointer"
+          className="min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0 p-2 sm:p-1.5 rounded-xl text-muted hover:text-fg hover:bg-surface transition-colors cursor-pointer flex items-center justify-center shrink-0"
         >
-          <Minus size={16} />
+          <Minus size={17} />
         </button>
 
         {/* Callout Dropdown */}
-        <div className="relative">
+        <div className="relative shrink-0">
           <button
             type="button"
             onClick={() => setCalloutsOpen(!calloutsOpen)}
             title="Insert Theological Callout"
-            className="flex items-center gap-1 p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface transition-colors cursor-pointer text-[12px]"
+            className="flex items-center gap-1 min-h-[40px] sm:min-h-0 p-2 sm:p-1.5 rounded-xl text-muted hover:text-fg hover:bg-surface transition-colors cursor-pointer text-[12px]"
           >
-            <Lightbulb size={16} className="text-amber-500" />
+            <Lightbulb size={17} className="text-amber-500" />
             <span className="hidden sm:inline font-medium">Callout</span>
             <ChevronDown size={12} />
           </button>
 
           {calloutsOpen && (
             <div 
-              className="absolute left-0 top-full mt-1 w-52 bg-bg border border-border rounded-xl shadow-xl z-30 p-1.5 space-y-1 animate-in fade-in"
+              className="absolute left-0 top-full mt-1.5 w-56 bg-bg border border-border rounded-xl shadow-xl z-30 p-1.5 space-y-1 animate-in fade-in"
               onClick={() => setCalloutsOpen(false)}
             >
               <button
                 type="button"
                 onClick={() => insertFormat('\n> 💡 **Theological Insight:**\n> ', '\n\n', 'Write key theological truth here...')}
-                className="w-full text-left px-2.5 py-1.5 text-[12px] rounded-lg hover:bg-surface flex items-center gap-2 text-fg cursor-pointer"
+                className="w-full text-left px-3 py-2.5 sm:py-1.5 text-xs rounded-xl hover:bg-surface flex items-center gap-2 text-fg cursor-pointer min-h-[40px]"
               >
                 <span>💡</span>
                 <span>Theological Insight</span>
@@ -233,7 +233,7 @@ export function NoteFormattingToolbar({
               <button
                 type="button"
                 onClick={() => insertFormat('\n> 🙏 **Prayer Anchor:**\n> ', '\n\n', 'Write prayer response here...')}
-                className="w-full text-left px-2.5 py-1.5 text-[12px] rounded-lg hover:bg-surface flex items-center gap-2 text-fg cursor-pointer"
+                className="w-full text-left px-3 py-2.5 sm:py-1.5 text-xs rounded-xl hover:bg-surface flex items-center gap-2 text-fg cursor-pointer min-h-[40px]"
               >
                 <span>🙏</span>
                 <span>Prayer Anchor</span>
@@ -241,7 +241,7 @@ export function NoteFormattingToolbar({
               <button
                 type="button"
                 onClick={() => insertFormat('\n> ⚠️ **Key Truth / Command:**\n> ', '\n\n', 'Write biblical mandate here...')}
-                className="w-full text-left px-2.5 py-1.5 text-[12px] rounded-lg hover:bg-surface flex items-center gap-2 text-fg cursor-pointer"
+                className="w-full text-left px-3 py-2.5 sm:py-1.5 text-xs rounded-xl hover:bg-surface flex items-center gap-2 text-fg cursor-pointer min-h-[40px]"
               >
                 <span>⚠️</span>
                 <span>Key Truth / Command</span>
@@ -249,7 +249,7 @@ export function NoteFormattingToolbar({
               <button
                 type="button"
                 onClick={() => insertFormat('\n> ✍️ **Reflection & Heart Check:**\n> ', '\n\n', 'Write personal reflection here...')}
-                className="w-full text-left px-2.5 py-1.5 text-[12px] rounded-lg hover:bg-surface flex items-center gap-2 text-fg cursor-pointer"
+                className="w-full text-left px-3 py-2.5 sm:py-1.5 text-xs rounded-xl hover:bg-surface flex items-center gap-2 text-fg cursor-pointer min-h-[40px]"
               >
                 <span>✍️</span>
                 <span>Personal Reflection</span>
@@ -260,15 +260,15 @@ export function NoteFormattingToolbar({
       </div>
 
       {/* Right Tools Group (Insert Verse, Templates, AI, View Mode) */}
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
         {/* Insert Verse */}
         <button
           type="button"
           onClick={onOpenInsertVerse}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-medium text-accent bg-accent/10 hover:bg-accent/20 border border-accent/20 transition-all cursor-pointer shadow-2xs"
+          className="flex items-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-xl text-xs font-semibold text-accent bg-accent/10 hover:bg-accent/20 border border-accent/20 transition-all cursor-pointer shadow-2xs min-h-[40px] sm:min-h-0 shrink-0"
           title="Insert formatted Scripture verse"
         >
-          <BookOpen size={14} />
+          <BookOpen size={15} />
           <span className="hidden sm:inline">Insert Verse</span>
         </button>
 
@@ -276,10 +276,10 @@ export function NoteFormattingToolbar({
         <button
           type="button"
           onClick={onOpenTemplates}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-medium text-fg hover:bg-surface border border-border transition-colors cursor-pointer"
+          className="flex items-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-xl text-xs font-medium text-fg hover:bg-surface border border-border transition-colors cursor-pointer min-h-[40px] sm:min-h-0 shrink-0"
           title="Choose a Bible Study Template"
         >
-          <LayoutTemplate size={14} />
+          <LayoutTemplate size={15} />
           <span className="hidden md:inline">Templates</span>
         </button>
 
@@ -287,56 +287,56 @@ export function NoteFormattingToolbar({
         <button
           type="button"
           onClick={onOpenAiAssistant}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-semibold text-white bg-gradient-to-r from-accent to-accent/90 hover:opacity-95 shadow-xs transition-all cursor-pointer"
+          className="flex items-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-xl text-xs font-semibold text-white bg-accent hover:opacity-95 shadow-xs transition-all cursor-pointer min-h-[40px] sm:min-h-0 shrink-0"
           title="Theologica AI Study Assistant"
         >
-          <Sparkles size={14} />
+          <Sparkles size={15} />
           <span className="hidden sm:inline">AI Study</span>
         </button>
 
-        <div className="w-px h-4 bg-border/60 mx-1 hidden sm:block" />
+        <div className="w-px h-5 bg-border/60 mx-0.5 hidden sm:block shrink-0" />
 
         {/* View Mode Segmented Control */}
-        <div className="flex items-center bg-surface border border-border/80 rounded-lg p-0.5">
+        <div className="flex items-center bg-surface border border-border/80 rounded-xl p-0.5 shrink-0">
           <button
             type="button"
             onClick={() => onChangeViewMode('edit')}
-            className={`p-1 px-2 rounded-md text-[11px] font-medium transition-colors flex items-center gap-1 cursor-pointer ${
+            className={`min-h-[38px] sm:min-h-0 px-2.5 sm:px-2 py-1.5 sm:py-1 rounded-lg text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer ${
               viewMode === 'edit'
                 ? 'bg-bg text-fg shadow-2xs font-semibold'
                 : 'text-muted hover:text-fg'
             }`}
             title="Edit Mode"
           >
-            <Edit3 size={13} />
+            <Edit3 size={14} />
             <span className="hidden sm:inline">Write</span>
           </button>
 
           <button
             type="button"
             onClick={() => onChangeViewMode('preview')}
-            className={`p-1 px-2 rounded-md text-[11px] font-medium transition-colors flex items-center gap-1 cursor-pointer ${
+            className={`min-h-[38px] sm:min-h-0 px-2.5 sm:px-2 py-1.5 sm:py-1 rounded-lg text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer ${
               viewMode === 'preview'
                 ? 'bg-bg text-fg shadow-2xs font-semibold'
                 : 'text-muted hover:text-fg'
             }`}
             title="Preview Mode"
           >
-            <Eye size={13} />
+            <Eye size={14} />
             <span className="hidden sm:inline">Preview</span>
           </button>
 
           <button
             type="button"
             onClick={() => onChangeViewMode('split')}
-            className={`hidden lg:flex p-1 px-2 rounded-md text-[11px] font-medium transition-colors items-center gap-1 cursor-pointer ${
+            className={`hidden lg:flex min-h-[38px] sm:min-h-0 px-2.5 sm:px-2 py-1.5 sm:py-1 rounded-lg text-xs font-medium transition-colors items-center gap-1 cursor-pointer ${
               viewMode === 'split'
                 ? 'bg-bg text-fg shadow-2xs font-semibold'
                 : 'text-muted hover:text-fg'
             }`}
             title="Split View (Side-by-side)"
           >
-            <Columns size={13} />
+            <Columns size={14} />
             <span>Split</span>
           </button>
         </div>

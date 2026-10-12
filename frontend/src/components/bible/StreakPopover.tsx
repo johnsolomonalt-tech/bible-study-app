@@ -83,7 +83,7 @@ export function StreakPopover({
           setStreakData(getStreakData());
           setIsOpen(true);
         }}
-        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer select-none active:scale-95 ${
+        className={`flex items-center gap-1.5 px-3 py-2 min-h-[44px] sm:min-h-0 sm:py-1.5 sm:px-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer select-none active:scale-95 ${
           isGlowing
             ? 'bg-amber-500/15 border-amber-500/35 text-amber-500 dark:text-amber-400 hover:bg-amber-500/25 shadow-xs shadow-amber-500/10'
             : streak > 0
@@ -121,14 +121,14 @@ export function StreakPopover({
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
               transition={{ duration: 0.2, ease: "easeOut" }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-lg bg-surface border border-border/80 rounded-3xl shadow-2xl overflow-hidden ring-1 ring-black/10 flex flex-col max-h-[90vh]"
+              className="w-full max-w-lg bg-surface border border-border/80 rounded-3xl shadow-2xl overflow-hidden ring-1 ring-black/10 flex flex-col max-h-[90dvh]"
             >
               {/* Top Hero Flame Header */}
               <div className="relative p-6 sm:p-8 bg-gradient-to-b from-amber-500/10 via-amber-500/5 to-transparent border-b border-border/60">
                 <button
                   type="button"
                   onClick={() => setIsOpen(false)}
-                  className="absolute top-4 right-4 p-2 text-muted hover:text-fg rounded-xl hover:bg-fg/5 transition-colors cursor-pointer"
+                  className="absolute top-4 right-4 min-w-[44px] min-h-[44px] flex items-center justify-center p-2 text-muted hover:text-fg rounded-xl hover:bg-fg/5 transition-colors cursor-pointer"
                   aria-label="Close"
                 >
                   <X size={18} />

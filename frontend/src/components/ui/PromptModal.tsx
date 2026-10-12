@@ -110,7 +110,7 @@ export function PromptModal({
                   value={value}
                   onChange={(e) => setValue(e.target.value)}
                   placeholder={placeholder}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-bg border border-border text-sm text-fg placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-bg border border-border text-[16px] text-fg placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent"
                   required
                 />
               </div>
@@ -119,14 +119,14 @@ export function PromptModal({
                 <button
                   type="button"
                   onClick={onCancel}
-                  className="px-4 py-2 text-xs sm:text-sm font-semibold rounded-xl border border-border bg-surface hover:bg-surface-hover text-fg transition-all cursor-pointer"
+                  className="min-h-[44px] px-4 py-2.5 text-sm font-semibold rounded-xl border border-border bg-surface hover:bg-surface-hover text-fg transition-all cursor-pointer"
                 >
                   {cancelLabel}
                 </button>
                 <button
                   type="submit"
                   disabled={!value.trim()}
-                  className="px-4 py-2 text-xs sm:text-sm font-semibold rounded-xl bg-accent text-white shadow-sm hover:opacity-90 transition-all cursor-pointer disabled:opacity-50 active:scale-95"
+                  className="min-h-[44px] px-4 py-2.5 text-sm font-semibold rounded-xl bg-accent text-white shadow-sm hover:opacity-90 transition-all cursor-pointer disabled:opacity-50 active:scale-95"
                 >
                   {confirmLabel}
                 </button>

@@ -110,7 +110,7 @@ export function ConfirmModal({
                 type="button"
                 onClick={onCancel}
                 disabled={isLoading}
-                className="px-4 py-2 text-xs sm:text-sm font-semibold rounded-xl border border-border bg-surface hover:bg-surface-hover text-fg transition-all cursor-pointer disabled:opacity-50"
+                className="min-h-[44px] px-4 py-2.5 text-sm font-semibold rounded-xl border border-border bg-surface hover:bg-surface-hover text-fg transition-all cursor-pointer disabled:opacity-50"
               >
                 {cancelLabel}
               </button>
@@ -119,7 +119,7 @@ export function ConfirmModal({
                 ref={confirmButtonRef}
                 onClick={onConfirm}
                 disabled={isLoading}
-                className={`px-4 py-2 text-xs sm:text-sm font-semibold rounded-xl text-white shadow-sm transition-all cursor-pointer disabled:opacity-50 active:scale-95 ${
+                className={`min-h-[44px] px-4 py-2.5 text-sm font-semibold rounded-xl text-white shadow-sm transition-all cursor-pointer disabled:opacity-50 active:scale-95 ${
                   variant === 'danger'
                     ? 'bg-rose-600 hover:bg-rose-500 border border-rose-700/50'
                     : variant === 'warning'

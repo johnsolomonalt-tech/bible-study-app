@@ -320,10 +320,10 @@ export function CanvasToolbar({
               setIsNewCanvasMenuOpen(false);
               setIsMoreMenuOpen(false);
             }}
-            className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-accent text-white text-xs sm:text-sm font-semibold hover:bg-accent/90 active:scale-95 transition-all shadow-sm cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-2 min-h-[44px] sm:min-h-0 sm:py-1.5 rounded-xl bg-accent text-white text-xs sm:text-sm font-semibold hover:bg-accent/90 active:scale-95 transition-all shadow-sm cursor-pointer"
             title="Add card to canvas"
           >
-            <Plus size={15} />
+            <Plus size={16} />
             {showAddCardText && <span>Add Card</span>}
             <ChevronDown size={13} className={`transition-transform duration-200 ${isAddMenuOpen ? 'rotate-180' : ''}`} />
           </button>
@@ -347,7 +347,7 @@ export function CanvasToolbar({
                         setIsAddMenuOpen(false);
                         onAddNode(cat);
                       }}
-                      className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer hover:bg-surface-hover text-fg"
+                      className="w-full flex items-center justify-between px-3.5 py-2.5 min-h-[44px] rounded-xl text-sm font-medium transition-colors cursor-pointer hover:bg-surface-hover text-fg"
                     >
                       <div className="flex items-center gap-2.5">
                         <span 
@@ -593,7 +593,7 @@ export function CanvasToolbar({
                 setIsAddMenuOpen(false);
                 setIsNewCanvasMenuOpen(false);
               }}
-              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+              className={`min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 p-2 sm:p-1.5 flex items-center justify-center rounded-xl transition-colors cursor-pointer ${
                 isMoreMenuOpen 
                   ? 'bg-accent text-accent-on ring-1 ring-border-soft' 
                   : 'hover:bg-surface-hover text-fg-2 hover:text-fg'

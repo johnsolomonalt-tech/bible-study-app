@@ -52,7 +52,7 @@ export function TranslationSelector({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface/80 hover:bg-surface border border-border-soft/60 hover:border-border-soft transition-all text-xs font-semibold text-fg cursor-pointer active:scale-95 shadow-xs"
+        className="flex items-center gap-1.5 px-3 py-2 min-h-[44px] sm:min-h-0 sm:py-1.5 sm:px-2.5 rounded-xl bg-surface/80 hover:bg-surface border border-border-soft/60 hover:border-border-soft transition-all text-xs font-semibold text-fg cursor-pointer active:scale-95 shadow-xs"
         title="Choose Bible Translation"
         aria-haspopup="true"
         aria-expanded={isOpen}
@@ -83,7 +83,7 @@ export function TranslationSelector({
                   key={t.id}
                   type="button"
                   onClick={() => handleSelect(t)}
-                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-left transition-colors cursor-pointer ${
+                  className={`w-full flex items-center justify-between px-3 py-3 sm:py-2 min-h-[44px] rounded-xl text-left transition-colors cursor-pointer ${
                     isSelected
                       ? 'bg-accent/15 text-fg font-semibold border border-accent/30'
                       : 'hover:bg-fg/5 text-fg-2 hover:text-fg'

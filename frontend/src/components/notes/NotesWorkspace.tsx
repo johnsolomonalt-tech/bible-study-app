@@ -757,15 +757,15 @@ export function NotesWorkspace({
   };
 
   return (
-    <div className="flex w-full h-full bg-bg relative overflow-hidden select-text p-2 sm:p-2.5 gap-2 sm:gap-2.5">
+    <div className="flex w-full h-full bg-bg relative overflow-hidden select-text p-0 lg:p-2.5 gap-0 lg:gap-2.5">
       {/* SIDEBAR: Notebooks & Notes List (Option 5) */}
       <aside 
-        className={`w-full lg:w-[320px] rounded-2xl border border-border/80 bg-surface/15 flex flex-col shrink-0 h-full min-h-0 overflow-hidden shadow-xs transition-all ${
+        className={`w-full lg:w-[320px] rounded-none lg:rounded-2xl border-0 lg:border border-border/80 bg-bg lg:bg-surface/15 flex flex-col shrink-0 h-full min-h-0 overflow-hidden lg:shadow-xs transition-all ${
           activeNoteId ? 'hidden lg:flex' : 'flex animate-in slide-in-from-left duration-300 ease-out'
         }`}
       >
         {/* Sidebar Header with Notes vs Backlinks vs Templates Tabs */}
-        <header className="h-[52px] border-b border-border/70 flex items-center justify-between px-2.5 shrink-0 bg-surface/25 backdrop-blur-sm gap-1.5">
+        <header className="h-[56px] border-b border-border/70 flex items-center justify-between px-3 sm:px-4 shrink-0 bg-surface/25 backdrop-blur-sm gap-2">
           {/* Tabs Segmented Control Pill Container (Always intact rounded corners, smooth edge fade) */}
           <div className="relative flex-1 min-w-0 flex items-center bg-surface/80 rounded-xl border border-border/60 p-0.5 overflow-hidden shadow-2xs">
             {/* Left fade gradient for smooth cutoff */}
@@ -851,10 +851,10 @@ export function NotesWorkspace({
             <button
               type="button"
               onClick={handleCreateBlankNote}
-              className="p-1.5 text-muted hover:text-fg hover:bg-surface border border-border/60 hover:border-border rounded-xl transition-colors cursor-pointer shadow-2xs"
+              className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 text-muted hover:text-fg hover:bg-surface border border-border/60 hover:border-border rounded-xl transition-colors cursor-pointer shadow-2xs"
               title="New Blank Note"
             >
-              <Plus size={15} />
+              <Plus size={16} />
             </button>
           </div>
         </header>
@@ -873,16 +873,16 @@ export function NotesWorkspace({
       <section 
         onTouchStart={handleNoteTouchStart}
         onTouchEnd={handleNoteTouchEnd}
-        className={`flex-1 flex-col bg-surface/10 rounded-2xl border border-border/80 overflow-hidden shadow-xs ${activeNoteId ? 'flex animate-in slide-in-from-right duration-300 ease-out' : 'hidden lg:flex'}`}
+        className={`flex-1 flex-col bg-bg lg:bg-surface/10 rounded-none lg:rounded-2xl border-0 lg:border border-border/80 overflow-hidden lg:shadow-xs ${activeNoteId ? 'flex animate-in slide-in-from-right duration-300 ease-out' : 'hidden lg:flex'}`}
       >
         {activeNote ? (
           <>
             {/* Note Top Header */}
-            <header className="h-[60px] border-b border-border flex items-center justify-between px-4 lg:px-8 shrink-0 bg-surface/10">
+            <header className="h-[58px] border-b border-border flex items-center justify-between px-3 sm:px-4 lg:px-8 shrink-0 bg-surface/10">
               <div className="flex items-center gap-2 flex-1 min-w-0 mr-4">
                 <button 
                   onClick={() => handleSelectNote(null)} 
-                  className="lg:hidden p-1.5 -ml-1 text-fg-2 hover:text-fg rounded-lg hover:bg-surface cursor-pointer"
+                  className="lg:hidden min-w-[44px] min-h-[44px] flex items-center justify-center p-2 -ml-1 text-fg-2 hover:text-fg rounded-xl hover:bg-surface cursor-pointer"
                   title="Back to Notes List"
                 >
                   <ChevronLeft size={20} />
@@ -897,7 +897,7 @@ export function NotesWorkspace({
               </div>
 
               {/* Note Metadata & Actions */}
-              <div className="flex items-center gap-3 shrink-0">
+              <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
                 {/* Word count & Reading Time Badge */}
                 <div className="hidden sm:flex items-center gap-2 text-[11px] text-meta bg-surface/70 px-2.5 py-1 rounded-lg border border-border/60">
                   <span>{noteStats.words} words</span>
@@ -909,7 +909,7 @@ export function NotesWorkspace({
                 <button
                   type="button"
                   onClick={() => togglePin(activeNote.id)}
-                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                  className={`min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-xl transition-colors cursor-pointer ${
                     pinnedIds.includes(activeNote.id)
                       ? 'text-accent bg-accent/10 border border-accent/20'
                       : 'text-muted hover:text-fg hover:bg-surface'
@@ -924,42 +924,42 @@ export function NotesWorkspace({
                   <button
                     type="button"
                     onClick={() => setIsActionsMenuOpen(!isActionsMenuOpen)}
-                    className="p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface transition-colors cursor-pointer"
+                    className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-xl text-muted hover:text-fg hover:bg-surface transition-colors cursor-pointer"
                   >
-                    <MoreVertical size={17} />
+                    <MoreVertical size={18} />
                   </button>
 
                   {isActionsMenuOpen && (
                     <div 
-                      className="absolute right-0 top-full mt-1.5 w-48 bg-bg border border-border rounded-xl shadow-xl z-30 p-1.5 space-y-1 animate-in fade-in"
+                      className="absolute right-0 top-full mt-1.5 w-52 bg-bg border border-border rounded-2xl shadow-2xl z-30 p-1.5 space-y-1 animate-in fade-in"
                       onClick={() => setIsActionsMenuOpen(false)}
                     >
                       <button
                         onClick={handleCopyNote}
-                        className="w-full text-left px-3 py-1.5 text-[12px] rounded-lg hover:bg-surface flex items-center gap-2 text-fg cursor-pointer"
+                        className="w-full text-left px-3 py-2.5 text-[13px] rounded-xl hover:bg-surface flex items-center gap-2.5 text-fg cursor-pointer min-h-[40px]"
                       >
-                        {copiedStatus ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                        {copiedStatus ? <Check size={15} className="text-emerald-500" /> : <Copy size={15} />}
                         <span>{copiedStatus ? 'Copied' : 'Copy All'}</span>
                       </button>
                       <button
                         onClick={handleDuplicateNote}
-                        className="w-full text-left px-3 py-1.5 text-[12px] rounded-lg hover:bg-surface flex items-center gap-2 text-fg cursor-pointer"
+                        className="w-full text-left px-3 py-2.5 text-[13px] rounded-xl hover:bg-surface flex items-center gap-2.5 text-fg cursor-pointer min-h-[40px]"
                       >
-                        <FilePlus size={14} />
+                        <FilePlus size={15} />
                         <span>Duplicate Note</span>
                       </button>
                       <button
                         onClick={() => handleExport('md')}
-                        className="w-full text-left px-3 py-1.5 text-[12px] rounded-lg hover:bg-surface flex items-center gap-2 text-fg cursor-pointer"
+                        className="w-full text-left px-3 py-2.5 text-[13px] rounded-xl hover:bg-surface flex items-center gap-2.5 text-fg cursor-pointer min-h-[40px]"
                       >
-                        <Download size={14} />
+                        <Download size={15} />
                         <span>Export Markdown (.md)</span>
                       </button>
                       <button
                         onClick={() => handleExport('txt')}
-                        className="w-full text-left px-3 py-1.5 text-[12px] rounded-lg hover:bg-surface flex items-center gap-2 text-fg cursor-pointer"
+                        className="w-full text-left px-3 py-2.5 text-[13px] rounded-xl hover:bg-surface flex items-center gap-2.5 text-fg cursor-pointer min-h-[40px]"
                       >
-                        <Download size={14} />
+                        <Download size={15} />
                         <span>Export Plain Text (.txt)</span>
                       </button>
                       <div className="w-full h-px bg-border my-1" />
@@ -968,9 +968,9 @@ export function NotesWorkspace({
                           setIsActionsMenuOpen(false);
                           setNoteToDelete(activeNote);
                         }}
-                        className="w-full text-left px-3 py-1.5 text-[12px] rounded-lg hover:bg-rose-500/10 flex items-center gap-2 text-rose-500 cursor-pointer"
+                        className="w-full text-left px-3 py-2.5 text-[13px] rounded-xl hover:bg-rose-500/10 flex items-center gap-2.5 text-rose-500 cursor-pointer min-h-[40px]"
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={15} />
                         <span>Delete Note</span>
                       </button>
                     </div>

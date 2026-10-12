@@ -264,6 +264,20 @@ html, body {
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
+.safe-area-pb {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 16px);
+}
+
+/* Mobile Sheet & Tap Target Utilities */
+@media screen and (max-width: 768px) {
+  .mobile-touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  .mobile-sheet-content {
+    padding-bottom: calc(max(env(safe-area-inset-bottom, 0px), 16px) + 12px);
+  }
+}
 
 /* Bible Scripture Highlighting - Vibrant, accessible in Dark, Light, and Sepia */
 mark.theologica-highlight {
