@@ -453,23 +453,21 @@ const AiThinkingAccordion = ({ thought }: { thought: string }) => {
   if (!thought) return null;
 
   return (
-    <div className="w-full mb-3 rounded-xl border border-border-soft/80 bg-surface/30 hover:bg-surface/50 transition-all overflow-hidden shadow-2xs">
+    <div className="w-full mb-2.5">
       <button
         type="button"
         onClick={() => setIsOpen(prev => !prev)}
-        className="w-full flex items-center justify-between px-3 py-2 text-left cursor-pointer group select-none transition-colors"
+        className="inline-flex items-center gap-1.5 text-left cursor-pointer group select-none transition-colors text-muted hover:text-fg py-0.5"
       >
-        <div className="flex items-center gap-2 min-w-0 text-muted group-hover:text-fg transition-colors">
-          <BrainCircuit size={13} className="text-accent/80 shrink-0" />
-          <span className="text-[12px] font-medium">
-            {isOpen ? 'Hide thinking' : 'Show thinking'}
-          </span>
-        </div>
-        <ChevronDown size={13} className={`text-muted group-hover:text-fg transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+        <BrainCircuit size={13} className="text-accent/80 shrink-0" />
+        <span className="text-[12px] font-medium">
+          {isOpen ? 'Hide thinking' : 'Show thinking'}
+        </span>
+        <ChevronDown size={12} className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {isOpen && (
-        <div className="px-3.5 py-2.5 border-t border-border-soft/50 bg-bg/40 text-[12px] leading-relaxed text-muted/95 max-h-72 overflow-y-auto custom-scroll whitespace-pre-wrap font-sans space-y-1.5 selection:bg-accent/20">
+        <div className="mt-1.5 pl-3 border-l-2 border-border-soft/80 text-[12px] leading-relaxed text-muted/85 max-h-72 overflow-y-auto custom-scroll whitespace-pre-wrap font-sans selection:bg-accent/20">
           {thought}
         </div>
       )}
@@ -498,89 +496,49 @@ const AiThinkingIndicator = ({
 
   const trimmedThinking = thinkingText?.trim() || '';
   const isImageStatus = status?.toLowerCase().includes('artwork') || status?.toLowerCase().includes('image');
-  const displayStatus = isImageStatus ? status : 'Thinking...';
 
   return (
-    <div className={`flex flex-col items-start w-full shrink-0 ${isFullView ? 'max-w-3xl mx-auto' : ''} py-3 animate-in fade-in duration-200`}>
-      <div className="flex items-center gap-2 mb-2 select-none">
+    <div className={`flex flex-col items-start w-full shrink-0 ${isFullView ? 'max-w-3xl mx-auto' : ''} py-2 animate-in fade-in duration-200`}>
+      <div className="flex items-center gap-2 mb-1.5 select-none">
         <div className="w-5 h-5 rounded-full bg-accent/15 border border-accent/40 flex items-center justify-center text-accent animate-pulse">
           <BrainCircuit size={12} />
         </div>
         <span className="text-[11px] font-semibold tracking-wider uppercase text-muted">Theologica AI</span>
       </div>
 
-      <div className="w-full rounded-2xl bg-surface/70 border border-border-soft shadow-xs overflow-hidden transition-all">
-        {/* Status Header */}
-        <div className="flex items-center justify-between px-3.5 py-2.5">
-          <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
-            <div className="flex gap-1 items-center shrink-0">
-              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '0ms' }} />
-              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '150ms' }} />
-              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '300ms' }} />
-            </div>
-            <span 
-              className="text-[12.5px] sm:text-[13px] text-fg font-medium truncate inline-block"
-            >
-              {displayStatus}
-            </span>
+      <div className="flex flex-col items-start w-full">
+        {/* Unboxed thinking indicator: three dots bouncing, no "Thinking..." text, followed by "Show thinking" */}
+        <div className="flex items-center gap-2.5 py-1">
+          <div className="flex gap-1.5 items-center shrink-0 py-0.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '0ms' }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '150ms' }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '300ms' }} />
           </div>
+
+          {isImageStatus && (
+            <span className="text-[12.5px] sm:text-[13px] text-muted font-medium truncate inline-block">
+              {status}
+            </span>
+          )}
 
           {trimmedThinking && (
             <button
               type="button"
               onClick={() => setShowLiveThoughts(prev => !prev)}
-              className="text-[11px] text-muted hover:text-fg transition-colors flex items-center gap-1 cursor-pointer shrink-0 ml-auto"
+              className="text-[12px] text-muted hover:text-fg transition-colors flex items-center gap-1 cursor-pointer shrink-0 ml-1"
             >
               <span>{showLiveThoughts ? 'Hide thinking' : 'Show thinking'}</span>
-              <ChevronDown size={13} className={`transition-transform duration-200 ${showLiveThoughts ? 'rotate-180' : ''}`} />
+              <ChevronDown size={12} className={`transition-transform duration-200 ${showLiveThoughts ? 'rotate-180' : ''}`} />
             </button>
           )}
         </div>
 
-        {/* Live thinking preview: couple of lines with '... Show thinking' */}
-        {trimmedThinking && !showLiveThoughts && (
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => setShowLiveThoughts(true)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                setShowLiveThoughts(true);
-              }
-            }}
-            className="w-full text-left px-3.5 py-2.5 border-t border-border-soft/50 bg-bg/30 hover:bg-bg/50 transition-colors cursor-pointer group block select-none"
-          >
-            <p className="text-[12px] leading-relaxed text-muted/85 font-sans line-clamp-2 selection:bg-accent/20">
-              {trimmedThinking}
-            </p>
-            <div className="mt-1.5 flex items-center gap-1 text-[11px] font-medium text-accent group-hover:text-accent/90">
-              <span>... Show thinking</span>
-              <ChevronDown size={12} className="transition-transform duration-150 group-hover:translate-y-0.5" />
-            </div>
-          </div>
-        )}
-
-        {/* Real-time thoughts stream (expanded) */}
+        {/* Real-time thoughts stream (expanded) - unboxed, minimal border-l */}
         {trimmedThinking && showLiveThoughts && (
-          <div className="border-t border-border-soft/50 bg-bg/60 animate-in fade-in duration-150">
-            <div className="flex items-center justify-between px-3.5 pt-2.5 pb-1 select-none">
-              <div className="flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-wider text-accent">
-                <Sparkles size={11} />
-                <span>Thinking Process</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowLiveThoughts(false)}
-                className="text-[11px] text-muted hover:text-fg transition-colors flex items-center gap-1 cursor-pointer"
-              >
-                <span>Hide thinking</span>
-                <ChevronDown size={12} className="rotate-180 transition-transform duration-200" />
-              </button>
-            </div>
+          <div className="mt-2 pl-3 border-l-2 border-border-soft/80 animate-in fade-in duration-150 w-full">
             <div 
               ref={thoughtsContainerRef}
-              className="px-3.5 pb-3 pt-1 text-[12px] leading-relaxed text-muted/90 max-h-56 overflow-y-auto custom-scroll whitespace-pre-wrap selection:bg-accent/20 font-sans"
+              className="text-[12px] leading-relaxed text-muted/80 max-h-56 overflow-y-auto custom-scroll whitespace-pre-wrap selection:bg-accent/20 font-sans"
             >
               {trimmedThinking}
               <span className="inline-block w-1.5 h-3.5 ml-1 bg-accent animate-pulse align-middle" />
