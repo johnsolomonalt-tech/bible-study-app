@@ -1,17 +1,8 @@
 "use client";
 
 import React from 'react';
-import { 
-  Sparkles, 
-  Compass, 
-  ArrowRight, 
-  Scroll, 
-  Flame, 
-  GraduationCap, 
-  Heart, 
-  BookOpen 
-} from 'lucide-react';
-import { TheologicalLensType, THEOLOGICAL_LENS_OPTIONS } from './TheologicalLensSelector';
+import { Sparkles, ArrowRight } from 'lucide-react';
+import { TheologicalLensType } from './TheologicalLensSelector';
 import { BIBLE_VERSE_REGEX } from '@/lib/bibleReferences';
 
 interface ChatFollowUpsProps {
@@ -108,34 +99,35 @@ export const ChatFollowUps: React.FC<ChatFollowUpsProps> = ({
   if (followUps.length === 0) return null;
 
   return (
-    <div className="w-full mt-2.5 pt-2.5 border-t border-border/30 space-y-2.5 animate-in fade-in duration-200">
-      {/* Follow-up question bubbles side-by-side */}
-      <div>
-        <div className="flex items-center gap-1.5 mb-1.5 select-none">
-          <Sparkles size={11} className="text-accent shrink-0" />
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-muted">
-            Tailored Follow-Ups
-          </span>
-        </div>
+    <div className="w-full mt-3 pt-2.5 border-t border-border/30 animate-in fade-in duration-200">
+      {/* Follow-up question links in ChatGPT unboxed style */}
+      <div className="flex items-center gap-1.5 mb-2 select-none">
+        <Sparkles size={11} className="text-accent/80 shrink-0" />
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted">
+          Suggested Follow-Ups
+        </span>
+      </div>
 
-        <div className={`grid gap-1.5 sm:gap-2 ${followUps.length === 1 ? 'grid-cols-1' : followUps.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
-          {followUps.map((q, idx) => (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => onSelectQuestion(q)}
-              title={q}
-              className="group relative flex flex-col justify-between p-2 sm:p-2.5 rounded-xl sm:rounded-2xl bg-surface/50 hover:bg-surface border border-border-soft/60 hover:border-accent/40 shadow-2xs hover:shadow-xs text-left transition-all duration-150 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer min-w-0"
-            >
-              <span className="text-[10.5px] sm:text-[11.5px] font-medium leading-tight sm:leading-snug text-fg-hover group-hover:text-fg line-clamp-3 break-words">
-                {q}
+      <div className="flex flex-col items-start gap-1 sm:gap-1.5">
+        {followUps.map((q, idx) => (
+          <button
+            key={idx}
+            type="button"
+            onClick={() => onSelectQuestion(q)}
+            title={q}
+            className="group text-left text-xs sm:text-[13px] text-muted hover:text-fg transition-colors duration-150 cursor-pointer py-1 px-0 bg-transparent border-0 shadow-none rounded-none max-w-full touch-manipulation focus-visible:outline-none focus-visible:text-fg"
+          >
+            <span className="leading-snug break-words">
+              {q}
+              <span className="inline-block ml-1.5 align-middle select-none">
+                <ArrowRight 
+                  size={12} 
+                  className="inline-block -translate-y-px opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 text-muted group-hover:text-fg transition-all duration-150 shrink-0" 
+                />
               </span>
-              <div className="flex items-center justify-end mt-1 text-meta/50 group-hover:text-accent transition-colors">
-                <ArrowRight size={10} className="sm:size-[11px] group-hover:translate-x-0.5 transition-transform shrink-0" />
-              </div>
-            </button>
-          ))}
-        </div>
+            </span>
+          </button>
+        ))}
       </div>
     </div>
   );
