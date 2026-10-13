@@ -247,8 +247,8 @@ export function ExportStudyGuideModal({
             <textarea
               value={generatedMarkdown}
               onChange={(e) => setGeneratedMarkdown(e.target.value)}
-              className="w-full h-96 p-4 rounded-xl font-mono text-xs focus:outline-none focus:ring-1 focus:ring-accent resize-none bg-bg border border-border text-fg"
-              placeholder="Edit markdown guide directly..."
+              className="w-full h-96 p-4 rounded-xl font-sans text-sm leading-relaxed focus:outline-none focus:ring-1 focus:ring-accent resize-none bg-bg border border-border text-fg"
+              placeholder="Edit study guide directly..."
             />
           ) : (
             <div className={`prose max-w-none break-words text-fg ${isDark ? 'prose-invert' : ''}`}>

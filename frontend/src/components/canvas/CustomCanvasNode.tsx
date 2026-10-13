@@ -346,7 +346,7 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
                   setIsEditing(true);
                 }}
                 className="p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface-hover transition-colors cursor-pointer"
-                title="Edit card markdown"
+                title="Edit Card"
               >
                 <Edit3 size={15} />
               </button>
@@ -494,7 +494,7 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
                 }`}
               >
                 <Edit3 size={15} className="shrink-0" />
-                <span>Edit Markdown</span>
+                <span>Edit Card</span>
               </button>
 
               <button
@@ -555,8 +555,8 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
                   }
                 }}
                 onBlur={commitChanges}
-                placeholder="Write markdown here..."
-                className="w-full min-h-[120px] resize-y font-mono text-xs p-2.5 rounded-lg border border-border bg-bg text-fg placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent transition-all"
+                placeholder="Write card content..."
+                className="w-full min-h-[120px] resize-y font-sans text-sm leading-relaxed p-2.5 rounded-lg border border-border bg-bg text-fg placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent transition-all"
               />
               <div className="flex items-center justify-between text-[11px] text-muted">
                 <span className="hidden sm:inline">Tip: Press <kbd className="px-1 py-0.5 bg-surface-warm rounded text-[10px] font-mono">{mod.symbol}+Enter</kbd> to save</span>
@@ -590,8 +590,8 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
             ) : (
               <div className="flex flex-col items-center justify-center py-6 text-muted text-xs text-center select-none">
                 <Edit3 size={18} className="mb-1.5 opacity-40" />
-                <span className="hidden sm:inline">Double-click to write Markdown</span>
-                <span className="sm:hidden">Tap edit to write Markdown</span>
+                <span className="hidden sm:inline">Double-click to edit card</span>
+                <span className="sm:hidden">Tap edit to edit card</span>
               </div>
             )}
           </div>

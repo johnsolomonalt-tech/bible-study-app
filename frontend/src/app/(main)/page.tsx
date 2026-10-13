@@ -2077,20 +2077,12 @@ export default function App() {
   // Permanent right controls (Audio ~36px, divider ~5px, Translation ~68px, 3-dots ~36px when active) = ~145px
   // Lectio (~82px) has highest priority to remain visible next to the chapter control whenever space allows:
   // - Lectio only: ~145 + 82 = ~227px
-  // - Lectio + Mark Complete (~132px): ~227 + 132 + 6 = ~365px
-  // - Lectio + Mark Complete + Interlinear (~108px): ~365 + 108 + 6 = ~479px
-  // - All 4 (+ Backlinks ~108px, no 3-dots needed): ~115 + 82 + 132 + 108 + 108 + 18 = ~563px
+  // Desktop collapsible study tools visibility based on available tools container width:
   const showBacklinksInBar = availableToolsWidth >= 565;
   const showInterlinearInBar = availableToolsWidth >= 475;
   const showMarkCompleteInBar = availableToolsWidth >= 365;
   const showLectioInBar = availableToolsWidth >= 225;
   const hasCollapsedStudyTools = !showBacklinksInBar || !showLectioInBar || !showInterlinearInBar || !showMarkCompleteInBar;
-
-  // Mobile/Tablet (<1024px) reader header space for keeping Lectio visible next to the chapter control whenever space allows:
-  // Permanent mobile right controls (Translation ~66px, AI ~36px, 3-dots ~36px, gaps ~12px, plus optional speaking/md interlinear) = ~150px
-  const mobilePermanentRightWidth = 150 + (isSpeaking ? 44 : 0) + (mobileReaderHeaderWidth >= 768 ? 40 : 0);
-  const mobileAvailableForLectio = mobileReaderHeaderWidth - mobileReaderTitleWidth - mobilePermanentRightWidth - 28;
-  const showMobileLectioInBar = mobileAvailableForLectio >= 68;
 
   // Outside click handler for desktop 3-dots study options menu
   useEffect(() => {
@@ -5525,33 +5517,20 @@ export default function App() {
                 className="min-h-[46px] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 bg-bg shrink-0 relative z-20 py-1.5"
               >
                 {/* Left: Book & Chapter Selector Trigger */}
-                <div className="flex items-center gap-1.5 min-w-0 shrink">
-                  <div ref={mobileReaderTitleRef} className="flex items-center shrink min-w-0">
+                <div className="flex items-center gap-1.5 min-w-0 flex-1 mr-2">
+                  <div ref={mobileReaderTitleRef} className="flex items-center min-w-0 max-w-full">
                     <button 
                       onClick={() => setMobileStudyView('chapters')} 
-                      className="min-h-[38px] flex items-center gap-1.5 py-1 px-3 rounded-full bg-surface/75 hover:bg-surface border border-border-soft/50 shadow-2xs text-fg transition-all cursor-pointer active:scale-95 shrink min-w-0" 
+                      className="min-h-[38px] flex items-center gap-1.5 py-1 px-3 rounded-full bg-surface/75 hover:bg-surface border border-border-soft/50 shadow-2xs text-fg transition-all cursor-pointer active:scale-95 min-w-0" 
                       title="Choose Book & Chapter"
                     >
                       <BookOpen size={16} className="text-accent shrink-0" />
-                      <span className="font-display text-[15px] sm:text-[17px] font-semibold truncate max-w-[130px] xs:max-w-none">
+                      <span className="font-display text-[15px] sm:text-[17px] font-semibold whitespace-nowrap">
                         {activeBook.name} {activeChapter}
                       </span>
                       <ChevronDown size={13} className="text-muted shrink-0 opacity-60" />
                     </button>
                   </div>
-
-                  {/* Lectio Divina visible next to chapter control whenever measured space allows */}
-                  {showMobileLectioInBar && (
-                    <button
-                      type="button"
-                      onClick={() => setIsLectioModalOpen(true)}
-                      className="flex items-center gap-1 px-2.5 py-1 min-h-[34px] rounded-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-[12px] font-medium border border-rose-500/20 transition-all cursor-pointer shrink-0 active:scale-95"
-                      title="Lectio Divina Guided Prayer"
-                    >
-                      <Heart size={13} className="text-rose-400 shrink-0" />
-                      <span>Lectio</span>
-                    </button>
-                  )}
                 </div>
 
                 {/* Right: Actions */}
@@ -5702,20 +5681,18 @@ export default function App() {
                             )}
                           </button>
 
-                          {/* Lectio Divina (only in overflow menu when it doesn't fit in the bar) */}
-                          {!showMobileLectioInBar && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setIsLectioModalOpen(true);
-                                setIsMobileMoreMenuOpen(false);
-                              }}
-                              className="w-full min-h-[48px] flex items-center gap-3 px-3.5 py-3 rounded-xl hover:bg-fg/5 text-fg text-sm font-medium cursor-pointer transition-colors"
-                            >
-                              <Heart size={18} className="text-rose-400" />
-                              <span>Lectio Divina Guided Prayer</span>
-                            </button>
-                          )}
+                          {/* Lectio Divina Guided Prayer (always in 3-dots on mobile) */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsLectioModalOpen(true);
+                              setIsMobileMoreMenuOpen(false);
+                            }}
+                            className="w-full min-h-[48px] flex items-center gap-3 px-3.5 py-3 rounded-xl hover:bg-fg/5 text-fg text-sm font-medium cursor-pointer transition-colors"
+                          >
+                            <Heart size={18} className="text-rose-400" />
+                            <span>Lectio Divina Guided Prayer</span>
+                          </button>
 
                           {/* Mark Completed */}
                           <button
