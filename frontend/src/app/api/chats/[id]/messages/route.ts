@@ -505,7 +505,7 @@ Do NOT inject original Hebrew/Greek characters, Strong's concordance numbers, or
       },
     });
 
-    onStatusUpdate?.('Formulating theological reasoning & exegesis...');
+    onStatusUpdate?.('Thinking...');
     const stream = await chatSession.sendMessageStream({ message: messageParts });
     let accumulated = '';
     let accumulatedThought = '';

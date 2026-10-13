@@ -487,17 +487,7 @@ const AiThinkingIndicator = ({
   isFullView?: boolean; 
 }) => {
   const [showLiveThoughts, setShowLiveThoughts] = useState(false);
-  const [elapsedMs, setElapsedMs] = useState(0);
   const thoughtsContainerRef = useRef<HTMLDivElement>(null);
-
-  // Real-time elapsed stopwatch (updates every 100ms)
-  useEffect(() => {
-    const startTime = Date.now();
-    const timer = setInterval(() => {
-      setElapsedMs(Date.now() - startTime);
-    }, 100);
-    return () => clearInterval(timer);
-  }, []);
 
   // Auto-scroll thoughts stream to bottom when expanded as new thoughts arrive
   useEffect(() => {
@@ -506,8 +496,9 @@ const AiThinkingIndicator = ({
     }
   }, [thinkingText, showLiveThoughts]);
 
-  const elapsedSec = (elapsedMs / 1000).toFixed(1);
   const trimmedThinking = thinkingText?.trim() || '';
+  const isImageStatus = status?.toLowerCase().includes('artwork') || status?.toLowerCase().includes('image');
+  const displayStatus = isImageStatus ? status : 'Thinking...';
 
   return (
     <div className={`flex flex-col items-start w-full shrink-0 ${isFullView ? 'max-w-3xl mx-auto' : ''} py-3 animate-in fade-in duration-200`}>
@@ -516,9 +507,6 @@ const AiThinkingIndicator = ({
           <BrainCircuit size={12} />
         </div>
         <span className="text-[11px] font-semibold tracking-wider uppercase text-muted">Theologica AI</span>
-        <span className="text-[10px] text-accent bg-accent/10 px-2 py-0.5 rounded-full font-mono font-medium animate-pulse">
-          Thinking • {elapsedSec}s
-        </span>
       </div>
 
       <div className="w-full rounded-2xl bg-surface/70 border border-border-soft shadow-xs overflow-hidden transition-all">
@@ -531,10 +519,9 @@ const AiThinkingIndicator = ({
               <span className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: '300ms' }} />
             </div>
             <span 
-              key={status} 
-              className="text-[12.5px] sm:text-[13px] text-fg font-medium truncate inline-block animate-in fade-in duration-150"
+              className="text-[12.5px] sm:text-[13px] text-fg font-medium truncate inline-block"
             >
-              {status || "Grounding in verified Scripture..."}
+              {displayStatus}
             </span>
           </div>
 
@@ -4796,10 +4783,8 @@ export default function App() {
       setAiActivityStatus('Initiating sacred artwork generation...');
     } else if (currentAttached) {
       setAiActivityStatus(`Analyzing attached ${currentAttached.type === 'pdf' ? 'PDF' : currentAttached.type === 'image' ? 'image' : 'document'} with Theologica AI...`);
-    } else if (scriptureContextToSend) {
-      setAiActivityStatus(`Connecting to Theologica AI with ${scriptureContextToSend.reference} context...`);
     } else {
-      setAiActivityStatus('Connecting to Theologica AI...');
+      setAiActivityStatus('Thinking...');
     }
 
     setAiThinkingText('');
