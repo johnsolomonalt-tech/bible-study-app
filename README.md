@@ -62,4 +62,4 @@ npm run build
 
 ## Deployment
 
-The linked Vercel project builds the `frontend/` directory when changes are pushed to the connected GitHub branch. The Vercel build command applies committed Prisma migrations before building the app. Configure the production environment variables in Vercel and ensure PostgreSQL is reachable. Vercel preview deployments should use a separate database or a safely isolated schema because preview builds also apply pending migrations.
+The linked Vercel project builds the `frontend/` directory when changes are pushed to the connected GitHub branch. The Vercel build command baselines an existing app database when needed, applies committed Prisma migrations, then builds the app. Configure the production environment variables in Vercel and ensure PostgreSQL is reachable. Vercel preview deployments should use a separate database or a safely isolated schema because preview builds also apply pending migrations.

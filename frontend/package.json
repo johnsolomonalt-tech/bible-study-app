@@ -9,6 +9,7 @@
     "test": "node scripts/verify-security.mjs",
     "lint": "eslint",
     "db:push": "prisma db push",
+    "db:baseline": "node scripts/baseline-database.mjs",
     "db:migrate": "prisma migrate deploy",
     "postinstall": "prisma generate"
   },
