@@ -195,7 +195,6 @@ const TypewriterTitle = ({ title }: { title: string }) => {
 const TypewriterMessage = ({
   content,
   onVerseClick,
-  onScrollToBottom,
 }: {
   content: string;
   onVerseClick?: VerseClickHandler;
@@ -204,8 +203,6 @@ const TypewriterMessage = ({
   const { imageBase64, textContent } = parseAiMessage(content);
   const [displayed, setDisplayed] = useState(() => seenMessages.has(content) ? textContent : '');
   const mdComponents = useMemo(() => createMarkdownComponents(onVerseClick), [onVerseClick]);
-  const onScrollToBottomRef = useRef(onScrollToBottom);
-  onScrollToBottomRef.current = onScrollToBottom;
   
   useEffect(() => {
     if (seenMessages.has(content)) {
@@ -216,28 +213,29 @@ const TypewriterMessage = ({
       // Images don't need typewriter — just mark as seen
       seenMessages.add(content);
       setDisplayed(textContent);
-      onScrollToBottomRef.current?.();
       return;
     }
     
     let index = 0;
+    // Spit text at 75-100 words per second (~85-90 wps: ~430-450 chars/sec)
+    // Standard typist metric: 1 word ≈ 5 characters.
+    // 7 characters per 16ms tick = 437.5 chars/sec ≈ 87.5 words per second.
+    // Leaves user exactly where they were instead of forcing scroll to the bottom.
     const interval = setInterval(() => {
       if (seenMessages.has(content)) {
         clearInterval(interval);
         setDisplayed(textContent);
         return;
       }
-      index += 35; // Type 35 chars every 15ms for a smooth, responsive streaming effect
+      index += 7;
       if (index > textContent.length) index = textContent.length;
       setDisplayed(textContent.slice(0, index));
-      onScrollToBottomRef.current?.();
       
       if (index >= textContent.length) {
         clearInterval(interval);
         seenMessages.add(content);
-        setTimeout(() => onScrollToBottomRef.current?.(), 30);
       }
-    }, 15);
+    }, 16);
     
     return () => clearInterval(interval);
   }, [content, textContent, imageBase64]);
@@ -2613,6 +2611,39 @@ export default function App() {
   const mobileStudyChatScrollRef = useRef<HTMLDivElement>(null);
   const desktopStudyChatScrollRef = useRef<HTMLDivElement>(null);
   const fullChatScrollRef = useRef<HTMLDivElement>(null);
+  const scrollToBottomOnChatOpenRef = useRef(false);
+
+  // Scrolls chat containers to the bottom (used when opening existing chats)
+  const scrollChatToBottom = useCallback(() => {
+    const scrollEls = () => {
+      [mobileStudyChatScrollRef.current, desktopStudyChatScrollRef.current, fullChatScrollRef.current].forEach(el => {
+        if (el) {
+          el.scrollTop = el.scrollHeight;
+        }
+      });
+    };
+    scrollEls();
+    requestAnimationFrame(scrollEls);
+    setTimeout(scrollEls, 50);
+    setTimeout(scrollEls, 150);
+  }, []);
+
+  // Opens an existing chat, marks all existing messages as seen (no typewriter), and leaves user at the bottom
+  const openExistingChat = useCallback((id: number) => {
+    setChats(currentChats => {
+      const target = currentChats.find(c => c.id === id);
+      if (target?.messages) {
+        target.messages.forEach(m => {
+          if (m?.content) seenMessages.add(m.content);
+        });
+      }
+      return currentChats;
+    });
+    setActiveChatId(id);
+    setMobileChatView('chat');
+    scrollToBottomOnChatOpenRef.current = true;
+    scrollChatToBottom();
+  }, [scrollChatToBottom]);
 
   useEffect(() => {
     if (!isAiTyping) {
@@ -2744,11 +2775,20 @@ export default function App() {
         .then(data => {
           if (Array.isArray(data)) {
             setChats(data);
-            data.forEach((c: { title: string }) => seenTitles.add(c.title));
+            data.forEach((c: { title: string; messages?: { content: string }[] }) => {
+              seenTitles.add(c.title);
+              if (Array.isArray(c.messages)) {
+                c.messages.forEach(m => {
+                  if (m?.content) seenMessages.add(m.content);
+                });
+              }
+            });
             const savedChatIdStr = getPreference(PREF_KEYS.ACTIVE_CHAT_ID);
             const savedChatId = savedChatIdStr ? parseInt(savedChatIdStr, 10) : null;
             if (savedChatId && data.some((c: { id: number }) => c.id === savedChatId)) {
               setActiveChatId(savedChatId);
+              scrollToBottomOnChatOpenRef.current = true;
+              scrollChatToBottom();
             } else {
               setActiveChatId(null);
             }
@@ -4153,19 +4193,16 @@ export default function App() {
     );
   };
 
-  const scrollToBottom = useCallback(() => {
-    [mobileStudyChatScrollRef.current, desktopStudyChatScrollRef.current, fullChatScrollRef.current].forEach(el => {
-      if (el) {
-        el.scrollTop = el.scrollHeight;
-      }
-    });
-  }, []);
+  const scrollToBottom = scrollChatToBottom;
 
+  // Only scroll to the bottom when explicitly opening an existing chat.
+  // When chatting or receiving AI responses, the user's scroll position is preserved exactly where they were.
   useEffect(() => {
-    scrollToBottom();
-    const timer = setTimeout(scrollToBottom, 60);
-    return () => clearTimeout(timer);
-  }, [activeChat?.id, activeChat?.messages?.length, isAiTyping, aiThinkingText, activeTab, mobileChatView, mobileStudyView, scrollToBottom]);
+    if (scrollToBottomOnChatOpenRef.current) {
+      scrollToBottomOnChatOpenRef.current = false;
+      scrollChatToBottom();
+    }
+  }, [activeChatId, activeTab, mobileChatView, mobileStudyView, scrollChatToBottom]);
 
   // Preload Voices for High-Quality TTS
   useEffect(() => {
@@ -4767,7 +4804,7 @@ export default function App() {
 
     setAiThinkingText('');
     setIsAiTyping(true);
-    setTimeout(scrollToBottom, 50);
+    scrollToBottomOnChatOpenRef.current = false;
 
     trackClientEvent('ai_chat_prompt', {
       translation: translation.toUpperCase(),
@@ -5114,6 +5151,8 @@ export default function App() {
                   }
                   if (tab === 'chats') {
                     setMobileChatView('chat');
+                    scrollToBottomOnChatOpenRef.current = true;
+                    scrollChatToBottom();
                   }
                 }}
                 title={label}
@@ -5566,7 +5605,11 @@ export default function App() {
 
                   {/* Study AI Button */}
                   <button 
-                    onClick={() => setMobileStudyView('ai')} 
+                    onClick={() => {
+                      setMobileStudyView('ai');
+                      scrollToBottomOnChatOpenRef.current = true;
+                      scrollChatToBottom();
+                    }} 
                     className="w-9 h-9 flex items-center justify-center rounded-full bg-accent/10 border border-accent/25 text-accent hover:bg-accent/20 active:scale-95 transition-all cursor-pointer shrink-0 relative" 
                     title="Study AI Assistant"
                   >
@@ -7863,8 +7906,7 @@ export default function App() {
                   <div 
                     key={c.id} 
                     onClick={() => {
-                      setActiveChatId(c.id);
-                      setMobileChatView('chat');
+                      openExistingChat(c.id);
                     }} 
                     className={`group flex items-center justify-between w-full px-4 py-3 rounded-lg text-[14px] transition-colors cursor-pointer ${activeChatId === c.id ? 'bg-surface text-fg ring-shadow font-medium' : 'text-muted hover:bg-surface hover:text-fg'}`}
                   >
@@ -8482,6 +8524,8 @@ export default function App() {
                   }
                   if (tab.id === 'chats') {
                     setMobileChatView('chat');
+                    scrollToBottomOnChatOpenRef.current = true;
+                    scrollChatToBottom();
                   }
                 }}
                 className="flex-1 flex items-center justify-center h-full transition-all relative cursor-pointer active:scale-90 touch-manipulation"
