@@ -19,6 +19,7 @@ export interface CanvasNodeData extends Record<string, unknown> {
   onDelete?: (id: string) => void;
   onConnectTo?: (sourceId: string, targetId: string) => void;
   onSpawnCrossReferences?: (nodeId: string, reference: string) => void;
+  onResizeEnd?: (id: string, width: number, height: number) => void;
   otherNodes?: Array<{ id: string; title: string; category: NodeCategory }>;
   theme?: 'dark' | 'light';
   onVerseClick?: (book: string, chapter: number, verse: number) => void;

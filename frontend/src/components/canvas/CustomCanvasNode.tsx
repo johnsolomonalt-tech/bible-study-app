@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, memo } from 'react';
-import { Handle, Position, NodeResizer, NodeProps, useViewport, useReactFlow } from '@xyflow/react';
+import { Handle, Position, NodeResizer, NodeProps, useReactFlow } from '@xyflow/react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { 
@@ -40,14 +40,9 @@ const CATEGORY_ICONS: Record<NodeCategory, React.ElementType> = {
 export const CustomCanvasNode = memo(function CustomCanvasNode(
   props: NodeProps & { data: CanvasNodeData; style?: React.CSSProperties }
 ) {
-  const { id, data, selected, width, style } = props;
+  const { id, data, selected, width, height, style } = props;
   const mod = useModifierKey();
-  const { zoom } = useViewport();
-  const { setNodes } = useReactFlow();
-
-  // Dynamic counter-scale: when canvas is zoomed out (zoom < 1), counter-scale up
-  // so options menu never shrinks below comfortable, legible size on the user's screen.
-  const menuScale = Math.min(Math.max(1 / Math.max(zoom, 0.1), 1), 3.2);
+  const { setNodes, getZoom } = useReactFlow();
 
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(data.content || '');
@@ -58,6 +53,11 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const titleDivRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Compute menu counter-scale on demand only when the menu is open so cards do not
+  // subscribe to useViewport() and re-render on every pan/zoom animation frame.
+  const currentZoom = isMenuOpen ? getZoom() : 1;
+  const menuScale = Math.min(Math.max(1 / Math.max(currentZoom, 0.1), 1), 3.2);
 
   const theme = data.theme || 'dark';
   const isDark = theme === 'dark';
@@ -142,18 +142,19 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
       onContextMenu={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, selected: true } : n)));
+        setNodes((nds) => nds.map((n) => ({ ...n, selected: n.id === id })));
         setIsMenuOpen(true);
       }}
-      className={`relative group rounded-xl transition-all duration-200 select-none w-[310px] sm:w-[380px] max-w-[calc(100vw-32px)] ${
+      className={`relative group rounded-xl transition-shadow duration-150 select-none w-[310px] sm:w-[380px] max-w-[calc(100vw-32px)] ${
         isMenuOpen ? '!z-50' : selected ? 'z-30' : 'z-0'
       } bg-surface text-fg border border-border shadow-[0_8px_30px_rgba(0,0,0,0.15)] backdrop-blur-md ${
         selected 
-          ? 'ring-2 ring-accent border-accent/80 shadow-2xl scale-[1.008]' 
+          ? 'ring-2 ring-accent border-accent/80 shadow-2xl' 
           : 'hover:border-border-soft hover:shadow-xl'
       }`}
       style={{
         width: width || (style as any)?.width || 380,
+        height: height || (style as any)?.height || undefined,
         minWidth: 240,
         minHeight: 160,
       }}
@@ -165,6 +166,9 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
         minHeight={150}
         lineClassName="border-accent"
         handleClassName="!w-3 !h-3 !bg-accent !border-2 !border-white !rounded-full shadow-md"
+        onResizeEnd={(_event, params) => {
+          data.onResizeEnd?.(id, Math.round(params.width), Math.round(params.height));
+        }}
       />
 
       {/* Perimeter Connection Handles (Top, Right, Bottom, Left) */}
@@ -601,4 +605,13 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
       />
     </div>
   );
-});
+}, (prev, next) =>
+  prev.id === next.id &&
+  prev.selected === next.selected &&
+  prev.width === next.width &&
+  prev.height === next.height &&
+  prev.data === next.data &&
+  (prev.style as any)?.width === (next.style as any)?.width &&
+  (prev.style as any)?.height === (next.style as any)?.height
+);
+

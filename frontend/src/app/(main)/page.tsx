@@ -1,7 +1,7 @@
 "use client";
 const API_URL = '';
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useAuth, UserButton, SignIn, SignInButton } from '@clerk/nextjs';
 import { Send, Plus, Layout, Edit, Sparkles, Target, Check, Copy, ChevronRight, ChevronLeft, ChevronDown, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquare, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow, ShieldCheck, Heart, Layers, Languages, MoreVertical, MoreHorizontal, Search, BookMarked, Quote, Compass, ArrowRight, Square, BrainCircuit, FileText, UploadCloud, Menu } from 'lucide-react';
@@ -40,6 +40,7 @@ import { parseVerseFootnote, getCleanScriptureText } from '@/lib/verseParser';
 import { findCanonicalBook } from '@/lib/bibleCanon';
 import { 
   getPreference, 
+  getBooleanPreference,
   setPreference, 
   flushPreferences, 
   removePreference, 
@@ -191,10 +192,20 @@ const TypewriterTitle = ({ title }: { title: string }) => {
   return <>{displayed}</>;
 };
 
-const TypewriterMessage = ({ content, onVerseClick }: { content: string; onVerseClick?: VerseClickHandler }) => {
+const TypewriterMessage = ({
+  content,
+  onVerseClick,
+  onScrollToBottom,
+}: {
+  content: string;
+  onVerseClick?: VerseClickHandler;
+  onScrollToBottom?: () => void;
+}) => {
   const { imageBase64, textContent } = parseAiMessage(content);
   const [displayed, setDisplayed] = useState(() => seenMessages.has(content) ? textContent : '');
   const mdComponents = useMemo(() => createMarkdownComponents(onVerseClick), [onVerseClick]);
+  const onScrollToBottomRef = useRef(onScrollToBottom);
+  onScrollToBottomRef.current = onScrollToBottom;
   
   useEffect(() => {
     if (seenMessages.has(content)) {
@@ -205,18 +216,26 @@ const TypewriterMessage = ({ content, onVerseClick }: { content: string; onVerse
       // Images don't need typewriter — just mark as seen
       seenMessages.add(content);
       setDisplayed(textContent);
+      onScrollToBottomRef.current?.();
       return;
     }
     
     let index = 0;
     const interval = setInterval(() => {
-      index += 25; // Type 25 chars every 15ms for an extremely fast but noticeable typing effect
+      if (seenMessages.has(content)) {
+        clearInterval(interval);
+        setDisplayed(textContent);
+        return;
+      }
+      index += 35; // Type 35 chars every 15ms for a smooth, responsive streaming effect
       if (index > textContent.length) index = textContent.length;
       setDisplayed(textContent.slice(0, index));
+      onScrollToBottomRef.current?.();
       
       if (index >= textContent.length) {
         clearInterval(interval);
         seenMessages.add(content);
+        setTimeout(() => onScrollToBottomRef.current?.(), 30);
       }
     }, 15);
     
@@ -493,7 +512,7 @@ const AiThinkingIndicator = ({
   const trimmedThinking = thinkingText?.trim() || '';
 
   return (
-    <div className={`flex flex-col items-start w-full ${isFullView ? 'max-w-3xl mx-auto' : ''} py-3 animate-in fade-in duration-200`}>
+    <div className={`flex flex-col items-start w-full shrink-0 ${isFullView ? 'max-w-3xl mx-auto' : ''} py-3 animate-in fade-in duration-200`}>
       <div className="flex items-center gap-2 mb-2 select-none">
         <div className="w-5 h-5 rounded-full bg-accent/15 border border-accent/40 flex items-center justify-center text-accent animate-pulse">
           <BrainCircuit size={12} />
@@ -604,6 +623,7 @@ const AiChatMessageView = ({
   onSaveToNotes,
   onSelectPrompt,
   onSelectLensComparison,
+  onScrollToBottom,
   chatTitle,
   chatId,
   activeLens = 'standard',
@@ -623,6 +643,7 @@ const AiChatMessageView = ({
   onSaveToNotes?: (content: string, title?: string) => Promise<boolean>;
   onSelectPrompt?: (prompt: string) => void;
   onSelectLensComparison?: (lens: TheologicalLensType, prompt: string) => void;
+  onScrollToBottom?: () => void;
   chatTitle?: string;
   chatId?: string | number;
   activeLens?: TheologicalLensType;
@@ -635,7 +656,7 @@ const AiChatMessageView = ({
 
   if (isUser) {
     return (
-      <div className={`flex flex-col items-end w-full ${isFullView ? 'max-w-3xl mx-auto' : ''} py-1.5`}>
+      <div className={`flex flex-col items-end w-full shrink-0 ${isFullView ? 'max-w-3xl mx-auto' : ''} py-1.5`}>
         <div className="flex items-center gap-1.5 mb-1.5 select-none pr-1">
           <span className="text-[11px] font-semibold tracking-wider uppercase text-muted">You</span>
         </div>
@@ -678,7 +699,7 @@ const AiChatMessageView = ({
   const verseCount = verseMatches.length;
 
   return (
-    <div className={`flex flex-col items-start w-full ${isFullView ? 'max-w-3xl mx-auto' : ''} py-2.5`}>
+    <div className={`flex flex-col items-start w-full shrink-0 ${isFullView ? 'max-w-3xl mx-auto' : ''} py-2.5`}>
       {/* Header with Lens & Language Badges */}
       <div className="flex items-center gap-2 mb-2 select-none flex-wrap">
         <div className="w-5 h-5 rounded-full bg-accent/10 border border-accent/30 flex items-center justify-center text-accent shrink-0">
@@ -721,9 +742,9 @@ const AiChatMessageView = ({
         <AiThinkingAccordion thought={thoughtContent} />
       )}
 
-      <div className={`w-full ${isFullView ? 'text-[15px] leading-[1.75]' : 'text-[14px] leading-relaxed'} text-fg overflow-x-auto break-words markdown-body`}>
+      <div className={`w-full ${isFullView ? 'text-[15px] leading-[1.75]' : 'text-[14px] leading-relaxed'} text-fg overflow-x-hidden break-words markdown-body`}>
         {isLast ? (
-          <TypewriterMessage content={message.content} onVerseClick={onVerseClick} />
+          <TypewriterMessage content={message.content} onVerseClick={onVerseClick} onScrollToBottom={onScrollToBottom} />
         ) : (
           <>
             {imageBase64 && (
@@ -1259,18 +1280,35 @@ export default function App() {
 
   const [mobileStudyView, setMobileStudyView] = useState<'reader' | 'chapters' | 'ai'>('reader');
   
-  // Layout State
-  const [showLeftSidebar, setShowLeftSidebar] = useState(true);
-  const [showRightSidebar, setShowRightSidebar] = useState(true);
+  // Layout State — read saved panel defaults synchronously before first render (falling back to all 3 open)
+  const [showLeftSidebar, setShowLeftSidebar] = useState<boolean>(() =>
+    getBooleanPreference(PREF_KEYS.SHOW_LEFT_SIDEBAR, true)
+  );
+  const [showRightSidebar, setShowRightSidebar] = useState<boolean>(() =>
+    getBooleanPreference(PREF_KEYS.SHOW_RIGHT_SIDEBAR, true)
+  );
   const leftPanelRef = useRef<PanelImperativeHandle>(null);
   const rightPanelRef = useRef<PanelImperativeHandle>(null);
   const bottomPanelRef = useRef<PanelImperativeHandle>(null);
-  const [showBottomNotes, setShowBottomNotes] = useState(true);
+  const [showBottomNotes, setShowBottomNotes] = useState<boolean>(() =>
+    getBooleanPreference(PREF_KEYS.SHOW_BOTTOM_NOTES, true)
+  );
+  const mobileBookListScrollRef = useRef<HTMLDivElement>(null);
+  const desktopBookListScrollRef = useRef<HTMLDivElement>(null);
+  const pendingBookScrollAnchorRef = useRef<{
+    container: HTMLElement;
+    summaryEl: HTMLElement;
+    beforeTop: number;
+  } | null>(null);
   const readerContainerRef = useRef<HTMLDivElement>(null);
   const readerHeaderRef = useRef<HTMLElement>(null);
   const [readerHeaderWidth, setReaderHeaderWidth] = useState<number>(1200);
   const readerTitleRef = useRef<HTMLDivElement>(null);
-  const [readerTitleWidth, setReaderTitleWidth] = useState<number>(180);
+  const [readerTitleWidth, setReaderTitleWidth] = useState<number>(150);
+  const mobileReaderHeaderRef = useRef<HTMLElement>(null);
+  const [mobileReaderHeaderWidth, setMobileReaderHeaderWidth] = useState<number>(390);
+  const mobileReaderTitleRef = useRef<HTMLDivElement>(null);
+  const [mobileReaderTitleWidth, setMobileReaderTitleWidth] = useState<number>(125);
   const desktopMoreMenuRef = useRef<HTMLDivElement>(null);
   const mobileMoreMenuRef = useRef<HTMLDivElement>(null);
   
@@ -1645,13 +1683,10 @@ export default function App() {
       }
     }
 
-    // 4. Layout Sidebars
-    const leftPref = getPreference(PREF_KEYS.SHOW_LEFT_SIDEBAR);
-    if (leftPref !== '') setShowLeftSidebar(leftPref === 'true');
-    const rightPref = getPreference(PREF_KEYS.SHOW_RIGHT_SIDEBAR);
-    if (rightPref !== '') setShowRightSidebar(rightPref === 'true');
-    const bottomPref = getPreference(PREF_KEYS.SHOW_BOTTOM_NOTES);
-    if (bottomPref !== '') setShowBottomNotes(bottomPref === 'true');
+    // 4. Layout Sidebars (read saved boolean defaults, falling back to true for missing/invalid data)
+    setShowLeftSidebar(getBooleanPreference(PREF_KEYS.SHOW_LEFT_SIDEBAR, true));
+    setShowRightSidebar(getBooleanPreference(PREF_KEYS.SHOW_RIGHT_SIDEBAR, true));
+    setShowBottomNotes(getBooleanPreference(PREF_KEYS.SHOW_BOTTOM_NOTES, true));
 
     // 5. Mobile Study View
     const mobileViewPref = getPreference(PREF_KEYS.MOBILE_STUDY_VIEW);
@@ -1754,6 +1789,42 @@ export default function App() {
     }
   }, []);
 
+  // Synchronously apply saved panel defaults before first paint on client hydration
+  useLayoutEffect(() => {
+    setShowLeftSidebar(getBooleanPreference(PREF_KEYS.SHOW_LEFT_SIDEBAR, true));
+    setShowRightSidebar(getBooleanPreference(PREF_KEYS.SHOW_RIGHT_SIDEBAR, true));
+    setShowBottomNotes(getBooleanPreference(PREF_KEYS.SHOW_BOTTOM_NOTES, true));
+  }, []);
+
+  // Record clicked book's screen Y coordinate before collapsing/expanding another book
+  const handleBookAccordionToggle = useCallback((
+    e: React.MouseEvent<HTMLElement>,
+    bookName: string,
+    container: HTMLElement | null
+  ) => {
+    e.preventDefault();
+    if (container) {
+      pendingBookScrollAnchorRef.current = {
+        container,
+        summaryEl: e.currentTarget,
+        beforeTop: e.currentTarget.getBoundingClientRect().top,
+      };
+    }
+    setExpandedBook((prev) => (prev === bookName ? null : bookName));
+  }, []);
+
+  // Synchronously adjust scrollTop after accordion layout change so the clicked book stays at its exact screen position
+  useLayoutEffect(() => {
+    const anchor = pendingBookScrollAnchorRef.current;
+    if (!anchor) return;
+    pendingBookScrollAnchorRef.current = null;
+    const afterTop = anchor.summaryEl.getBoundingClientRect().top;
+    const delta = afterTop - anchor.beforeTop;
+    if (Math.abs(delta) > 0.5) {
+      anchor.container.scrollTop += delta;
+    }
+  }, [expandedBook]);
+
   // Persist translation version
   useEffect(() => {
     if (typeof window !== 'undefined' && translation) {
@@ -1781,9 +1852,9 @@ export default function App() {
     }
   }, [activeBook.name, activeChapter, translation]);
 
-  // Persist layout sidebars
+  // Persist layout sidebars after initial preferences have been restored
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && preferencesRestoredRef.current) {
       setPreference(PREF_KEYS.SHOW_LEFT_SIDEBAR, String(showLeftSidebar));
       setPreference(PREF_KEYS.SHOW_RIGHT_SIDEBAR, String(showRightSidebar));
       setPreference(PREF_KEYS.SHOW_BOTTOM_NOTES, String(showBottomNotes));
@@ -1947,9 +2018,9 @@ export default function App() {
     metaTheme.content = themeColor;
   }, [theme]);
 
-  // Measure Bible reader column width and title width to dynamically collapse study tools ONLY when actually cramped
+  // Measure Bible reader header width and title width (both desktop and mobile) via ResizeObserver
   const measureWidths = useCallback(() => {
-    const containerEl = readerContainerRef.current || readerHeaderRef.current;
+    const containerEl = readerHeaderRef.current || readerContainerRef.current;
     if (containerEl) {
       const rect = containerEl.getBoundingClientRect();
       if (rect.width > 0) {
@@ -1962,6 +2033,18 @@ export default function App() {
         setReaderTitleWidth(titleRect.width);
       }
     }
+    if (mobileReaderHeaderRef.current) {
+      const mRect = mobileReaderHeaderRef.current.getBoundingClientRect();
+      if (mRect.width > 0) {
+        setMobileReaderHeaderWidth(mRect.width);
+      }
+    }
+    if (mobileReaderTitleRef.current) {
+      const mTitleRect = mobileReaderTitleRef.current.getBoundingClientRect();
+      if (mTitleRect.width > 0) {
+        setMobileReaderTitleWidth(mTitleRect.width);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -1969,23 +2052,15 @@ export default function App() {
 
     measureWidths();
 
-    const targetEl = readerContainerRef.current || readerHeaderRef.current;
-    if (!targetEl) return;
-
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        if ((entry.target === targetEl || entry.target === targetEl.parentElement) && entry.contentRect.width > 0) {
-          setReaderHeaderWidth(entry.contentRect.width);
-        } else if (entry.target === readerTitleRef.current && entry.contentRect.width > 0) {
-          setReaderTitleWidth(entry.contentRect.width);
-        }
-      }
+    const observer = new ResizeObserver(() => {
+      measureWidths();
     });
 
-    observer.observe(targetEl);
-    if (readerTitleRef.current) {
-      observer.observe(readerTitleRef.current);
-    }
+    if (readerContainerRef.current) observer.observe(readerContainerRef.current);
+    if (readerHeaderRef.current) observer.observe(readerHeaderRef.current);
+    if (readerTitleRef.current) observer.observe(readerTitleRef.current);
+    if (mobileReaderHeaderRef.current) observer.observe(mobileReaderHeaderRef.current);
+    if (mobileReaderTitleRef.current) observer.observe(mobileReaderTitleRef.current);
 
     window.addEventListener('resize', measureWidths);
 
@@ -1993,33 +2068,29 @@ export default function App() {
       observer.disconnect();
       window.removeEventListener('resize', measureWidths);
     };
-  }, [activeTab, showLeftSidebar, showRightSidebar, activeBook.name, activeChapter, measureWidths]);
+  }, [activeTab, isLoaded, authTimeout, showLeftSidebar, showRightSidebar, activeBook.name, activeChapter, measureWidths]);
 
-  // Available space for right-side study tools:
-  // Reader column width minus title width, horizontal padding (~48px), and safety margin (24px)
-  const availableToolsWidth = Math.max(0, readerHeaderWidth - readerTitleWidth - 72);
+  // Available width in the desktop reader header after accounting for the chapter title and horizontal padding (~48px)
+  const availableToolsWidth = Math.max(0, readerHeaderWidth - readerTitleWidth - 48);
 
-  // Progressive study tools collapse thresholds: ONLY collapse when ACTUALLY cramped!
-  //
-  // Tool widths:
-  // Permanent controls (Audio ~38px, divider ~13px, Translation selector ~74px, gaps ~12px) = ~137px
-  // 3-dots button (when active) = ~38px + 6px gap = ~44px -> Base with 3-dots = ~181px
-  // 1. Backlinks (~126px) -> 1st to collapse into 3 dots
-  // 2. Lectio (~86px) -> 2nd to collapse into 3 dots
-  // 3. Interlinear (~116px) -> 3rd to collapse into 3 dots
-  // 4. Mark Complete (~141px) -> 4th/last to collapse into 3 dots
-  //
-  // Cumulative needed widths:
-  // All 4 tools: 137 + 126 + 86 + 116 + 141 + gaps ~24 = ~630px (threshold: 670px)
-  // 3 tools (without Backlinks): 181 + 86 + 116 + 141 + gaps ~18 = ~542px (threshold: 565px)
-  // 2 tools (without Lectio): 181 + 116 + 141 + gaps ~12 = ~450px (threshold: 465px)
-  // 1 tool (without Interlinear): 181 + 141 + gaps ~6 = ~328px (threshold: 345px)
-  // 0 tools (all in 3 dots): ~181px
-  const showBacklinksInBar = availableToolsWidth >= 670;
-  const showLectioInBar = availableToolsWidth >= 565;
-  const showInterlinearInBar = availableToolsWidth >= 465;
-  const showMarkCompleteInBar = availableToolsWidth >= 345;
+  // Progressive study tools collapse thresholds based on actual measured button widths:
+  // Permanent right controls (Audio ~36px, divider ~5px, Translation ~68px, 3-dots ~36px when active) = ~145px
+  // Lectio (~82px) has highest priority to remain visible next to the chapter control whenever space allows:
+  // - Lectio only: ~145 + 82 = ~227px
+  // - Lectio + Mark Complete (~132px): ~227 + 132 + 6 = ~365px
+  // - Lectio + Mark Complete + Interlinear (~108px): ~365 + 108 + 6 = ~479px
+  // - All 4 (+ Backlinks ~108px, no 3-dots needed): ~115 + 82 + 132 + 108 + 108 + 18 = ~563px
+  const showBacklinksInBar = availableToolsWidth >= 565;
+  const showInterlinearInBar = availableToolsWidth >= 475;
+  const showMarkCompleteInBar = availableToolsWidth >= 365;
+  const showLectioInBar = availableToolsWidth >= 225;
   const hasCollapsedStudyTools = !showBacklinksInBar || !showLectioInBar || !showInterlinearInBar || !showMarkCompleteInBar;
+
+  // Mobile/Tablet (<1024px) reader header space for keeping Lectio visible next to the chapter control whenever space allows:
+  // Permanent mobile right controls (Translation ~66px, AI ~36px, 3-dots ~36px, gaps ~12px, plus optional speaking/md interlinear) = ~150px
+  const mobilePermanentRightWidth = 150 + (isSpeaking ? 44 : 0) + (mobileReaderHeaderWidth >= 768 ? 40 : 0);
+  const mobileAvailableForLectio = mobileReaderHeaderWidth - mobileReaderTitleWidth - mobilePermanentRightWidth - 28;
+  const showMobileLectioInBar = mobileAvailableForLectio >= 68;
 
   // Outside click handler for desktop 3-dots study options menu
   useEffect(() => {
@@ -2062,6 +2133,21 @@ export default function App() {
   }, [isMobileMoreMenuOpen]);
 
   // Unified Settings Handlers
+  const handleToggleLeftSidebar = useCallback((val: boolean) => {
+    setShowLeftSidebar(val);
+    setPreference(PREF_KEYS.SHOW_LEFT_SIDEBAR, String(val));
+  }, []);
+
+  const handleToggleRightSidebar = useCallback((val: boolean) => {
+    setShowRightSidebar(val);
+    setPreference(PREF_KEYS.SHOW_RIGHT_SIDEBAR, String(val));
+  }, []);
+
+  const handleToggleBottomNotes = useCallback((val: boolean) => {
+    setShowBottomNotes(val);
+    setPreference(PREF_KEYS.SHOW_BOTTOM_NOTES, String(val));
+  }, []);
+
   const handleThemeChange = (newTheme: 'dark' | 'light' | 'sepia') => {
     setTheme(newTheme);
     setPreference(PREF_KEYS.THEME, newTheme);
@@ -2362,9 +2448,9 @@ export default function App() {
     handleTheologicalLensChange('standard');
     handleTrackerFormatChange('percent');
     handleDailyChapterGoalChange(3);
-    setShowLeftSidebar(true);
-    setShowRightSidebar(true);
-    setShowBottomNotes(true);
+    handleToggleLeftSidebar(true);
+    handleToggleRightSidebar(true);
+    handleToggleBottomNotes(true);
   };
   const [chatInput, setChatInput] = useState('');
   const [chatQuotes, setChatQuotes] = useState<{id: string, text: string, reference: string}[]>([]);
@@ -2509,7 +2595,6 @@ export default function App() {
       processSelectedFile(files[0]);
     }
   }, [processSelectedFile]);
-  const [cooldown, setCooldown] = useState(0);
   const [isAiTyping, setIsAiTyping] = useState(false);
   const [aiActivityStatus, setAiActivityStatus] = useState('Ready');
   const [aiThinkingText, setAiThinkingText] = useState('');
@@ -2533,7 +2618,9 @@ export default function App() {
   };
   const [showSlashCommands, setShowSlashCommands] = useState(false);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const mobileStudyChatScrollRef = useRef<HTMLDivElement>(null);
+  const desktopStudyChatScrollRef = useRef<HTMLDivElement>(null);
+  const fullChatScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!isAiTyping) {
@@ -3378,11 +3465,6 @@ export default function App() {
   const askAiAboutHighlight = () => {
     const rawText = selectedText || selectionRange?.toString().trim() || '';
     if (!rawText || !selectionVerse) return;
-    
-    if (cooldown > 0) {
-      alert(`Study AI is resting (${cooldown}s remaining). Please wait a moment.`);
-      return;
-    }
 
     const startVerse = Math.min(selectionVerse, endVerseNumber || selectionVerse);
     const endVerse = Math.max(selectionVerse, endVerseNumber || selectionVerse);
@@ -3395,7 +3477,7 @@ export default function App() {
     
     // Switch to AI tab
     setMobileStudyView('ai');
-    if (!showRightSidebar) setShowRightSidebar(true);
+    if (!showRightSidebar) handleToggleRightSidebar(true);
     try { rightPanelRef.current?.expand(); } catch {}
     
     setToolbarPosition(null);
@@ -4079,34 +4161,19 @@ export default function App() {
     );
   };
 
-  const scrollToBottom = () => {
-    if (messagesEndRef.current) {
-      const parent = messagesEndRef.current.parentElement;
-      if (parent) parent.scrollTop = parent.scrollHeight;
-    }
-  };
+  const scrollToBottom = useCallback(() => {
+    [mobileStudyChatScrollRef.current, desktopStudyChatScrollRef.current, fullChatScrollRef.current].forEach(el => {
+      if (el) {
+        el.scrollTop = el.scrollHeight;
+      }
+    });
+  }, []);
 
   useEffect(() => {
-    // On mobile, keep AI chats at the top when opened rather than auto-scrolling to the bottom
-    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
-      const resetScrollTop = () => {
-        if (messagesEndRef.current?.parentElement) {
-          messagesEndRef.current.parentElement.scrollTop = 0;
-        }
-      };
-      resetScrollTop();
-      const timer = setTimeout(resetScrollTop, 60);
-      return () => clearTimeout(timer);
-    }
     scrollToBottom();
-  }, [activeChat?.id, activeTab, mobileChatView, mobileStudyView]);
-
-  useEffect(() => {
-    if (cooldown > 0) {
-      const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [cooldown]);
+    const timer = setTimeout(scrollToBottom, 60);
+    return () => clearTimeout(timer);
+  }, [activeChat?.id, activeChat?.messages?.length, isAiTyping, aiThinkingText, activeTab, mobileChatView, mobileStudyView, scrollToBottom]);
 
   // Preload Voices for High-Quality TTS
   useEffect(() => {
@@ -4607,7 +4674,6 @@ export default function App() {
     const currentChat = activeChatId ? chats.find(c => c.id === activeChatId) : null;
     const isFirstMessage = !activeChatId || (currentChat && currentChat.messages.length === 0);
     if (!textToSend.trim() && !chatImage && !attachedFile) return;
-    if (cooldown > 0) return;
     
     setChatQuotes([]);
     const currentImage = chatImage;
@@ -4686,7 +4752,6 @@ export default function App() {
     const currentInput = textToSend;
     if (!overrideText) setChatInput(''); else setChatInput('');
     setShowSlashCommands(false);
-    setCooldown(30); // 30s cooldown
     const isImageReq = [
       'draw', 'generate an image', 'create an image', 'make an image', 'paint',
       'illustrate', 'visualize', 'show me a picture', 'create a picture',
@@ -5085,7 +5150,7 @@ export default function App() {
             <div className="hidden lg:flex items-center bg-surface border border-border-soft/60 rounded-lg p-0.5 shrink-0">
               <button
                 type="button"
-                onClick={() => setShowLeftSidebar(!showLeftSidebar)}
+                onClick={() => handleToggleLeftSidebar(!showLeftSidebar)}
                 className={`p-1.5 rounded-md transition-colors cursor-pointer ${
                   showLeftSidebar ? 'text-fg hover:bg-border-soft' : 'text-muted hover:text-fg'
                 }`}
@@ -5096,7 +5161,7 @@ export default function App() {
               </button>
               <button
                 type="button"
-                onClick={() => setShowBottomNotes(!showBottomNotes)}
+                onClick={() => handleToggleBottomNotes(!showBottomNotes)}
                 className={`p-1.5 rounded-md transition-colors cursor-pointer ${
                   showBottomNotes ? 'text-fg hover:bg-border-soft' : 'text-muted hover:text-fg'
                 }`}
@@ -5107,7 +5172,7 @@ export default function App() {
               </button>
               <button
                 type="button"
-                onClick={() => setShowRightSidebar(!showRightSidebar)}
+                onClick={() => handleToggleRightSidebar(!showRightSidebar)}
                 className={`p-1.5 rounded-md transition-colors cursor-pointer ${
                   showRightSidebar ? 'text-fg hover:bg-border-soft' : 'text-muted hover:text-fg'
                 }`}
@@ -5248,7 +5313,11 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto custom-scroll p-3 space-y-2">
+              <div
+                ref={mobileBookListScrollRef}
+                style={{ overflowAnchor: 'none' }}
+                className="flex-1 overflow-y-auto custom-scroll p-3 space-y-2"
+              >
                 {/* Old Testament Section */}
                 {filteredOtBooks.length > 0 && (
                   <div>
@@ -5285,15 +5354,11 @@ export default function App() {
                           return (
                             <details
                               key={b.name}
-                              name="mobile-bible-books"
                               open={expandedBook === b.name}
                               className="group"
                             >
                               <summary
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  setExpandedBook(prev => prev === b.name ? null : b.name);
-                                }}
+                                onClick={(e) => handleBookAccordionToggle(e, b.name, mobileBookListScrollRef.current)}
                                 className={`w-full min-h-[44px] text-left px-3.5 py-2.5 rounded-xl text-[15px] cursor-pointer list-none flex justify-between items-center transition-colors ${
                                   isCurrentBook
                                     ? 'bg-accent/10 text-accent font-semibold'
@@ -5382,15 +5447,11 @@ export default function App() {
                           return (
                             <details
                               key={b.name}
-                              name="mobile-bible-books"
                               open={expandedBook === b.name}
                               className="group"
                             >
                               <summary
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  setExpandedBook(prev => prev === b.name ? null : b.name);
-                                }}
+                                onClick={(e) => handleBookAccordionToggle(e, b.name, mobileBookListScrollRef.current)}
                                 className={`w-full min-h-[44px] text-left px-3.5 py-2.5 rounded-xl text-[15px] cursor-pointer list-none flex justify-between items-center transition-colors ${
                                   isCurrentBook
                                     ? 'bg-accent/10 text-accent font-semibold'
@@ -5460,21 +5521,37 @@ export default function App() {
               className="absolute inset-0 w-full h-full flex flex-col bg-bg z-10"
             >
               <header 
+                ref={mobileReaderHeaderRef}
                 className="min-h-[46px] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 bg-bg shrink-0 relative z-20 py-1.5"
               >
                 {/* Left: Book & Chapter Selector Trigger */}
-                <div className="flex items-center gap-1 min-w-0 shrink">
-                  <button 
-                    onClick={() => setMobileStudyView('chapters')} 
-                    className="min-h-[38px] flex items-center gap-1.5 py-1 px-3 rounded-full bg-surface/75 hover:bg-surface border border-border-soft/50 shadow-2xs text-fg transition-all cursor-pointer active:scale-95 shrink min-w-0" 
-                    title="Choose Book & Chapter"
-                  >
-                    <BookOpen size={16} className="text-accent shrink-0" />
-                    <span className="font-display text-[15px] sm:text-[17px] font-semibold truncate max-w-[130px] xs:max-w-none">
-                      {activeBook.name} {activeChapter}
-                    </span>
-                    <ChevronDown size={13} className="text-muted shrink-0 opacity-60" />
-                  </button>
+                <div className="flex items-center gap-1.5 min-w-0 shrink">
+                  <div ref={mobileReaderTitleRef} className="flex items-center shrink min-w-0">
+                    <button 
+                      onClick={() => setMobileStudyView('chapters')} 
+                      className="min-h-[38px] flex items-center gap-1.5 py-1 px-3 rounded-full bg-surface/75 hover:bg-surface border border-border-soft/50 shadow-2xs text-fg transition-all cursor-pointer active:scale-95 shrink min-w-0" 
+                      title="Choose Book & Chapter"
+                    >
+                      <BookOpen size={16} className="text-accent shrink-0" />
+                      <span className="font-display text-[15px] sm:text-[17px] font-semibold truncate max-w-[130px] xs:max-w-none">
+                        {activeBook.name} {activeChapter}
+                      </span>
+                      <ChevronDown size={13} className="text-muted shrink-0 opacity-60" />
+                    </button>
+                  </div>
+
+                  {/* Lectio Divina visible next to chapter control whenever measured space allows */}
+                  {showMobileLectioInBar && (
+                    <button
+                      type="button"
+                      onClick={() => setIsLectioModalOpen(true)}
+                      className="flex items-center gap-1 px-2.5 py-1 min-h-[34px] rounded-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-[12px] font-medium border border-rose-500/20 transition-all cursor-pointer shrink-0 active:scale-95"
+                      title="Lectio Divina Guided Prayer"
+                    >
+                      <Heart size={13} className="text-rose-400 shrink-0" />
+                      <span>Lectio</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Right: Actions */}
@@ -5625,18 +5702,20 @@ export default function App() {
                             )}
                           </button>
 
-                          {/* Lectio Divina */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setIsLectioModalOpen(true);
-                              setIsMobileMoreMenuOpen(false);
-                            }}
-                            className="w-full min-h-[48px] flex items-center gap-3 px-3.5 py-3 rounded-xl hover:bg-fg/5 text-fg text-sm font-medium cursor-pointer transition-colors"
-                          >
-                            <Heart size={18} className="text-rose-400" />
-                            <span>Lectio Divina Guided Prayer</span>
-                          </button>
+                          {/* Lectio Divina (only in overflow menu when it doesn't fit in the bar) */}
+                          {!showMobileLectioInBar && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsLectioModalOpen(true);
+                                setIsMobileMoreMenuOpen(false);
+                              }}
+                              className="w-full min-h-[48px] flex items-center gap-3 px-3.5 py-3 rounded-xl hover:bg-fg/5 text-fg text-sm font-medium cursor-pointer transition-colors"
+                            >
+                              <Heart size={18} className="text-rose-400" />
+                              <span>Lectio Divina Guided Prayer</span>
+                            </button>
+                          )}
 
                           {/* Mark Completed */}
                           <button
@@ -5923,7 +6002,10 @@ export default function App() {
                 />
               </header>
               <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-                <div className={`flex-1 ${activeChat.messages.length === 0 && !isAiTyping ? 'overflow-hidden flex flex-col justify-center' : 'overflow-y-auto custom-scroll space-y-4'} p-3 sm:p-4`}>
+                <div
+                  ref={mobileStudyChatScrollRef}
+                  className={`flex-1 min-h-0 ${activeChat.messages.length === 0 && !isAiTyping ? 'overflow-hidden flex flex-col justify-center' : 'overflow-y-auto custom-scroll space-y-4'} p-3 sm:p-4`}
+                >
                   {activeChat.messages.length === 0 ? (
                     <ChatEmptyState
                       activeBook={activeBook}
@@ -5953,13 +6035,13 @@ export default function App() {
                         chatId={activeChatId || activeChat?.id}
                         activeLens={theologicalLens}
                         translation={translation}
+                        onScrollToBottom={scrollToBottom}
                       />
                     ))
                   )}
                   {isAiTyping && (
                     <AiThinkingIndicator status={aiActivityStatus} thinkingText={aiThinkingText} />
                   )}
-                  <div ref={messagesEndRef} />
                 </div>
                 <form onSubmit={handleSendMessage} className="p-3 border-t border-border bg-bg shrink-0">
                   <div className="flex flex-col relative">
@@ -6120,7 +6202,7 @@ export default function App() {
                       <button 
                         type="button" 
                         onClick={() => imageFileRef.current?.click()} 
-                        disabled={cooldown > 0 || !isOnline} 
+                        disabled={!isOnline} 
                         className="flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center p-2.5 text-muted hover:text-fg disabled:opacity-40 transition-colors mr-0.5 cursor-pointer"
                         title="Attach file or image"
                       >
@@ -6131,7 +6213,7 @@ export default function App() {
                         minRows={1}
                         maxRows={5}
                         className="flex-1 bg-transparent text-fg pl-1 pr-12 py-2.5 text-[16px] placeholder:text-meta focus:outline-none resize-none" 
-                        placeholder={!isOnline ? "Study AI is unavailable offline" : cooldown > 0 ? `Study AI is resting... (${cooldown}s)` : "Ask anything (type / for commands)..."} 
+                        placeholder={!isOnline ? "Study AI is unavailable offline" : "Ask anything (type / for commands)..."} 
                         value={chatInput}
                         onChange={(e) => {
                           setChatInput(e.target.value);
@@ -6142,11 +6224,11 @@ export default function App() {
                           }
                         }}
                         onKeyDown={handleChatKeyDown}
-                        disabled={cooldown > 0 || !isOnline}
+                        disabled={!isOnline}
                       />
                       <button 
                         type="submit" 
-                        disabled={isAiTyping || (!chatInput.trim() && !chatImage && !attachedFile && chatQuotes.length === 0) || cooldown > 0 || !isOnline}
+                        disabled={isAiTyping || (!chatInput.trim() && !chatImage && !attachedFile && chatQuotes.length === 0) || !isOnline}
                         className="min-w-[44px] min-h-[44px] flex items-center justify-center absolute right-1.5 bottom-1.5 p-2.5 bg-accent hover:bg-[#b5583b] text-white rounded-xl disabled:opacity-30 disabled:hover:bg-accent transition-all shadow-sm shrink-0 cursor-pointer"
                         title="Send message"
                       >
@@ -6164,17 +6246,18 @@ export default function App() {
         )}
 
         {activeTab === 'study' && (
-          <div className="hidden lg:flex w-full h-full">
+          <div className="hidden lg:flex w-full h-full min-h-0 overflow-hidden">
             <PanelGroup 
               orientation="horizontal" 
               id="theologica-layout-v2" 
-              className="flex w-full h-full"
+              className="flex w-full h-full min-h-0 overflow-hidden"
               onLayoutChange={() => measureWidths()}
               onLayoutChanged={() => measureWidths()}
             >
             {/* Left Sidebar: Navigation */}
             {showLeftSidebar && (
               <Panel panelRef={leftPanelRef} defaultSize="15" minSize="15" className={`w-full lg:w-auto border-r border-border bg-bg flex-col ${mobileStudyView === 'chapters' ? 'flex' : 'hidden lg:flex'}`}>
+              <div className="w-full h-full flex flex-col min-h-0 overflow-hidden">
               <header className="lg:hidden h-[60px] border-b border-border flex items-center px-4 shrink-0">
                 <button onClick={() => setMobileStudyView('reader')} className="p-2 mr-2 text-fg-2 hover:text-fg">
                   <ChevronLeft size={20} />
@@ -6205,7 +6288,11 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto custom-scroll p-2 space-y-1">
+              <div
+                ref={desktopBookListScrollRef}
+                style={{ overflowAnchor: 'none' }}
+                className="flex-1 min-h-0 overflow-y-auto custom-scroll p-2 space-y-1"
+              >
                 {/* Old Testament Section */}
                 {filteredOtBooks.length > 0 && (
                   <div>
@@ -6242,15 +6329,11 @@ export default function App() {
                           return (
                             <details
                               key={b.name}
-                              name="desktop-bible-books"
                               open={expandedBook === b.name}
                               className="group"
                             >
                               <summary
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  setExpandedBook(prev => prev === b.name ? null : b.name);
-                                }}
+                                onClick={(e) => handleBookAccordionToggle(e, b.name, desktopBookListScrollRef.current)}
                                 className={`w-full text-left px-3 py-2 rounded-xl text-[13px] cursor-pointer list-none flex justify-between items-center transition-colors ${
                                   isCurrentBook
                                     ? 'bg-accent/10 text-accent font-semibold'
@@ -6334,15 +6417,11 @@ export default function App() {
                           return (
                             <details
                               key={b.name}
-                              name="desktop-bible-books"
                               open={expandedBook === b.name}
                               className="group"
                             >
                               <summary
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  setExpandedBook(prev => prev === b.name ? null : b.name);
-                                }}
+                                onClick={(e) => handleBookAccordionToggle(e, b.name, desktopBookListScrollRef.current)}
                                 className={`w-full text-left px-3 py-2 rounded-xl text-[13px] cursor-pointer list-none flex justify-between items-center transition-colors ${
                                   isCurrentBook
                                     ? 'bg-accent/10 text-accent font-semibold'
@@ -6397,6 +6476,7 @@ export default function App() {
                   </div>
                 )}
               </div>
+              </div>
               </Panel>
             )}
 
@@ -6406,9 +6486,10 @@ export default function App() {
 
             {/* Center: Bible Reader */}
             <Panel defaultSize="60" minSize="30" className={`w-full lg:w-auto flex-col h-full bg-bg min-w-0 ${mobileStudyView === 'reader' ? 'flex' : 'hidden lg:flex'}`}>
-              <div ref={readerContainerRef} className="w-full h-full flex flex-col min-w-0 overflow-hidden relative">
-                <PanelGroup orientation="vertical" id="theologica-layout-vertical-v2">
+              <div ref={readerContainerRef} className="w-full h-full flex flex-col min-h-0 min-w-0 overflow-hidden relative">
+                <PanelGroup orientation="vertical" id="theologica-layout-vertical-v2" className="flex-1 min-h-0">
                 <Panel defaultSize="75" minSize="30" className="flex flex-col relative min-w-0">
+                  <div className="w-full h-full flex flex-col min-h-0 min-w-0 overflow-hidden relative">
                   <header 
                     ref={readerHeaderRef}
                     className="w-full max-w-full min-w-0 h-[60px] border-b border-border flex items-center justify-between px-3 sm:px-4 lg:px-6 bg-bg shrink-0 gap-2 relative z-20"
@@ -6820,6 +6901,7 @@ export default function App() {
                   )}
                 </article>
               </div>
+                  </div>
                 </Panel>
                 
                 {showBottomNotes && (
@@ -6829,39 +6911,17 @@ export default function App() {
               {/* Quick Note Split */}
                 {showBottomNotes && (
                 <Panel panelRef={bottomPanelRef} defaultSize="25" minSize="20" className="hidden lg:flex border-t border-border bg-bg flex-col shrink-0">
-                <div className="h-10 border-b border-border flex items-center justify-between px-6 text-[11px] font-bold text-muted uppercase tracking-widest">
-                  <span>Quick Note — {chapterTitle}</span>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (chapterNote) {
-                        setActiveTab('notes');
-                        setActiveNoteId(chapterNote.id);
-                      } else {
-                        const res = await fetchWithAuth(`${API_URL}/api/notes`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ title: chapterTitle, content: '' })
-                        });
-                        const newNote = await res.json();
-                        setNotes(prev => [newNote, ...prev]);
-                        setActiveTab('notes');
-                        setActiveNoteId(newNote.id);
-                      }
-                    }}
-                    className="text-[11px] font-semibold text-accent hover:underline flex items-center gap-1 normal-case tracking-normal cursor-pointer"
-                    title="Open in full Study Notebook with rich formatting and AI"
-                  >
-                    <span>Open in Full Notes</span>
-                    <ChevronRight size={13} />
-                  </button>
+                <div className="w-full h-full flex flex-col min-h-0 overflow-hidden">
+                  <div className="h-10 border-b border-border flex items-center px-6 text-[11px] font-bold text-muted uppercase tracking-widest shrink-0">
+                    <span>Quick Note — {chapterTitle}</span>
+                  </div>
+                  <textarea 
+                    className="flex-1 min-h-0 bg-transparent p-6 focus:outline-none resize-none text-[15px] leading-relaxed text-fg custom-scroll" 
+                    placeholder={`Take notes for ${chapterTitle}...`}
+                    value={chapterNote ? chapterNote.content : ''}
+                    onChange={handleQuickNoteChange}
+                  />
                 </div>
-                <textarea 
-                  className="flex-1 bg-transparent p-6 focus:outline-none resize-none text-[15px] leading-relaxed text-fg custom-scroll" 
-                  placeholder={`Take notes for ${chapterTitle}...`}
-                  value={chapterNote ? chapterNote.content : ''}
-                  onChange={handleQuickNoteChange}
-                />
                 </Panel>
                 )}
               </PanelGroup>
@@ -6884,6 +6944,7 @@ export default function App() {
                 onDragLeave={handleChatDragLeave}
                 onDrop={handleChatDrop}
               >
+              <div className="w-full h-full flex flex-col min-h-0 min-w-0 overflow-hidden relative">
               {isDraggingOverChat && (
                 <div className="absolute inset-0 z-50 bg-bg/85 backdrop-blur-sm border-2 border-dashed border-accent rounded-2xl flex flex-col items-center justify-center p-6 text-center pointer-events-none transition-all animate-in fade-in zoom-in-95 duration-150 m-2 shadow-2xl">
                   <div className="w-14 h-14 rounded-2xl bg-accent/15 text-accent flex items-center justify-center mb-3 shadow-inner">
@@ -6909,7 +6970,10 @@ export default function App() {
                   compact 
                 />
               </header>
-              <div className={`flex-1 ${activeChat.messages.length === 0 && !isAiTyping ? 'overflow-hidden flex flex-col justify-center' : 'overflow-y-auto custom-scroll space-y-6'} p-4`}>
+              <div
+                ref={desktopStudyChatScrollRef}
+                className={`flex-1 min-h-0 ${activeChat.messages.length === 0 && !isAiTyping ? 'overflow-hidden flex flex-col justify-center' : 'overflow-y-auto custom-scroll space-y-6'} p-4`}
+              >
                 {activeChat.messages.length === 0 ? (
                   <ChatEmptyState
                     activeBook={activeBook}
@@ -6939,13 +7003,13 @@ export default function App() {
                       chatId={activeChatId || activeChat?.id}
                       activeLens={theologicalLens}
                       translation={translation}
+                      onScrollToBottom={scrollToBottom}
                     />
                   ))
                 )}
                 {isAiTyping && (
                   <AiThinkingIndicator status={aiActivityStatus} thinkingText={aiThinkingText} />
                 )}
-                <div ref={messagesEndRef} />
               </div>
                 <form onSubmit={handleSendMessage} className="p-4 border-t border-border bg-bg shrink-0">
                   <div className="flex flex-col relative">
@@ -7107,7 +7171,7 @@ export default function App() {
                       <button 
                         type="button" 
                         onClick={() => imageFileRef.current?.click()} 
-                        disabled={cooldown > 0 || !isOnline} 
+                        disabled={!isOnline} 
                         className="flex-shrink-0 p-2 text-muted hover:text-fg disabled:opacity-40 transition-colors mr-1 cursor-pointer"
                         title="Attach file or image"
                       >
@@ -7127,13 +7191,13 @@ export default function App() {
                           }
                         }}
                         onKeyDown={handleChatKeyDown}
-                        disabled={cooldown > 0 || !isOnline}
-                        placeholder={!isOnline ? "Study AI is unavailable offline" : cooldown > 0 ? `Study AI is resting... (${cooldown}s)` : "Message Study AI (type / for commands)..."}
+                        disabled={!isOnline}
+                        placeholder={!isOnline ? "Study AI is unavailable offline" : "Message Study AI (type / for commands)..."}
                         className="flex-1 bg-transparent text-fg pl-1 pr-10 py-2 text-[14px] focus:outline-none disabled:opacity-50 transition-all placeholder:text-meta resize-none"
                       />
                       <button 
                         type="submit" 
-                        disabled={isAiTyping || (!chatInput.trim() && !chatImage && !attachedFile && chatQuotes.length === 0) || cooldown > 0 || !isOnline} 
+                        disabled={isAiTyping || (!chatInput.trim() && !chatImage && !attachedFile && chatQuotes.length === 0) || !isOnline} 
                         className="absolute right-2 bottom-2 p-2 bg-accent hover:bg-[#b5583b] text-white rounded-xl disabled:opacity-40 disabled:hover:bg-accent transition-all shadow-sm cursor-pointer"
                         title="Send message"
                       >
@@ -7145,6 +7209,7 @@ export default function App() {
                     </p>
                   </div>
                 </form>
+              </div>
               </Panel>
             )}
           </PanelGroup>
@@ -7543,6 +7608,11 @@ export default function App() {
           <div className="flex-1 flex flex-col w-full h-full min-h-0 bg-bg overflow-hidden">
             <div className="flex-1 flex flex-col items-center overflow-y-auto custom-scroll p-4 sm:p-6 lg:p-10 pb-28 lg:pb-10 bg-bg">
             <div className="w-full max-w-4xl xl:max-w-5xl space-y-6">
+              {/* Today's local date header */}
+              <div className="text-xs sm:text-sm font-medium text-muted tracking-wide">
+                Today is {new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).format(new Date())}
+              </div>
+
               {/* Day navigation & Time toggle header */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4 shrink-0 pb-3 border-b border-border/50">
                 {/* Prev / Today / Next Day Navigation */}
@@ -7898,7 +7968,10 @@ export default function App() {
                   />
                 </div>
               </header>
-              <div className={`flex-1 ${activeChat.messages.length === 0 && !isAiTyping ? 'overflow-hidden justify-center' : 'overflow-y-auto custom-scroll space-y-6 sm:space-y-8'} p-2.5 sm:p-8 lg:p-12 flex flex-col`}>
+              <div
+                ref={fullChatScrollRef}
+                className={`flex-1 min-h-0 ${activeChat.messages.length === 0 && !isAiTyping ? 'overflow-hidden flex flex-col justify-center' : 'overflow-y-auto custom-scroll space-y-6 sm:space-y-8'} p-2.5 sm:p-8 lg:p-12`}
+              >
                 {activeChat.messages.length === 0 ? (
                   <ChatEmptyState
                     activeBook={activeBook}
@@ -7929,13 +8002,13 @@ export default function App() {
                       activeLens={theologicalLens}
                       translation={translation}
                       isFullView
+                      onScrollToBottom={scrollToBottom}
                     />
                   ))
                 )}
                 {isAiTyping && (
                   <AiThinkingIndicator status={aiActivityStatus} thinkingText={aiThinkingText} isFullView />
                 )}
-                <div ref={messagesEndRef} />
               </div>
               <form onSubmit={handleSendMessage} className="p-2 sm:p-5 border-t border-border w-full shrink-0">
                 <div className="flex flex-col max-w-4xl mx-auto w-full relative">
@@ -8096,7 +8169,7 @@ export default function App() {
                     <button 
                       type="button" 
                       onClick={() => imageFileRef.current?.click()} 
-                      disabled={cooldown > 0} 
+                      disabled={!isOnline} 
                       className="flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center p-2.5 text-muted hover:text-fg disabled:opacity-40 transition-colors mr-1 cursor-pointer"
                       title="Attach file or image"
                     >
@@ -8116,13 +8189,13 @@ export default function App() {
                         }
                       }}
                       onKeyDown={handleChatKeyDown}
-                      disabled={cooldown > 0}
-                      placeholder={cooldown > 0 ? `Study AI is resting... (${cooldown}s)` : "Ask anything (type / for commands)..."}
+                      disabled={!isOnline}
+                      placeholder={!isOnline ? "Study AI is unavailable offline" : "Ask anything (type / for commands)..."}
                       className="flex-1 bg-transparent text-fg pl-1 pr-14 py-2.5 text-[16px] focus:outline-none disabled:opacity-50 transition-all placeholder:text-meta resize-none"
                     />
                     <button 
                       type="submit" 
-                      disabled={isAiTyping || (!chatInput.trim() && !chatImage && !attachedFile && chatQuotes.length === 0) || cooldown > 0} 
+                      disabled={isAiTyping || (!chatInput.trim() && !chatImage && !attachedFile && chatQuotes.length === 0) || !isOnline} 
                       className="min-w-[44px] min-h-[44px] flex items-center justify-center absolute right-2 bottom-2 p-2.5 bg-accent hover:bg-[#b5583b] text-white rounded-xl disabled:opacity-40 disabled:hover:bg-accent transition-all shadow-sm cursor-pointer"
                       title="Send message"
                     >
@@ -8461,11 +8534,11 @@ export default function App() {
           accentColor={accentColor}
           onAccentColorChange={handleAccentColorChange}
           showLeftSidebar={showLeftSidebar}
-          onToggleLeftSidebar={setShowLeftSidebar}
+          onToggleLeftSidebar={handleToggleLeftSidebar}
           showRightSidebar={showRightSidebar}
-          onToggleRightSidebar={setShowRightSidebar}
+          onToggleRightSidebar={handleToggleRightSidebar}
           showBottomNotes={showBottomNotes}
-          onToggleBottomNotes={setShowBottomNotes}
+          onToggleBottomNotes={handleToggleBottomNotes}
           readerFontFamily={readerFontFamily}
           onReaderFontFamilyChange={handleReaderFontFamilyChange}
           readerFontSize={readerFontSize}

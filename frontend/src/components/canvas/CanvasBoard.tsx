@@ -245,9 +245,7 @@ function InnerCanvasBoard({
 
   useEffect(() => {
     const checkMobile = () => {
-      const mobileQuery = window.matchMedia('(max-width: 768px)').matches;
-      const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-      setIsMobile(mobileQuery || hasTouch);
+      setIsMobile(window.matchMedia('(max-width: 768px)').matches);
     };
     checkMobile();
     window.addEventListener('resize', checkMobile);
@@ -265,6 +263,7 @@ function InnerCanvasBoard({
     let initialViewport = { x: 0, y: 0, zoom: 1 };
     let initialWorldPoint = { x: 0, y: 0 };
     let isPinching = false;
+    let pinchRafId: number | null = null;
 
     const onTouchStart = (e: TouchEvent) => {
       if (e.touches.length === 2) {
@@ -319,7 +318,13 @@ function InnerCanvasBoard({
           const nextX = currCanvasX - initialWorldPoint.x * targetZoom;
           const nextY = currCanvasY - initialWorldPoint.y * targetZoom;
 
-          setViewport({ x: nextX, y: nextY, zoom: targetZoom });
+          if (pinchRafId !== null) {
+            cancelAnimationFrame(pinchRafId);
+          }
+          pinchRafId = requestAnimationFrame(() => {
+            pinchRafId = null;
+            setViewport({ x: nextX, y: nextY, zoom: targetZoom });
+          });
 
           if (e.cancelable) e.preventDefault();
           e.stopPropagation();
@@ -330,6 +335,10 @@ function InnerCanvasBoard({
     const onTouchEnd = (e: TouchEvent) => {
       if (e.touches.length < 2) {
         isPinching = false;
+        if (pinchRafId !== null) {
+          cancelAnimationFrame(pinchRafId);
+          pinchRafId = null;
+        }
       }
     };
 
@@ -339,6 +348,9 @@ function InnerCanvasBoard({
     el.addEventListener('touchcancel', onTouchEnd, { capture: true, passive: false });
 
     return () => {
+      if (pinchRafId !== null) {
+        cancelAnimationFrame(pinchRafId);
+      }
       el.removeEventListener('touchstart', onTouchStart, { capture: true });
       el.removeEventListener('touchmove', onTouchMove, { capture: true });
       el.removeEventListener('touchend', onTouchEnd, { capture: true });
@@ -424,9 +436,10 @@ function InnerCanvasBoard({
   boardTitleRef.current = boardTitle;
   boardsRef.current = boards;
 
-  // Auto-spawn camera directly where note cards are located on the canvas board
+  // Auto-spawn camera directly where note cards are located on the canvas board.
+  // Read nodes from nodesRef.current so node drag/edit updates do not re-trigger fitView.
   const spawnToCards = useCallback((duration = 450) => {
-    const currentNodes = nodesRef.current.length > 0 ? nodesRef.current : nodes;
+    const currentNodes = nodesRef.current;
 
     if (!currentNodes || currentNodes.length === 0) {
       setViewport({ x: 0, y: 0, zoom: 1 }, { duration: 250 });
@@ -452,7 +465,7 @@ function InnerCanvasBoard({
     }, 100);
 
     return () => clearTimeout(retryTimer);
-  }, [fitView, isMobile, nodes, setViewport]);
+  }, [fitView, isMobile, setViewport]);
 
   // Viewport auto-spawn whenever switching to or clicking the Canvas tab
   useEffect(() => {
@@ -573,6 +586,28 @@ function InnerCanvasBoard({
     });
   }, [pushSnapshot, setNodes]);
 
+  const handleResizeNodeEnd = useCallback((id: string, width: number, height: number) => {
+    setNodes((nds) => {
+      const next = nds.map((n) => {
+        if (n.id === id) {
+          return {
+            ...n,
+            width,
+            height,
+            style: {
+              ...n.style,
+              width,
+              height,
+            },
+          };
+        }
+        return n;
+      });
+      pushSnapshot(next, edgesRef.current);
+      return next;
+    });
+  }, [pushSnapshot, setNodes]);
+
   const handleDeleteNode = useCallback((id: string) => {
     setNodes((nds) => {
       const remainingNodes = nds.filter((n) => n.id !== id);
@@ -584,6 +619,22 @@ function InnerCanvasBoard({
       return remainingNodes;
     });
   }, [pushSnapshot, setEdges, setNodes]);
+
+  const handleEdgeDelete = useCallback((edgeId: string) => {
+    setEdges((eds) => {
+      const next = eds.filter((e) => e.id !== edgeId);
+      pushSnapshot(nodesRef.current, next);
+      return next;
+    });
+  }, [pushSnapshot, setEdges]);
+
+  const handleEdgeLabelChange = useCallback((edgeId: string, newLabel: string) => {
+    setEdges((eds) => {
+      const next = eds.map((e) => (e.id === edgeId ? { ...e, label: newLabel } : e));
+      pushSnapshot(nodesRef.current, next);
+      return next;
+    });
+  }, [pushSnapshot, setEdges]);
 
   const handleDuplicateNode: (id: string) => void = useCallback((id: string) => {
     const target = nodesRef.current.find((n) => n.id === id);
@@ -604,6 +655,8 @@ function InnerCanvasBoard({
         onUpdate: handleUpdateNode,
         onDuplicate: handleDuplicateNode,
         onDelete: handleDeleteNode,
+        onResizeEnd: handleResizeNodeEnd,
+        onVerseClick: onNavigateToVerse,
         theme,
       },
     };
@@ -616,7 +669,7 @@ function InnerCanvasBoard({
       pushSnapshot(next, edgesRef.current);
       return next;
     });
-  }, [handleDeleteNode, handleUpdateNode, pushSnapshot, setNodes, theme]);
+  }, [handleDeleteNode, handleResizeNodeEnd, handleUpdateNode, onNavigateToVerse, pushSnapshot, setNodes, theme]);
 
   // Connect source card to target card (from card options menu)
   const handleConnectTo = useCallback((sourceId: string, targetId: string) => {
@@ -637,7 +690,11 @@ function InnerCanvasBoard({
       type: 'customEdge',
       label: 'Connected',
       animated: true,
-      data: { theme },
+      data: {
+        theme,
+        onEdgeDelete: handleEdgeDelete,
+        onEdgeLabelChange: handleEdgeLabelChange,
+      },
       markerEnd: {
         type: MarkerType.ArrowClosed,
         color: isDark ? '#a1a1aa' : '#71717a',
@@ -654,7 +711,7 @@ function InnerCanvasBoard({
       pushSnapshot(nodesRef.current, next);
       return next;
     });
-  }, [isDark, theme, pushSnapshot, setEdges]);
+  }, [isDark, theme, handleEdgeDelete, handleEdgeLabelChange, pushSnapshot, setEdges]);
 
   // Spawn Treasury of Scripture Knowledge cross-reference nodes
   const handleSpawnCrossReferences = useCallback(async (nodeId: string, reference: string) => {
@@ -707,6 +764,7 @@ function InnerCanvasBoard({
           onUpdate: handleUpdateNode,
           onDuplicate: handleDuplicateNode,
           onDelete: handleDeleteNode,
+          onResizeEnd: handleResizeNodeEnd,
           onConnectTo: handleConnectTo,
           onSpawnCrossReferences: handleSpawnCrossReferences,
           onVerseClick: onNavigateToVerse,
@@ -724,7 +782,11 @@ function InnerCanvasBoard({
         type: 'customEdge',
         label: cr.relationship,
         animated: true,
-        data: { theme },
+        data: {
+          theme,
+          onEdgeDelete: handleEdgeDelete,
+          onEdgeLabelChange: handleEdgeLabelChange,
+        },
         markerEnd: {
           type: MarkerType.ArrowClosed,
           color: isDark ? '#f59e0b' : '#d97706',
@@ -748,7 +810,7 @@ function InnerCanvasBoard({
     setTimeout(() => {
       fitView({ padding: 0.2, duration: 600 });
     }, 150);
-  }, [fitView, handleDeleteNode, handleDuplicateNode, handleUpdateNode, handleConnectTo, isDark, isMobile, onNavigateToVerse, pushSnapshot, setEdges, setNodes, theme]);
+  }, [fitView, handleDeleteNode, handleDuplicateNode, handleResizeNodeEnd, handleUpdateNode, handleConnectTo, handleEdgeDelete, handleEdgeLabelChange, isDark, isMobile, onNavigateToVerse, pushSnapshot, setEdges, setNodes, theme]);
 
   // Core Auto Arrange Algorithm: computes collision-free topological columns & optimal connection handles
   const arrangeGraph = useCallback((
@@ -945,6 +1007,7 @@ function InnerCanvasBoard({
         onUpdate: handleUpdateNode,
         onDuplicate: handleDuplicateNode,
         onDelete: handleDeleteNode,
+        onResizeEnd: handleResizeNodeEnd,
         onConnectTo: handleConnectTo,
         onSpawnCrossReferences: handleSpawnCrossReferences,
         onVerseClick: onNavigateToVerse,
@@ -954,7 +1017,7 @@ function InnerCanvasBoard({
         ...raw.style,
       },
     };
-  }, [handleDeleteNode, handleDuplicateNode, handleUpdateNode, handleConnectTo, handleSpawnCrossReferences, onNavigateToVerse, theme, isMobile]);
+  }, [handleDeleteNode, handleDuplicateNode, handleResizeNodeEnd, handleUpdateNode, handleConnectTo, handleSpawnCrossReferences, onNavigateToVerse, theme, isMobile]);
 
   // Format edge helper
   const prepareEdge = useCallback((raw: SerializableEdge): Edge => {
@@ -967,7 +1030,11 @@ function InnerCanvasBoard({
       type: 'customEdge',
       label: raw.label || 'Relates to',
       animated: raw.animated ?? true,
-      data: { theme },
+      data: {
+        theme,
+        onEdgeDelete: handleEdgeDelete,
+        onEdgeLabelChange: handleEdgeLabelChange,
+      },
       markerEnd: {
         type: MarkerType.ArrowClosed,
         color: isDark ? '#a1a1aa' : '#71717a',
@@ -975,7 +1042,7 @@ function InnerCanvasBoard({
         height: 16,
       },
     };
-  }, [isDark, theme]);
+  }, [isDark, theme, handleEdgeDelete, handleEdgeLabelChange]);
 
   // Immediate board persistence helper (sync to localStorage, background sync to API)
   const saveBoardImmediate = useCallback((
@@ -1375,7 +1442,7 @@ function InnerCanvasBoard({
     };
   }, [isActiveTab, fetchWithAuth, syncBoardsWithRemote]);
 
-  // Sync theme changes to nodes
+  // Sync theme changes to nodes and edges
   useEffect(() => {
     setNodes((nds) =>
       nds.map((n) => ({
@@ -1386,10 +1453,25 @@ function InnerCanvasBoard({
           onUpdate: handleUpdateNode,
           onDuplicate: handleDuplicateNode,
           onDelete: handleDeleteNode,
+          onResizeEnd: handleResizeNodeEnd,
+          onConnectTo: handleConnectTo,
+          onSpawnCrossReferences: handleSpawnCrossReferences,
+          onVerseClick: onNavigateToVerse,
         },
       }))
     );
-  }, [theme, handleUpdateNode, handleDuplicateNode, handleDeleteNode, setNodes]);
+    setEdges((eds) =>
+      eds.map((e) => ({
+        ...e,
+        data: {
+          ...e.data,
+          theme,
+          onEdgeDelete: handleEdgeDelete,
+          onEdgeLabelChange: handleEdgeLabelChange,
+        },
+      }))
+    );
+  }, [theme, handleUpdateNode, handleDuplicateNode, handleDeleteNode, handleResizeNodeEnd, handleConnectTo, handleSpawnCrossReferences, onNavigateToVerse, handleEdgeDelete, handleEdgeLabelChange, setNodes, setEdges]);
 
   // Synchronous auto-save debounce for current board
   useEffect(() => {
@@ -1666,7 +1748,7 @@ function InnerCanvasBoard({
         setSaveStatus('saved');
       }
     }
-  }, [loadBoardData, updateHistoryState, setNodes, setEdges]);
+  }, [loadBoardData, updateHistoryState, setNodes, setEdges, fetchWithAuth]);
 
   // Handle incoming node from Bible reader or AI chat
   useEffect(() => {
@@ -1771,6 +1853,9 @@ function InnerCanvasBoard({
         onUpdate: handleUpdateNode,
         onDuplicate: handleDuplicateNode,
         onDelete: handleDeleteNode,
+        onResizeEnd: handleResizeNodeEnd,
+        onConnectTo: handleConnectTo,
+        onSpawnCrossReferences: handleSpawnCrossReferences,
       },
     };
 
@@ -1802,7 +1887,7 @@ function InnerCanvasBoard({
         fitView({ padding: 0.25, duration: 600, minZoom: 0.35, maxZoom: 1.1 });
       }
     }, 150);
-  }, [incomingNode, handleCreateBoard, handleSelectBoard, prepareNode, saveBoardImmediate, theme, onNavigateToVerse, handleUpdateNode, handleDuplicateNode, handleDeleteNode, onIncomingNodeHandled, pushSnapshot, fitView, setNodes]);
+  }, [incomingNode, handleCreateBoard, handleSelectBoard, prepareNode, saveBoardImmediate, theme, onNavigateToVerse, handleUpdateNode, handleDuplicateNode, handleDeleteNode, handleResizeNodeEnd, handleConnectTo, handleSpawnCrossReferences, onIncomingNodeHandled, pushSnapshot, fitView, setNodes]);
 
   // Add card from toolbar or context menu
   const handleAddNode = useCallback((category: NodeCategory, customPos?: { x: number; y: number }) => {
@@ -1848,6 +1933,9 @@ function InnerCanvasBoard({
         onUpdate: handleUpdateNode,
         onDuplicate: handleDuplicateNode,
         onDelete: handleDeleteNode,
+        onResizeEnd: handleResizeNodeEnd,
+        onConnectTo: handleConnectTo,
+        onSpawnCrossReferences: handleSpawnCrossReferences,
       },
     };
 
@@ -1859,7 +1947,7 @@ function InnerCanvasBoard({
       pushSnapshot(next, edgesRef.current);
       return next;
     });
-  }, [handleCreateBoard, theme, onNavigateToVerse, handleUpdateNode, handleDuplicateNode, handleDeleteNode, pushSnapshot, setNodes, isMobile]);
+  }, [handleCreateBoard, theme, onNavigateToVerse, handleUpdateNode, handleDuplicateNode, handleDeleteNode, handleResizeNodeEnd, handleConnectTo, handleSpawnCrossReferences, pushSnapshot, setNodes, isMobile]);
 
   // Connecting edges
   const onConnect = useCallback((connection: Connection) => {
@@ -1878,7 +1966,11 @@ function InnerCanvasBoard({
         type: 'customEdge',
         label: 'Relates to',
         animated: true,
-        data: { theme },
+        data: {
+          theme,
+          onEdgeDelete: handleEdgeDelete,
+          onEdgeLabelChange: handleEdgeLabelChange,
+        },
         markerEnd: {
           type: MarkerType.ArrowClosed,
           color: isDark ? '#a1a1aa' : '#71717a',
@@ -1891,7 +1983,7 @@ function InnerCanvasBoard({
       pushSnapshot(nodesRef.current, next);
       return next;
     });
-  }, [isDark, theme, pushSnapshot, setEdges]);
+  }, [isDark, theme, handleEdgeDelete, handleEdgeLabelChange, pushSnapshot, setEdges]);
 
   // Capture drag stop so moving nodes can be undone!
   const onNodeDragStop = useCallback(() => {
@@ -2286,33 +2378,113 @@ function InnerCanvasBoard({
   const nodeTypes = useMemo(() => ({ customCard: CustomCanvasNode }), []);
   const edgeTypes = useMemo(() => ({ customEdge: CustomCanvasEdge }), []);
 
-  // Enrich live nodes with otherNodes summary list for the "Add Connection" card menu
-  const displayNodes = useMemo(() => {
-    const summary = nodes.map((n) => ({
-      id: n.id,
-      title: n.data.title || 'Untitled Card',
-      category: (n.data.category || 'general') as NodeCategory,
-    }));
+  const nodesSummaryKey = useMemo(
+    () => nodes.map((n) => `${n.id}:${n.data.title || ''}:${n.data.category || 'general'}`).join('|'),
+    [nodes]
+  );
 
-    return nodes.map((n) => ({
-      ...n,
-      style: {
-        width: n.style?.width || 380,
-        ...n.style,
-      },
-      data: {
-        ...n.data,
+  const nodesSummary = useMemo(
+    () =>
+      nodes.map((n) => ({
+        id: n.id,
+        title: n.data.title || 'Untitled Card',
+        category: (n.data.category || 'general') as NodeCategory,
+      })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [nodesSummaryKey]
+  );
+
+  const nodeEnrichCacheRef = useRef<
+    Map<
+      string,
+      {
+        rawNode: Node<CanvasNodeData>;
+        rawData: CanvasNodeData;
+        summary: typeof nodesSummary;
+        theme: string;
+        enrichedData: CanvasNodeData;
+        enrichedNode: Node<CanvasNodeData>;
+      }
+    >
+  >(new Map());
+
+  // Enrich live nodes with otherNodes summary list and callbacks while preserving object references during drag frames
+  const displayNodes = useMemo(() => {
+    const cache = nodeEnrichCacheRef.current;
+    const nextCache = new Map<string, (typeof cache extends Map<string, infer V> ? V : never)>();
+
+    const result = nodes.map((n) => {
+      const cached = cache.get(n.id);
+      const canReuseData =
+        cached &&
+        cached.rawData === n.data &&
+        cached.summary === nodesSummary &&
+        cached.theme === theme &&
+        cached.enrichedData.onUpdate === handleUpdateNode &&
+        cached.enrichedData.onDuplicate === handleDuplicateNode &&
+        cached.enrichedData.onDelete === handleDeleteNode &&
+        cached.enrichedData.onResizeEnd === handleResizeNodeEnd &&
+        cached.enrichedData.onConnectTo === handleConnectTo &&
+        cached.enrichedData.onSpawnCrossReferences === handleSpawnCrossReferences &&
+        cached.enrichedData.onVerseClick === onNavigateToVerse;
+
+      const enrichedData: CanvasNodeData = canReuseData
+        ? cached.enrichedData
+        : {
+            ...n.data,
+            theme,
+            onUpdate: handleUpdateNode,
+            onDuplicate: handleDuplicateNode,
+            onDelete: handleDeleteNode,
+            onResizeEnd: handleResizeNodeEnd,
+            onConnectTo: handleConnectTo,
+            onSpawnCrossReferences: handleSpawnCrossReferences,
+            onVerseClick: onNavigateToVerse,
+            otherNodes: nodesSummary.filter((s) => s.id !== n.id),
+          };
+
+      if (canReuseData && cached.rawNode === n) {
+        nextCache.set(n.id, cached);
+        return cached.enrichedNode;
+      }
+
+      const enrichedNode: Node<CanvasNodeData> = {
+        ...n,
+        style: n.style?.width
+          ? n.style
+          : {
+              width: 380,
+              ...n.style,
+            },
+        data: enrichedData,
+      };
+
+      nextCache.set(n.id, {
+        rawNode: n,
+        rawData: n.data,
+        summary: nodesSummary,
         theme,
-        onUpdate: handleUpdateNode,
-        onDuplicate: handleDuplicateNode,
-        onDelete: handleDeleteNode,
-        onConnectTo: handleConnectTo,
-        onSpawnCrossReferences: handleSpawnCrossReferences,
-        onVerseClick: onNavigateToVerse,
-        otherNodes: summary.filter((s) => s.id !== n.id),
-      },
-    }));
-  }, [nodes, theme, handleUpdateNode, handleDuplicateNode, handleDeleteNode, handleConnectTo, handleSpawnCrossReferences, onNavigateToVerse]);
+        enrichedData,
+        enrichedNode,
+      });
+
+      return enrichedNode;
+    });
+
+    nodeEnrichCacheRef.current = nextCache;
+    return result;
+  }, [
+    nodes,
+    nodesSummary,
+    theme,
+    handleUpdateNode,
+    handleDuplicateNode,
+    handleDeleteNode,
+    handleResizeNodeEnd,
+    handleConnectTo,
+    handleSpawnCrossReferences,
+    onNavigateToVerse,
+  ]);
 
   return (
     <div 
@@ -2352,7 +2524,24 @@ function InnerCanvasBoard({
       />
 
       {/* Main Content Area */}
-      <div ref={canvasWrapperRef} className="flex-1 h-full relative overflow-hidden flex flex-col min-w-0">
+      <div
+        ref={canvasWrapperRef}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          const target = e.target as HTMLElement;
+          if (
+            target.closest('.react-flow') &&
+            !target.closest('.react-flow__node') &&
+            !target.closest('.react-flow__edge') &&
+            !target.closest('.react-flow__controls') &&
+            !target.closest('.react-flow__minimap')
+          ) {
+            setPaneContextMenu({ x: e.clientX, y: e.clientY });
+            setPaneAddSubmenuOpen(false);
+          }
+        }}
+        className="flex-1 h-full relative overflow-hidden flex flex-col min-w-0"
+      >
         {isCreatePageActive || (boards.length === 0 && !activeBoardId) ? (
           <CanvasStartPage
             onGenerateCanvas={handleGenerateFromStartPage}
@@ -2434,10 +2623,18 @@ function InnerCanvasBoard({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onNodeDragStart={() => {
+          if (paneContextMenu) setPaneContextMenu(null);
+        }}
         onNodeDragStop={onNodeDragStop}
         onNodesDelete={onNodesDelete}
         onEdgesDelete={onEdgesDelete}
         onPaneContextMenu={(event) => {
+          event.preventDefault();
+          setPaneContextMenu({ x: event.clientX, y: event.clientY });
+          setPaneAddSubmenuOpen(false);
+        }}
+        onSelectionContextMenu={(event) => {
           event.preventDefault();
           setPaneContextMenu({ x: event.clientX, y: event.clientY });
           setPaneAddSubmenuOpen(false);
@@ -2457,10 +2654,12 @@ function InnerCanvasBoard({
         defaultViewport={{ x: isMobile ? 20 : 80, y: isMobile ? 40 : 60, zoom: isMobile ? 0.7 : 0.85 }}
         selectionMode={SelectionMode.Partial}
         panOnScroll={false}
-        selectionOnDrag={!isMobile}
-        panOnDrag={isMobile ? true : [1, 2]}
+        selectionOnDrag={false}
+        selectionKeyCode="Shift"
+        panOnDrag={true}
         zoomOnPinch={true}
         zoomOnScroll={true}
+        zoomOnDoubleClick={false}
         preventScrolling={true}
         autoPanOnNodeDrag={true}
         autoPanOnConnect={true}

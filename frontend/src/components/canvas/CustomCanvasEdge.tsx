@@ -54,17 +54,25 @@ export function CustomCanvasEdge({
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setEdges((edges) => edges.filter((edge) => edge.id !== id));
+    if (typeof (data as any)?.onEdgeDelete === 'function') {
+      (data as any).onEdgeDelete(id);
+    } else {
+      setEdges((edges) => edges.filter((edge) => edge.id !== id));
+    }
   };
 
   const handleSaveLabel = (text: string) => {
     setIsEditing(false);
     const trimmed = text.trim();
-    setEdges((edges) =>
-      edges.map((edge) =>
-        edge.id === id ? { ...edge, label: trimmed || undefined } : edge
-      )
-    );
+    if (typeof (data as any)?.onEdgeLabelChange === 'function') {
+      (data as any).onEdgeLabelChange(id, trimmed || undefined);
+    } else {
+      setEdges((edges) =>
+        edges.map((edge) =>
+          edge.id === id ? { ...edge, label: trimmed || undefined } : edge
+        )
+      );
+    }
   };
 
   const hasLabel = label !== undefined && label !== null && String(label).trim() !== '';
@@ -90,6 +98,11 @@ export function CustomCanvasEdge({
         className="cursor-pointer pointer-events-stroke"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsEditing(true);
+        }}
       />
       
       <EdgeLabelRenderer>
@@ -103,6 +116,11 @@ export function CustomCanvasEdge({
           className="nodrag nopan flex items-center gap-1 transition-transform"
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsEditing(true);
+          }}
         >
           {isEditing ? (
             <input

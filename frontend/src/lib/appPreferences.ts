@@ -149,6 +149,18 @@ export function getPreference(key: string, defaultValue: string = ''): string {
 }
 
 /**
+ * Read a boolean preference synchronously from cookies/localStorage.
+ * Falls back to `defaultValue` (true by default) if missing or invalid.
+ */
+export function getBooleanPreference(key: string, defaultValue: boolean = true): boolean {
+  if (typeof window === 'undefined') return defaultValue;
+  const raw = getPreference(key, '');
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  return defaultValue;
+}
+
+/**
  * Dual-save preference to both cookie and localStorage.
  */
 export function setPreference(key: string, value: string): void {
