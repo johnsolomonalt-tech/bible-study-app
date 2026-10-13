@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Sparkles, 
   BookOpen, 
@@ -10,8 +10,7 @@ import {
   Languages, 
   Cross,
   Compass,
-  ArrowRight,
-  RefreshCw
+  ArrowRight
 } from 'lucide-react';
 import { TheologicalLensType, THEOLOGICAL_LENS_OPTIONS } from './TheologicalLensSelector';
 
@@ -244,6 +243,15 @@ function buildDynamicQuestionPool(bookName: string, chapter: number, translation
   return [...specific, ...rotatedGenre];
 }
 
+const shuffleArray = <T,>(array: T[]): T[] => {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+};
+
 export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
   activeBook = { name: 'Genesis', chapters: 50 },
   activeChapter = 1,
@@ -252,8 +260,6 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
   onSelectPrompt,
   isCompact = false,
 }) => {
-  const [shuffleOffset, setShuffleOffset] = useState(0);
-
   const currentLensMeta = THEOLOGICAL_LENS_OPTIONS.find(l => l.id === theologicalLens) || THEOLOGICAL_LENS_OPTIONS[0];
 
   const questionPool = useMemo(
@@ -261,15 +267,16 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
     [activeBook.name, activeChapter, translation, currentLensMeta.name]
   );
 
-  // Pick 4 questions (display 2 on mobile, 4 on sm+ screens), offset by shuffleOffset
-  const visibleQuestions = useMemo(() => {
-    const count = 4;
-    const items: QuestionItem[] = [];
-    for (let i = 0; i < count; i++) {
-      items.push(questionPool[(shuffleOffset + i) % questionPool.length]);
-    }
-    return items;
-  }, [questionPool, shuffleOffset]);
+  // Pick 4 questions randomized every time on reload/mount (2 on mobile, 4 on desktop)
+  const [visibleQuestions, setVisibleQuestions] = useState<QuestionItem[]>(() => {
+    return questionPool.slice(0, 4);
+  });
+
+  useEffect(() => {
+    if (!questionPool || questionPool.length === 0) return;
+    const shuffled = shuffleArray(questionPool);
+    setVisibleQuestions(shuffled.slice(0, 4));
+  }, [questionPool]);
 
   const thematicCards = [
     {
@@ -357,31 +364,19 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
         </button>
       </div>
 
-      {/* Context-Aware Dynamic Starters with Shuffle Button */}
+      {/* Context-Aware Dynamic Starters */}
       <div className="w-full max-w-md sm:max-w-xl mb-1 sm:mb-4">
-        <div className="flex items-center justify-between mb-2 px-1">
-          <div className="flex items-center gap-1.5">
-            <Sparkles size={11} className="text-accent" />
-            <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-muted">
-              Suggested Questions
-            </span>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setShuffleOffset(prev => (prev + 2) % questionPool.length)}
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold text-accent hover:bg-accent/10 transition-colors cursor-pointer active:scale-95"
-            title="Show different suggested questions"
-          >
-            <RefreshCw size={10} />
-            <span>More Questions</span>
-          </button>
+        <div className="flex items-center gap-1.5 mb-2 px-1">
+          <Sparkles size={11} className="text-accent" />
+          <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-muted">
+            Suggested Questions
+          </span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {visibleQuestions.map((item, idx) => (
             <button
-              key={`${shuffleOffset}-${idx}`}
+              key={`${item.prompt}-${idx}`}
               type="button"
               onClick={() => onSelectPrompt(item.prompt)}
               className={`${idx >= 2 ? 'hidden sm:flex' : 'flex'} group text-left p-2.5 sm:p-3 rounded-xl bg-surface/60 hover:bg-surface border border-border-soft/60 hover:border-accent/50 transition-all cursor-pointer shadow-2xs hover:shadow-xs items-center justify-between gap-2 active:scale-[0.99]`}
