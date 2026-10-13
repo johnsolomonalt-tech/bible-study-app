@@ -804,17 +804,37 @@ export function SettingsModal(props: SettingsModalProps) {
                   </div>
                 </div>
 
-                {/* Daily Reading Target relocated to Reading Tracker */}
-                <div className="p-4 bg-surface rounded-2xl border border-border space-y-2">
+                {/* Daily Reading Target */}
+                <div className="p-4 bg-surface rounded-2xl border border-border space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-muted">Daily Reading Target</span>
-                    <span className="text-xs font-bold text-accent px-2.5 py-0.5 rounded-full bg-accent/10 border border-accent/20">
-                      {dailyChapterGoal} {dailyChapterGoal === 1 ? 'Chapter' : 'Chapters'} / day
-                    </span>
+                    <div>
+                      <span className="text-xs font-bold uppercase tracking-wider text-muted block">Daily Reading Target</span>
+                      <span className="text-xs text-muted">Adjust how many chapters you aim to read each day</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onDailyChapterGoalChange(Math.max(1, dailyChapterGoal - 1))}
+                        disabled={dailyChapterGoal <= 1}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg border border-border bg-bg text-fg hover:bg-surface disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-sm font-bold"
+                        title="Decrease daily goal"
+                      >
+                        -
+                      </button>
+                      <span className="text-xs font-bold text-accent min-w-[80px] text-center px-2.5 py-1 rounded-lg bg-accent/10 border border-accent/20">
+                        {dailyChapterGoal} {dailyChapterGoal === 1 ? 'ch' : 'chs'} / day
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => onDailyChapterGoalChange(Math.min(50, dailyChapterGoal + 1))}
+                        disabled={dailyChapterGoal >= 50}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg border border-border bg-bg text-fg hover:bg-surface disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-sm font-bold"
+                        title="Increase daily goal"
+                      >
+                        +
+                      </button>
+                    </div>
                   </div>
-                  <p className="text-xs text-muted leading-relaxed">
-                    Daily chapter goals and reading timeline estimates can now be changed directly in the <strong className="text-fg">Reading Tracker</strong> tab using the <strong className="text-accent">&quot;Edit Daily Goal&quot;</strong> button.
-                  </p>
                 </div>
               </div>
             )}

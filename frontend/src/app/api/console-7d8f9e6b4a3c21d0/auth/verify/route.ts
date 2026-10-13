@@ -7,12 +7,25 @@ import {
   createDevSessionToken,
   DEV_COOKIE_NAME,
 } from '@/lib/devAuth';
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 
 export async function POST(req: Request) {
   try {
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: 'Authentication required. Please sign in with Clerk.' }, { status: 401 });
+    }
+
+    const ip = getClientIp(req);
+    const rateLimit = await checkRateLimit(`dev_auth_verify:${userId || ip}`, {
+      windowMs: 15 * 60 * 1000,
+      maxRequests: 5,
+    });
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: `Too many password attempts. Please wait ${Math.ceil(rateLimit.resetSeconds / 60)} minutes before trying again.` },
+        { status: 429, headers: { 'Retry-After': String(rateLimit.resetSeconds) } }
+      );
     }
 
     const user = await currentUser();

@@ -23,8 +23,13 @@ export async function POST(req: Request) {
   if (!userId) return new NextResponse('Unauthorized', { status: 401 });
 
   try {
-    const { chapterId } = await req.json();
-    
+    const body = await req.json();
+    const chapterId = typeof body?.chapterId === 'string' ? body.chapterId.trim() : '';
+
+    if (!chapterId || chapterId.length > 50 || !/^[1-3]?[A-Za-z ]+-\d+$/.test(chapterId)) {
+      return NextResponse.json({ error: 'Invalid chapterId format. Expected {Book}-{Chapter}' }, { status: 400 });
+    }
+
     const existing = await prisma.tracker.findUnique({
       where: { userId_chapterId: { userId, chapterId } }
     });

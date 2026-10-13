@@ -73,7 +73,7 @@ export async function POST(req: Request) {
     }
 
     const ip = getClientIp(req);
-    const rateLimit = checkRateLimit(`notes_ai:${userId || ip}`, {
+    const rateLimit = await checkRateLimit(`notes_ai:${userId || ip}`, {
       windowMs: 60 * 1000,
       maxRequests: 20,
     });

@@ -151,9 +151,8 @@ export async function GET(req: Request) {
       });
     }
 
-    // Check memory cache for active user or any cached entry matching boardId
-    const cachedEntry = memoryCache[cacheKey] ||
-      Object.entries(memoryCache).find(([k]) => k.endsWith(`_${boardId}`))?.[1];
+    // Check memory cache strictly for active user
+    const cachedEntry = memoryCache[cacheKey];
 
     if (cachedEntry) {
       return NextResponse.json({
@@ -266,7 +265,9 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   try {
     const userId = await getSafeUserId(req);
-    const activeUserId = userId || 'anonymous_user';
+    if (!userId) {
+      return NextResponse.json({ error: 'Authentication required to delete canvas.' }, { status: 401 });
+    }
 
     const url = new URL(req.url);
     const id = url.searchParams.get('id');
@@ -274,25 +275,26 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Board ID is required.' }, { status: 400 });
     }
 
-    const cacheKey = `${activeUserId}_${id}`;
+    const cacheKey = `${userId}_${id}`;
     delete memoryCache[cacheKey];
 
-    if (memoryIndexCache[activeUserId]) {
-      memoryIndexCache[activeUserId] = memoryIndexCache[activeUserId].filter((b) => b.id !== id);
+    if (memoryIndexCache[userId]) {
+      memoryIndexCache[userId] = memoryIndexCache[userId].filter((b) => b.id !== id);
     }
 
-    // Delete from PostgreSQL database
-    if (userId) {
-      try {
-        await prisma.canvas.deleteMany({
-          where: {
-            userId,
-            boardId: id,
-          },
-        });
-      } catch (dbErr) {
-        console.error('Canvas: PostgreSQL delete error:', dbErr);
+    // Delete from PostgreSQL database enforcing ownership
+    try {
+      const result = await prisma.canvas.deleteMany({
+        where: {
+          userId,
+          boardId: id,
+        },
+      });
+      if (result.count === 0) {
+        return NextResponse.json({ error: 'Canvas board not found or unauthorized.' }, { status: 404 });
       }
+    } catch (dbErr) {
+      console.error('Canvas: PostgreSQL delete error:', dbErr);
     }
 
     return NextResponse.json({ success: true, deletedId: id });
@@ -308,20 +310,27 @@ export async function DELETE(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const userId = await getSafeUserId(req);
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Authentication required to update canvas sharing settings.' },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const { id, isPublic } = body;
     if (!id) return NextResponse.json({ error: 'Board ID is required.' }, { status: 400 });
 
-    if (userId) {
-      await prisma.canvas.updateMany({
-        where: { userId, boardId: id },
-        data: { isPublic: Boolean(isPublic) },
-      });
-    } else {
-      await prisma.canvas.updateMany({
-        where: { boardId: id },
-        data: { isPublic: Boolean(isPublic) },
-      });
+    const updated = await prisma.canvas.updateMany({
+      where: { userId, boardId: id },
+      data: { isPublic: Boolean(isPublic) },
+    });
+
+    if (updated.count === 0) {
+      return NextResponse.json(
+        { error: 'Canvas board not found or unauthorized.' },
+        { status: 404 }
+      );
     }
 
     return NextResponse.json({ success: true, id, isPublic: Boolean(isPublic) });

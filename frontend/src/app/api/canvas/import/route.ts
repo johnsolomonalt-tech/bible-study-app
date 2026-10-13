@@ -50,11 +50,19 @@ export async function POST(req: Request) {
       sourceBoardId = match[0].startsWith('share/canvas/') ? match[1] : match[0];
     }
 
-    // 1. Look up the source board from PostgreSQL Prisma
+    const userId = await getSafeUserId(req);
+
+    // 1. Look up the source board from PostgreSQL Prisma (must be public or owned by requester)
     let sourceBoard: any = null;
     try {
       sourceBoard = await prisma.canvas.findFirst({
-        where: { boardId: sourceBoardId },
+        where: {
+          boardId: sourceBoardId,
+          OR: [
+            { isPublic: true },
+            ...(userId ? [{ userId }] : []),
+          ],
+        },
       });
     } catch (dbErr) {
       console.warn('Canvas Import: DB lookup failed:', dbErr);
@@ -62,13 +70,12 @@ export async function POST(req: Request) {
 
     if (!sourceBoard) {
       return NextResponse.json(
-        { error: 'Canvas board not found. Please verify the code or link and ensure the board exists.' },
+        { error: 'Canvas board not found or is not shared publicly.' },
         { status: 404 }
       );
     }
 
     // 2. Clone into recipient account
-    const userId = await getSafeUserId(req);
     const targetUserId = userId || 'anonymous_user';
     const newBoardId = `board-${Date.now()}`;
     const newTitle = sourceBoard.title || 'Imported Canvas';

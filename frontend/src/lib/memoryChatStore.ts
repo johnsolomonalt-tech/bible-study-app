@@ -21,13 +21,13 @@ export interface MemoryChat {
 }
 
 const memoryChats = new Map<string, MemoryChat[]>();
-const memoryMessages = new Map<number, MemoryMessage[]>();
+const memoryMessages = new Map<string, MemoryMessage[]>();
 
 export function getMemoryChats(userId: string): MemoryChat[] {
   const chats = memoryChats.get(userId) || [];
   return chats.map(c => ({
     ...c,
-    messages: memoryMessages.get(c.id) || c.messages || [],
+    messages: memoryMessages.get(messageKey(userId, c.id)) || c.messages || [],
   }));
 }
 
@@ -36,28 +36,30 @@ export function addMemoryChat(userId: string, chat: MemoryChat) {
   memoryChats.set(userId, [chat, ...current]);
 }
 
-export function updateMemoryChatTitle(chatId: number, title: string) {
-  for (const [, chats] of memoryChats.entries()) {
-    const found = chats.find(c => c.id === chatId);
-    if (found) {
-      found.title = title;
-      break;
-    }
-  }
+export function getMemoryChat(userId: string, chatId: number): MemoryChat | undefined {
+  return memoryChats.get(userId)?.find((chat) => chat.id === chatId);
 }
 
-export function getMemoryMessages(chatId: number): MemoryMessage[] {
-  return memoryMessages.get(chatId) || [];
+function messageKey(userId: string, chatId: number) {
+  return `${userId}:${chatId}`;
 }
 
-export function addMemoryMessage(chatId: number, message: MemoryMessage) {
-  const existing = memoryMessages.get(chatId) || [];
-  memoryMessages.set(chatId, [...existing, message]);
+export function updateMemoryChatTitle(userId: string, chatId: number, title: string) {
+  const found = getMemoryChat(userId, chatId);
+  if (found) found.title = title;
 }
 
-export function deleteMemoryChat(chatId: number) {
-  memoryMessages.delete(chatId);
-  for (const [userId, chats] of memoryChats.entries()) {
-    memoryChats.set(userId, chats.filter(c => c.id !== chatId));
-  }
+export function getMemoryMessages(userId: string, chatId: number): MemoryMessage[] {
+  return memoryMessages.get(messageKey(userId, chatId)) || [];
+}
+
+export function addMemoryMessage(userId: string, chatId: number, message: MemoryMessage) {
+  const key = messageKey(userId, chatId);
+  const existing = memoryMessages.get(key) || [];
+  memoryMessages.set(key, [...existing, message]);
+}
+
+export function deleteMemoryChat(userId: string, chatId: number) {
+  memoryMessages.delete(messageKey(userId, chatId));
+  memoryChats.set(userId, (memoryChats.get(userId) || []).filter((chat) => chat.id !== chatId));
 }

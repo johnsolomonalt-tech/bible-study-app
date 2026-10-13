@@ -1,18 +1,19 @@
-import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getMemoryChats, addMemoryChat } from '@/lib/memoryChatStore';
+import { createGuestChatSession, GUEST_CHAT_COOKIE, resolveChatIdentity } from '@/lib/chatIdentity';
+import { randomInt } from 'node:crypto';
 
-export async function GET() {
-  let userId: string | null = null;
-  try {
-    const authResult = await auth();
-    userId = authResult?.userId || null;
-  } catch {}
+export async function GET(req: Request) {
+  const identity = await resolveChatIdentity(req);
+  const userId = identity?.userId || null;
 
-  const effectiveUserId = userId || 'guest_user';
+  // Unauthenticated guests maintain local state on their device; do not leak shared server state
+  if (!userId) {
+    return NextResponse.json([]);
+  }
 
-  if (userId && process.env.DATABASE_URL) {
+  if (process.env.DATABASE_URL) {
     try {
       const chats = await prisma.chat.findMany({
         where: { userId },
@@ -25,18 +26,14 @@ export async function GET() {
     }
   }
 
-  const list = getMemoryChats(effectiveUserId);
+  const list = getMemoryChats(identity?.ownerKey || `user:${userId}`);
   return NextResponse.json(list);
 }
 
 export async function POST(req: Request) {
-  let userId: string | null = null;
-  try {
-    const authResult = await auth();
-    userId = authResult?.userId || null;
-  } catch {}
+  const identity = await resolveChatIdentity(req);
+  const userId = identity?.userId || null;
 
-  const effectiveUserId = userId || 'guest_user';
   let title = 'New Chat';
   try {
     const body = await req.json();
@@ -58,15 +55,37 @@ export async function POST(req: Request) {
     }
   }
 
-  const guestChat = {
-    id: Date.now(),
-    userId: effectiveUserId,
+  let ownerKey = identity?.ownerKey;
+  let guestSession: string | null = null;
+  if (!userId && !ownerKey) {
+    guestSession = createGuestChatSession();
+    if (!guestSession) {
+      return NextResponse.json({ error: 'Guest chat sessions are unavailable until GUEST_CHAT_SECRET is configured.' }, { status: 503 });
+    }
+    // The key is signed and verified on every subsequent request.
+    const sessionId = guestSession.slice(0, guestSession.lastIndexOf('.'));
+    ownerKey = `guest:${sessionId}`;
+  }
+
+  const clientChat = {
+    id: randomInt(1, 2147483647),
+    userId: userId || 'guest',
     title,
     createdAt: new Date().toISOString(),
     messages: []
   };
 
-  addMemoryChat(effectiveUserId, guestChat);
+  addMemoryChat(ownerKey || `user:${userId}`, clientChat);
 
-  return NextResponse.json(guestChat, { status: 201 });
+  const response = NextResponse.json(clientChat, { status: 201 });
+  if (guestSession) {
+    response.cookies.set(GUEST_CHAT_COOKIE, guestSession, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 30,
+    });
+  }
+  return response;
 }

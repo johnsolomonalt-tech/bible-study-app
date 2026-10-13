@@ -1,68 +1,65 @@
-import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { isValidDbId, deleteMemoryChat, updateMemoryChatTitle } from '@/lib/memoryChatStore';
+import { deleteMemoryChat, isValidDbId, updateMemoryChatTitle } from '@/lib/memoryChatStore';
+import { ownsChat, resolveChatIdentity } from '@/lib/chatIdentity';
 
-export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+type Context = { params: Promise<{ id: string }> };
+
+async function authorizedChat(req: Request, rawId: string) {
+  const identity = await resolveChatIdentity(req);
+  const chatId = Number(rawId);
+  if (!identity || !isValidDbId(chatId) || !(await ownsChat(identity, chatId))) return null;
+  return { identity, chatId };
+}
+
+export async function DELETE(req: Request, { params }: Context) {
   const { id } = await params;
-  const numId = parseInt(id) || 0;
-  let userId: string | null = null;
-  try {
-    const authResult = await auth();
-    userId = authResult?.userId || null;
-  } catch {}
+  const access = await authorizedChat(req, id);
+  if (!access) return NextResponse.json({ error: 'Chat not found.' }, { status: 404 });
+  const { identity, chatId } = access;
 
-  deleteMemoryChat(numId);
-
-  if (userId && process.env.DATABASE_URL && isValidDbId(numId)) {
+  if (identity.kind === 'user' && process.env.DATABASE_URL) {
     try {
-      const chat = await prisma.chat.findUnique({
-        where: { id: numId, userId }
-      });
-      if (chat) {
-        await prisma.message.deleteMany({
-          where: { chatId: numId },
-        });
-        await prisma.chat.delete({
-          where: { id: numId, userId },
-        });
-      }
-    } catch (err) {
-      console.warn('Prisma chat delete failed:', err);
+      await prisma.chat.deleteMany({ where: { id: chatId, userId: identity.userId } });
+    } catch (error) {
+      console.warn('Prisma chat delete failed; deleting owner-scoped memory fallback:', error);
     }
   }
-
+  deleteMemoryChat(identity.ownerKey, chatId);
   return NextResponse.json({ success: true });
 }
 
-export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function PUT(req: Request, { params }: Context) {
   const { id } = await params;
-  const numId = parseInt(id) || 0;
-  let userId: string | null = null;
+  const access = await authorizedChat(req, id);
+  if (!access) return NextResponse.json({ error: 'Chat not found.' }, { status: 404 });
+
+  let body: unknown;
   try {
-    const authResult = await auth();
-    userId = authResult?.userId || null;
-  } catch {}
-
-  const { title } = await req.json();
-  updateMemoryChatTitle(numId, title);
-
-  if (userId && process.env.DATABASE_URL && isValidDbId(numId)) {
-    try {
-      const chat = await prisma.chat.findUnique({
-        where: { id: numId, userId }
-      });
-      if (chat) {
-        const updatedChat = await prisma.chat.update({
-          where: { id: numId, userId },
-          data: { title },
-        });
-        return NextResponse.json(updatedChat);
-      }
-    } catch (err) {
-      console.warn('Prisma chat update failed:', err);
-    }
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 });
+  }
+  const title = (body as { title?: unknown })?.title;
+  if (typeof title !== 'string' || !title.trim() || title.length > 200) {
+    return NextResponse.json({ error: 'Title must be between 1 and 200 characters.' }, { status: 400 });
   }
 
-  return NextResponse.json({ id: numId, title });
+  const { identity, chatId } = access;
+  updateMemoryChatTitle(identity.ownerKey, chatId, title.trim());
+  if (identity.kind === 'user' && process.env.DATABASE_URL) {
+    try {
+      const updated = await prisma.chat.updateMany({
+        where: { id: chatId, userId: identity.userId },
+        data: { title: title.trim() },
+      });
+      if (updated.count > 0) {
+        const chat = await prisma.chat.findFirst({ where: { id: chatId, userId: identity.userId } });
+        if (chat) return NextResponse.json(chat);
+      }
+    } catch (error) {
+      console.warn('Prisma chat update failed; updated owner-scoped memory fallback:', error);
+    }
+  }
+  return NextResponse.json({ id: chatId, title: title.trim() });
 }

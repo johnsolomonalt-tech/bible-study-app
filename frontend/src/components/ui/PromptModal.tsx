@@ -27,12 +27,14 @@ export function PromptModal({
   onConfirm,
   onCancel,
 }: PromptModalProps) {
+  const [prevInitialValue, setPrevInitialValue] = useState(initialValue);
   const [value, setValue] = useState(initialValue);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
+  if (prevInitialValue !== initialValue) {
+    setPrevInitialValue(initialValue);
     setValue(initialValue);
-  }, [initialValue, isOpen]);
+  }
 
   useEffect(() => {
     if (!isOpen) return;

@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
+import { auth } from '@clerk/nextjs/server';
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import { SerializableNode, SerializableEdge } from '@/types/canvas';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
@@ -125,6 +127,25 @@ ${applicationNodes.map(a => `- **${a.data.title}**: ${a.data.content}`).join('\n
 
 export async function POST(req: Request) {
   try {
+    let userId: string | null = null;
+    try {
+      const userAuth = await auth();
+      userId = userAuth.userId;
+    } catch {
+      // Guest
+    }
+    const ip = getClientIp(req);
+    const rateLimit = await checkRateLimit(`export_guide:${userId || ip}`, {
+      windowMs: 60 * 1000,
+      maxRequests: 15,
+    });
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: `Rate limit exceeded. Please wait ${rateLimit.resetSeconds} seconds.` },
+        { status: 429, headers: { 'Retry-After': String(rateLimit.resetSeconds) } }
+      );
+    }
+
     const body: ExportRequestBody = await req.json();
     const { boardTitle, nodes, edges, format, theologicalLens = 'canonical' } = body;
 

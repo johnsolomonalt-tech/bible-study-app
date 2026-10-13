@@ -10,9 +10,12 @@ export async function GET() {
     userId = authResult?.userId || null;
   } catch {}
 
-  const effectiveUserId = userId || 'guest_user';
+  // Unauthenticated guests maintain local state on their device; do not leak shared server state
+  if (!userId) {
+    return NextResponse.json([]);
+  }
 
-  if (userId && process.env.DATABASE_URL) {
+  if (process.env.DATABASE_URL) {
     try {
       const notes = await prisma.note.findMany({
         where: { userId },
@@ -24,7 +27,7 @@ export async function GET() {
     }
   }
 
-  const list = getMemoryNotes(effectiveUserId);
+  const list = getMemoryNotes(userId);
   return NextResponse.json(list);
 }
 
@@ -35,7 +38,6 @@ export async function POST(req: Request) {
     userId = authResult?.userId || null;
   } catch {}
 
-  const effectiveUserId = userId || 'guest_user';
   let title = 'Untitled Note';
   let content = '';
 
@@ -60,14 +62,18 @@ export async function POST(req: Request) {
     }
   }
 
-  const newNote = {
+  const clientNote = {
     id: Date.now(),
-    userId: effectiveUserId,
+    userId: userId || 'guest',
     title,
     content,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
-  addMemoryNote(effectiveUserId, newNote);
-  return NextResponse.json(newNote, { status: 201 });
+
+  if (userId) {
+    addMemoryNote(userId, clientNote);
+  }
+
+  return NextResponse.json(clientNote, { status: 201 });
 }

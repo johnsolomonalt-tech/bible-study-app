@@ -79,6 +79,10 @@ export const CANONICAL_BOOKS: CanonicalBook[] = [
   { number: 66, code: 'REV', name: 'Revelation', testament: 'NT', chapters: 22, aliases: ['rev', 'revelation', 'revelations', 'apocalypse', 'rv'] },
 ];
 
+export const ALL_BOOKS = CANONICAL_BOOKS;
+export const OT_BOOKS = CANONICAL_BOOKS.filter(b => b.testament === 'OT');
+export const NT_BOOKS = CANONICAL_BOOKS.filter(b => b.testament === 'NT');
+
 // Pre-indexed lookup maps for instant 0ms lookups
 const CODE_MAP = new Map<string, CanonicalBook>();
 const NUMBER_MAP = new Map<number, CanonicalBook>();

@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Theologica Bible Study Workspace
 
-## Getting Started
+Theologica is a Scripture study workspace built with Next.js. It combines a Bible reader, study notes, chat-based assistance, an interactive canvas, interlinear tools, reading tracking, and installable PWA support.
 
-First, run the development server:
+## Stack
+
+- Next.js 16 App Router, React 19, and TypeScript
+- Clerk for sign-in
+- PostgreSQL and Prisma for account data
+- Google Gemini for AI features
+- Vercel deployment (the Vercel project is configured to build from `frontend/`)
+
+## Local development
+
+Requirements: Node.js 20 or later and PostgreSQL.
+
+1. Copy `frontend/.env.example` to `frontend/.env.local` and set the required values.
+2. Install dependencies and create the Prisma client:
+
+   ```bash
+   cd frontend
+   npm ci
+   ```
+
+3. Apply committed database migrations:
+
+   ```bash
+   npm run db:migrate
+   ```
+
+4. Start the app:
+
+   ```bash
+   npm run dev
+   ```
+
+The development server is available at <http://localhost:3000>.
+
+## Environment variables
+
+Required for the full production app:
+
+- `DATABASE_URL`: PostgreSQL connection string used by Prisma.
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY`: Clerk credentials.
+- `GEMINI_API_KEY`: Google AI Studio key for AI features.
+- `NEXT_PUBLIC_APP_URL`: canonical public app URL.
+- `GUEST_CHAT_SECRET`: at least 32 random characters used to sign guest chat sessions. If omitted, `CLERK_SECRET_KEY` is used. Set a dedicated value in production so guest sessions remain valid across deployments.
+
+Optional integrations and admin settings are documented in `frontend/.env.example`, including API.Bible, Pixazo, the developer console, and admin allowlists. Never commit `.env.local` or production secrets.
+
+## Checks
+
+Run these from `frontend/`:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run lint
+npm test
+npm run build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`npm run build` generates the Prisma client before running the Next.js production build. Database migrations must be deployed before serving code that depends on a newly added table.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Deployment
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The linked Vercel project builds the `frontend/` directory when changes are pushed to the connected GitHub branch. The Vercel build command applies committed Prisma migrations before building the app. Configure the production environment variables in Vercel and ensure PostgreSQL is reachable. Vercel preview deployments should use a separate database or a safely isolated schema because preview builds also apply pending migrations.

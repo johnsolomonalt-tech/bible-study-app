@@ -17,6 +17,8 @@ model Note {
   content   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([userId, createdAt(sort: Desc)])
 }
 
 model Chat {
@@ -25,6 +27,8 @@ model Chat {
   title     String
   createdAt DateTime  @default(now())
   messages  Message[]
+
+  @@index([userId, createdAt(sort: Desc)])
 }
 
 model Message {
@@ -34,6 +38,8 @@ model Message {
   role      String   // 'user' or 'model'
   content   String
   createdAt DateTime @default(now())
+
+  @@index([chatId, createdAt(sort: Asc)])
 }
 
 model Tracker {
@@ -54,6 +60,8 @@ model Highlight {
   text      String
   color     String
   createdAt DateTime @default(now())
+
+  @@index([userId, book, chapter])
 }
 
 model Canvas {
@@ -94,5 +102,13 @@ model DevAdminConfig {
   allowedEmails  String[] @default([])
   allowedUserIds String[] @default([])
   updatedAt      DateTime @updatedAt
+}
+
+model RateLimitBucket {
+  id        String   @id
+  count     Int      @default(0)
+  expiresAt DateTime
+
+  @@index([expiresAt])
 }
 

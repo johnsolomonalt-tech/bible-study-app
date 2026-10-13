@@ -2,7 +2,6 @@ import crypto from 'crypto';
 import prisma from '@/lib/prisma';
 
 const isProd = process.env.NODE_ENV === 'production';
-const DEFAULT_DEV_PASSWORD = process.env.DEV_ADMIN_PASSWORD || (isProd ? '' : '1234');
 const DEV_SESSION_SECRET = process.env.DEV_SESSION_SECRET || process.env.CLERK_SECRET_KEY || (isProd ? crypto.randomBytes(32).toString('hex') : 'theologica-dev-secret-key-2026');
 export const DEV_COOKIE_NAME = 'theologica_dev_session';
 
@@ -42,6 +41,8 @@ export async function getAdminConfig() {
  * Verify whether the given password matches the current dev password.
  */
 export async function verifyDevPassword(password: string): Promise<boolean> {
+  if (!password || typeof password !== 'string') return false;
+
   const config = await getAdminConfig();
 
   // 1. If password hash is stored in the database, verify with PBKDF2
@@ -56,14 +57,13 @@ export async function verifyDevPassword(password: string): Promise<boolean> {
     return password === envPassword;
   }
 
-  // 3. Fallback in development mode
+  // 3. Fallback in development mode only
   if (!isProd) {
     return password === '1234';
   }
 
-  // 4. Initial claim in production if no password has ever been set:
-  // The first entered password will be accepted and saved permanently.
-  return true;
+  // 4. Fail closed in production if no password is configured
+  return false;
 }
 
 /**

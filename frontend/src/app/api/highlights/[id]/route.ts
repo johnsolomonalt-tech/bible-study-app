@@ -12,7 +12,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     const { id: idStr } = await params;
     const id = parseInt(idStr, 10);
     
-    if (isNaN(id)) {
+    if (isNaN(id) || id < 1 || id > 2147483647) {
       return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
     }
 
@@ -49,7 +49,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const { id: idStr } = await params;
     const id = parseInt(idStr, 10);
     
-    if (isNaN(id)) {
+    if (isNaN(id) || id < 1 || id > 2147483647) {
       return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
     }
 

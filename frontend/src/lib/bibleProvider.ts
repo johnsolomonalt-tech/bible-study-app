@@ -119,7 +119,6 @@ export async function getPassage(
         };
         const itemKey = `${versionKey}:${bookCode}:${chNum}`;
         MEMORY_CACHE.set(itemKey, chPayload);
-        saveToPersistentCache(itemKey, chPayload);
       }
     }
 

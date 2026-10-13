@@ -6,14 +6,9 @@ import { getPassage } from '@/lib/bibleProvider';
 import { BibleVerse } from '@/types/bible';
 import { getPreference, setPreference, PREF_KEYS } from '@/lib/appPreferences';
 import { parseVerseFootnote } from '@/lib/verseParser';
+import { OT_BOOKS, NT_BOOKS, ALL_BOOKS } from '@/lib/bibleCanon';
 
-// --- All 66 Books ---
-const otStr = "Genesis:50,Exodus:40,Leviticus:27,Numbers:36,Deuteronomy:34,Joshua:24,Judges:21,Ruth:4,1 Samuel:31,2 Samuel:24,1 Kings:22,2 Kings:25,1 Chronicles:29,2 Chronicles:36,Ezra:10,Nehemiah:13,Esther:10,Job:42,Psalms:150,Proverbs:31,Ecclesiastes:12,Song of Solomon:8,Isaiah:66,Jeremiah:52,Lamentations:5,Ezekiel:48,Daniel:12,Hosea:14,Joel:3,Amos:9,Obadiah:1,Jonah:4,Micah:7,Nahum:3,Habakkuk:3,Zephaniah:3,Haggai:2,Zechariah:14,Malachi:4";
-const ntStr = "Matthew:28,Mark:16,Luke:24,John:21,Acts:28,Romans:16,1 Corinthians:16,2 Corinthians:13,Galatians:6,Ephesians:6,Philippians:4,Colossians:4,1 Thessalonians:5,2 Thessalonians:3,1 Timothy:6,2 Timothy:4,Titus:3,Philemon:1,Hebrews:13,James:5,1 Peter:5,2 Peter:3,1 John:5,2 John:1,3 John:1,Jude:1,Revelation:22";
-
-const OT_BOOKS = otStr.split(',').map(s => { const [n, c] = s.split(':'); return { name: n, chapters: parseInt(c) }; });
-const NT_BOOKS = ntStr.split(',').map(s => { const [n, c] = s.split(':'); return { name: n, chapters: parseInt(c) }; });
-const ALL_BOOKS = [...OT_BOOKS, ...NT_BOOKS];
+const OFFLINE_TRANSLATIONS = ['bsb', 'web', 'kjv'];
 
 export default function OfflinePage() {
   const [activeBook, setActiveBook] = useState('Genesis');
@@ -27,10 +22,10 @@ export default function OfflinePage() {
   useEffect(() => {
     const savedBook = getPreference(PREF_KEYS.LAST_BOOK, 'Genesis');
     const savedChapter = getPreference(PREF_KEYS.LAST_CHAPTER, '1');
-    const savedTrans = getPreference(PREF_KEYS.BIBLE_VERSION, 'bsb');
+    const savedTrans = getPreference(PREF_KEYS.BIBLE_VERSION, 'bsb')?.toLowerCase() || 'bsb';
     if (savedBook) setActiveBook(savedBook);
     if (savedChapter) setActiveChapter(parseInt(savedChapter, 10));
-    if (savedTrans) setTranslation(savedTrans.toLowerCase());
+    setTranslation(OFFLINE_TRANSLATIONS.includes(savedTrans) ? savedTrans : 'bsb');
   }, []);
 
   // Fetch text using unified engine
@@ -136,8 +131,6 @@ export default function OfflinePage() {
               <option value="bsb">BSB (Berean Standard)</option>
               <option value="web">WEB (World English)</option>
               <option value="kjv">KJV (King James)</option>
-              <option value="asv">ASV (American Standard)</option>
-              <option value="ylt">YLT (Young's Literal)</option>
             </select>
           </div>
         </div>

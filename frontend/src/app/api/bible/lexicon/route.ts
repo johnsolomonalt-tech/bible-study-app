@@ -50,7 +50,7 @@ function loadLexiconData() {
 
 export async function GET(req: NextRequest) {
   const ip = getClientIp(req);
-  const rateLimit = checkRateLimit(`bible_lexicon:${ip}`, {
+  const rateLimit = await checkRateLimit(`bible_lexicon:${ip}`, {
     windowMs: 60 * 1000,
     maxRequests: 1200,
   });
@@ -204,14 +204,27 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const ip = getClientIp(req);
+  const rateLimit = await checkRateLimit(`bible_lexicon_post:${ip}`, {
+    windowMs: 60 * 1000,
+    maxRequests: 300,
+  });
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded. Please wait a moment.' },
+      { status: 429, headers: { 'Retry-After': String(rateLimit.resetSeconds) } }
+    );
+  }
+
   loadLexiconData();
 
   try {
     const body = await req.json();
     const { ids, verseRef } = body;
     if (Array.isArray(ids)) {
+      const sliceIds = ids.slice(0, 100);
       const words: Record<string, LexiconWordPayload> = {};
-      for (const rawId of ids) {
+      for (const rawId of sliceIds) {
         const uId = String(rawId).trim().toUpperCase();
         let rawEntry: any = null;
         if (uId.startsWith('H') && HEBREW_DATA) {

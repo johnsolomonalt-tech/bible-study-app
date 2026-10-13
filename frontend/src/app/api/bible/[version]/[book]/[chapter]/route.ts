@@ -17,7 +17,7 @@ const API_BIBLE_MAP: Record<string, string> = {
   esv: '06125adad2d5898a-01', // ESV
   niv: '716077271e422315-01', // NIV
   nasb: 'bba9f40183526463-01', // NASB
-  nlt: '06125adad2d5898a-01',
+  nlt: 'd5151f43501a117b-01', // NLT
 };
 
 // Known open translations supported directly via Bolls Life
@@ -49,7 +49,7 @@ export async function GET(
 ) {
   try {
     const ip = getClientIp(req);
-    const rateLimit = checkRateLimit(`bible_passage:${ip}`, {
+    const rateLimit = await checkRateLimit(`bible_passage:${ip}`, {
       windowMs: 60 * 1000,
       maxRequests: 120,
     });

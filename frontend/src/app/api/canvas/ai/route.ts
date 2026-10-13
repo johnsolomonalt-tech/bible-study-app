@@ -116,7 +116,7 @@ export async function POST(req: Request) {
     }
 
     const ip = getClientIp(req);
-    const rateLimit = checkRateLimit(`canvas_ai:${userId || ip}`, {
+    const rateLimit = await checkRateLimit(`canvas_ai:${userId || ip}`, {
       windowMs: 60 * 1000,
       maxRequests: 15,
     });

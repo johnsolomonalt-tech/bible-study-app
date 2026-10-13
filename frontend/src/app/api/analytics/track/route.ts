@@ -8,7 +8,7 @@ import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 export async function POST(req: NextRequest) {
   try {
     const ip = getClientIp(req);
-    const rateLimit = checkRateLimit(`analytics:${ip}`, {
+    const rateLimit = await checkRateLimit(`analytics:${ip}`, {
       windowMs: 60 * 1000,
       maxRequests: 60,
     });
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing eventType' }, { status: 400 });
     }
 
-    // 1. Check Clerk server-side auth
+    // 1. Check Clerk server-side auth (only trusted source for authenticated identity)
     let clerkUserId: string | null = null;
     try {
       const clerkAuth = await auth();
@@ -50,12 +50,7 @@ export async function POST(req: NextRequest) {
       // Unauthenticated
     }
 
-    // 2. Check client-reported userId
-    if (!clerkUserId && typeof body.userId === 'string' && body.userId.startsWith('user_')) {
-      clerkUserId = body.userId;
-    }
-
-    // 3. Check persistent first-party cookie
+    // 2. Check persistent first-party cookie
     let visitorCookie = req.cookies.get('th_vid')?.value;
     let shouldSetCookie = false;
 

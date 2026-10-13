@@ -300,6 +300,14 @@ export function NotesWorkspace({
   // Find active note
   const activeNote = notes.find(n => n.id === activeNoteId);
 
+  // Local draft state for zero-latency typing and debounced parent saving
+  const [draftTitle, setDraftTitle] = useState(activeNote?.title || '');
+  const [draftContent, setDraftContent] = useState(activeNote?.content || '');
+  const draftTitleRef = useRef(activeNote?.title || '');
+  const draftContentRef = useRef(activeNote?.content || '');
+  const lastSyncedNoteIdRef = useRef<number | null>(activeNoteId);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   // Set of note IDs that were newly created as blank notes in this session and haven't had content typed
   const newlyCreatedBlankNoteIdsRef = useRef<Set<number>>(new Set());
   const activeNoteRef = useRef<NoteItem | undefined>(activeNote);
@@ -311,11 +319,96 @@ export function NotesWorkspace({
     notesRef.current = notes;
   });
 
+  // Sync draft state with incoming active note or prop changes
+  useEffect(() => {
+    if (activeNoteId !== lastSyncedNoteIdRef.current) {
+      if (debounceTimerRef.current && lastSyncedNoteIdRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+        onUpdateNote(lastSyncedNoteIdRef.current, draftTitleRef.current, draftContentRef.current);
+      }
+      lastSyncedNoteIdRef.current = activeNoteId;
+      const initialTitle = activeNote?.title || '';
+      const initialContent = activeNote?.content || '';
+      setDraftTitle(initialTitle);
+      setDraftContent(initialContent);
+      draftTitleRef.current = initialTitle;
+      draftContentRef.current = initialContent;
+    } else if (activeNote && !debounceTimerRef.current) {
+      if (activeNote.title !== draftTitleRef.current || activeNote.content !== draftContentRef.current) {
+        setDraftTitle(activeNote.title);
+        setDraftContent(activeNote.content);
+        draftTitleRef.current = activeNote.title;
+        draftContentRef.current = activeNote.content;
+      }
+    }
+  }, [activeNoteId, activeNote, onUpdateNote]);
+
+  // Flush on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current && activeNoteRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        onUpdateNote(activeNoteRef.current.id, draftTitleRef.current, draftContentRef.current);
+      }
+    };
+  }, [onUpdateNote]);
+
+  const updateNoteImmediately = useCallback((newTitle: string, newContent: string) => {
+    if (!activeNoteRef.current) return;
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    setDraftTitle(newTitle);
+    setDraftContent(newContent);
+    draftTitleRef.current = newTitle;
+    draftContentRef.current = newContent;
+    newlyCreatedBlankNoteIdsRef.current.delete(activeNoteRef.current.id);
+    onUpdateNote(activeNoteRef.current.id, newTitle, newContent);
+  }, [onUpdateNote]);
+
+  const handleTitleChange = useCallback((newTitle: string) => {
+    if (!activeNoteRef.current) return;
+    const currentId = activeNoteRef.current.id;
+    setDraftTitle(newTitle);
+    draftTitleRef.current = newTitle;
+    newlyCreatedBlankNoteIdsRef.current.delete(currentId);
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      onUpdateNote(currentId, newTitle, draftContentRef.current);
+      debounceTimerRef.current = null;
+    }, 300);
+  }, [onUpdateNote]);
+
+  const handleContentChange = useCallback((newContent: string) => {
+    if (!activeNoteRef.current) return;
+    const currentId = activeNoteRef.current.id;
+    setDraftContent(newContent);
+    draftContentRef.current = newContent;
+    newlyCreatedBlankNoteIdsRef.current.delete(currentId);
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      onUpdateNote(currentId, draftTitleRef.current, newContent);
+      debounceTimerRef.current = null;
+    }, 300);
+  }, [onUpdateNote]);
+
+  const handleBlurFlush = useCallback(() => {
+    if (debounceTimerRef.current && activeNoteRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+      onUpdateNote(activeNoteRef.current.id, draftTitleRef.current, draftContentRef.current);
+    }
+  }, [onUpdateNote]);
+
   // Helper: check if a note has nothing typed on it (empty content and empty/placeholder title)
   const isUntouchedBlankNote = useCallback((note: NoteItem | undefined): boolean => {
     if (!note) return false;
-    const isContentEmpty = !note.content || note.content.trim() === '';
-    const trimmedTitle = (note.title || '').trim().toLowerCase();
+    const rawContent = note.id === activeNoteRef.current?.id ? draftContentRef.current : note.content;
+    const rawTitle = note.id === activeNoteRef.current?.id ? draftTitleRef.current : note.title;
+    const isContentEmpty = !rawContent || rawContent.trim() === '';
+    const trimmedTitle = (rawTitle || '').trim().toLowerCase();
     const isTitleDefaultOrEmpty = 
       !trimmedTitle || 
       trimmedTitle === 'new study note' || 
@@ -341,12 +434,17 @@ export function NotesWorkspace({
 
   // Wrapper for selecting a note: cleans up any untouched newly created blank note when switching away
   const handleSelectNote = useCallback((newId: number | null) => {
+    if (debounceTimerRef.current && activeNoteRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+      onUpdateNote(activeNoteRef.current.id, draftTitleRef.current, draftContentRef.current);
+    }
     const currentActiveId = activeNoteRef.current?.id;
     if (currentActiveId && currentActiveId !== newId) {
       checkAndAutoDeleteBlankNote(currentActiveId);
     }
     onSelectNote(newId);
-  }, [checkAndAutoDeleteBlankNote, onSelectNote]);
+  }, [checkAndAutoDeleteBlankNote, onSelectNote, onUpdateNote]);
 
   // Auto-delete untouched blank note on unmount (e.g. user switched away from Notes tab)
   useEffect(() => {
@@ -448,7 +546,7 @@ export function NotesWorkspace({
   // Statistics for active note
   const noteStats = useMemo(() => {
     if (!activeNote) return { words: 0, chars: 0, readingTime: '0 min' };
-    const text = (activeNote.content || '').trim();
+    const text = draftContent.trim();
     const chars = text.length;
     const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
     const minutes = Math.max(1, Math.ceil(words / 200));
@@ -457,19 +555,19 @@ export function NotesWorkspace({
       chars,
       readingTime: `${minutes} min read`,
     };
-  }, [activeNote]);
+  }, [activeNote, draftContent]);
 
   // Detected Scripture references in active note
   const detectedReferences = useMemo(() => {
     if (!activeNote) return [];
-    return extractScriptureReferences(`${activeNote.title}\n${activeNote.content}`);
-  }, [activeNote]);
+    return extractScriptureReferences(`${draftTitle}\n${draftContent}`);
+  }, [activeNote, draftTitle, draftContent]);
 
   // Detected Tags in active note
   const activeNoteTags = useMemo(() => {
     if (!activeNote) return [];
-    return extractTags(`${activeNote.title} ${activeNote.content}`);
-  }, [activeNote]);
+    return extractTags(`${draftTitle} ${draftContent}`);
+  }, [activeNote, draftTitle, draftContent]);
 
   // All backlinks grouped by scripture passage across all notes
   const allBacklinksGroups = useMemo(() => {
@@ -493,10 +591,10 @@ export function NotesWorkspace({
   // References in the current active note for contextual backlink connections
   const activeNoteBacklinks = useMemo(() => {
     if (!activeNote) return [];
-    const activeRefs = extractAllScriptureReferences(`${activeNote.title || ''}\n${activeNote.content || ''}`);
+    const activeRefs = extractAllScriptureReferences(`${draftTitle || ''}\n${draftContent || ''}`);
     const activeKeys = new Set(activeRefs.map(r => `${r.book} ${r.chapter}:${r.verse}`));
     return allBacklinksGroups.filter(g => activeKeys.has(g.reference));
-  }, [activeNote, allBacklinksGroups]);
+  }, [activeNote, draftTitle, draftContent, allBacklinksGroups]);
 
   // Unique template category badges
   const allTemplateBadges = useMemo(() => {
@@ -621,22 +719,22 @@ export function NotesWorkspace({
     if (!activeNote) return;
     const cleanTag = tagToAdd.trim().replace(/^#+/, '').toLowerCase();
     if (!cleanTag) return;
-    const currentTags = extractTags(`${activeNote.title} ${activeNote.content}`);
+    const currentTags = extractTags(`${draftTitle} ${draftContent}`);
     if (currentTags.includes(cleanTag)) return;
 
-    const newContent = activeNote.content.trim()
-      ? `${activeNote.content.trim()}\n\n#${cleanTag}`
+    const newContent = draftContent.trim()
+      ? `${draftContent.trim()}\n\n#${cleanTag}`
       : `#${cleanTag}`;
-    onUpdateNote(activeNote.id, activeNote.title, newContent);
+    updateNoteImmediately(draftTitle, newContent);
   };
 
   const handleRemoveTag = (tagToRemove: string) => {
     if (!activeNote) return;
     const cleanTag = tagToRemove.trim().replace(/^#+/, '').toLowerCase();
     const tagRegex = new RegExp(`(?:^|\\s)#${cleanTag}\\b`, 'gi');
-    const updatedContent = activeNote.content.replace(tagRegex, '').replace(/\n{3,}/g, '\n\n').trim();
-    const updatedTitle = activeNote.title.replace(tagRegex, '').trim();
-    onUpdateNote(activeNote.id, updatedTitle || 'Untitled Note', updatedContent);
+    const updatedContent = draftContent.replace(tagRegex, '').replace(/\n{3,}/g, '\n\n').trim();
+    const updatedTitle = draftTitle.replace(tagRegex, '').trim();
+    updateNoteImmediately(updatedTitle || 'Untitled Note', updatedContent);
   };
 
   // Handlers
@@ -669,13 +767,13 @@ export function NotesWorkspace({
       });
       if (created) handleSelectNote(created.id);
     } else if (mode === 'replace') {
-      onUpdateNote(activeNote.id, template.name, templatedContent);
+      updateNoteImmediately(template.name, templatedContent);
     } else {
       // Append
-      const newContent = activeNote.content
-        ? `${activeNote.content}\n\n---\n\n${templatedContent}`
+      const newContent = draftContent
+        ? `${draftContent}\n\n---\n\n${templatedContent}`
         : templatedContent;
-      onUpdateNote(activeNote.id, activeNote.title, newContent);
+      updateNoteImmediately(draftTitle, newContent);
     }
   };
 
@@ -685,30 +783,30 @@ export function NotesWorkspace({
     if (textarea) {
       const start = textarea.selectionStart;
       const end = textarea.selectionEnd;
-      const current = activeNote.content;
+      const current = draftContent;
       const updated = current.substring(0, start) + verseMarkdown + current.substring(end);
-      onUpdateNote(activeNote.id, activeNote.title, updated);
+      updateNoteImmediately(draftTitle, updated);
       setTimeout(() => {
         textarea.focus();
         const nextPos = start + verseMarkdown.length;
         textarea.setSelectionRange(nextPos, nextPos);
       }, 0);
     } else {
-      const updated = activeNote.content ? `${activeNote.content}\n${verseMarkdown}` : verseMarkdown;
-      onUpdateNote(activeNote.id, activeNote.title, updated);
+      const updated = draftContent ? `${draftContent}\n${verseMarkdown}` : verseMarkdown;
+      updateNoteImmediately(draftTitle, updated);
     }
   };
 
   const handleAppendAiText = (aiContent: string) => {
     if (!activeNote) return;
-    const updated = activeNote.content ? `${activeNote.content}${aiContent}` : aiContent;
-    onUpdateNote(activeNote.id, activeNote.title, updated);
+    const updated = draftContent ? `${draftContent}${aiContent}` : aiContent;
+    updateNoteImmediately(draftTitle, updated);
   };
 
   const handleToggleCheckbox = (itemIndex: number) => {
     if (!activeNote) return;
     let count = 0;
-    const updated = activeNote.content.replace(/- \[( |x|X)\]/g, (match, checkState) => {
+    const updated = draftContent.replace(/- \[( |x|X)\]/g, (match, checkState) => {
       if (count === itemIndex) {
         count++;
         return checkState === ' ' ? '- [x]' : '- [ ]';
@@ -716,14 +814,14 @@ export function NotesWorkspace({
       count++;
       return match;
     });
-    onUpdateNote(activeNote.id, activeNote.title, updated);
+    updateNoteImmediately(draftTitle, updated);
   };
 
   const handleExport = (format: 'md' | 'txt') => {
     if (!activeNote) return;
-    const title = activeNote.title || 'Untitled Note';
+    const title = draftTitle || 'Untitled Note';
     const filename = `${title.replace(/[^a-zA-Z0-9_\-]/g, '_')}.${format}`;
-    const blob = new Blob([activeNote.content], { type: format === 'md' ? 'text/markdown' : 'text/plain' });
+    const blob = new Blob([draftContent], { type: format === 'md' ? 'text/markdown' : 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -737,7 +835,7 @@ export function NotesWorkspace({
 
   const handleCopyNote = () => {
     if (!activeNote) return;
-    navigator.clipboard.writeText(`${activeNote.title}\n\n${activeNote.content}`);
+    navigator.clipboard.writeText(`${draftTitle}\n\n${draftContent}`);
     setCopiedStatus(true);
     setTimeout(() => setCopiedStatus(false), 2000);
     setIsActionsMenuOpen(false);
@@ -749,8 +847,8 @@ export function NotesWorkspace({
       checkAndAutoDeleteBlankNote(activeNoteRef.current.id);
     }
     const duplicated = await onCreateNote({
-      title: `${activeNote.title} (Copy)`,
-      content: activeNote.content,
+      title: `${draftTitle} (Copy)`,
+      content: draftContent,
     });
     if (duplicated) handleSelectNote(duplicated.id);
     setIsActionsMenuOpen(false);
@@ -889,8 +987,9 @@ export function NotesWorkspace({
                 </button>
                 <input 
                   type="text" 
-                  value={activeNote.title} 
-                  onChange={(e) => onUpdateNote(activeNote.id, e.target.value, activeNote.content)}
+                  value={draftTitle}
+                  onChange={(e) => handleTitleChange(e.target.value)}
+                  onBlur={handleBlurFlush}
                   className="bg-transparent text-[19px] sm:text-[21px] font-semibold text-fg focus:outline-none w-full truncate placeholder:text-muted" 
                   placeholder="Note Title..."
                 />
@@ -1131,8 +1230,8 @@ export function NotesWorkspace({
             {/* Rich Formatting Toolbar (Option 4) */}
             <NoteFormattingToolbar
               textareaRef={textareaRef}
-              content={activeNote.content}
-              onChangeContent={(newContent) => onUpdateNote(activeNote.id, activeNote.title, newContent)}
+              content={draftContent}
+              onChangeContent={(newContent) => updateNoteImmediately(draftTitle, newContent)}
               viewMode={viewMode}
               onChangeViewMode={setViewMode}
               onOpenInsertVerse={() => setIsInsertVerseOpen(true)}
@@ -1151,8 +1250,9 @@ export function NotesWorkspace({
                   <textarea 
                     ref={textareaRef}
                     className="w-full h-full bg-transparent focus:outline-none resize-none text-[16px] leading-[1.8] text-fg font-sans placeholder:text-muted" 
-                    value={activeNote.content} 
-                    onChange={(e) => onUpdateNote(activeNote.id, activeNote.title, e.target.value)}
+                    value={draftContent}
+                    onChange={(e) => handleContentChange(e.target.value)}
+                    onBlur={handleBlurFlush}
                     placeholder="Start typing your note, reflections, or paste Scripture here... Use markdown or the toolbar above."
                   />
                 </div>
@@ -1165,7 +1265,7 @@ export function NotesWorkspace({
                   style={{ WebkitOverflowScrolling: 'touch' }}
                 >
                   <NoteMarkdownRenderer
-                    content={activeNote.content}
+                    content={draftContent}
                     onVerseClick={(book, chapter, verse) => setPreviewVerse({ book, chapter, verse })}
                     onToggleCheckbox={handleToggleCheckbox}
                   />
@@ -1285,8 +1385,8 @@ export function NotesWorkspace({
       <NoteAiAssistantModal
         isOpen={isAiAssistantOpen}
         onClose={() => setIsAiAssistantOpen(false)}
-        noteTitle={activeNote?.title || ''}
-        noteContent={activeNote?.content || ''}
+        noteTitle={draftTitle}
+        noteContent={draftContent}
         onAppendToNote={handleAppendAiText}
         theologicalLens={theologicalLens}
       />

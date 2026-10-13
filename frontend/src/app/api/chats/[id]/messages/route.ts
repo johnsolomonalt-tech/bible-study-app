@@ -1,4 +1,3 @@
-import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { GoogleGenAI } from '@google/genai';
@@ -7,6 +6,7 @@ import path from 'path';
 import { findCanonicalBook } from '@/lib/bibleCanon';
 import { BIBLE_VERSE_REGEX } from '@/lib/bibleReferences';
 import { isValidDbId, getMemoryMessages, addMemoryMessage, MemoryMessage } from '@/lib/memoryChatStore';
+import { ChatIdentity, ownsChat, resolveChatIdentity } from '@/lib/chatIdentity';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
@@ -193,10 +193,10 @@ You are guiding the user with a gentle, prayerful, contemplative heart focused o
 - Include thoughtful reflective questions that invite the user to examine their soul and pray before the Lord.`,
 };
 
-async function saveOrMockMessage(data: { content: string; role: string; chatId: number }) {
-  if (process.env.DATABASE_URL && isValidDbId(data.chatId)) {
+async function saveOrMockMessage(data: { content: string; role: string; chatId: number; identity: ChatIdentity }) {
+  if (data.identity.kind === 'user' && process.env.DATABASE_URL && isValidDbId(data.chatId)) {
     try {
-      return await prisma.message.create({ data });
+      return await prisma.message.create({ data: { content: data.content, role: data.role, chatId: data.chatId } });
     } catch (e) {
       console.warn('Prisma message write skipped:', e);
     }
@@ -208,23 +208,21 @@ async function saveOrMockMessage(data: { content: string; role: string; chatId: 
     chatId: data.chatId,
     createdAt: new Date(),
   };
-  addMemoryMessage(data.chatId, mock);
+  addMemoryMessage(data.identity.ownerKey, data.chatId, mock);
   return mock;
 }
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  let userId: string | null = null;
-  try {
-    const authResult = await auth();
-    userId = authResult?.userId || null;
-  } catch {}
-
-  const chatId = parseInt(id) || 0;
-  if (userId && process.env.DATABASE_URL && isValidDbId(chatId)) {
+  const identity = await resolveChatIdentity(req);
+  const chatId = Number(id);
+  if (!identity || !isValidDbId(chatId) || !(await ownsChat(identity, chatId))) {
+    return NextResponse.json({ error: 'Chat not found.' }, { status: 404 });
+  }
+  if (identity.kind === 'user' && process.env.DATABASE_URL) {
     try {
       const chat = await prisma.chat.findUnique({
-        where: { id: chatId, userId }
+        where: { id: chatId, userId: identity.userId }
       });
       if (chat) {
         const messages = await prisma.message.findMany({
@@ -236,11 +234,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     } catch {}
   }
 
-  return NextResponse.json(getMemoryMessages(chatId));
+  return NextResponse.json(getMemoryMessages(identity.ownerKey, chatId));
 }
 
 interface ProcessAiMessageParams {
   chatId: number;
+  identity: ChatIdentity;
   content: string;
   image?: { base64: string; mimeType: string };
   scriptureContext?: ScriptureContext;
@@ -253,6 +252,7 @@ interface ProcessAiMessageParams {
 
 async function processAiMessage({
   chatId,
+  identity,
   content,
   image,
   scriptureContext,
@@ -266,6 +266,7 @@ async function processAiMessage({
     content: content || '',
     role: 'user',
     chatId,
+    identity,
   });
 
   // --- Route: Image Generation ---
@@ -278,6 +279,7 @@ async function processAiMessage({
           content: "Image generation requires a Pixazo API key. Please add PIXAZO_API_KEY to your environment variables to enable Flux image generation.\n\nI can still help with Bible study — just ask me any question about scripture!",
           role: 'model',
           chatId,
+          identity,
         });
         return { userMessage, aiMessage };
       }
@@ -304,6 +306,7 @@ async function processAiMessage({
           content: "I'd love to help, but I can only generate images that are related to the Bible, Christianity, or biblical history. Please feel free to ask for any scriptural scenes or theological illustrations!",
           role: 'model',
           chatId,
+          identity,
         });
         return { userMessage, aiMessage };
       }
@@ -358,7 +361,8 @@ async function processAiMessage({
       const aiMessage = await saveOrMockMessage({
         content: aiContent,
         role: 'model',
-        chatId
+        chatId,
+        identity,
       });
 
       return { userMessage, aiMessage };
@@ -370,7 +374,7 @@ async function processAiMessage({
 
   // --- Route: Normal Text / Vision Response ---
   let pastMessages: { id: number; content: string; role: string }[] = [];
-  if (process.env.DATABASE_URL && isValidDbId(chatId)) {
+  if (identity.kind === 'user' && process.env.DATABASE_URL && isValidDbId(chatId)) {
     try {
       pastMessages = await prisma.message.findMany({
         where: { chatId },
@@ -378,10 +382,10 @@ async function processAiMessage({
       });
     } catch (err) {
       console.warn('Prisma message retrieval skipped:', err);
-      pastMessages = getMemoryMessages(chatId);
+      pastMessages = getMemoryMessages(identity.ownerKey, chatId);
     }
   } else {
-    pastMessages = getMemoryMessages(chatId);
+    pastMessages = getMemoryMessages(identity.ownerKey, chatId);
   }
 
   const history = pastMessages
@@ -576,6 +580,7 @@ Do NOT inject original Hebrew/Greek characters, Strong's concordance numbers, or
     content: aiResponseText,
     role: 'model',
     chatId,
+    identity,
   });
 
   return { userMessage, aiMessage };
@@ -586,14 +591,15 @@ import { recordAnalyticsEvent } from '@/lib/analyticsService';
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  let userId: string | null = null;
-  try {
-    const authResult = await auth();
-    userId = authResult?.userId || null;
-  } catch {}
+  const identity = await resolveChatIdentity(req);
+  const userId = identity?.userId || null;
+  const chatId = Number(id);
+  if (!identity || !isValidDbId(chatId) || !(await ownsChat(identity, chatId))) {
+    return NextResponse.json({ error: 'Chat not found.' }, { status: 404 });
+  }
 
   const ip = getClientIp(req);
-  const rateLimit = checkRateLimit(`chat_msg:${userId || ip}`, {
+  const rateLimit = await checkRateLimit(`chat_msg:${userId || ip}`, {
     windowMs: 60 * 1000,
     maxRequests: 25,
   });
@@ -605,23 +611,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     );
   }
 
-  const chatId = parseInt(id) || Date.now();
   const body = await req.json();
   const { content, image, scriptureContext, translation, theologicalLens, includeOriginalRoots } = body;
 
   if (image) {
     recordAnalyticsEvent('chat_file_upload', userId || ip, { feature: 'chat' }).catch(() => {});
-  }
-
-  if (userId && process.env.DATABASE_URL && isValidDbId(chatId)) {
-    try {
-      const chat = await prisma.chat.findUnique({
-        where: { id: chatId, userId }
-      });
-      if (!chat) {
-        console.warn(`Chat ${chatId} not found in database for user ${userId}, continuing with session.`);
-      }
-    } catch {}
   }
 
   const wantsStream = 
@@ -643,6 +637,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         try {
           const result = await processAiMessage({
             chatId,
+            identity,
             content,
             image,
             scriptureContext,
@@ -679,6 +674,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // Non-streaming fallback
   const result = await processAiMessage({
     chatId,
+    identity,
     content,
     image,
     scriptureContext,

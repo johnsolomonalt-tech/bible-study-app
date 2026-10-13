@@ -129,7 +129,7 @@ export async function DELETE(request: Request) {
 
   try {
     if (ids) {
-      const idList = ids.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n) && n < 1000000000000);
+      const idList = ids.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n) && n > 0 && n <= 2147483647);
       if (idList.length > 0) {
         await prisma.highlight.deleteMany({
           where: {
@@ -143,7 +143,7 @@ export async function DELETE(request: Request) {
 
     if (id) {
       const parsedId = parseInt(id, 10);
-      if (!isNaN(parsedId) && parsedId < 1000000000000) {
+      if (!isNaN(parsedId) && parsedId > 0 && parsedId <= 2147483647) {
         await prisma.highlight.deleteMany({
           where: {
             userId,

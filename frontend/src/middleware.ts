@@ -14,10 +14,10 @@ export default clerkMiddleware(async (auth, req) => {
   if (isDevRoute(req)) {
     const targetSlug = DEV_PORTAL_SLUG || 'console-7d8f9e6b4a3c21d0';
 
-    // 1. Alias /dev to the obfuscated developer portal slug so Solomon can directly visit /dev
+    // 1. Alias /dev internally to the obfuscated developer portal slug without revealing it via 307 redirect
     if (req.nextUrl.pathname === '/dev' || req.nextUrl.pathname.startsWith('/dev/')) {
       const newPath = req.nextUrl.pathname.replace(/^\/dev/, `/${targetSlug}`);
-      return NextResponse.redirect(new URL(newPath, req.url));
+      return NextResponse.rewrite(new URL(newPath, req.url));
     }
     if (req.nextUrl.pathname.startsWith('/api/dev')) {
       const newPath = req.nextUrl.pathname.replace(/^\/api\/dev/, `/api/${targetSlug}`);

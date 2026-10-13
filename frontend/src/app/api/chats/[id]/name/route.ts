@@ -1,8 +1,9 @@
-import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { GoogleGenAI } from '@google/genai';
 import { isValidDbId, updateMemoryChatTitle } from '@/lib/memoryChatStore';
+import { ownsChat, resolveChatIdentity } from '@/lib/chatIdentity';
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 const NAME_MODELS = [
@@ -36,13 +37,24 @@ function isRetryable(e: unknown): boolean {
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  let userId: string | null = null;
-  try {
-    const authResult = await auth();
-    userId = authResult?.userId || null;
-  } catch {}
+  const identity = await resolveChatIdentity(req);
+  const userId = identity?.userId || null;
+  const chatId = Number(id);
+  if (!identity || !isValidDbId(chatId) || !(await ownsChat(identity, chatId))) {
+    return NextResponse.json({ error: 'Chat not found.' }, { status: 404 });
+  }
+  const ip = getClientIp(req);
+  const rateLimit = await checkRateLimit(`chat_name:${userId || ip}`, {
+    windowMs: 60 * 1000,
+    maxRequests: 30,
+  });
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      { title: 'New Conversation' },
+      { status: 429, headers: { 'Retry-After': String(rateLimit.resetSeconds) } }
+    );
+  }
 
-  const chatId = parseInt(id) || Date.now();
   let userMessage = '';
   try {
     const body = await req.json();
@@ -70,7 +82,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const finalTitle = title || 'New Conversation';
 
-    updateMemoryChatTitle(chatId, finalTitle);
+    updateMemoryChatTitle(identity.ownerKey, chatId, finalTitle);
 
     if (userId && process.env.DATABASE_URL && isValidDbId(chatId)) {
       try {

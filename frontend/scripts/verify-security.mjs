@@ -8,29 +8,12 @@ import test from 'node:test';
 import fs from 'node:fs';
 import path from 'node:path';
 
-test('Rate Limiter: enforces sliding window and limits', async () => {
-  const store = new Map();
-  function checkLimit(key, max, windowMs) {
-    const now = Date.now();
-    let record = store.get(key);
-    if (!record) {
-      record = { timestamps: [] };
-      store.set(key, record);
-    }
-    record.timestamps = record.timestamps.filter((ts) => now - ts < windowMs);
-    if (record.timestamps.length >= max) {
-      return false;
-    }
-    record.timestamps.push(now);
-    return true;
-  }
-
-  const key = 'test-user-ip';
-  for (let i = 0; i < 5; i++) {
-    assert.strictEqual(checkLimit(key, 5, 1000), true, `Request ${i + 1} should be allowed`);
-  }
-  // 6th request must be rejected
-  assert.strictEqual(checkLimit(key, 5, 1000), false, '6th request must be blocked');
+test('Rate Limiter: uses shared atomic counters and trusted proxy addresses', () => {
+  const limiter = fs.readFileSync(path.resolve('src/lib/rateLimit.ts'), 'utf8');
+  assert.ok(limiter.includes('prisma.rateLimitBucket.upsert'), 'Rate limiter must use the shared database store');
+  assert.ok(limiter.includes('count: { increment: 1 }'), 'Rate limiter must increment counters atomically');
+  assert.ok(limiter.includes("req.headers.get('x-real-ip')"), 'Rate limiter must prefer the hosting proxy client address');
+  assert.ok(limiter.includes('addresses[addresses.length - 1]'), 'Forwarded addresses must not trust the client-controlled first value');
 });
 
 test('Dev Auth Security: fail-closed in production', () => {
@@ -151,11 +134,52 @@ test('Error Boundaries: custom not-found and error pages exist', () => {
 
 test('SEO & Metadata: robots.ts, sitemap.ts, and metadataBase configured', () => {
   const robotsPath = path.resolve('src/app/robots.ts');
+  const robotsCode = fs.readFileSync(robotsPath, 'utf8');
+  assert.ok(fs.existsSync(robotsPath), 'robots.ts must exist');
+  assert.ok(!robotsCode.includes('console-7d8f9e6b4a3c21d0'), 'robots.ts must not disclose obfuscated dev console slug');
+
   const sitemapPath = path.resolve('src/app/sitemap.ts');
+  const sitemapCode = fs.readFileSync(sitemapPath, 'utf8');
+  assert.ok(fs.existsSync(sitemapPath), 'sitemap.ts must exist');
+  assert.ok(!sitemapCode.includes('~offline'), 'sitemap.ts must not index internal ~offline fallback route');
+
   const layoutPath = path.resolve('src/app/layout.tsx');
   const layoutCode = fs.readFileSync(layoutPath, 'utf8');
-
-  assert.ok(fs.existsSync(robotsPath), 'robots.ts must exist');
-  assert.ok(fs.existsSync(sitemapPath), 'sitemap.ts must exist');
   assert.ok(layoutCode.includes('metadataBase:'), 'layout.tsx must configure metadataBase');
+});
+
+test('Guest Data Isolation: notes and chats do not pool guest records in server memory', () => {
+  const chatsRoute = fs.readFileSync(path.resolve('src/app/api/chats/route.ts'), 'utf8');
+  assert.ok(chatsRoute.includes('return NextResponse.json([])'), 'Guest chats query must return empty array without server memory pooling');
+
+  const notesRoute = fs.readFileSync(path.resolve('src/app/api/notes/route.ts'), 'utf8');
+  assert.ok(notesRoute.includes('return NextResponse.json([])'), 'Guest notes query must return empty array without server memory pooling');
+});
+
+test('Chat API: requires owner access and scopes memory messages by owner', () => {
+  const messageRoute = fs.readFileSync(path.resolve('src/app/api/chats/[id]/messages/route.ts'), 'utf8');
+  assert.ok(messageRoute.includes('resolveChatIdentity(req)'), 'Message routes must resolve a signed-in or guest-session identity');
+  assert.ok(messageRoute.includes('!(await ownsChat(identity, chatId))'), 'Message routes must check chat ownership before reading or writing');
+  assert.ok(messageRoute.includes('getMemoryMessages(identity.ownerKey, chatId)'), 'Fallback message reads must be scoped to the owner');
+  const chatRoute = fs.readFileSync(path.resolve('src/app/api/chats/[id]/route.ts'), 'utf8');
+  assert.ok(chatRoute.includes('deleteMemoryChat(identity.ownerKey, chatId)'), 'Fallback deletion must be scoped to the owner');
+  assert.ok(chatRoute.includes('updateMemoryChatTitle(identity.ownerKey, chatId'), 'Fallback title updates must be scoped to the owner');
+});
+
+test('Rate Limiting Coverage: AI & search endpoints enforce shared rate limits', () => {
+  const exportGuide = fs.readFileSync(path.resolve('src/app/api/canvas/export-guide/route.ts'), 'utf8');
+  assert.ok(exportGuide.includes('checkRateLimit'), 'export-guide must enforce rate limiting');
+
+  const chatName = fs.readFileSync(path.resolve('src/app/api/chats/[id]/name/route.ts'), 'utf8');
+  assert.ok(chatName.includes('checkRateLimit'), 'chat auto-naming must enforce rate limiting');
+
+  const lexiconRoute = fs.readFileSync(path.resolve('src/app/api/bible/lexicon/route.ts'), 'utf8');
+  assert.ok(lexiconRoute.includes('bible_lexicon_post'), 'lexicon POST must enforce rate limiting');
+});
+
+test('Database Performance: Prisma schema includes composite indexes for query patterns', () => {
+  const schema = fs.readFileSync(path.resolve('prisma/schema.prisma'), 'utf8');
+  assert.ok(schema.includes('@@index([userId, createdAt(sort: Desc)])'), 'Note and Chat models must have composite userId+createdAt indexes');
+  assert.ok(schema.includes('@@index([chatId, createdAt(sort: Asc)])'), 'Message model must have composite chatId+createdAt index');
+  assert.ok(schema.includes('@@index([userId, book, chapter])'), 'Highlight model must have composite userId+book+chapter index');
 });
