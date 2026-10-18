@@ -64,21 +64,22 @@ interface RequestBody {
 
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import { recordAnalyticsEvent } from '@/lib/analyticsService';
+import { resolveChatIdentity } from '@/lib/chatIdentity';
 
 export async function POST(req: Request) {
   try {
-    const { userId } = await auth();
-    if (!userId) {
-      return new NextResponse('Unauthorized', { status: 401 });
-    }
-
+    const identity = await resolveChatIdentity(req);
+    const userId = identity?.userId || null;
     const ip = getClientIp(req);
-    const rateLimit = await checkRateLimit(`notes_ai:${userId || ip}`, {
+    const actorId = userId || ip;
+    const isGuest = !userId;
+
+    const rateLimit = await checkRateLimit(`notes_ai:${actorId}`, {
       windowMs: 60 * 1000,
-      maxRequests: 20,
+      maxRequests: isGuest ? 10 : 20,
     });
     if (!rateLimit.success) {
-      recordAnalyticsEvent('rate_limit_blocked', userId || ip, { feature: 'notes_ai' }).catch(() => {});
+      recordAnalyticsEvent('rate_limit_blocked', actorId, { feature: 'notes_ai' }).catch(() => {});
       return NextResponse.json(
         { error: `Rate limit exceeded. Please wait ${rateLimit.resetSeconds} seconds.` },
         { status: 429, headers: { 'Retry-After': String(rateLimit.resetSeconds) } }
@@ -195,7 +196,7 @@ FORMATTING INSTRUCTIONS:
       );
     }
 
-    recordAnalyticsEvent('notes_ai_generate', userId, { feature: 'notes', action }).catch(() => {});
+    recordAnalyticsEvent('notes_ai_generate', actorId, { feature: 'notes', action }).catch(() => {});
 
     return NextResponse.json({
       content: generatedText.trim(),

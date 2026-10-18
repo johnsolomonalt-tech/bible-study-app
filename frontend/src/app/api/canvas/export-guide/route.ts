@@ -125,19 +125,19 @@ ${applicationNodes.map(a => `- **${a.data.title}**: ${a.data.content}`).join('\n
 *Theologica Academic Brief*`;
 }
 
+import { resolveChatIdentity } from '@/lib/chatIdentity';
+
 export async function POST(req: Request) {
   try {
-    let userId: string | null = null;
-    try {
-      const userAuth = await auth();
-      userId = userAuth.userId;
-    } catch {
-      // Guest
-    }
+    const identity = await resolveChatIdentity(req);
+    const userId = identity?.userId || null;
     const ip = getClientIp(req);
-    const rateLimit = await checkRateLimit(`export_guide:${userId || ip}`, {
+    const actorId = userId || ip;
+    const isGuest = !userId;
+
+    const rateLimit = await checkRateLimit(`export_guide:${actorId}`, {
       windowMs: 60 * 1000,
-      maxRequests: 15,
+      maxRequests: isGuest ? 10 : 15,
     });
     if (!rateLimit.success) {
       return NextResponse.json(

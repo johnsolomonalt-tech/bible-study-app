@@ -1222,9 +1222,9 @@ export default function App() {
 
   const [mobileStudyView, setMobileStudyView] = useState<'reader' | 'chapters' | 'ai'>('reader');
   
-  // Layout State — read saved panel defaults synchronously before first render (falling back to all 3 open)
+  // Layout State — read saved panel defaults synchronously before first render (falling back to calm 2-panel layout: Reader + Study AI)
   const [showLeftSidebar, setShowLeftSidebar] = useState<boolean>(() =>
-    getBooleanPreference(PREF_KEYS.SHOW_LEFT_SIDEBAR, true)
+    getBooleanPreference(PREF_KEYS.SHOW_LEFT_SIDEBAR, false)
   );
   const [showRightSidebar, setShowRightSidebar] = useState<boolean>(() =>
     getBooleanPreference(PREF_KEYS.SHOW_RIGHT_SIDEBAR, true)
@@ -1233,7 +1233,7 @@ export default function App() {
   const rightPanelRef = useRef<PanelImperativeHandle>(null);
   const bottomPanelRef = useRef<PanelImperativeHandle>(null);
   const [showBottomNotes, setShowBottomNotes] = useState<boolean>(() =>
-    getBooleanPreference(PREF_KEYS.SHOW_BOTTOM_NOTES, true)
+    getBooleanPreference(PREF_KEYS.SHOW_BOTTOM_NOTES, false)
   );
   const mobileBookListScrollRef = useRef<HTMLDivElement>(null);
   const desktopBookListScrollRef = useRef<HTMLDivElement>(null);
@@ -1364,6 +1364,41 @@ export default function App() {
     chatSwipeStartYRef.current = null;
   };
 
+  // Mobile Standalone PWA detection and safe-area top padding
+  const [isStandalone, setIsStandalone] = useState(false);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsStandalone(window.matchMedia('(display-mode: standalone)').matches);
+    }
+  }, []);
+
+  const mobileTopPadding = isStandalone
+    ? 'calc(env(safe-area-inset-top, 0px) + 12px)'
+    : 'calc(env(safe-area-inset-top, 0px) + 8px)';
+
+  // Auto-hide mobile top header and bottom nav bar on downward scroll in Scripture reader
+  const [mobileChromeHidden, setMobileChromeHidden] = useState(false);
+  const mobileLastScrollTopRef = useRef(0);
+
+  const handleReaderScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const currentScrollTop = e.currentTarget.scrollTop;
+    const deltaY = currentScrollTop - mobileLastScrollTopRef.current;
+
+    // Scrolling down hides chrome; scrolling up or reaching top reveals chrome
+    if (deltaY > 15 && currentScrollTop > 80) {
+      setMobileChromeHidden(true);
+    } else if (deltaY < -10 || currentScrollTop <= 30) {
+      setMobileChromeHidden(false);
+    }
+    mobileLastScrollTopRef.current = currentScrollTop;
+  }, []);
+
+  const handleReaderTap = useCallback(() => {
+    if (mobileChromeHidden) {
+      setMobileChromeHidden(false);
+    }
+  }, [mobileChromeHidden]);
+
   // Mobile Sidebar Touch Dragging & Smooth Transitions
   const [mobileDragSidebar, setMobileDragSidebar] = useState<'chapters' | 'ai' | null>(null);
   const [mobileDragOffset, setMobileDragOffset] = useState<number>(0);
@@ -1390,46 +1425,82 @@ export default function App() {
     const currentY = e.touches[0].clientY;
     const dx = currentX - mobileTouchStartXRef.current;
     const dy = currentY - mobileTouchStartYRef.current;
+    const startX = mobileTouchStartXRef.current;
+    const winW = typeof window !== 'undefined' ? window.innerWidth : 380;
 
     if (mobileDragLockedRef.current === null) {
       if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) {
         mobileDragLockedRef.current = 'vertical';
-      } else if (dx > 10 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+      } else if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.2) {
         const sel = window.getSelection();
         if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) return;
-        mobileDragLockedRef.current = 'horizontal';
-        setIsMobileDragging(true);
-        setMobileDragSidebar('chapters');
+
+        // Restrict horizontal swipe-to-open to edge activation zones so mid-screen reading/highlighting is never hijacked
+        // Left edge swipe (startX <= 32) opens chapters drawer
+        if (dx > 10 && startX <= 32) {
+          mobileDragLockedRef.current = 'horizontal';
+          setIsMobileDragging(true);
+          setMobileDragSidebar('chapters');
+        } 
+        // Right edge swipe (startX >= winW - 32) opens ai drawer
+        else if (dx < -10 && startX >= winW - 32) {
+          mobileDragLockedRef.current = 'horizontal';
+          setIsMobileDragging(true);
+          setMobileDragSidebar('ai');
+        }
       }
     }
 
     if (mobileDragLockedRef.current === 'horizontal') {
-      const winW = typeof window !== 'undefined' ? window.innerWidth : 380;
-      setMobileDragOffset(Math.max(0, Math.min(winW, dx)));
+      if (mobileDragSidebar === 'chapters') {
+        setMobileDragOffset(Math.max(0, Math.min(winW, dx)));
+      } else if (mobileDragSidebar === 'ai') {
+        setMobileDragOffset(Math.max(0, Math.min(winW, -dx)));
+      }
     }
   };
 
   const handleMobileReaderTouchEnd = (e: React.TouchEvent) => {
-    if (mobileDragLockedRef.current === 'horizontal' && mobileDragSidebar === 'chapters') {
+    if (mobileDragLockedRef.current === 'horizontal') {
       const winW = typeof window !== 'undefined' ? window.innerWidth : 380;
       const dx = e.changedTouches[0].clientX - mobileTouchStartXRef.current;
       const dt = Date.now() - mobileTouchTimeRef.current;
       const velocity = dx / Math.max(1, dt);
-      const shouldOpen = dx > winW * 0.45 || (velocity > 0.35 && dx > 40);
 
-      setIsMobileDragging(false);
-      if (shouldOpen) {
-        setMobileDragOffset(winW);
-        setTimeout(() => {
-          setMobileStudyView('chapters');
-          setMobileDragSidebar(null);
+      if (mobileDragSidebar === 'chapters') {
+        const shouldOpen = dx > winW * 0.45 || (velocity > 0.35 && dx > 40);
+        setIsMobileDragging(false);
+        if (shouldOpen) {
+          setMobileDragOffset(winW);
+          setTimeout(() => {
+            setMobileStudyView('chapters');
+            setMobileDragSidebar(null);
+            setMobileDragOffset(0);
+          }, 260);
+        } else {
           setMobileDragOffset(0);
-        }, 260);
-      } else {
-        setMobileDragOffset(0);
-        setTimeout(() => {
-          setMobileDragSidebar(null);
-        }, 260);
+          setTimeout(() => {
+            setMobileDragSidebar(null);
+          }, 260);
+        }
+      } else if (mobileDragSidebar === 'ai') {
+        const shouldOpen = -dx > winW * 0.45 || (velocity < -0.35 && -dx > 40);
+        setIsMobileDragging(false);
+        if (shouldOpen) {
+          setMobileDragOffset(winW);
+          setTimeout(() => {
+            setMobileStudyView('ai');
+            scrollToBottomOnChatOpenRef.current = true;
+            scrollChatToBottom();
+            setMobileDragSidebar(null);
+            setMobileDragOffset(0);
+          }, 260);
+        } else {
+          setMobileDragOffset(0);
+          setTimeout(() => {
+            setMobileDragSidebar(null);
+          }, 260);
+        }
       }
     }
     mobileDragLockedRef.current = null;
@@ -1625,10 +1696,10 @@ export default function App() {
       }
     }
 
-    // 4. Layout Sidebars (read saved boolean defaults, falling back to true for missing/invalid data)
-    setShowLeftSidebar(getBooleanPreference(PREF_KEYS.SHOW_LEFT_SIDEBAR, true));
+    // 4. Layout Sidebars (read saved boolean defaults, falling back to false for left & bottom to maintain calm 2-panel default)
+    setShowLeftSidebar(getBooleanPreference(PREF_KEYS.SHOW_LEFT_SIDEBAR, false));
     setShowRightSidebar(getBooleanPreference(PREF_KEYS.SHOW_RIGHT_SIDEBAR, true));
-    setShowBottomNotes(getBooleanPreference(PREF_KEYS.SHOW_BOTTOM_NOTES, true));
+    setShowBottomNotes(getBooleanPreference(PREF_KEYS.SHOW_BOTTOM_NOTES, false));
 
     // 5. Mobile Study View
     const mobileViewPref = getPreference(PREF_KEYS.MOBILE_STUDY_VIEW);
@@ -1733,9 +1804,9 @@ export default function App() {
 
   // Synchronously apply saved panel defaults before first paint on client hydration
   useLayoutEffect(() => {
-    setShowLeftSidebar(getBooleanPreference(PREF_KEYS.SHOW_LEFT_SIDEBAR, true));
+    setShowLeftSidebar(getBooleanPreference(PREF_KEYS.SHOW_LEFT_SIDEBAR, false));
     setShowRightSidebar(getBooleanPreference(PREF_KEYS.SHOW_RIGHT_SIDEBAR, true));
-    setShowBottomNotes(getBooleanPreference(PREF_KEYS.SHOW_BOTTOM_NOTES, true));
+    setShowBottomNotes(getBooleanPreference(PREF_KEYS.SHOW_BOTTOM_NOTES, false));
   }, []);
 
   // Record clicked book's screen Y coordinate before collapsing/expanding another book
@@ -2100,6 +2171,20 @@ export default function App() {
     setReaderFontFamily(val);
     setPreference(PREF_KEYS.READER_FONT_FAMILY, val);
   };
+
+  // Layout preset toggle (Focus Mode vs. Scholar Workspace)
+  const isFocusMode = !showLeftSidebar && !showBottomNotes && !showRightSidebar;
+  const handleToggleWorkspacePreset = useCallback(() => {
+    if (!showLeftSidebar && !showBottomNotes && !showRightSidebar) {
+      handleToggleLeftSidebar(true);
+      handleToggleBottomNotes(true);
+      handleToggleRightSidebar(true);
+    } else {
+      handleToggleLeftSidebar(false);
+      handleToggleBottomNotes(false);
+      handleToggleRightSidebar(false);
+    }
+  }, [showLeftSidebar, showBottomNotes, showRightSidebar, handleToggleLeftSidebar, handleToggleBottomNotes, handleToggleRightSidebar]);
 
   const handleReaderFontSizeChange = (val: ReaderFontSize) => {
     setReaderFontSize(val);
@@ -3223,6 +3308,75 @@ export default function App() {
       localStorage.setItem(LOCAL_HIGHLIGHTS_KEY, JSON.stringify(hlList));
     } catch {}
   };
+
+  // Contextual "Sync Your Study" Banner for Guests & Sign-in Cloud Sync
+  const [isSyncBannerDismissed, setIsSyncBannerDismissed] = useState(false);
+  const hasGuestData = useMemo(() => {
+    if (userId) return false;
+    const hasLocalNotes = notes.length > 0;
+    const hasLocalHighlights = highlights.length > 0;
+    const hasLocalChats = chats.some(c => c.messages && c.messages.length > 0) || (activeChat && activeChat.messages.length > 0);
+    return hasLocalNotes || hasLocalHighlights || hasLocalChats;
+  }, [userId, notes.length, highlights.length, chats, activeChat]);
+
+  const prevUserIdRef = useRef<string | null>(userId || null);
+  useEffect(() => {
+    if (!prevUserIdRef.current && userId) {
+      // 1. Sync local notes to /api/notes
+      const localNotes = getLocalNotes();
+      if (localNotes.length > 0) {
+        Promise.all(
+          localNotes.map(n =>
+            fetchWithAuth(`${API_URL}/api/notes`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ title: n.title, content: n.content })
+            }).catch(() => null)
+          )
+        ).then(() => {
+          fetchWithAuth(`${API_URL}/api/notes`)
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+              if (Array.isArray(data)) {
+                setNotes(data);
+                saveLocalNotes(data);
+              }
+            }).catch(() => {});
+        });
+      }
+
+      // 2. Sync local highlights to /api/highlights
+      const localHighlights = getLocalHighlights();
+      const pendingHighlights = localHighlights.filter(h => h.id > 1000000000000 || !h.id);
+      if (pendingHighlights.length > 0) {
+        Promise.all(
+          pendingHighlights.map(h =>
+            fetchWithAuth(`${API_URL}/api/highlights`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                book: h.book,
+                chapter: h.chapter,
+                verse: h.verse,
+                text: h.text,
+                color: h.color
+              })
+            }).catch(() => null)
+          )
+        ).then(() => {
+          fetchWithAuth(`${API_URL}/api/highlights`)
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+              if (Array.isArray(data)) {
+                setHighlights(data);
+                saveLocalHighlights(data);
+              }
+            }).catch(() => {});
+        });
+      }
+    }
+    prevUserIdRef.current = userId || null;
+  }, [userId, getLocalNotes, saveLocalNotes, fetchWithAuth]);
 
   const saveHighlight = async (color: string) => {
     const rawText = selectedText || selectionRange?.toString().trim() || '';
@@ -5118,9 +5272,9 @@ export default function App() {
         
         {/* Right: Panel Toggles, Streak, Settings & Clerk UserButton */}
         <div className="flex justify-end items-center gap-1.5 sm:gap-2.5 shrink-0">
-          {/* Collapsible Panel Toggles - Book Selector, Quick Note, Study AI */}
+          {/* Collapsible Panel Toggles - Book Selector, Quick Note, Study AI & Preset */}
           {activeTab === 'study' && (
-            <div className="hidden lg:flex items-center bg-surface border border-border-soft/60 rounded-lg p-0.5 shrink-0">
+            <div className="hidden lg:flex items-center bg-surface border border-border-soft/60 rounded-lg p-0.5 shrink-0 gap-0.5">
               <button
                 type="button"
                 onClick={() => handleToggleLeftSidebar(!showLeftSidebar)}
@@ -5154,6 +5308,26 @@ export default function App() {
               >
                 {showRightSidebar ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
               </button>
+              <div className="w-[1px] h-3.5 bg-border/60 mx-0.5" />
+              {/* 1-Click Preset Toggle: Focus Mode vs Scholar Workspace */}
+              <button
+                type="button"
+                onClick={handleToggleWorkspacePreset}
+                className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                  isFocusMode
+                    ? 'bg-accent/15 text-accent font-bold hover:bg-accent/25'
+                    : 'text-muted hover:text-fg hover:bg-border-soft'
+                }`}
+                title={
+                  isFocusMode
+                    ? 'Scholar Workspace: Expand all sidebars for deep study'
+                    : 'Reader Focus: Collapse sidebars for distraction-free reading'
+                }
+                aria-label="Toggle Workspace Layout Preset"
+              >
+                <BookOpen size={13} className={isFocusMode ? "text-accent" : "opacity-70"} />
+                <span>{isFocusMode ? 'Focus' : 'Workspace'}</span>
+              </button>
             </div>
           )}
 
@@ -5184,50 +5358,50 @@ export default function App() {
         </div>
       </header>
 
-      {/* Subtle Global Mobile Top Bar across every tab */}
-      <header 
-        className="lg:hidden border-b border-border/40 flex items-center justify-between px-3.5 sm:px-4 bg-bg/95 backdrop-blur-xs shrink-0 z-30 pb-1.5"
-        style={{ paddingTop: 'calc(max(env(safe-area-inset-top, 0px), 48px) + 4px)' }}
-      >
-        <div className="flex items-center gap-1.5 min-w-0">
-          {activeTab === 'study' && <Layout size={13} className="text-muted/80 shrink-0" />}
-          {activeTab === 'canvas' && <Workflow size={13} className="text-muted/80 shrink-0" />}
-          {activeTab === 'devotional' && <Sun size={13} className="text-muted/80 shrink-0" />}
-          {activeTab === 'notes' && <Edit size={13} className="text-muted/80 shrink-0" />}
-          {activeTab === 'chats' && <Sparkles size={13} className="text-muted/80 shrink-0" />}
-          {activeTab === 'tracker' && <Target size={13} className="text-muted/80 shrink-0" />}
-          <span className="font-sans text-[12px] font-medium tracking-wider uppercase text-muted/85 truncate">
-            {activeTab === 'study' ? 'Scripture Study' :
-             activeTab === 'canvas' ? 'Study Canvas' :
-             activeTab === 'devotional' ? 'Daily Devotional' :
-             activeTab === 'notes' ? 'Study Notes' :
-             activeTab === 'chats' ? 'Study AI' : 'Reading Tracker'}
-          </span>
-        </div>
-        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-          <StreakPopover onNavigateToTab={setActiveTab} onNavigateToVerse={navigateToVerse} />
-          <button 
-            onClick={() => setIsSettingsOpen(true)}
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-surface/60 hover:bg-surface border border-border-soft/40 text-muted hover:text-fg active:scale-95 transition-all cursor-pointer"
-            title="Settings"
-            aria-label="Settings"
-          >
-            <Settings size={15} />
-          </button>
-          {userId ? (
-            <div className="min-w-[32px] min-h-[32px] flex items-center justify-center scale-90">
-              <UserButton />
-            </div>
-          ) : (
-            <Link 
-              href="/sign-in"
-              className="px-2.5 py-1 text-[11px] font-semibold rounded-full bg-accent text-accent-on hover:opacity-90 transition-opacity cursor-pointer shadow-xs active:scale-95"
+      {/* Subtle Global Mobile Top Bar across non-study tabs */}
+      {activeTab !== 'study' && (
+        <header 
+          className="lg:hidden border-b border-border/40 flex items-center justify-between px-3.5 sm:px-4 bg-bg/95 backdrop-blur-xs shrink-0 z-30 pb-1.5"
+          style={{ paddingTop: mobileTopPadding }}
+        >
+          <div className="flex items-center gap-1.5 min-w-0">
+            {activeTab === 'canvas' && <Workflow size={13} className="text-muted/80 shrink-0" />}
+            {activeTab === 'devotional' && <Sun size={13} className="text-muted/80 shrink-0" />}
+            {activeTab === 'notes' && <Edit size={13} className="text-muted/80 shrink-0" />}
+            {activeTab === 'chats' && <Sparkles size={13} className="text-muted/80 shrink-0" />}
+            {activeTab === 'tracker' && <Target size={13} className="text-muted/80 shrink-0" />}
+            <span className="font-sans text-[12px] font-medium tracking-wider uppercase text-muted/85 truncate">
+              {activeTab === 'canvas' ? 'Study Canvas' :
+               activeTab === 'devotional' ? 'Daily Devotional' :
+               activeTab === 'notes' ? 'Study Notes' :
+               activeTab === 'chats' ? 'Study AI' : 'Reading Tracker'}
+            </span>
+          </div>
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+            <StreakPopover onNavigateToTab={setActiveTab} onNavigateToVerse={navigateToVerse} />
+            <button 
+              onClick={() => setIsSettingsOpen(true)}
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-surface/60 hover:bg-surface border border-border-soft/40 text-muted hover:text-fg active:scale-95 transition-all cursor-pointer"
+              title="Settings"
+              aria-label="Settings"
             >
-              Sign In
-            </Link>
-          )}
-        </div>
-      </header>
+              <Settings size={15} />
+            </button>
+            {userId ? (
+              <div className="min-w-[32px] min-h-[32px] flex items-center justify-center scale-90">
+                <UserButton />
+              </div>
+            ) : (
+              <Link 
+                href="/sign-in"
+                className="px-2.5 py-1 text-[11px] font-semibold rounded-full bg-accent text-accent-on hover:opacity-90 transition-opacity cursor-pointer shadow-xs active:scale-95"
+              >
+                Sign In
+              </Link>
+            )}
+          </div>
+        </header>
+      )}
       
       {/* Main Viewport */}
       <main className="flex-1 overflow-hidden min-h-0 flex relative">
@@ -5251,6 +5425,7 @@ export default function App() {
             >
               <header 
                 className="min-h-[46px] border-b border-border/60 flex items-center justify-between px-4 shrink-0 bg-bg py-1.5"
+                style={{ paddingTop: mobileTopPadding }}
               >
                 <div className="flex items-center gap-1.5">
                   <button onClick={() => setMobileStudyView('reader')} className="min-w-[40px] min-h-[40px] flex items-center justify-center -ml-2 p-2 text-fg-2 hover:text-fg rounded-xl hover:bg-surface cursor-pointer" title="Back to reader">
@@ -5495,23 +5670,35 @@ export default function App() {
             >
               <header 
                 ref={mobileReaderHeaderRef}
-                className="min-h-[46px] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 bg-bg shrink-0 relative z-20 py-1.5"
+                className="min-h-[52px] border-b border-border/60 flex items-center justify-between px-2 sm:px-4 bg-bg shrink-0 relative z-20 py-1.5"
+                style={{
+                  paddingTop: mobileTopPadding,
+                  transform: mobileChromeHidden ? 'translateY(-100%)' : 'translateY(0)',
+                  transition: 'transform 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
+                }}
               >
-                {/* Left: Book & Chapter Selector Trigger */}
-                <div className="flex items-center gap-1.5 min-w-0 flex-1 mr-2">
+                {/* Left: Book & Chapter Selector Trigger + Translation */}
+                <div className="flex items-center gap-1 sm:gap-1.5 min-w-0 flex-1 mr-1">
                   <div ref={mobileReaderTitleRef} className="flex items-center min-w-0 max-w-full">
                     <button 
                       onClick={() => setMobileStudyView('chapters')} 
-                      className="min-h-[38px] flex items-center gap-1.5 py-1 px-3 rounded-full bg-surface/75 hover:bg-surface border border-border-soft/50 shadow-2xs text-fg transition-all cursor-pointer active:scale-95 min-w-0" 
+                      className="min-h-[36px] flex items-center gap-1 py-1 px-2.5 rounded-full bg-surface/75 hover:bg-surface border border-border-soft/50 shadow-2xs text-fg transition-all cursor-pointer active:scale-95 min-w-0" 
                       title="Choose Book & Chapter"
                     >
-                      <BookOpen size={16} className="text-accent shrink-0" />
-                      <span className="font-display text-[15px] sm:text-[17px] font-semibold whitespace-nowrap">
+                      <BookOpen size={15} className="text-accent shrink-0" />
+                      <span className="font-display text-[14px] sm:text-[16px] font-semibold whitespace-nowrap truncate max-w-[110px] xs:max-w-none">
                         {activeBook.name} {activeChapter}
                       </span>
-                      <ChevronDown size={13} className="text-muted shrink-0 opacity-60" />
+                      <ChevronDown size={12} className="text-muted shrink-0 opacity-60" />
                     </button>
                   </div>
+
+                  {/* Translation Selector */}
+                  <TranslationSelector 
+                    currentTranslation={translation} 
+                    onSelectTranslation={setTranslation}
+                    theme={theme as 'dark' | 'light'}
+                  />
                 </div>
 
                 {/* Right: Actions */}
@@ -5520,30 +5707,26 @@ export default function App() {
                   {isSpeaking && (
                     <button 
                       onClick={toggleSpeech} 
-                      className="min-w-[40px] min-h-[40px] flex items-center justify-center p-2 rounded-xl bg-accent/15 text-accent animate-pulse cursor-pointer shrink-0" 
+                      className="w-8 h-8 flex items-center justify-center p-1.5 rounded-full bg-accent/15 text-accent animate-pulse cursor-pointer shrink-0" 
                       title="Stop reading chapter"
                     >
-                      <VolumeX size={18} />
+                      <VolumeX size={16} />
                     </button>
                   )}
-
-                  {/* Translation Selector */}
-                  <TranslationSelector 
-                    currentTranslation={translation} 
-                    onSelectTranslation={setTranslation}
-                    theme={theme as 'dark' | 'light'}
-                  />
 
                   {/* Reverse Interlinear Quick Button (Visible on tablet screens where there is room) */}
                   <button 
                     onClick={() => handleToggleInterlinearMode()} 
-                    className={`hidden md:flex p-2 rounded-lg transition-colors cursor-pointer shrink-0 ${
+                    className={`hidden md:flex p-1.5 rounded-lg transition-colors cursor-pointer shrink-0 ${
                       isInterlinearMode ? 'bg-accent text-accent-on' : 'text-fg-2 hover:text-fg hover:bg-surface'
                     }`} 
                     title={isInterlinearMode ? "Disable Interlinear" : "Enable Interlinear"}
                   >
-                    <Languages size={18} />
+                    <Languages size={17} />
                   </button>
+
+                  {/* Streak Flame */}
+                  <StreakPopover onNavigateToTab={setActiveTab} onNavigateToVerse={navigateToVerse} />
 
                   {/* Study AI Button */}
                   <button 
@@ -5552,29 +5735,53 @@ export default function App() {
                       scrollToBottomOnChatOpenRef.current = true;
                       scrollChatToBottom();
                     }} 
-                    className="w-9 h-9 flex items-center justify-center rounded-full bg-accent/10 border border-accent/25 text-accent hover:bg-accent/20 active:scale-95 transition-all cursor-pointer shrink-0 relative" 
+                    className="w-8 h-8 flex items-center justify-center rounded-full bg-accent/10 border border-accent/25 text-accent hover:bg-accent/20 active:scale-95 transition-all cursor-pointer shrink-0 relative" 
                     title="Study AI Assistant"
                   >
-                    <Sparkles size={16} />
+                    <Sparkles size={15} />
                     {chatQuotes.length > 0 && (
-                      <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 bg-accent text-accent-on text-[10px] font-bold rounded-full flex items-center justify-center shadow-xs">
+                      <span className="absolute -top-1 -right-1 min-w-[15px] h-3.5 px-0.5 bg-accent text-accent-on text-[9px] font-bold rounded-full flex items-center justify-center shadow-xs">
                         {chatQuotes.length}
                       </span>
                     )}
                   </button>
+
+                  {/* Settings Button */}
+                  <button 
+                    onClick={() => setIsSettingsOpen(true)}
+                    className="w-8 h-8 flex items-center justify-center rounded-full bg-surface/60 hover:bg-surface border border-border-soft/40 text-muted hover:text-fg active:scale-95 transition-all cursor-pointer"
+                    title="Settings"
+                    aria-label="Settings"
+                  >
+                    <Settings size={15} />
+                  </button>
+
+                  {/* Profile / Sign In */}
+                  {userId ? (
+                    <div className="min-w-[28px] min-h-[28px] flex items-center justify-center scale-90">
+                      <UserButton />
+                    </div>
+                  ) : (
+                    <Link 
+                      href="/sign-in"
+                      className="px-2 py-1 text-[11px] font-semibold rounded-full bg-accent text-accent-on hover:opacity-90 transition-opacity cursor-pointer shadow-xs active:scale-95 shrink-0"
+                    >
+                      Sign In
+                    </Link>
+                  )}
 
                   {/* 3 Dots More Menu (Always available on mobile & tablet) */}
                   <div ref={mobileMoreMenuRef} className="relative z-30 mobile-more-menu-container">
                     <button
                       type="button"
                       onClick={() => setIsMobileMoreMenuOpen(prev => !prev)}
-                      className={`w-9 h-9 flex items-center justify-center rounded-full bg-surface/70 hover:bg-surface border border-border-soft/50 text-muted hover:text-fg active:scale-95 transition-all cursor-pointer ${
+                      className={`w-8 h-8 flex items-center justify-center rounded-full bg-surface/70 hover:bg-surface border border-border-soft/50 text-muted hover:text-fg active:scale-95 transition-all cursor-pointer ${
                         isMobileMoreMenuOpen ? 'bg-surface text-fg' : ''
                       }`}
                       title="More study tools & options"
                       aria-label="More study options"
                     >
-                      <MoreVertical size={16} className="pointer-events-none" />
+                      <MoreVertical size={15} className="pointer-events-none" />
                     </button>
 
                     {isMobileMoreMenuOpen && (
@@ -5707,8 +5914,15 @@ export default function App() {
                 </div>
               </header>
 
-              <div className="bible-reader-content select-text flex-1 overflow-y-auto custom-scroll px-4.5 sm:px-6 lg:px-10 py-5 sm:py-6 lg:py-10 pb-32 sm:pb-36 lg:pb-12" onMouseUp={handleSelection} onTouchEnd={handleSelection} onContextMenu={handleReaderContextMenu}>
-                <article className="max-w-3xl mx-auto w-full break-words select-text">
+              <div 
+                className="bible-reader-content select-text flex-1 overflow-y-auto custom-scroll px-4.5 sm:px-6 lg:px-10 py-5 sm:py-6 lg:py-10 pb-32 sm:pb-36 lg:pb-12" 
+                onScroll={handleReaderScroll}
+                onClick={handleReaderTap}
+                onMouseUp={handleSelection} 
+                onTouchEnd={handleSelection} 
+                onContextMenu={handleReaderContextMenu}
+              >
+                <article className="max-w-[68ch] mx-auto w-full break-words select-text">
                   {isInterlinearMode && (
                     <InterlinearModeRibbon
                       isOldTestament={isOldTestament}
@@ -5947,6 +6161,7 @@ export default function App() {
               )}
               <header 
                 className="min-h-[46px] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 text-[15px] font-medium text-fg shrink-0 gap-2 bg-bg py-1.5"
+                style={{ paddingTop: mobileTopPadding }}
               >
                 <div className="flex items-center gap-1.5 min-w-0">
                   <button onClick={() => setMobileStudyView('reader')} className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2.5 -ml-1 text-fg-2 hover:text-fg rounded-xl hover:bg-surface shrink-0 cursor-pointer" title="Back to reader">
@@ -6006,6 +6221,25 @@ export default function App() {
                   )}
                 </div>
                 <form onSubmit={handleSendMessage} className="p-3 border-t border-border bg-bg shrink-0">
+                  {/* Contextual Sync Your Study Banner for Guests */}
+                  {hasGuestData && !isSyncBannerDismissed && (
+                    <div className="mb-2 p-2 rounded-xl bg-[#c96442]/10 border border-[#c96442]/25 text-[#c96442] dark:text-[#e07a5f] flex items-center justify-between gap-1.5 text-xs animate-in fade-in duration-200">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <UploadCloud size={14} className="shrink-0" />
+                        <span className="truncate text-[11px]">
+                          Study saved locally. <Link href="/sign-in" className="underline font-semibold hover:opacity-80">Sign in</Link> to sync.
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsSyncBannerDismissed(true)}
+                        className="p-1 rounded-md hover:bg-black/10 dark:hover:bg-white/10 text-inherit shrink-0 cursor-pointer"
+                        title="Dismiss notification"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  )}
                   <div className="flex flex-col relative">
                     {/* Scripture Context Pill */}
                     {attachedScripture ? (
@@ -6456,11 +6690,26 @@ export default function App() {
                     ref={readerHeaderRef}
                     className="w-full max-w-full min-w-0 h-[60px] border-b border-border flex items-center justify-between px-3 sm:px-4 lg:px-6 bg-bg shrink-0 gap-2 relative z-20"
                   >
-                    {/* Left: Book & Chapter Reference - ALWAYS visible, NEVER shrinks or gets clipped */}
+                    {/* Left: Book & Chapter Reference - ALWAYS visible, clickable to toggle book picker */}
                     <div ref={readerTitleRef} className="flex items-center gap-1.5 shrink-0 z-1 select-none">
-                      <div className="font-display text-[16px] sm:text-[18px] lg:text-[20px] font-semibold whitespace-nowrap shrink-0">
-                        {activeBook.name} {activeChapter}
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleToggleLeftSidebar(true);
+                          setTimeout(() => {
+                            const searchInput = document.querySelector('input[placeholder*="Search books"]') as HTMLInputElement;
+                            searchInput?.focus();
+                          }, 80);
+                        }}
+                        className="flex items-center gap-1.5 px-2 py-1 -ml-2 rounded-lg hover:bg-surface border border-transparent hover:border-border text-fg transition-all cursor-pointer group text-left active:scale-[0.98]"
+                        title="Browse Books & Chapters (or press Cmd+K)"
+                        aria-label={`Select Book & Chapter. Current: ${activeBook.name} ${activeChapter}`}
+                      >
+                        <span className="font-display text-[16px] sm:text-[18px] lg:text-[20px] font-semibold whitespace-nowrap">
+                          {activeBook.name} {activeChapter}
+                        </span>
+                        <ChevronDown size={15} className="text-muted group-hover:text-fg opacity-60 transition-transform group-hover:translate-y-0.5 shrink-0" />
+                      </button>
                     </div>
 
                     {/* Right: Actions container (Collapsible Tools + Permanent Right Controls) */}
@@ -6667,7 +6916,7 @@ export default function App() {
                     </div>
                   </header>
               <div className="bible-reader-content select-text flex-1 overflow-y-auto custom-scroll p-10 lg:p-16" onMouseUp={handleSelection} onTouchEnd={handleSelection} onContextMenu={handleReaderContextMenu}>
-                <article className="max-w-3xl mx-auto w-full break-words select-text">
+                <article className={`${!showLeftSidebar && !showRightSidebar ? 'max-w-[68ch]' : 'max-w-3xl'} mx-auto w-full break-words select-text`}>
                   {isInterlinearMode && (
                     <InterlinearModeRibbon
                       isOldTestament={isOldTestament}
@@ -6874,8 +7123,13 @@ export default function App() {
                 {showBottomNotes && (
                 <Panel panelRef={bottomPanelRef} defaultSize="25" minSize="20" className="hidden lg:flex border-t border-border bg-bg flex-col shrink-0">
                 <div className="w-full h-full flex flex-col min-h-0 overflow-hidden">
-                  <div className="h-10 border-b border-border flex items-center px-6 text-[11px] font-bold text-muted uppercase tracking-widest shrink-0">
+                  <div className="h-10 border-b border-border flex items-center justify-between px-6 text-[11px] font-bold text-muted uppercase tracking-widest shrink-0">
                     <span>Quick Note — {chapterTitle}</span>
+                    {hasGuestData && !isSyncBannerDismissed && (
+                      <span className="text-[10px] lowercase font-normal text-accent flex items-center gap-1">
+                        <UploadCloud size={11} /> Saved locally · <Link href="/sign-in" className="underline font-semibold">Sign in</Link> to sync
+                      </span>
+                    )}
                   </div>
                   <textarea 
                     className="flex-1 min-h-0 bg-transparent p-6 focus:outline-none resize-none text-[15px] leading-relaxed text-fg custom-scroll" 
@@ -6974,6 +7228,25 @@ export default function App() {
                 )}
               </div>
                 <form onSubmit={handleSendMessage} className="p-4 border-t border-border bg-bg shrink-0">
+                  {/* Contextual Sync Your Study Banner for Guests */}
+                  {hasGuestData && !isSyncBannerDismissed && (
+                    <div className="mb-2 p-2 rounded-xl bg-[#c96442]/10 border border-[#c96442]/25 text-[#c96442] dark:text-[#e07a5f] flex items-center justify-between gap-1.5 text-xs animate-in fade-in duration-200">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <UploadCloud size={14} className="shrink-0" />
+                        <span className="truncate text-[11px]">
+                          Study saved locally. <Link href="/sign-in" className="underline font-semibold hover:opacity-80">Sign in</Link> to sync across devices.
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsSyncBannerDismissed(true)}
+                        className="p-1 rounded-md hover:bg-black/10 dark:hover:bg-white/10 text-inherit shrink-0 cursor-pointer"
+                        title="Dismiss notification"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  )}
                   <div className="flex flex-col relative">
                     {/* Scripture Context Pill */}
                     {attachedScripture ? (
@@ -7973,6 +8246,25 @@ export default function App() {
               </div>
               <form onSubmit={handleSendMessage} className="p-2 sm:p-5 border-t border-border w-full shrink-0">
                 <div className="flex flex-col max-w-4xl mx-auto w-full relative">
+                  {/* Contextual Sync Your Study Banner for Guests */}
+                  {hasGuestData && !isSyncBannerDismissed && (
+                    <div className="mb-2 p-2.5 rounded-xl bg-[#c96442]/10 border border-[#c96442]/25 text-[#c96442] dark:text-[#e07a5f] flex items-center justify-between gap-2 text-xs animate-in fade-in duration-200">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <UploadCloud size={15} className="shrink-0" />
+                        <span className="truncate text-[12px]">
+                          Your study notes & chats are saved locally on this device. <Link href="/sign-in" className="underline font-semibold hover:opacity-80">Sign in</Link> to sync across your devices.
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsSyncBannerDismissed(true)}
+                        className="p-1 rounded-md hover:bg-black/10 dark:hover:bg-white/10 text-inherit shrink-0 cursor-pointer"
+                        title="Dismiss notification"
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
+                  )}
                   {/* Scripture Context Pill */}
                   {attachedScripture ? (
                     <div className="mb-1.5 sm:mb-2.5 flex items-center justify-between px-3 py-1 rounded-xl bg-surface border border-border-soft text-[11px] sm:text-[12px] text-muted shadow-2xs">
@@ -8433,13 +8725,15 @@ export default function App() {
         {/* Mobile Bottom Navigation — Ultra-thin Duolingo-style icon bar anchored above iOS swipe-up indicator */}
         <nav 
           aria-label="Mobile Navigation"
-          className={`lg:hidden shrink-0 bg-bg/95 backdrop-blur-2xl border-t border-border/50 flex items-center justify-around px-2 z-40 w-full transition-all duration-200 select-none ${
+          className={`lg:hidden shrink-0 bg-bg/95 backdrop-blur-2xl border-t border-border/50 flex items-center justify-around px-2 z-40 w-full select-none ${
             (isMobileTyping && activeTab !== 'canvas') ? 'hidden pointer-events-none' : 'flex'
-          }`}
+          } ${mobileChromeHidden && activeTab === 'study' ? 'pointer-events-none' : ''}`}
           style={{ 
             height: '50px',
             paddingTop: '4px',
-            paddingBottom: '12px'
+            paddingBottom: '12px',
+            transform: mobileChromeHidden && activeTab === 'study' ? 'translateY(100%)' : 'translateY(0)',
+            transition: 'transform 260ms cubic-bezier(0.16, 1, 0.3, 1), background-color 200ms ease'
           }}
         >
           {[

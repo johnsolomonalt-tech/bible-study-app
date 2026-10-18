@@ -4,15 +4,18 @@ import prisma from '@/lib/prisma';
 import { getMemoryChat } from '@/lib/memoryChatStore';
 
 export const GUEST_CHAT_COOKIE = 'theologica_guest_chat';
-const isProd = process.env.NODE_ENV === 'production';
 
 export type ChatIdentity =
   | { kind: 'user'; ownerKey: string; userId: string }
   | { kind: 'guest'; ownerKey: string; userId: null };
 
 function guestSecret() {
-  return process.env.GUEST_CHAT_SECRET || process.env.CLERK_SECRET_KEY ||
-    (isProd ? null : 'theologica-local-guest-session-secret');
+  return (
+    process.env.GUEST_CHAT_SECRET ||
+    process.env.CLERK_SECRET_KEY ||
+    process.env.GEMINI_API_KEY ||
+    'theologica-guest-session-fallback'
+  );
 }
 
 function signGuestId(id: string, secret: string) {

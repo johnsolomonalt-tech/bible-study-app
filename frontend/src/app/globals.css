@@ -600,9 +600,20 @@ button {
   letter-spacing: 0.1em !important;
 }
 
+/* Ensure tabular numerals for clean vertical alignment in all badges, verse numbers, and counters */
+.tabular-nums,
+.verse-number,
+.verse-number-btn,
+.chapter-badge,
+.strongs-badge,
+.streak-counter,
+sup.verse-number {
+  font-variant-numeric: tabular-nums;
+}
+
 /* Mobile safe area modal backdrop and content sizing for iPhone Dynamic Island, notch, and home bar */
 .modal-safe-overlay {
-  padding-top: calc(max(env(safe-area-inset-top, 0px), 48px) + 14px);
+  padding-top: calc(env(safe-area-inset-top, 0px) + 14px);
   padding-bottom: calc(max(env(safe-area-inset-bottom, 0px), 16px) + 14px);
   padding-left: max(env(safe-area-inset-left, 0px), 12px);
   padding-right: max(env(safe-area-inset-right, 0px), 12px);

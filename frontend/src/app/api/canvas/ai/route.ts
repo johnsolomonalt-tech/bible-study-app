@@ -104,24 +104,22 @@ function deriveFallbackBoardTitle(prompt: string): string {
 }
 
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { resolveChatIdentity } from '@/lib/chatIdentity';
 
 export async function POST(req: Request) {
   try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Authentication required. Please sign in to use Theologica AI.' },
-        { status: 401 }
-      );
-    }
-
+    const identity = await resolveChatIdentity(req);
+    const userId = identity?.userId || null;
     const ip = getClientIp(req);
-    const rateLimit = await checkRateLimit(`canvas_ai:${userId || ip}`, {
+    const actorId = userId || ip;
+    const isGuest = !userId;
+
+    const rateLimit = await checkRateLimit(`canvas_ai:${actorId}`, {
       windowMs: 60 * 1000,
-      maxRequests: 15,
+      maxRequests: isGuest ? 10 : 15,
     });
     if (!rateLimit.success) {
-      recordAnalyticsEvent('rate_limit_blocked', userId || ip, { feature: 'canvas_ai' }).catch(() => {});
+      recordAnalyticsEvent('rate_limit_blocked', actorId, { feature: 'canvas_ai' }).catch(() => {});
       return NextResponse.json(
         { error: `Rate limit exceeded. Please wait ${rateLimit.resetSeconds} seconds before generating again.` },
         { status: 429, headers: { 'Retry-After': String(rateLimit.resetSeconds) } }
@@ -631,7 +629,7 @@ JSON Format:
     const rawAiBoardTitle = typeof parsed.boardTitle === 'string' ? parsed.boardTitle.trim() : '';
     const effectiveBoardTitle = rawAiBoardTitle || deriveFallbackBoardTitle(prompt);
 
-    recordAnalyticsEvent('canvas_ai_generate', userId, { feature: 'canvas', mode }).catch(() => {});
+    recordAnalyticsEvent('canvas_ai_generate', actorId, { feature: 'canvas', mode }).catch(() => {});
 
     return NextResponse.json({
       action: parsed.action || 'add_nodes',
