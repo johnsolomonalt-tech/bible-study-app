@@ -5,7 +5,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } fr
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useAuth, UserButton, SignIn, SignInButton } from '@clerk/nextjs';
-import { Send, Plus, Layout, Edit, Sparkles, Target, Check, Copy, ChevronRight, ChevronLeft, ChevronDown, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquare, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow, ShieldCheck, Heart, Layers, Languages, MoreVertical, MoreHorizontal, Search, BookMarked, Quote, Compass, ArrowRight, Square, BrainCircuit, FileText, UploadCloud, Menu } from 'lucide-react';
+import { Send, Plus, Layout, Edit, Sparkles, Target, Check, Copy, ChevronRight, ChevronLeft, ChevronDown, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquare, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow, ShieldCheck, Heart, Layers, Languages, MoreVertical, MoreHorizontal, Search, BookMarked, Quote, Compass, ArrowRight, Square, BrainCircuit, FileText, UploadCloud, Menu, SlidersHorizontal } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import TextareaAutosize from 'react-textarea-autosize';
 import { getDevotionalForDay, fetchDevotionalForDay, DevotionalEntry, getDevotionalBody } from '../../lib/devotionals';
@@ -993,7 +993,6 @@ export default function App() {
     reference: '',
     backlinks: null,
   });
-  const [isMobileMoreMenuOpen, setIsMobileMoreMenuOpen] = useState(false);
   const [isMobileTyping, setIsMobileTyping] = useState(false);
   const activeTabRef = useRef(activeTab);
   useEffect(() => {
@@ -1275,7 +1274,7 @@ export default function App() {
   const toggleTestament = (t: string) => setExpandedTestaments(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
   const toggleBook = (b: string) => setExpandedBooks(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b]);
 
-  const [mobileStudyView, setMobileStudyView] = useState<'reader' | 'chapters' | 'ai'>('reader');
+  const [mobileStudyView, setMobileStudyView] = useState<'reader' | 'chapters' | 'ai' | 'tools'>('reader');
   
   // Layout State — read saved panel defaults synchronously before first render (falling back to calm 2-panel layout: Reader + Study AI)
   const [showLeftSidebar, setShowLeftSidebar] = useState<boolean>(() =>
@@ -1307,7 +1306,6 @@ export default function App() {
   const mobileReaderTitleRef = useRef<HTMLDivElement>(null);
   const [mobileReaderTitleWidth, setMobileReaderTitleWidth] = useState<number>(125);
   const desktopMoreMenuRef = useRef<HTMLDivElement>(null);
-  const mobileMoreMenuRef = useRef<HTMLDivElement>(null);
   
   const [isSpeaking, setIsSpeaking] = useState(false);
   const isSpeakingRef = useRef(false);
@@ -1455,7 +1453,7 @@ export default function App() {
   }, [mobileChromeHidden]);
 
   // Mobile Sidebar Touch Dragging & Smooth Transitions
-  const [mobileDragSidebar, setMobileDragSidebar] = useState<'chapters' | 'ai' | null>(null);
+  const [mobileDragSidebar, setMobileDragSidebar] = useState<'chapters' | 'ai' | 'tools' | null>(null);
   const [mobileDragOffset, setMobileDragOffset] = useState<number>(0);
   const [isMobileDragging, setIsMobileDragging] = useState<boolean>(false);
 
@@ -1679,6 +1677,65 @@ export default function App() {
     mobileDragLockedRef.current = null;
   };
 
+  // 4. Gesture on Study Tools Drawer: Swipe Left-to-Right to close
+  const handleMobileStudyToolsTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      mobileTouchStartXRef.current = e.touches[0].clientX;
+      mobileTouchStartYRef.current = e.touches[0].clientY;
+      mobileTouchTimeRef.current = Date.now();
+      mobileDragLockedRef.current = null;
+    }
+  };
+
+  const handleMobileStudyToolsTouchMove = (e: React.TouchEvent) => {
+    if (mobileStudyView !== 'tools' || e.touches.length !== 1) return;
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+    const dx = currentX - mobileTouchStartXRef.current;
+    const dy = currentY - mobileTouchStartYRef.current;
+
+    if (mobileDragLockedRef.current === null) {
+      if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) {
+        mobileDragLockedRef.current = 'vertical';
+      } else if (dx > 8 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+        mobileDragLockedRef.current = 'horizontal';
+        setIsMobileDragging(true);
+        setMobileDragSidebar('tools');
+      }
+    }
+
+    if (mobileDragLockedRef.current === 'horizontal') {
+      const winW = typeof window !== 'undefined' ? window.innerWidth : 380;
+      setMobileDragOffset(Math.max(0, Math.min(winW, dx)));
+    }
+  };
+
+  const handleMobileStudyToolsTouchEnd = (e: React.TouchEvent) => {
+    if (mobileDragLockedRef.current === 'horizontal' && mobileDragSidebar === 'tools') {
+      const winW = typeof window !== 'undefined' ? window.innerWidth : 380;
+      const dx = e.changedTouches[0].clientX - mobileTouchStartXRef.current;
+      const dt = Date.now() - mobileTouchTimeRef.current;
+      const velocity = dx / Math.max(1, dt);
+      const shouldClose = dx > winW * 0.45 || (velocity > 0.35 && dx > 40);
+
+      setIsMobileDragging(false);
+      if (shouldClose) {
+        setMobileDragOffset(winW);
+        setTimeout(() => {
+          setMobileStudyView('reader');
+          setMobileDragSidebar(null);
+          setMobileDragOffset(0);
+        }, 260);
+      } else {
+        setMobileDragOffset(0);
+        setTimeout(() => {
+          setMobileDragSidebar(null);
+        }, 260);
+      }
+    }
+    mobileDragLockedRef.current = null;
+  };
+
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [theme, setTheme] = useState('dark');
   const [accentColor, setAccentColor] = useState('#c96442');
@@ -1713,10 +1770,6 @@ export default function App() {
     if (typeof window === 'undefined') return;
 
     const handlePopState = () => {
-      if (isMobileMoreMenuOpen) {
-        setIsMobileMoreMenuOpen(false);
-        return;
-      }
       if (mobileStudyView !== 'reader') {
         setMobileStudyView('reader');
         return;
@@ -1751,7 +1804,6 @@ export default function App() {
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, [
-    isMobileMoreMenuOpen,
     mobileStudyView,
     isSettingsOpen,
     isLectioModalOpen,
@@ -2224,26 +2276,6 @@ export default function App() {
       document.removeEventListener('touchstart', handleOutsideClick);
     };
   }, [isDesktopMoreMenuOpen]);
-
-  // Outside click handler for mobile 3-dots study options menu
-  useEffect(() => {
-    if (!isMobileMoreMenuOpen) return;
-
-    const handleOutsideClick = (e: MouseEvent | TouchEvent) => {
-      const target = e.target as Node | null;
-      if (!target) return;
-      if (mobileMoreMenuRef.current && !mobileMoreMenuRef.current.contains(target)) {
-        setIsMobileMoreMenuOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleOutsideClick);
-    document.addEventListener('touchstart', handleOutsideClick);
-    return () => {
-      document.removeEventListener('mousedown', handleOutsideClick);
-      document.removeEventListener('touchstart', handleOutsideClick);
-    };
-  }, [isMobileMoreMenuOpen]);
 
   // Unified Settings Handlers
   const handleToggleLeftSidebar = useCallback((val: boolean) => {
@@ -4728,7 +4760,7 @@ export default function App() {
         if (activeInterlinearWord) { setActiveInterlinearWord(null); return; }
         if (isVerseInterlinearOpen) { setIsVerseInterlinearOpen(false); return; }
         if (isDesktopMoreMenuOpen) { setIsDesktopMoreMenuOpen(false); return; }
-        if (isMobileMoreMenuOpen) { setIsMobileMoreMenuOpen(false); return; }
+        if (mobileStudyView !== 'reader') { setMobileStudyView('reader'); return; }
       }
 
       // 2. Cmd+K / Ctrl+K: Focus book search or switch to study tab
@@ -4794,7 +4826,7 @@ export default function App() {
     activeInterlinearWord, 
     isVerseInterlinearOpen,
     isDesktopMoreMenuOpen, 
-    isMobileMoreMenuOpen
+    mobileStudyView
   ]);
 
 
@@ -5287,6 +5319,7 @@ export default function App() {
   // Dynamic CSS transforms for smooth mobile sidebar sliding
   const isBookSelectorActive = mobileStudyView === 'chapters' || mobileDragSidebar === 'chapters';
   const isStudyAiActive = mobileStudyView === 'ai' || mobileDragSidebar === 'ai';
+  const isStudyToolsActive = mobileStudyView === 'tools' || mobileDragSidebar === 'tools';
 
   let bookSelectorTransform = 'translateX(-100%)';
   if (mobileStudyView === 'chapters') {
@@ -5310,6 +5343,17 @@ export default function App() {
     studyAiTransform = `translateX(calc(100% - ${mobileDragOffset}px))`;
   }
 
+  let studyToolsTransform = 'translateX(100%)';
+  if (mobileStudyView === 'tools') {
+    if (mobileDragSidebar === 'tools') {
+      studyToolsTransform = `translateX(${mobileDragOffset}px)`;
+    } else {
+      studyToolsTransform = 'translateX(0px)';
+    }
+  } else if (mobileDragSidebar === 'tools') {
+    studyToolsTransform = `translateX(calc(100% - ${mobileDragOffset}px))`;
+  }
+
   // Backdrop opacity calculation
   let backdropOpacity = 0;
   if (mobileStudyView === 'chapters') {
@@ -5319,6 +5363,10 @@ export default function App() {
   } else if (mobileStudyView === 'ai') {
     const winW = typeof window !== 'undefined' ? window.innerWidth : 380;
     const progress = mobileDragSidebar === 'ai' ? Math.max(0, 1 - mobileDragOffset / winW) : 1;
+    backdropOpacity = progress * 0.45;
+  } else if (mobileStudyView === 'tools') {
+    const winW = typeof window !== 'undefined' ? window.innerWidth : 380;
+    const progress = mobileDragSidebar === 'tools' ? Math.max(0, 1 - mobileDragOffset / winW) : 1;
     backdropOpacity = progress * 0.45;
   } else if (mobileDragSidebar === 'chapters') {
     const winW = typeof window !== 'undefined' ? window.innerWidth : 380;
@@ -5838,6 +5886,9 @@ export default function App() {
                     {isSpeaking ? <VolumeX size={17} /> : <Volume2 size={17} />}
                   </button>
 
+                  {/* Streak Flame (visible across all screens, matching the other mobile tabs) */}
+                  <StreakPopover onNavigateToTab={setActiveTab} onNavigateToVerse={navigateToVerse} />
+
                   {/* Desktop & Tablet shortcuts (hidden on mobile phone screens for clean, uncluttered layout) */}
                   <div className="hidden md:flex items-center gap-1 sm:gap-1.5">
                     {/* Reverse Interlinear Quick Button */}
@@ -5850,9 +5901,6 @@ export default function App() {
                     >
                       <Languages size={17} />
                     </button>
-
-                    {/* Streak Flame */}
-                    <StreakPopover onNavigateToTab={setActiveTab} onNavigateToVerse={navigateToVerse} />
 
                     {/* Study AI Button */}
                     <button 
@@ -5897,173 +5945,18 @@ export default function App() {
                     )}
                   </div>
 
-                  {/* 3 Dots More Menu Button */}
-                  <div ref={mobileMoreMenuRef} className="relative z-30 mobile-more-menu-container">
-                    <button
-                      type="button"
-                      onClick={() => setIsMobileMoreMenuOpen(prev => !prev)}
-                      className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-surface/70 hover:bg-surface border border-border-soft/50 text-muted hover:text-fg active:scale-95 transition-all cursor-pointer touch-manipulation ${
-                        isMobileMoreMenuOpen ? 'bg-surface text-fg' : ''
-                      }`}
-                      title="More study tools & options"
-                      aria-label="More study options"
-                    >
-                      <MoreVertical size={18} className="pointer-events-none" />
-                    </button>
-
-                    {isMobileMoreMenuOpen && (
-                      <>
-                        <div 
-                          className="fixed inset-0 bg-black/50 z-40 backdrop-blur-xs transition-opacity duration-200"
-                          onClick={() => setIsMobileMoreMenuOpen(false)}
-                        />
-                        <div 
-                          className="fixed bottom-0 left-0 right-0 z-50 bg-surface/98 backdrop-blur-2xl border-t border-border/80 rounded-t-[28px] shadow-2xl p-4 space-y-1.5 animate-in slide-in-from-bottom duration-200"
-                          style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 16px)' }}
-                        >
-                          <div className="w-10 h-1 bg-border-soft rounded-full mx-auto mb-3" />
-                          <div className="flex items-center justify-between pb-2 px-1 mb-1 border-b border-border/40">
-                            <span className="font-semibold text-fg text-sm">Study Tools & Options</span>
-                            <button
-                              type="button"
-                              onClick={() => setIsMobileMoreMenuOpen(false)}
-                              className="min-w-[44px] min-h-[44px] flex items-center justify-center text-muted hover:text-fg rounded-full cursor-pointer -mr-2"
-                              title="Close options"
-                            >
-                              <X size={18} />
-                            </button>
-                          </div>
-
-                          {/* Reverse Interlinear toggle */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              handleToggleInterlinearMode();
-                              setIsMobileMoreMenuOpen(false);
-                            }}
-                            className={`w-full min-h-[48px] flex items-center justify-between px-3.5 py-3 rounded-xl hover:bg-fg/5 text-sm font-medium cursor-pointer transition-colors ${
-                              isInterlinearMode ? 'text-accent bg-accent/10 font-semibold' : 'text-fg'
-                            }`}
-                          >
-                            <div className="flex items-center gap-3">
-                              <Languages size={18} className={isInterlinearMode ? "text-accent" : "text-fg-2"} />
-                              <span>Reverse Interlinear</span>
-                            </div>
-                            {isInterlinearMode && (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-accent text-accent-on">
-                                Active
-                              </span>
-                            )}
-                          </button>
-
-                          {/* Read Chapter Aloud */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              toggleSpeech();
-                              setIsMobileMoreMenuOpen(false);
-                            }}
-                            className="w-full min-h-[48px] flex items-center justify-between px-3.5 py-3 rounded-xl hover:bg-fg/5 text-fg text-sm font-medium cursor-pointer transition-colors"
-                          >
-                            <div className="flex items-center gap-3">
-                              {isSpeaking ? <VolumeX size={18} className="text-accent" /> : <Volume2 size={18} className="text-fg-2" />}
-                              <span>{isSpeaking ? 'Stop Reading Aloud' : 'Read Chapter Aloud'}</span>
-                            </div>
-                            {isSpeaking && (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-accent/20 text-accent animate-pulse">
-                                Playing
-                              </span>
-                            )}
-                          </button>
-
-                          {/* Scripture Backlinks */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setBacklinksDrawerState({
-                                isOpen: true,
-                                reference: `${activeBook.name} ${activeChapter}`,
-                                backlinks: totalChapterBacklinks,
-                              });
-                              setIsMobileMoreMenuOpen(false);
-                            }}
-                            className="w-full min-h-[48px] flex items-center justify-between px-3.5 py-3 rounded-xl hover:bg-fg/5 text-fg text-sm font-medium cursor-pointer transition-colors"
-                          >
-                            <div className="flex items-center gap-3">
-                              <Layers size={18} className="text-accent" />
-                              <span>Scripture Backlinks</span>
-                            </div>
-                            {totalChapterBacklinks.totalCount > 0 && (
-                              <span className="min-w-[18px] h-4.5 px-1.5 bg-accent text-accent-on text-[11px] font-bold rounded-full flex items-center justify-center">
-                                {totalChapterBacklinks.totalCount}
-                              </span>
-                            )}
-                          </button>
-
-                          {/* Lectio Divina Guided Prayer (always in 3-dots on mobile) */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setIsLectioModalOpen(true);
-                              setIsMobileMoreMenuOpen(false);
-                            }}
-                            className="w-full min-h-[48px] flex items-center gap-3 px-3.5 py-3 rounded-xl hover:bg-fg/5 text-fg text-sm font-medium cursor-pointer transition-colors"
-                          >
-                            <Heart size={18} className="text-rose-400" />
-                            <span>Lectio Divina Guided Prayer</span>
-                          </button>
-
-                          {/* Reading Tracker */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActiveTab('tracker');
-                              setIsMobileMoreMenuOpen(false);
-                            }}
-                            className="w-full min-h-[48px] flex items-center gap-3 px-3.5 py-3 rounded-xl hover:bg-fg/5 text-fg text-sm font-medium cursor-pointer transition-colors"
-                          >
-                            <Target size={18} className="text-accent" />
-                            <span>Reading Tracker & Progress</span>
-                          </button>
-
-                          {/* Settings & Appearance */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setIsSettingsOpen(true);
-                              setIsMobileMoreMenuOpen(false);
-                            }}
-                            className="w-full min-h-[48px] flex items-center gap-3 px-3.5 py-3 rounded-xl hover:bg-fg/5 text-fg text-sm font-medium cursor-pointer transition-colors"
-                          >
-                            <Settings size={18} className="text-muted" />
-                            <span>Display & Reader Settings</span>
-                          </button>
-
-                          {/* Mark Completed */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              toggleCompleted();
-                              setIsMobileMoreMenuOpen(false);
-                            }}
-                            className={`w-full min-h-[48px] flex items-center justify-between px-3.5 py-3 rounded-xl hover:bg-fg/5 text-sm font-medium cursor-pointer border-t border-border/50 mt-1 pt-3 transition-colors ${
-                              isCompleted ? 'text-accent font-semibold' : 'text-fg'
-                            }`}
-                          >
-                            <div className="flex items-center gap-3">
-                              <Check size={18} className={isCompleted ? "text-accent" : "text-meta"} />
-                              <span>{isCompleted ? 'Marked Completed' : 'Mark as Completed'}</span>
-                            </div>
-                            {isCompleted && (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-accent/15 text-accent">
-                                Done
-                              </span>
-                            )}
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
+                  {/* 3 Dots More Menu Button (Toggles smooth sliding Study Tools drawer) */}
+                  <button
+                    type="button"
+                    onClick={() => setMobileStudyView(prev => prev === 'tools' ? 'reader' : 'tools')}
+                    className={`min-w-[42px] min-h-[42px] flex items-center justify-center rounded-full bg-surface/70 hover:bg-surface border border-border-soft/50 text-muted hover:text-fg active:scale-95 transition-all cursor-pointer touch-manipulation ${
+                      mobileStudyView === 'tools' ? 'bg-surface text-fg ring-1 ring-border-soft' : ''
+                    }`}
+                    title="Study tools & options"
+                    aria-label="Study tools & options"
+                  >
+                    <MoreVertical size={18} className="pointer-events-none" />
+                  </button>
                 </div>
               </header>
 
@@ -6274,7 +6167,7 @@ export default function App() {
             </section>
 
             {/* Backdrop overlay for drawers */}
-            {(isBookSelectorActive || isStudyAiActive) && backdropOpacity > 0 && (
+            {(isBookSelectorActive || isStudyAiActive || isStudyToolsActive) && backdropOpacity > 0 && (
               <div 
                 className="absolute inset-0 bg-black/45 z-20 transition-opacity duration-200"
                 style={{ opacity: backdropOpacity }}
@@ -6297,7 +6190,7 @@ export default function App() {
                 pointerEvents: isStudyAiActive ? 'auto' : 'none',
                 visibility: isStudyAiActive ? 'visible' : 'hidden',
               }}
-              className="absolute inset-0 z-30 w-full h-full border-l border-border bg-bg flex flex-col shadow-2xl will-change-transform"
+              className="absolute inset-0 z-35 w-full h-full border-l border-border bg-bg flex flex-col shadow-2xl will-change-transform"
               onDragEnter={handleChatDragEnter}
               onDragOver={handleChatDragOver}
               onDragLeave={handleChatDragLeave}
@@ -6589,6 +6482,271 @@ export default function App() {
                     </p>
                   </div>
                 </form>
+              </div>
+            </aside>
+
+            {/* Mobile Right Sidebar: Study Tools & Options */}
+            <aside 
+              onTouchStart={handleMobileStudyToolsTouchStart}
+              onTouchMove={handleMobileStudyToolsTouchMove}
+              onTouchEnd={handleMobileStudyToolsTouchEnd}
+              style={{
+                transform: studyToolsTransform,
+                transition: isMobileDragging ? 'none' : 'transform 0.28s cubic-bezier(0.25, 1, 0.5, 1)',
+                pointerEvents: isStudyToolsActive ? 'auto' : 'none',
+                visibility: isStudyToolsActive ? 'visible' : 'hidden',
+              }}
+              className="absolute inset-0 z-30 w-full h-full border-l border-border bg-bg flex flex-col shadow-2xl will-change-transform"
+            >
+              <header 
+                className="min-h-[46px] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 text-[15px] font-medium text-fg shrink-0 gap-2 bg-bg py-1.5"
+                style={{ paddingTop: mobileTopPadding }}
+              >
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <button 
+                    type="button"
+                    onClick={() => setMobileStudyView('reader')} 
+                    className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2.5 -ml-1 text-fg-2 hover:text-fg rounded-xl hover:bg-surface shrink-0 cursor-pointer" 
+                    title="Back to reader"
+                    aria-label="Back to reader"
+                  >
+                    <ChevronLeft size={22} />
+                  </button>
+                  <SlidersHorizontal size={16} className="text-accent shrink-0" />
+                  <span className="truncate font-semibold text-[15px]">Study Tools</span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-[11px] font-medium text-muted bg-surface px-2.5 py-1 rounded-full border border-border/50 truncate max-w-[130px]">
+                    {activeBook.name} {activeChapter}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setMobileStudyView('reader')}
+                    className="min-w-[36px] min-h-[36px] flex items-center justify-center text-muted hover:text-fg rounded-full cursor-pointer hover:bg-surface/80"
+                    title="Close study tools"
+                    aria-label="Close study tools"
+                  >
+                    <X size={17} />
+                  </button>
+                </div>
+              </header>
+
+              <div className="flex-1 overflow-y-auto custom-scroll p-3.5 sm:p-4 space-y-3 pb-24">
+                {/* Featured: Open Study AI Assistant */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileStudyView('ai');
+                    scrollToBottomOnChatOpenRef.current = true;
+                    scrollChatToBottom();
+                  }}
+                  className="w-full p-3.5 rounded-2xl bg-gradient-to-br from-accent/15 via-accent/5 to-surface/80 border border-accent/30 text-left cursor-pointer transition-all active:scale-[0.98] shadow-xs group"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-accent text-accent-on flex items-center justify-center shrink-0 shadow-xs">
+                        <Sparkles size={20} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-[14.5px] font-semibold text-fg flex items-center gap-1.5 truncate">
+                          <span>Study AI Assistant</span>
+                          <span className="text-[9.5px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-full bg-accent/20 text-accent shrink-0">
+                            Slide Out
+                          </span>
+                        </div>
+                        <div className="text-[12px] text-muted truncate mt-0.5">
+                          Exegesis, theology & Greek/Hebrew
+                        </div>
+                      </div>
+                    </div>
+                    <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center text-accent group-hover:translate-x-0.5 transition-transform shrink-0">
+                      <ChevronRight size={16} />
+                    </div>
+                  </div>
+                </button>
+
+                {/* Reading & Exegesis Group */}
+                <div className="rounded-2xl border border-border/70 bg-surface/40 overflow-hidden divide-y divide-border/40">
+                  {/* Reverse Interlinear */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleToggleInterlinearMode();
+                    }}
+                    className={`w-full min-h-[50px] flex items-center justify-between px-3.5 py-3 hover:bg-fg/5 text-sm font-medium cursor-pointer transition-colors ${
+                      isInterlinearMode ? 'bg-accent/10 text-accent font-semibold' : 'text-fg'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isInterlinearMode ? 'bg-accent text-accent-on' : 'bg-fg/5 text-fg-2'}`}>
+                        <Languages size={17} />
+                      </div>
+                      <div className="text-left">
+                        <div className="text-[14px]">Reverse Interlinear</div>
+                        <div className="text-[11px] text-muted font-normal">Hebrew/Greek roots & Strong numbers</div>
+                      </div>
+                    </div>
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
+                      isInterlinearMode ? 'bg-accent text-accent-on' : 'bg-fg/5 text-muted'
+                    }`}>
+                      {isInterlinearMode ? 'Active' : 'Off'}
+                    </span>
+                  </button>
+
+                  {/* Read Chapter Aloud (TTS) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      toggleSpeech();
+                    }}
+                    className="w-full min-h-[50px] flex items-center justify-between px-3.5 py-3 hover:bg-fg/5 text-fg text-sm font-medium cursor-pointer transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isSpeaking ? 'bg-accent text-accent-on animate-pulse' : 'bg-fg/5 text-fg-2'}`}>
+                        {isSpeaking ? <VolumeX size={17} /> : <Volume2 size={17} />}
+                      </div>
+                      <div className="text-left">
+                        <div className="text-[14px]">{isSpeaking ? 'Stop Reading Aloud' : 'Read Chapter Aloud'}</div>
+                        <div className="text-[11px] text-muted font-normal">Voice narration for current chapter</div>
+                      </div>
+                    </div>
+                    {isSpeaking && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-accent/20 text-accent animate-pulse">
+                        Playing
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Scripture Backlinks */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBacklinksDrawerState({
+                        isOpen: true,
+                        reference: `${activeBook.name} ${activeChapter}`,
+                        backlinks: totalChapterBacklinks,
+                      });
+                      setMobileStudyView('reader');
+                    }}
+                    className="w-full min-h-[50px] flex items-center justify-between px-3.5 py-3 hover:bg-fg/5 text-fg text-sm font-medium cursor-pointer transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-fg/5 text-fg-2 flex items-center justify-center">
+                        <Layers size={17} />
+                      </div>
+                      <div className="text-left">
+                        <div className="text-[14px]">Scripture Backlinks</div>
+                        <div className="text-[11px] text-muted font-normal">Cross-references & thematic echoes</div>
+                      </div>
+                    </div>
+                    {totalChapterBacklinks.totalCount > 0 ? (
+                      <span className="min-w-[20px] h-5 px-1.5 bg-accent text-accent-on text-[11px] font-bold rounded-full flex items-center justify-center">
+                        {totalChapterBacklinks.totalCount}
+                      </span>
+                    ) : (
+                      <ChevronRight size={16} className="text-muted" />
+                    )}
+                  </button>
+
+                  {/* Lectio Divina Guided Prayer */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsLectioModalOpen(true);
+                      setMobileStudyView('reader');
+                    }}
+                    className="w-full min-h-[50px] flex items-center justify-between px-3.5 py-3 hover:bg-fg/5 text-fg text-sm font-medium cursor-pointer transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-500 flex items-center justify-center">
+                        <Heart size={17} />
+                      </div>
+                      <div className="text-left">
+                        <div className="text-[14px]">Lectio Divina</div>
+                        <div className="text-[11px] text-muted font-normal">4-step contemplative meditation</div>
+                      </div>
+                    </div>
+                    <ChevronRight size={16} className="text-muted" />
+                  </button>
+                </div>
+
+                {/* Navigation & Settings Group */}
+                <div className="rounded-2xl border border-border/70 bg-surface/40 overflow-hidden divide-y divide-border/40">
+                  {/* Reading Tracker */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('tracker');
+                      setMobileStudyView('reader');
+                    }}
+                    className="w-full min-h-[50px] flex items-center justify-between px-3.5 py-3 hover:bg-fg/5 text-fg text-sm font-medium cursor-pointer transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-fg/5 text-fg-2 flex items-center justify-center">
+                        <Target size={17} />
+                      </div>
+                      <div className="text-left">
+                        <div className="text-[14px]">Reading Tracker & Progress</div>
+                        <div className="text-[11px] text-muted font-normal">Annual plan, chapter stats & streak</div>
+                      </div>
+                    </div>
+                    <ChevronRight size={16} className="text-muted" />
+                  </button>
+
+                  {/* Display & Reader Settings */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSettingsOpen(true);
+                    }}
+                    className="w-full min-h-[50px] flex items-center justify-between px-3.5 py-3 hover:bg-fg/5 text-fg text-sm font-medium cursor-pointer transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-fg/5 text-fg-2 flex items-center justify-center">
+                        <Settings size={17} />
+                      </div>
+                      <div className="text-left">
+                        <div className="text-[14px]">Display & Reader Settings</div>
+                        <div className="text-[11px] text-muted font-normal">Typography, font size, theme & layout</div>
+                      </div>
+                    </div>
+                    <ChevronRight size={16} className="text-muted" />
+                  </button>
+                </div>
+
+                {/* Mark as Completed */}
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => toggleCompleted()}
+                    className={`w-full min-h-[56px] flex items-center justify-between p-3.5 rounded-2xl border transition-all cursor-pointer active:scale-[0.98] ${
+                      isCompleted 
+                        ? 'bg-accent/15 border-accent/40 text-accent shadow-xs' 
+                        : 'bg-surface/70 border-border/70 hover:bg-surface text-fg'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
+                        isCompleted ? 'bg-accent text-accent-on' : 'bg-fg/5 text-muted'
+                      }`}>
+                        <Check size={18} strokeWidth={isCompleted ? 2.8 : 2} />
+                      </div>
+                      <div className="text-left">
+                        <div className="text-[14.5px] font-semibold">
+                          {isCompleted ? 'Chapter Completed' : 'Mark as Completed'}
+                        </div>
+                        <div className="text-[11px] text-muted font-normal">
+                          {isCompleted ? 'Recorded in reading progress' : `Record ${activeBook.name} ${activeChapter} complete`}
+                        </div>
+                      </div>
+                    </div>
+                    <span className={`text-[11px] font-bold px-3 py-1 rounded-full transition-colors ${
+                      isCompleted ? 'bg-accent text-accent-on' : 'bg-fg/5 text-muted'
+                    }`}>
+                      {isCompleted ? 'Done' : 'Mark Done'}
+                    </span>
+                  </button>
+                </div>
               </div>
             </aside>
           </div>
@@ -8889,7 +9047,7 @@ export default function App() {
           }}
         >
           {[
-            { id: 'study', label: 'Bible', icon: BookOpen },
+            { id: 'study', label: 'Study', icon: BookOpen },
             { id: 'chats', label: 'Study AI', icon: Sparkles },
             { id: 'notes', label: 'Notes', icon: FileText },
             { id: 'tracker', label: 'Tracker', icon: Target },

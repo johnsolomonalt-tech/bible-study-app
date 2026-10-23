@@ -52,7 +52,7 @@ export type ReaderLayout = 'verse' | 'paragraph';
 export const VALID_TABS = ['study', 'canvas', 'devotional', 'notes', 'chats', 'tracker'] as const;
 export type ValidTab = typeof VALID_TABS[number];
 
-export const VALID_MOBILE_VIEWS = ['reader', 'chapters', 'ai'] as const;
+export const VALID_MOBILE_VIEWS = ['reader', 'chapters', 'ai', 'tools'] as const;
 export type ValidMobileView = typeof VALID_MOBILE_VIEWS[number];
 
 /**
