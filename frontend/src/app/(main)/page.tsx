@@ -5800,14 +5800,14 @@ export default function App() {
               >
                 {/* Left: Book & Chapter Selector Trigger + Translation */}
                 <div className="flex items-center gap-1.5 min-w-0 flex-1 mr-1">
-                  <div ref={mobileReaderTitleRef} className="flex items-center min-w-0 max-w-full">
+                  <div ref={mobileReaderTitleRef} className="flex items-center min-w-0">
                     <button 
                       onClick={() => setMobileStudyView('chapters')} 
-                      className="min-h-[44px] flex items-center gap-1.5 py-1 px-3 rounded-full bg-surface/80 hover:bg-surface border border-border-soft/60 shadow-2xs text-fg transition-all cursor-pointer active:scale-95 min-w-0 touch-manipulation" 
+                      className="min-h-[42px] flex items-center gap-1.5 py-1 px-2.5 sm:px-3 rounded-full bg-surface/80 hover:bg-surface border border-border-soft/60 shadow-2xs text-fg transition-all cursor-pointer active:scale-95 shrink-0 touch-manipulation" 
                       title="Choose Book & Chapter"
                     >
                       <BookOpen size={16} className="text-accent shrink-0" />
-                      <span className="font-display text-[15px] sm:text-[16px] font-semibold whitespace-nowrap truncate max-w-[130px] xs:max-w-none">
+                      <span className="font-display text-[14.5px] sm:text-[16px] font-semibold whitespace-nowrap truncate max-w-[210px] xs:max-w-none">
                         {activeBook.name} {activeChapter}
                       </span>
                       <ChevronDown size={14} className="text-muted shrink-0 opacity-60" />
@@ -6243,7 +6243,7 @@ export default function App() {
                             navigateToVerse(prevChapterInfo.book, prevChapterInfo.chapter, 1);
                             document.querySelectorAll('.bible-reader-content').forEach(el => el.scrollTo({ top: 0, behavior: 'smooth' }));
                           }}
-                          className="flex-1 min-w-0 min-h-[48px] max-w-[210px] flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl bg-surface hover:bg-surface-hover border border-border text-fg font-semibold transition-all cursor-pointer shadow-xs active:scale-[0.98]"
+                          className="flex-1 min-w-0 min-h-[48px] max-w-[220px] flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-surface hover:bg-surface-hover border border-border text-fg text-[13px] sm:text-sm font-semibold transition-all cursor-pointer shadow-xs active:scale-[0.98]"
                         >
                           <ChevronLeft size={18} className="shrink-0" />
                           <span className="truncate">{prevChapterInfo.book} {prevChapterInfo.chapter}</span>
@@ -6259,7 +6259,7 @@ export default function App() {
                             navigateToVerse(nextChapterInfo.book, nextChapterInfo.chapter, 1);
                             document.querySelectorAll('.bible-reader-content').forEach(el => el.scrollTo({ top: 0, behavior: 'smooth' }));
                           }}
-                          className="flex-1 min-w-0 min-h-[48px] max-w-[210px] flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl bg-accent text-accent-on font-semibold hover:opacity-95 transition-all cursor-pointer shadow-xs active:scale-[0.98]"
+                          className="flex-1 min-w-0 min-h-[48px] max-w-[220px] flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-accent text-accent-on text-[13px] sm:text-sm font-semibold hover:opacity-95 transition-all cursor-pointer shadow-xs active:scale-[0.98]"
                         >
                           <span className="truncate">{nextChapterInfo.book} {nextChapterInfo.chapter}</span>
                           <ChevronRight size={18} className="shrink-0" />
