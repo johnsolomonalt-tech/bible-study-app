@@ -5824,16 +5824,19 @@ export default function App() {
 
                 {/* Right: Actions */}
                 <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-                  {/* Quick Speech / Pause button if currently speaking */}
-                  {isSpeaking && (
-                    <button 
-                      onClick={toggleSpeech} 
-                      className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-full bg-accent/15 text-accent animate-pulse cursor-pointer shrink-0" 
-                      title="Stop reading chapter"
-                    >
-                      <VolumeX size={18} />
-                    </button>
-                  )}
+                  {/* Quick Speech / Listen button */}
+                  <button 
+                    onClick={toggleSpeech} 
+                    className={`min-w-[40px] min-h-[40px] flex items-center justify-center rounded-full transition-all cursor-pointer shrink-0 ${
+                      isSpeaking 
+                        ? 'bg-accent/15 text-accent animate-pulse border border-accent/30' 
+                        : 'text-muted hover:text-fg hover:bg-surface/80 active:scale-95'
+                    }`} 
+                    title={isSpeaking ? "Stop reading chapter" : "Listen to chapter"}
+                    aria-label={isSpeaking ? "Stop reading chapter" : "Listen to chapter"}
+                  >
+                    {isSpeaking ? <VolumeX size={17} /> : <Volume2 size={17} />}
+                  </button>
 
                   {/* Desktop & Tablet shortcuts (hidden on mobile phone screens for clean, uncluttered layout) */}
                   <div className="hidden md:flex items-center gap-1 sm:gap-1.5">
@@ -5915,10 +5918,10 @@ export default function App() {
                           onClick={() => setIsMobileMoreMenuOpen(false)}
                         />
                         <div 
-                          className="fixed bottom-0 left-0 right-0 z-50 bg-surface border-t border-border rounded-t-3xl shadow-2xl p-4 space-y-1.5 animate-in slide-in-from-bottom duration-200"
-                          style={{ paddingBottom: 'calc(max(env(safe-area-inset-bottom, 0px), 16px) + 12px)' }}
+                          className="fixed bottom-0 left-0 right-0 z-50 bg-surface/98 backdrop-blur-2xl border-t border-border/80 rounded-t-[28px] shadow-2xl p-4 space-y-1.5 animate-in slide-in-from-bottom duration-200"
+                          style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 16px)' }}
                         >
-                          <div className="w-12 h-1 bg-border rounded-full mx-auto mb-3" />
+                          <div className="w-10 h-1 bg-border-soft rounded-full mx-auto mb-3" />
                           <div className="flex items-center justify-between pb-2 px-1 mb-1 border-b border-border/40">
                             <span className="font-semibold text-fg text-sm">Study Tools & Options</span>
                             <button
@@ -6065,7 +6068,7 @@ export default function App() {
               </header>
 
               <div 
-                className="bible-reader-content select-text flex-1 overflow-y-auto custom-scroll px-4.5 sm:px-6 lg:px-10 py-5 sm:py-6 lg:py-10 pb-32 sm:pb-36 lg:pb-12" 
+                className="bible-reader-content select-text flex-1 overflow-y-auto custom-scroll px-4.5 sm:px-6 lg:px-10 py-5 sm:py-6 lg:py-10 pb-16 sm:pb-20 lg:pb-12" 
                 onScroll={handleReaderScroll}
                 onClick={handleReaderTap}
                 onMouseUp={handleSelection} 
@@ -7607,10 +7610,10 @@ export default function App() {
           <>
             {/* Mobile Slide-up Verse Action Bottom Sheet (< 768px) */}
             <div 
-              className="md:hidden floating-verse-toolbar fixed inset-x-0 bottom-0 z-50 bg-surface/98 border-t border-border rounded-t-3xl shadow-2xl p-4 animate-in slide-in-from-bottom duration-200 backdrop-blur-xl"
-              style={{ paddingBottom: 'calc(max(env(safe-area-inset-bottom, 0px), 16px) + 12px)' }}
+              className="md:hidden floating-verse-toolbar fixed inset-x-0 bottom-0 z-50 bg-surface/98 border-t border-border/80 rounded-t-[28px] shadow-2xl p-4 animate-in slide-in-from-bottom duration-200 backdrop-blur-2xl"
+              style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 16px)' }}
             >
-              <div className="w-12 h-1 bg-border rounded-full mx-auto mb-3" />
+              <div className="w-10 h-1 bg-border-soft rounded-full mx-auto mb-3" />
               {/* Header: Verse reference & close button */}
               <div className="flex items-center justify-between px-1 pb-3 mb-2 border-b border-border/40">
                 <div className="flex items-center gap-2 min-w-0">
@@ -7991,7 +7994,7 @@ export default function App() {
         {/* DEVOTIONAL TAB */}
         {activeTab === 'devotional' && (
           <div className="flex-1 flex flex-col w-full h-full min-h-0 bg-bg overflow-hidden">
-            <div className="flex-1 flex flex-col items-center overflow-y-auto custom-scroll p-4 sm:p-6 lg:p-10 pb-28 lg:pb-10 bg-bg">
+            <div className="flex-1 flex flex-col items-center overflow-y-auto custom-scroll p-4 sm:p-6 lg:p-10 pb-16 lg:pb-10 bg-bg">
             <div className="w-full max-w-4xl xl:max-w-5xl space-y-6">
               {/* Today's local date header */}
               <div className="text-xs sm:text-sm font-medium text-muted tracking-wide">
@@ -8266,7 +8269,7 @@ export default function App() {
                 </button>
               </div>
 
-              <div className="flex-1 min-h-0 overflow-y-auto custom-scroll p-3 pb-24 lg:pb-3 space-y-1">
+              <div className="flex-1 min-h-0 overflow-y-auto custom-scroll p-3 pb-16 lg:pb-3 space-y-1">
                 {chats.map(c => (
                   <div 
                     key={c.id} 
@@ -8630,7 +8633,7 @@ export default function App() {
 
           return (
             <div className="flex-1 flex flex-col w-full h-full min-h-0 bg-bg overflow-hidden">
-              <div className="flex-1 overflow-y-auto custom-scroll p-4 sm:p-10 lg:p-16 pb-28 lg:pb-16 bg-bg">
+              <div className="flex-1 overflow-y-auto custom-scroll p-4 sm:p-10 lg:p-16 pb-16 lg:pb-16 bg-bg">
               <div className="max-w-5xl mx-auto">
                 <header className="hidden lg:block mb-6 sm:mb-8">
                   <h1 className="text-2xl sm:text-[40px] font-display text-fg mb-2 sm:mb-3">Reading Tracker</h1>
@@ -8872,16 +8875,15 @@ export default function App() {
           />
         </div>
       </main>
-        {/* Mobile Bottom Navigation — Clean, elevated icon bar safely anchored above iOS home indicator */}
+        {/* Mobile Bottom Navigation — Sleek, modern app tab bar safely anchored above iOS home indicator */}
         <nav 
           aria-label="Mobile Navigation"
-          className={`lg:hidden shrink-0 bg-bg/95 backdrop-blur-2xl border-t border-border/50 flex items-center justify-around px-2 z-40 w-full select-none ${
+          className={`lg:hidden shrink-0 bg-bg/90 backdrop-blur-2xl border-t border-border/40 flex items-center justify-around px-1 z-40 w-full select-none ${
             (isMobileTyping && activeTab !== 'canvas') ? 'hidden pointer-events-none' : 'flex'
           }`}
           style={{ 
-            minHeight: 'calc(54px + env(safe-area-inset-bottom, 0px))',
-            paddingTop: '6px',
-            paddingBottom: 'calc(max(env(safe-area-inset-bottom, 0px), 8px) + 2px)',
+            height: 'calc(49px + env(safe-area-inset-bottom, 0px))',
+            paddingBottom: 'env(safe-area-inset-bottom, 0px)',
             transition: 'background-color 200ms ease'
           }}
         >
@@ -8889,6 +8891,7 @@ export default function App() {
             { id: 'study', label: 'Bible', icon: BookOpen },
             { id: 'chats', label: 'Study AI', icon: Sparkles },
             { id: 'notes', label: 'Notes', icon: FileText },
+            { id: 'tracker', label: 'Tracker', icon: Target },
             { id: 'devotional', label: 'Devotion', icon: Sun },
             { id: 'canvas', label: 'Canvas', icon: Workflow },
           ].map(tab => {
@@ -8912,21 +8915,24 @@ export default function App() {
                     scrollChatToBottom();
                   }
                 }}
-                className="flex-1 flex flex-col items-center justify-center min-h-[44px] transition-all relative cursor-pointer active:scale-95 touch-manipulation"
+                className="flex-1 flex flex-col items-center justify-center h-[46px] py-1 transition-all relative cursor-pointer active:scale-90 touch-manipulation select-none"
                 title={tab.label}
                 aria-label={tab.label}
               >
-                <div 
-                  className={`w-11 h-[34px] rounded-xl flex items-center justify-center transition-all duration-150 ${
-                    isTabActive 
-                      ? 'bg-accent/15 border-2 border-accent text-accent shadow-2xs' 
-                      : 'text-muted hover:text-fg border-2 border-transparent opacity-75'
-                  }`}
-                >
-                  <tab.icon size={20} strokeWidth={isTabActive ? 2.3 : 1.8} />
+                <div className="relative flex items-center justify-center">
+                  <tab.icon 
+                    size={19} 
+                    strokeWidth={isTabActive ? 2.4 : 1.75}
+                    className={`transition-colors duration-150 ${
+                      isTabActive ? 'text-accent' : 'text-muted/70 hover:text-fg'
+                    }`}
+                  />
+                  {isTabActive && (
+                    <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-accent shadow-xs" />
+                  )}
                 </div>
-                <span className={`text-[10px] font-medium tracking-tight mt-0.5 ${
-                  isTabActive ? 'text-accent font-semibold' : 'text-meta'
+                <span className={`text-[10px] tracking-tight mt-1 leading-none transition-colors duration-150 ${
+                  isTabActive ? 'text-accent font-semibold' : 'text-meta font-medium'
                 }`}>
                   {tab.label}
                 </span>

@@ -1268,7 +1268,7 @@ export function NotesWorkspace({
               {/* EDIT MODE: Raw Markdown Textarea */}
               {(viewMode === 'edit' || viewMode === 'split') && (
                 <div 
-                  className={`h-full overflow-y-auto custom-scroll flex-1 p-4 sm:p-8 lg:p-12 pb-28 lg:pb-16 touch-pan-y ${viewMode === 'split' ? 'border-r border-border' : ''}`}
+                  className={`h-full overflow-y-auto custom-scroll flex-1 p-4 sm:p-8 lg:p-12 pb-16 lg:pb-16 touch-pan-y ${viewMode === 'split' ? 'border-r border-border' : ''}`}
                   style={{ WebkitOverflowScrolling: 'touch' }}
                 >
                   <textarea 
@@ -1285,7 +1285,7 @@ export function NotesWorkspace({
               {/* PREVIEW MODE: Live Rendered Markdown */}
               {(viewMode === 'preview' || viewMode === 'split') && (
                 <div 
-                  className="h-full overflow-y-auto custom-scroll flex-1 p-4 sm:p-8 lg:p-12 pb-28 lg:pb-16 bg-surface/5 touch-pan-y"
+                  className="h-full overflow-y-auto custom-scroll flex-1 p-4 sm:p-8 lg:p-12 pb-16 lg:pb-16 bg-surface/5 touch-pan-y"
                   style={{ WebkitOverflowScrolling: 'touch' }}
                 >
                   <NoteMarkdownRenderer
@@ -1636,7 +1636,7 @@ export function NotesWorkspace({
 
         {/* Notes Items List */}
         <div 
-          className="notes-panel-scroll flex-1 min-h-0 overflow-y-auto custom-scroll p-2.5 space-y-1 pb-24 lg:pb-4 touch-pan-y"
+          className="notes-panel-scroll flex-1 min-h-0 overflow-y-auto custom-scroll p-2.5 space-y-1 pb-16 lg:pb-4 touch-pan-y"
           style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}
         >
           {filteredNotes.length === 0 && (
@@ -1708,7 +1708,7 @@ export function NotesWorkspace({
 
         {/* Backlinks List */}
         <div 
-          className="notes-panel-scroll flex-1 min-h-0 overflow-y-auto custom-scroll p-2.5 space-y-3 pb-24 lg:pb-4 touch-pan-y"
+          className="notes-panel-scroll flex-1 min-h-0 overflow-y-auto custom-scroll p-2.5 space-y-3 pb-16 lg:pb-4 touch-pan-y"
           style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}
         >
           {filteredBacklinksGroups.length === 0 ? (
@@ -1820,7 +1820,7 @@ export function NotesWorkspace({
 
         {/* Templates List */}
         <div 
-          className="notes-panel-scroll flex-1 min-h-0 overflow-y-auto custom-scroll p-2.5 space-y-2.5 pb-24 lg:pb-4 touch-pan-y"
+          className="notes-panel-scroll flex-1 min-h-0 overflow-y-auto custom-scroll p-2.5 space-y-2.5 pb-16 lg:pb-4 touch-pan-y"
           style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}
         >
           {filteredTemplates.length === 0 ? (

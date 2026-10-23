@@ -279,7 +279,7 @@ html, body {
     min-width: 44px;
   }
   .mobile-sheet-content {
-    padding-bottom: calc(max(env(safe-area-inset-bottom, 0px), 16px) + 12px);
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 16px);
   }
 }
 
