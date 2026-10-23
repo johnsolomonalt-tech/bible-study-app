@@ -5,6 +5,5 @@
 # canvas storage
 .canvas_storage/
 
-# PWA service worker build artifacts
-public/sw.js*
+# Workbox artifacts (our custom public/sw.js is tracked)
 public/workbox-*.js

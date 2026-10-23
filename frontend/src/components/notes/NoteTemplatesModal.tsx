@@ -72,7 +72,7 @@ export function NoteTemplatesModal({
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/70 backdrop-blur-md animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center modal-safe-overlay bg-black/70 backdrop-blur-md animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div 

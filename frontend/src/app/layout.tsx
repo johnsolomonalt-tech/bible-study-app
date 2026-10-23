@@ -39,7 +39,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   icons: {
     icon: "/logo-dark.png",
-    apple: "/logo-dark.png",
+    apple: "/apple-touch-icon.png",
   },
   openGraph: {
     title: "Theologica Study Workspace",
@@ -74,6 +74,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: 'cover',
   themeColor: '#141413',
+  interactiveWidget: 'resizes-content',
 };
 
 export default function RootLayout({
@@ -95,12 +96,12 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Theologica" />
         <link id="dynamic-favicon" rel="icon" href="/logo-dark.png" type="image/png" />
-        <link id="dynamic-apple-icon" rel="apple-touch-icon" href="/logo-dark.png" type="image/png" />
+        <link id="dynamic-apple-icon" rel="apple-touch-icon" href="/apple-touch-icon.png" type="image/png" />
         <script
           dangerouslySetInnerHTML={{
             __html: `
               try {
-                let themeMatch = document.cookie.match(/(^|;)\s*theme=([^;]+)/);
+                let themeMatch = document.cookie.match(/(^|;)\\s*theme=([^;]+)/);
                 let theme = themeMatch ? decodeURIComponent(themeMatch[2]) : localStorage.getItem('theme');
                 if (!theme) {
                   theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -112,7 +113,7 @@ export default function RootLayout({
                 } else {
                   document.documentElement.removeAttribute('data-theme');
                 }
-                var accentMatch = document.cookie.match(/(^|;)\s*theologica_accent_color=([^;]+)/);
+                var accentMatch = document.cookie.match(/(^|;)\\s*theologica_accent_color=([^;]+)/);
                 var accent = accentMatch ? decodeURIComponent(accentMatch[2]) : localStorage.getItem('theologica_accent_color');
                 if (accent) {
                   document.documentElement.style.setProperty('--accent', accent);
@@ -120,28 +121,27 @@ export default function RootLayout({
                 var iconPath = (theme === 'light' || theme === 'sepia') ? '/logo-light.png' : '/logo-dark.png';
                 var fav = document.getElementById('dynamic-favicon') || document.querySelector("link[rel~='icon']");
                 if (fav) fav.href = iconPath;
-                var appleFav = document.getElementById('dynamic-apple-icon') || document.querySelector("link[rel~='apple-touch-icon']");
-                if (appleFav) appleFav.href = iconPath;
 
-                // Evict obsolete PWA service worker and clear stale cache across deployments
-                var BUILD_REV = '20261012-mobile-rev9';
-                var lastRev = localStorage.getItem('theologica_build_rev');
-                if (lastRev !== BUILD_REV) {
-                  localStorage.setItem('theologica_build_rev', BUILD_REV);
-                  if ('serviceWorker' in navigator) {
-                    navigator.serviceWorker.getRegistrations().then(function(regs) {
-                      for (var r of regs) {
-                        r.unregister();
-                      }
-                    }).catch(function() {});
-                  }
-                  if ('caches' in window) {
-                    caches.keys().then(function(keys) {
-                      for (var k of keys) {
-                        caches.delete(k);
-                      }
-                    }).catch(function() {});
-                  }
+                // Register PWA Service Worker
+                if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+                  window.addEventListener('load', function() {
+                    navigator.serviceWorker.register('/sw.js', { scope: '/' })
+                      .then(function(reg) {
+                        reg.onupdatefound = function() {
+                          var installingWorker = reg.installing;
+                          if (installingWorker) {
+                            installingWorker.onstatechange = function() {
+                              if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                console.log('[Theologica] New version available.');
+                              }
+                            };
+                          }
+                        };
+                      })
+                      .catch(function(err) {
+                        console.warn('[Theologica] SW registration failed:', err);
+                      });
+                  });
                 }
               } catch (e) {}
             `,

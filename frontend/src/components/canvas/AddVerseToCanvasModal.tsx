@@ -129,7 +129,7 @@ export function AddVerseToCanvasModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center modal-safe-overlay bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
       <div
         className={`w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden flex flex-col transition-all ${
           isDark

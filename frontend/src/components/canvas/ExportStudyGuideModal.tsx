@@ -141,7 +141,7 @@ export function ExportStudyGuideModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center modal-safe-overlay bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div 
         className="w-full max-w-4xl max-h-[90vh] flex flex-col rounded-2xl shadow-2xl border border-border bg-surface text-fg overflow-hidden backdrop-blur-xl transition-all"
       >

@@ -252,111 +252,42 @@ function InnerCanvasBoard({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Canvas Mobile Pinch-to-Zoom Gesture Engine (Works seamlessly anywhere, including over text boxes/cards)
   const canvasWrapperRef = useRef<HTMLDivElement>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
 
-  useEffect(() => {
-    const el = canvasWrapperRef.current;
-    if (!el) return;
+  const handleTouchStartWrapper = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = setTimeout(() => {
+        setPaneContextMenu({ x: touch.clientX, y: touch.clientY });
+      }, 550);
+    } else {
+      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    }
+  };
 
-    let initialDistance = 0;
-    let initialViewport = { x: 0, y: 0, zoom: 1 };
-    let initialWorldPoint = { x: 0, y: 0 };
-    let isPinching = false;
-    let pinchRafId: number | null = null;
-
-    const onTouchStart = (e: TouchEvent) => {
-      if (e.touches.length === 2) {
-        const t0 = e.touches[0];
-        const t1 = e.touches[1];
-        const dx = t1.clientX - t0.clientX;
-        const dy = t1.clientY - t0.clientY;
-        const dist = Math.hypot(dx, dy);
-
-        if (dist > 8) {
-          isPinching = true;
-          initialDistance = dist;
-          const rect = el.getBoundingClientRect();
-          const midScreenX = (t0.clientX + t1.clientX) / 2;
-          const midScreenY = (t0.clientY + t1.clientY) / 2;
-          const canvasX = midScreenX - rect.left;
-          const canvasY = midScreenY - rect.top;
-
-          const vp = getViewport();
-          initialViewport = { ...vp };
-          initialWorldPoint = {
-            x: (canvasX - vp.x) / vp.zoom,
-            y: (canvasY - vp.y) / vp.zoom,
-          };
-
-          if (e.cancelable) e.preventDefault();
-          e.stopPropagation();
-        }
-      } else {
-        isPinching = false;
-      }
-    };
-
-    const onTouchMove = (e: TouchEvent) => {
-      if (e.touches.length === 2 && isPinching && initialDistance > 0) {
-        const t0 = e.touches[0];
-        const t1 = e.touches[1];
-        const dx = t1.clientX - t0.clientX;
-        const dy = t1.clientY - t0.clientY;
-        const dist = Math.hypot(dx, dy);
-
-        if (dist > 8) {
-          const scale = dist / initialDistance;
-          const targetZoom = Math.min(2.0, Math.max(0.2, initialViewport.zoom * scale));
-
-          const rect = el.getBoundingClientRect();
-          const midScreenX = (t0.clientX + t1.clientX) / 2;
-          const midScreenY = (t0.clientY + t1.clientY) / 2;
-          const currCanvasX = midScreenX - rect.left;
-          const currCanvasY = midScreenY - rect.top;
-
-          const nextX = currCanvasX - initialWorldPoint.x * targetZoom;
-          const nextY = currCanvasY - initialWorldPoint.y * targetZoom;
-
-          if (pinchRafId !== null) {
-            cancelAnimationFrame(pinchRafId);
-          }
-          pinchRafId = requestAnimationFrame(() => {
-            pinchRafId = null;
-            setViewport({ x: nextX, y: nextY, zoom: targetZoom });
-          });
-
-          if (e.cancelable) e.preventDefault();
-          e.stopPropagation();
+  const handleTouchMoveWrapper = (e: React.TouchEvent) => {
+    if (touchStartPosRef.current && e.touches.length === 1) {
+      const dx = Math.abs(e.touches[0].clientX - touchStartPosRef.current.x);
+      const dy = Math.abs(e.touches[0].clientY - touchStartPosRef.current.y);
+      if (dx > 10 || dy > 10) {
+        if (longPressTimerRef.current) {
+          clearTimeout(longPressTimerRef.current);
+          longPressTimerRef.current = null;
         }
       }
-    };
+    }
+  };
 
-    const onTouchEnd = (e: TouchEvent) => {
-      if (e.touches.length < 2) {
-        isPinching = false;
-        if (pinchRafId !== null) {
-          cancelAnimationFrame(pinchRafId);
-          pinchRafId = null;
-        }
-      }
-    };
-
-    el.addEventListener('touchstart', onTouchStart, { capture: true, passive: false });
-    el.addEventListener('touchmove', onTouchMove, { capture: true, passive: false });
-    el.addEventListener('touchend', onTouchEnd, { capture: true, passive: false });
-    el.addEventListener('touchcancel', onTouchEnd, { capture: true, passive: false });
-
-    return () => {
-      if (pinchRafId !== null) {
-        cancelAnimationFrame(pinchRafId);
-      }
-      el.removeEventListener('touchstart', onTouchStart, { capture: true });
-      el.removeEventListener('touchmove', onTouchMove, { capture: true });
-      el.removeEventListener('touchend', onTouchEnd, { capture: true });
-      el.removeEventListener('touchcancel', onTouchEnd, { capture: true });
-    };
-  }, [getViewport, setViewport]);
+  const handleTouchEndWrapper = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
 
   // Pane Context Menu state
   const [paneContextMenu, setPaneContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -2526,6 +2457,9 @@ function InnerCanvasBoard({
       {/* Main Content Area */}
       <div
         ref={canvasWrapperRef}
+        onTouchStart={handleTouchStartWrapper}
+        onTouchMove={handleTouchMoveWrapper}
+        onTouchEnd={handleTouchEndWrapper}
         onContextMenu={(e) => {
           e.preventDefault();
           const target = e.target as HTMLElement;
@@ -2715,8 +2649,12 @@ function InnerCanvasBoard({
         <div
           ref={contextMenuRef}
           style={{ 
-            left: Math.min(paneContextMenu.x, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 270), 
-            top: Math.min(paneContextMenu.y, (typeof window !== 'undefined' ? window.innerHeight : 800) - 400) 
+            left: isMobile && typeof window !== 'undefined' 
+              ? Math.max(16, (window.innerWidth - 270) / 2)
+              : Math.min(paneContextMenu.x, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 270), 
+            top: isMobile && typeof window !== 'undefined'
+              ? Math.max(70, Math.min(paneContextMenu.y - 100, window.innerHeight - 380))
+              : Math.min(paneContextMenu.y, (typeof window !== 'undefined' ? window.innerHeight : 800) - 400) 
           }}
           className="fixed z-50 w-64 rounded-2xl shadow-2xl border border-border p-2 animate-in fade-in-50 zoom-in-95 backdrop-blur-md select-none bg-surface/95 text-fg ring-1 ring-border/50"
           onClick={(e) => e.stopPropagation()}

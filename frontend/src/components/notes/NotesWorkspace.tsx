@@ -901,7 +901,7 @@ export function NotesWorkspace({
                 ref={backlinksTabBtnRef}
                 type="button"
                 onClick={() => setSidebarTab('backlinks')}
-                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11.5px] font-semibold transition-all cursor-pointer shrink-0 whitespace-nowrap ${
+                className={`hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11.5px] font-semibold transition-all cursor-pointer shrink-0 whitespace-nowrap ${
                   sidebarTab === 'backlinks'
                     ? 'bg-bg text-accent shadow-2xs ring-1 ring-border/80'
                     : 'text-muted hover:text-fg hover:bg-surface/50'
@@ -920,7 +920,7 @@ export function NotesWorkspace({
                 ref={templatesTabBtnRef}
                 type="button"
                 onClick={() => setSidebarTab('templates')}
-                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11.5px] font-semibold transition-all cursor-pointer shrink-0 whitespace-nowrap ${
+                className={`hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11.5px] font-semibold transition-all cursor-pointer shrink-0 whitespace-nowrap ${
                   sidebarTab === 'templates'
                     ? 'bg-bg text-accent shadow-2xs ring-1 ring-border/80'
                     : 'text-muted hover:text-fg hover:bg-surface/50'
@@ -997,6 +997,28 @@ export function NotesWorkspace({
 
               {/* Note Metadata & Actions */}
               <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+                {/* Mobile View Mode Toggle (Clean & Simple) */}
+                <div className="flex sm:hidden items-center bg-surface border border-border/60 rounded-xl p-0.5 mr-1">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('edit')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      viewMode === 'edit' || viewMode === 'split' ? 'bg-accent text-accent-on shadow-2xs' : 'text-muted'
+                    }`}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('preview')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      viewMode === 'preview' ? 'bg-accent text-accent-on shadow-2xs' : 'text-muted'
+                    }`}
+                  >
+                    View
+                  </button>
+                </div>
+
                 {/* Word count & Reading Time Badge */}
                 <div className="hidden sm:flex items-center gap-2 text-[11px] text-meta bg-surface/70 px-2.5 py-1 rounded-lg border border-border/60">
                   <span>{noteStats.words} words</span>
@@ -1078,8 +1100,8 @@ export function NotesWorkspace({
               </div>
             </header>
 
-            {/* Interactive Note Tag Ribbon & Manager */}
-            <div className="px-4 lg:px-8 py-2 border-b border-border/50 bg-surface/10 flex items-center gap-2 flex-wrap shrink-0">
+            {/* Interactive Note Tag Ribbon & Manager (Desktop only to keep mobile uncluttered) */}
+            <div className="hidden sm:flex px-4 lg:px-8 py-2 border-b border-border/50 bg-surface/10 items-center gap-2 flex-wrap shrink-0">
               <div className="flex items-center gap-1.5 text-muted text-[11px] font-medium shrink-0">
                 <Tag size={12} className="text-muted/80" />
                 <span>Tags:</span>
@@ -1227,17 +1249,19 @@ export function NotesWorkspace({
               </div>
             )}
 
-            {/* Rich Formatting Toolbar (Option 4) */}
-            <NoteFormattingToolbar
-              textareaRef={textareaRef}
-              content={draftContent}
-              onChangeContent={(newContent) => updateNoteImmediately(draftTitle, newContent)}
-              viewMode={viewMode}
-              onChangeViewMode={setViewMode}
-              onOpenInsertVerse={() => setIsInsertVerseOpen(true)}
-              onOpenTemplates={() => setIsTemplatesOpen(true)}
-              onOpenAiAssistant={() => setIsAiAssistantOpen(true)}
-            />
+            {/* Rich Formatting Toolbar (Kept full-featured on desktop, hidden on mobile for clean distraction-free writing) */}
+            <div className="hidden sm:block shrink-0">
+              <NoteFormattingToolbar
+                textareaRef={textareaRef}
+                content={draftContent}
+                onChangeContent={(newContent) => updateNoteImmediately(draftTitle, newContent)}
+                viewMode={viewMode}
+                onChangeViewMode={setViewMode}
+                onOpenInsertVerse={() => setIsInsertVerseOpen(true)}
+                onOpenTemplates={() => setIsTemplatesOpen(true)}
+                onOpenAiAssistant={() => setIsAiAssistantOpen(true)}
+              />
+            </div>
 
             {/* Canvas / Editor Viewport */}
             <div className="flex-1 overflow-hidden relative flex">

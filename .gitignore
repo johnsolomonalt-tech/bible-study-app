@@ -44,6 +44,5 @@ dist/
 # canvas storage
 frontend/.canvas_storage/
 
-# PWA service worker build artifacts
-frontend/public/sw.js*
+# Workbox artifacts (our custom frontend/public/sw.js is tracked)
 frontend/public/workbox-*.js

@@ -214,42 +214,43 @@ export async function POST(req: Request) {
     }
     memoryIndexCache[activeUserId] = index;
 
-    // Persist directly to PostgreSQL database
-    const dbUserId = userId || 'anonymous_user';
-    try {
-      const saved = await prisma.canvas.upsert({
-        where: {
-          userId_boardId: {
-            userId: dbUserId,
-            boardId: id,
+    // Persist directly to PostgreSQL database only for authenticated users
+    if (userId) {
+      try {
+        const saved = await prisma.canvas.upsert({
+          where: {
+            userId_boardId: {
+              userId,
+              boardId: id,
+            },
           },
-        },
-        update: {
-          title,
-          nodes: cleanNodes,
-          edges: cleanEdges,
-          viewport: viewport || undefined,
-          ...(typeof isPublic === 'boolean' ? { isPublic } : {}),
-        },
-        create: {
-          userId: dbUserId,
-          boardId: id,
-          title,
-          nodes: cleanNodes,
-          edges: cleanEdges,
-          viewport: viewport || undefined,
-          isPublic: Boolean(isPublic),
-        },
-      });
+          update: {
+            title,
+            nodes: cleanNodes,
+            edges: cleanEdges,
+            viewport: viewport || undefined,
+            ...(typeof isPublic === 'boolean' ? { isPublic } : {}),
+          },
+          create: {
+            userId,
+            boardId: id,
+            title,
+            nodes: cleanNodes,
+            edges: cleanEdges,
+            viewport: viewport || undefined,
+            isPublic: Boolean(isPublic),
+          },
+        });
 
-      return NextResponse.json({
-        success: true,
-        id: saved.boardId,
-        title: saved.title,
-        updatedAt: saved.updatedAt.toISOString(),
-      });
-    } catch (dbErr) {
-      console.error('Canvas: PostgreSQL upsert error (in-memory cached):', dbErr);
+        return NextResponse.json({
+          success: true,
+          id: saved.boardId,
+          title: saved.title,
+          updatedAt: saved.updatedAt.toISOString(),
+        });
+      } catch (dbErr) {
+        console.error('Canvas: PostgreSQL upsert error (in-memory cached):', dbErr);
+      }
     }
 
     return NextResponse.json({ success: true, id, title, updatedAt: nowIso });

@@ -2,21 +2,19 @@
 const API_URL = '';
 
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useAuth, UserButton, SignIn, SignInButton } from '@clerk/nextjs';
 import { Send, Plus, Layout, Edit, Sparkles, Target, Check, Copy, ChevronRight, ChevronLeft, ChevronDown, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquare, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow, ShieldCheck, Heart, Layers, Languages, MoreVertical, MoreHorizontal, Search, BookMarked, Quote, Compass, ArrowRight, Square, BrainCircuit, FileText, UploadCloud, Menu } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import TextareaAutosize from 'react-textarea-autosize';
-import { getDevotionalForDay, DevotionalEntry, getDevotionalBody } from '../../lib/devotionals';
+import { getDevotionalForDay, fetchDevotionalForDay, DevotionalEntry, getDevotionalBody } from '../../lib/devotionals';
 import PWAInstallPrompt from '../PWAInstallPrompt';
 import { CookieConsentPrompt } from '@/components/bible/CookieConsentPrompt';
-import { CanvasBoard } from '@/components/canvas/CanvasBoard';
 import { NodeCategory } from '@/types/canvas';
-import { LectioDivinaModal } from '@/components/bible/LectioDivinaModal';
 import { ScriptureBacklinksDrawer } from '@/components/bible/ScriptureBacklinksDrawer';
 import { InterlinearHoverCard } from '@/components/bible/InterlinearHoverCard';
 import { InterlinearModeRibbon } from '@/components/bible/InterlinearModeRibbon';
-import { VerseInterlinearModal } from '@/components/bible/VerseInterlinearModal';
 import { findInterlinearWord, getOrGenerateInterlinearWord, fetchInterlinearWord, getVerseInterlinearTokens, preloadChapterLexicon, CLIENT_LEXICON_CACHE, STOPWORDS, InterlinearWord } from '@/lib/interlinearData';
 import { getScriptureBacklinks, BacklinksResult } from '@/lib/backlinks';
 import { TheologicalLensSelector, TheologicalLensType, THEOLOGICAL_LENS_OPTIONS } from '@/components/chat/TheologicalLensSelector';
@@ -54,14 +52,59 @@ import {
   ReaderLineHeight,
   ReaderLayout
 } from '@/lib/appPreferences';
-import { SettingsModal } from '@/components/settings/SettingsModal';
 import { initSessionTracking, trackClientEvent } from '@/lib/analyticsClient';
-import { NotesWorkspace, NoteItem } from '@/components/notes/NotesWorkspace';
+import type { NoteItem } from '@/components/notes/NotesWorkspace';
 import { StreakPopover } from '@/components/bible/StreakPopover';
 import { TrackerStreakHero } from '@/components/bible/TrackerStreakHero';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { PromptModal } from '@/components/ui/PromptModal';
-import { DailyVerseModal } from '@/components/bible/DailyVerseModal';
+
+// Dynamically imported heavy modules to keep the primary bundle featherweight
+const CanvasBoard = dynamic(
+  () => import('@/components/canvas/CanvasBoard').then((m) => m.CanvasBoard),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-full flex flex-col items-center justify-center p-8 bg-bg text-fg">
+        <div className="w-8 h-8 rounded-full border-2 border-accent border-t-transparent animate-spin mb-3" />
+        <span className="text-sm font-medium text-meta">Loading Canvas workspace...</span>
+      </div>
+    ),
+  }
+);
+
+const NotesWorkspace = dynamic(
+  () => import('@/components/notes/NotesWorkspace').then((m) => m.NotesWorkspace),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-full flex flex-col items-center justify-center p-8 bg-bg text-fg">
+        <div className="w-8 h-8 rounded-full border-2 border-accent border-t-transparent animate-spin mb-3" />
+        <span className="text-sm font-medium text-meta">Loading Notes workspace...</span>
+      </div>
+    ),
+  }
+);
+
+const SettingsModal = dynamic(
+  () => import('@/components/settings/SettingsModal').then((m) => m.SettingsModal),
+  { ssr: false }
+);
+
+const DailyVerseModal = dynamic(
+  () => import('@/components/bible/DailyVerseModal').then((m) => m.DailyVerseModal),
+  { ssr: false }
+);
+
+const LectioDivinaModal = dynamic(
+  () => import('@/components/bible/LectioDivinaModal').then((m) => m.LectioDivinaModal),
+  { ssr: false }
+);
+
+const VerseInterlinearModal = dynamic(
+  () => import('@/components/bible/VerseInterlinearModal').then((m) => m.VerseInterlinearModal),
+  { ssr: false }
+);
 import { 
   recordHabitActivity, 
   unmarkChapterActivity,
@@ -217,17 +260,14 @@ const TypewriterMessage = ({
     }
     
     let index = 0;
-    // Spit text at 75-100 words per second (~85-90 wps: ~430-450 chars/sec)
-    // Standard typist metric: 1 word ≈ 5 characters.
-    // 7 characters per 16ms tick = 437.5 chars/sec ≈ 87.5 words per second.
-    // Leaves user exactly where they were instead of forcing scroll to the bottom.
+    // Smooth streaming chunk updates at 20fps (~50ms intervals) to prevent main-thread AST re-parsing churn
     const interval = setInterval(() => {
       if (seenMessages.has(content)) {
         clearInterval(interval);
         setDisplayed(textContent);
         return;
       }
-      index += 7;
+      index += 22;
       if (index > textContent.length) index = textContent.length;
       setDisplayed(textContent.slice(0, index));
       
@@ -235,7 +275,7 @@ const TypewriterMessage = ({
         clearInterval(interval);
         seenMessages.add(content);
       }
-    }, 16);
+    }, 48);
     
     return () => clearInterval(interval);
   }, [content, textContent, imageBase64]);
@@ -840,7 +880,9 @@ export default function App() {
     if (nextDay < 1) nextDay = totalDays;
     if (nextDay > totalDays) nextDay = 1;
     setDisplayDay(nextDay);
-    setDevotionalEntry(getDevotionalForDay(nextDay));
+    fetchDevotionalForDay(nextDay).then(entry => {
+      if (entry) setDevotionalEntry(entry);
+    });
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
@@ -887,6 +929,13 @@ export default function App() {
   const [bibleVerses, setBibleVerses] = useState<{verse: number, text: string}[]>([]);
   const [chapterCopyright, setChapterCopyright] = useState<string>('');
   const [completedChapters, setCompletedChapters] = useState<string[]>([]);
+
+  // Reset reader scroll position to top whenever switching books or chapters
+  useEffect(() => {
+    document.querySelectorAll('.bible-reader-content').forEach(el => {
+      el.scrollTo({ top: 0, behavior: 'instant' });
+    });
+  }, [activeBook.name, activeChapter]);
   
   // Theological Lens & Feature States
   const [theologicalLens, setTheologicalLens] = useState<TheologicalLensType>('standard');
@@ -974,6 +1023,12 @@ export default function App() {
       if (activeTabRef.current === 'canvas') return;
       if (isInputElement(e.target as Element)) {
         setIsMobileTyping(true);
+        const target = e.target as HTMLElement;
+        setTimeout(() => {
+          try {
+            target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          } catch {}
+        }, 300);
       }
     };
 
@@ -1652,6 +1707,59 @@ export default function App() {
   const preferencesRestoredRef = useRef(false);
   const isFirstBookMountRef = useRef(true);
   const isFirstTabMountRef = useRef(true);
+
+  // Hardware Back & Swipe Gesture Support for Installed PWA
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handlePopState = () => {
+      if (isMobileMoreMenuOpen) {
+        setIsMobileMoreMenuOpen(false);
+        return;
+      }
+      if (mobileStudyView !== 'reader') {
+        setMobileStudyView('reader');
+        return;
+      }
+      if (isSettingsOpen) {
+        setIsSettingsOpen(false);
+        return;
+      }
+      if (isLectioModalOpen) {
+        setIsLectioModalOpen(false);
+        return;
+      }
+      if (dailyVerseModal.isOpen) {
+        setDailyVerseModal(prev => ({ ...prev, isOpen: false }));
+        return;
+      }
+      if (isVerseInterlinearOpen) {
+        setIsVerseInterlinearOpen(false);
+        return;
+      }
+      if (backlinksDrawerState.isOpen) {
+        setBacklinksDrawerState(prev => ({ ...prev, isOpen: false }));
+        return;
+      }
+      if (toolbarPosition) {
+        setToolbarPosition(null);
+        setSelectionVerse(null);
+        return;
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [
+    isMobileMoreMenuOpen,
+    mobileStudyView,
+    isSettingsOpen,
+    isLectioModalOpen,
+    dailyVerseModal.isOpen,
+    isVerseInterlinearOpen,
+    backlinksDrawerState.isOpen,
+    toolbarPosition,
+  ]);
 
   // Restore all saved session preferences & temporary UI states on mount
   useEffect(() => {
@@ -3324,9 +3432,10 @@ export default function App() {
     if (!prevUserIdRef.current && userId) {
       // 1. Sync local notes to /api/notes
       const localNotes = getLocalNotes();
-      if (localNotes.length > 0) {
+      const pendingNotes = localNotes.filter(n => n.id > 1000000000000 || !n.id);
+      if (pendingNotes.length > 0) {
         Promise.all(
-          localNotes.map(n =>
+          pendingNotes.map(n =>
             fetchWithAuth(`${API_URL}/api/notes`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -4135,8 +4244,6 @@ export default function App() {
       );
     }
 
-    console.log(`[THEOLOGICA-HL] Rendering verse ${verse} with ${verseHighlights.length} highlight(s)`);
-
     // Sort so most recently added/updated highlights take rendering priority
     const sortedVerseHighlights = [...verseHighlights].sort((a, b) => b.id - a.id);
 
@@ -4346,7 +4453,9 @@ export default function App() {
     todayDayRef.current = actualDoy;
     setDisplayDay(actualDoy);
     setTotalDays(isLeapYear ? 366 : 365);
-    setDevotionalEntry(getDevotionalForDay(alignedDoy));
+    fetchDevotionalForDay(alignedDoy).then(entry => {
+      if (entry) setDevotionalEntry(entry);
+    });
   }, []);
 
   // Devotional TTS
@@ -4942,49 +5051,73 @@ export default function App() {
       });
     }
 
-    const res = await messagePromise;
-    
-    if (res.ok) {
-      const isStream = res.headers.get('content-type')?.includes('text/event-stream');
-      if (isStream && res.body) {
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-        let streamResult: { userMessage?: any; aiMessage?: any } | null = null;
-        let streamError: string | null = null;
+    try {
+      const res = await messagePromise;
+      
+      if (res.ok) {
+        const isStream = res.headers.get('content-type')?.includes('text/event-stream');
+        if (isStream && res.body) {
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+          let streamResult: { userMessage?: any; aiMessage?: any } | null = null;
+          let streamError: string | null = null;
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n\n');
-          buffer = lines.pop() || '';
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (trimmed.startsWith('data: ')) {
-              try {
-                const payload = JSON.parse(trimmed.slice(6));
-                if (payload.type === 'status' && payload.status) {
-                  setAiActivityStatus(payload.status);
-                } else if (payload.type === 'thought' && payload.thought) {
-                  setAiThinkingText(payload.thought);
-                } else if (payload.type === 'result') {
-                  streamResult = payload;
-                } else if (payload.type === 'error') {
-                  console.error('Server chat stream error:', payload.error);
-                  streamError = payload.error;
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n\n');
+            buffer = lines.pop() || '';
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (trimmed.startsWith('data: ')) {
+                try {
+                  const payload = JSON.parse(trimmed.slice(6));
+                  if (payload.type === 'status' && payload.status) {
+                    setAiActivityStatus(payload.status);
+                  } else if (payload.type === 'thought' && payload.thought) {
+                    setAiThinkingText(payload.thought);
+                  } else if (payload.type === 'result') {
+                    streamResult = payload;
+                  } else if (payload.type === 'error') {
+                    console.error('Server chat stream error:', payload.error);
+                    streamError = payload.error;
+                  }
+                } catch {
+                  // ignore chunk parse failure
                 }
-              } catch {
-                // ignore chunk parse failure
               }
             }
           }
-        }
 
-        setIsAiTyping(false);
-
-        if (streamResult && streamResult.aiMessage) {
-          const data = streamResult;
+          if (streamResult && streamResult.aiMessage) {
+            const data = streamResult;
+            setChats(prev => prev.map(c => {
+              if (c.id === targetChatId) {
+                const msgs = c.messages;
+                const lastUserIdx = [...msgs].reverse().findIndex(m => m.role === 'user');
+                const sliceEnd = lastUserIdx >= 0 ? msgs.length - lastUserIdx : msgs.length;
+                return { ...c, messages: [...msgs.slice(0, sliceEnd - 1), { ...msgs[sliceEnd - 1], ...data.userMessage }, data.aiMessage] };
+              }
+              return c;
+            }));
+          } else if (streamError) {
+            const errorMsg = { 
+              id: Date.now(), 
+              chatId: targetChatId, 
+              role: 'model', 
+              content: `**Error:** ${streamError}. Please try sending your message again.` 
+            };
+            setChats(prev => prev.map(c => {
+              if (c.id === targetChatId) {
+                return { ...c, messages: [...c.messages, errorMsg] };
+              }
+              return c;
+            }));
+          }
+        } else {
+          const data = await res.json();
           setChats(prev => prev.map(c => {
             if (c.id === targetChatId) {
               const msgs = c.messages;
@@ -4994,52 +5127,40 @@ export default function App() {
             }
             return c;
           }));
-        } else if (streamError) {
-          const errorMsg = { 
-            id: Date.now(), 
-            chatId: targetChatId, 
-            role: 'model', 
-            content: `**Error:** ${streamError}. Please try sending your message again.` 
-          };
-          setChats(prev => prev.map(c => {
-            if (c.id === targetChatId) {
-              return { ...c, messages: [...c.messages, errorMsg] };
+        }
+
+        if (namePromise) {
+          namePromise.then(async (nameRes) => {
+            if (nameRes.ok) {
+              const { title } = await nameRes.json();
+              setChats(prev => prev.map(c => c.id === targetChatId ? { ...c, title } : c));
             }
-            return c;
-          }));
+          }).catch(() => {
+            // Silent fail
+          });
         }
       } else {
-        const data = await res.json();
-        setIsAiTyping(false);
+        const errorData = await res.json().catch(() => null);
+        const errorMsg = { 
+          id: Date.now(), 
+          chatId: targetChatId, 
+          role: 'model', 
+          content: `**Error:** ${errorData?.details || errorData?.error || 'Failed to get response from AI'}` 
+        };
         setChats(prev => prev.map(c => {
           if (c.id === targetChatId) {
-            const msgs = c.messages;
-            const lastUserIdx = [...msgs].reverse().findIndex(m => m.role === 'user');
-            const sliceEnd = lastUserIdx >= 0 ? msgs.length - lastUserIdx : msgs.length;
-            return { ...c, messages: [...msgs.slice(0, sliceEnd - 1), { ...msgs[sliceEnd - 1], ...data.userMessage }, data.aiMessage] };
+            return { ...c, messages: [...c.messages, errorMsg] };
           }
           return c;
         }));
       }
-
-      if (namePromise) {
-        namePromise.then(async (nameRes) => {
-          if (nameRes.ok) {
-            const { title } = await nameRes.json();
-            setChats(prev => prev.map(c => c.id === targetChatId ? { ...c, title } : c));
-          }
-        }).catch(() => {
-          // Silent fail
-        });
-      }
-    } else {
-      setIsAiTyping(false);
-      const errorData = await res.json().catch(() => null);
+    } catch (networkErr: any) {
+      console.error('Chat request network failure:', networkErr);
       const errorMsg = { 
         id: Date.now(), 
         chatId: targetChatId, 
         role: 'model', 
-        content: `**Error:** ${errorData?.details || errorData?.error || 'Failed to get response from AI'}` 
+        content: '**Connection Error:** Unable to connect to Theologica AI. Please check your internet connection and try again.' 
       };
       setChats(prev => prev.map(c => {
         if (c.id === targetChatId) {
@@ -5047,6 +5168,8 @@ export default function App() {
         }
         return c;
       }));
+    } finally {
+      setIsAiTyping(false);
     }
   };
 
@@ -5670,26 +5793,24 @@ export default function App() {
             >
               <header 
                 ref={mobileReaderHeaderRef}
-                className="min-h-[52px] border-b border-border/60 flex items-center justify-between px-2 sm:px-4 bg-bg shrink-0 relative z-20 py-1.5"
+                className="min-h-[52px] border-b border-border/60 flex items-center justify-between px-2.5 sm:px-4 bg-bg shrink-0 relative z-20 py-2"
                 style={{
                   paddingTop: mobileTopPadding,
-                  transform: mobileChromeHidden ? 'translateY(-100%)' : 'translateY(0)',
-                  transition: 'transform 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
                 }}
               >
                 {/* Left: Book & Chapter Selector Trigger + Translation */}
-                <div className="flex items-center gap-1 sm:gap-1.5 min-w-0 flex-1 mr-1">
+                <div className="flex items-center gap-1.5 min-w-0 flex-1 mr-1">
                   <div ref={mobileReaderTitleRef} className="flex items-center min-w-0 max-w-full">
                     <button 
                       onClick={() => setMobileStudyView('chapters')} 
-                      className="min-h-[36px] flex items-center gap-1 py-1 px-2.5 rounded-full bg-surface/75 hover:bg-surface border border-border-soft/50 shadow-2xs text-fg transition-all cursor-pointer active:scale-95 min-w-0" 
+                      className="min-h-[44px] flex items-center gap-1.5 py-1 px-3 rounded-full bg-surface/80 hover:bg-surface border border-border-soft/60 shadow-2xs text-fg transition-all cursor-pointer active:scale-95 min-w-0 touch-manipulation" 
                       title="Choose Book & Chapter"
                     >
-                      <BookOpen size={15} className="text-accent shrink-0" />
-                      <span className="font-display text-[14px] sm:text-[16px] font-semibold whitespace-nowrap truncate max-w-[110px] xs:max-w-none">
+                      <BookOpen size={16} className="text-accent shrink-0" />
+                      <span className="font-display text-[15px] sm:text-[16px] font-semibold whitespace-nowrap truncate max-w-[130px] xs:max-w-none">
                         {activeBook.name} {activeChapter}
                       </span>
-                      <ChevronDown size={12} className="text-muted shrink-0 opacity-60" />
+                      <ChevronDown size={14} className="text-muted shrink-0 opacity-60" />
                     </button>
                   </div>
 
@@ -5707,81 +5828,84 @@ export default function App() {
                   {isSpeaking && (
                     <button 
                       onClick={toggleSpeech} 
-                      className="w-8 h-8 flex items-center justify-center p-1.5 rounded-full bg-accent/15 text-accent animate-pulse cursor-pointer shrink-0" 
+                      className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-full bg-accent/15 text-accent animate-pulse cursor-pointer shrink-0" 
                       title="Stop reading chapter"
                     >
-                      <VolumeX size={16} />
+                      <VolumeX size={18} />
                     </button>
                   )}
 
-                  {/* Reverse Interlinear Quick Button (Visible on tablet screens where there is room) */}
-                  <button 
-                    onClick={() => handleToggleInterlinearMode()} 
-                    className={`hidden md:flex p-1.5 rounded-lg transition-colors cursor-pointer shrink-0 ${
-                      isInterlinearMode ? 'bg-accent text-accent-on' : 'text-fg-2 hover:text-fg hover:bg-surface'
-                    }`} 
-                    title={isInterlinearMode ? "Disable Interlinear" : "Enable Interlinear"}
-                  >
-                    <Languages size={17} />
-                  </button>
-
-                  {/* Streak Flame */}
-                  <StreakPopover onNavigateToTab={setActiveTab} onNavigateToVerse={navigateToVerse} />
-
-                  {/* Study AI Button */}
-                  <button 
-                    onClick={() => {
-                      setMobileStudyView('ai');
-                      scrollToBottomOnChatOpenRef.current = true;
-                      scrollChatToBottom();
-                    }} 
-                    className="w-8 h-8 flex items-center justify-center rounded-full bg-accent/10 border border-accent/25 text-accent hover:bg-accent/20 active:scale-95 transition-all cursor-pointer shrink-0 relative" 
-                    title="Study AI Assistant"
-                  >
-                    <Sparkles size={15} />
-                    {chatQuotes.length > 0 && (
-                      <span className="absolute -top-1 -right-1 min-w-[15px] h-3.5 px-0.5 bg-accent text-accent-on text-[9px] font-bold rounded-full flex items-center justify-center shadow-xs">
-                        {chatQuotes.length}
-                      </span>
-                    )}
-                  </button>
-
-                  {/* Settings Button */}
-                  <button 
-                    onClick={() => setIsSettingsOpen(true)}
-                    className="w-8 h-8 flex items-center justify-center rounded-full bg-surface/60 hover:bg-surface border border-border-soft/40 text-muted hover:text-fg active:scale-95 transition-all cursor-pointer"
-                    title="Settings"
-                    aria-label="Settings"
-                  >
-                    <Settings size={15} />
-                  </button>
-
-                  {/* Profile / Sign In */}
-                  {userId ? (
-                    <div className="min-w-[28px] min-h-[28px] flex items-center justify-center scale-90">
-                      <UserButton />
-                    </div>
-                  ) : (
-                    <Link 
-                      href="/sign-in"
-                      className="px-2 py-1 text-[11px] font-semibold rounded-full bg-accent text-accent-on hover:opacity-90 transition-opacity cursor-pointer shadow-xs active:scale-95 shrink-0"
+                  {/* Desktop & Tablet shortcuts (hidden on mobile phone screens for clean, uncluttered layout) */}
+                  <div className="hidden md:flex items-center gap-1 sm:gap-1.5">
+                    {/* Reverse Interlinear Quick Button */}
+                    <button 
+                      onClick={() => handleToggleInterlinearMode()} 
+                      className={`min-w-[38px] min-h-[38px] flex items-center justify-center p-2 rounded-lg transition-colors cursor-pointer shrink-0 ${
+                        isInterlinearMode ? 'bg-accent text-accent-on' : 'text-fg-2 hover:text-fg hover:bg-surface'
+                      }`} 
+                      title={isInterlinearMode ? "Disable Interlinear" : "Enable Interlinear"}
                     >
-                      Sign In
-                    </Link>
-                  )}
+                      <Languages size={17} />
+                    </button>
 
-                  {/* 3 Dots More Menu (Always available on mobile & tablet) */}
+                    {/* Streak Flame */}
+                    <StreakPopover onNavigateToTab={setActiveTab} onNavigateToVerse={navigateToVerse} />
+
+                    {/* Study AI Button */}
+                    <button 
+                      onClick={() => {
+                        setMobileStudyView('ai');
+                        scrollToBottomOnChatOpenRef.current = true;
+                        scrollChatToBottom();
+                      }} 
+                      className="min-w-[38px] min-h-[38px] flex items-center justify-center rounded-full bg-accent/10 border border-accent/25 text-accent hover:bg-accent/20 active:scale-95 transition-all cursor-pointer shrink-0 relative" 
+                      title="Study AI Assistant"
+                    >
+                      <Sparkles size={15} />
+                      {chatQuotes.length > 0 && (
+                        <span className="absolute -top-1 -right-1 min-w-[15px] h-3.5 px-0.5 bg-accent text-accent-on text-[9px] font-bold rounded-full flex items-center justify-center shadow-xs">
+                          {chatQuotes.length}
+                        </span>
+                      )}
+                    </button>
+
+                    {/* Settings Button */}
+                    <button 
+                      onClick={() => setIsSettingsOpen(true)}
+                      className="min-w-[38px] min-h-[38px] flex items-center justify-center rounded-full bg-surface/60 hover:bg-surface border border-border-soft/40 text-muted hover:text-fg active:scale-95 transition-all cursor-pointer"
+                      title="Settings"
+                      aria-label="Settings"
+                    >
+                      <Settings size={15} />
+                    </button>
+
+                    {/* Profile / Sign In */}
+                    {userId ? (
+                      <div className="min-w-[30px] min-h-[30px] flex items-center justify-center scale-90">
+                        <UserButton />
+                      </div>
+                    ) : (
+                      <Link 
+                        href="/sign-in"
+                        className="px-2.5 py-1 text-[11px] font-semibold rounded-full bg-accent text-accent-on hover:opacity-90 transition-opacity cursor-pointer shadow-xs active:scale-95 shrink-0"
+                      >
+                        Sign In
+                      </Link>
+                    )}
+                  </div>
+
+                  {/* 3 Dots More Menu Button */}
                   <div ref={mobileMoreMenuRef} className="relative z-30 mobile-more-menu-container">
                     <button
                       type="button"
                       onClick={() => setIsMobileMoreMenuOpen(prev => !prev)}
-                      className={`w-8 h-8 flex items-center justify-center rounded-full bg-surface/70 hover:bg-surface border border-border-soft/50 text-muted hover:text-fg active:scale-95 transition-all cursor-pointer ${
+                      className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-surface/70 hover:bg-surface border border-border-soft/50 text-muted hover:text-fg active:scale-95 transition-all cursor-pointer touch-manipulation ${
                         isMobileMoreMenuOpen ? 'bg-surface text-fg' : ''
                       }`}
                       title="More study tools & options"
                       aria-label="More study options"
                     >
-                      <MoreVertical size={15} className="pointer-events-none" />
+                      <MoreVertical size={18} className="pointer-events-none" />
                     </button>
 
                     {isMobileMoreMenuOpen && (
@@ -5884,6 +6008,32 @@ export default function App() {
                           >
                             <Heart size={18} className="text-rose-400" />
                             <span>Lectio Divina Guided Prayer</span>
+                          </button>
+
+                          {/* Reading Tracker */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveTab('tracker');
+                              setIsMobileMoreMenuOpen(false);
+                            }}
+                            className="w-full min-h-[48px] flex items-center gap-3 px-3.5 py-3 rounded-xl hover:bg-fg/5 text-fg text-sm font-medium cursor-pointer transition-colors"
+                          >
+                            <Target size={18} className="text-accent" />
+                            <span>Reading Tracker & Progress</span>
+                          </button>
+
+                          {/* Settings & Appearance */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsSettingsOpen(true);
+                              setIsMobileMoreMenuOpen(false);
+                            }}
+                            className="w-full min-h-[48px] flex items-center gap-3 px-3.5 py-3 rounded-xl hover:bg-fg/5 text-fg text-sm font-medium cursor-pointer transition-colors"
+                          >
+                            <Settings size={18} className="text-muted" />
+                            <span>Display & Reader Settings</span>
                           </button>
 
                           {/* Mark Completed */}
@@ -7457,7 +7607,7 @@ export default function App() {
           <>
             {/* Mobile Slide-up Verse Action Bottom Sheet (< 768px) */}
             <div 
-              className="md:hidden fixed inset-x-0 bottom-0 z-50 bg-surface/98 border-t border-border rounded-t-3xl shadow-2xl p-4 animate-in slide-in-from-bottom duration-200 backdrop-blur-xl"
+              className="md:hidden floating-verse-toolbar fixed inset-x-0 bottom-0 z-50 bg-surface/98 border-t border-border rounded-t-3xl shadow-2xl p-4 animate-in slide-in-from-bottom duration-200 backdrop-blur-xl"
               style={{ paddingBottom: 'calc(max(env(safe-area-inset-bottom, 0px), 16px) + 12px)' }}
             >
               <div className="w-12 h-1 bg-border rounded-full mx-auto mb-3" />
@@ -8722,26 +8872,24 @@ export default function App() {
           />
         </div>
       </main>
-        {/* Mobile Bottom Navigation — Ultra-thin Duolingo-style icon bar anchored above iOS swipe-up indicator */}
+        {/* Mobile Bottom Navigation — Clean, elevated icon bar safely anchored above iOS home indicator */}
         <nav 
           aria-label="Mobile Navigation"
           className={`lg:hidden shrink-0 bg-bg/95 backdrop-blur-2xl border-t border-border/50 flex items-center justify-around px-2 z-40 w-full select-none ${
             (isMobileTyping && activeTab !== 'canvas') ? 'hidden pointer-events-none' : 'flex'
-          } ${mobileChromeHidden && activeTab === 'study' ? 'pointer-events-none' : ''}`}
+          }`}
           style={{ 
-            height: '50px',
-            paddingTop: '4px',
-            paddingBottom: '12px',
-            transform: mobileChromeHidden && activeTab === 'study' ? 'translateY(100%)' : 'translateY(0)',
-            transition: 'transform 260ms cubic-bezier(0.16, 1, 0.3, 1), background-color 200ms ease'
+            minHeight: 'calc(54px + env(safe-area-inset-bottom, 0px))',
+            paddingTop: '6px',
+            paddingBottom: 'calc(max(env(safe-area-inset-bottom, 0px), 8px) + 2px)',
+            transition: 'background-color 200ms ease'
           }}
         >
           {[
             { id: 'study', label: 'Bible', icon: BookOpen },
-            { id: 'devotional', label: 'Devotion', icon: Sun },
-            { id: 'chats', label: 'AI', icon: Sparkles },
+            { id: 'chats', label: 'Study AI', icon: Sparkles },
             { id: 'notes', label: 'Notes', icon: FileText },
-            { id: 'tracker', label: 'Tracker', icon: Target },
+            { id: 'devotional', label: 'Devotion', icon: Sun },
             { id: 'canvas', label: 'Canvas', icon: Workflow },
           ].map(tab => {
             const isTabActive = activeTab === tab.id;
@@ -8764,19 +8912,24 @@ export default function App() {
                     scrollChatToBottom();
                   }
                 }}
-                className="flex-1 flex items-center justify-center h-full transition-all relative cursor-pointer active:scale-90 touch-manipulation"
+                className="flex-1 flex flex-col items-center justify-center min-h-[44px] transition-all relative cursor-pointer active:scale-95 touch-manipulation"
                 title={tab.label}
                 aria-label={tab.label}
               >
                 <div 
-                  className={`w-10 h-[34px] rounded-xl flex items-center justify-center transition-all duration-150 ${
+                  className={`w-11 h-[34px] rounded-xl flex items-center justify-center transition-all duration-150 ${
                     isTabActive 
                       ? 'bg-accent/15 border-2 border-accent text-accent shadow-2xs' 
-                      : 'text-muted hover:text-fg border-2 border-transparent opacity-80'
+                      : 'text-muted hover:text-fg border-2 border-transparent opacity-75'
                   }`}
                 >
-                  <tab.icon size={20} strokeWidth={isTabActive ? 2.4 : 1.9} />
+                  <tab.icon size={20} strokeWidth={isTabActive ? 2.3 : 1.8} />
                 </div>
+                <span className={`text-[10px] font-medium tracking-tight mt-0.5 ${
+                  isTabActive ? 'text-accent font-semibold' : 'text-meta'
+                }`}>
+                  {tab.label}
+                </span>
               </button>
             );
           })}

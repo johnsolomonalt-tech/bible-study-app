@@ -154,7 +154,7 @@ export function NoteAiAssistantModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center modal-safe-overlay bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div 
         className="bg-bg border border-border rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
