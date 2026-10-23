@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import devotionalsData from '@/lib/devotionalsData.json';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const rawDay = searchParams.get('day');
