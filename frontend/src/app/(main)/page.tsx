@@ -5618,7 +5618,7 @@ export default function App() {
                       </span>
                     </button>
 
-                    {isOtExpanded && (
+                    {(isOtExpanded || Boolean(bookSearchQuery.trim())) && (
                       <div className="mt-1 space-y-1 pl-1">
                         {filteredOtBooks.map(b => {
                           const isCurrentBook = activeBook.name === b.name;
@@ -5711,7 +5711,7 @@ export default function App() {
                       </span>
                     </button>
 
-                    {isNtExpanded && (
+                    {(isNtExpanded || Boolean(bookSearchQuery.trim())) && (
                       <div className="mt-1 space-y-1 pl-1">
                         {filteredNtBooks.map(b => {
                           const isCurrentBook = activeBook.name === b.name;
@@ -6671,7 +6671,7 @@ export default function App() {
                       </span>
                     </button>
 
-                    {isOtExpanded && (
+                    {(isOtExpanded || Boolean(bookSearchQuery.trim())) && (
                       <div className="mt-0.5 space-y-0.5 pl-1">
                         {filteredOtBooks.map(b => {
                           const isCurrentBook = activeBook.name === b.name;
@@ -6759,7 +6759,7 @@ export default function App() {
                       </span>
                     </button>
 
-                    {isNtExpanded && (
+                    {(isNtExpanded || Boolean(bookSearchQuery.trim())) && (
                       <div className="mt-0.5 space-y-0.5 pl-1">
                         {filteredNtBooks.map(b => {
                           const isCurrentBook = activeBook.name === b.name;
@@ -8882,8 +8882,9 @@ export default function App() {
             (isMobileTyping && activeTab !== 'canvas') ? 'hidden pointer-events-none' : 'flex'
           }`}
           style={{ 
-            height: 'calc(49px + env(safe-area-inset-bottom, 0px))',
-            paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+            height: 'calc(44px + max(calc(env(safe-area-inset-bottom, 0px) - 28px), 4px))',
+            paddingBottom: 'max(calc(env(safe-area-inset-bottom, 0px) - 28px), 4px)',
+            paddingTop: '2px',
             transition: 'background-color 200ms ease'
           }}
         >
@@ -8915,13 +8916,13 @@ export default function App() {
                     scrollChatToBottom();
                   }
                 }}
-                className="flex-1 flex flex-col items-center justify-center h-[46px] py-1 transition-all relative cursor-pointer active:scale-90 touch-manipulation select-none"
+                className="flex-1 flex flex-col items-center justify-center h-[42px] py-0.5 transition-all relative cursor-pointer active:scale-90 touch-manipulation select-none"
                 title={tab.label}
                 aria-label={tab.label}
               >
                 <div className="relative flex items-center justify-center">
                   <tab.icon 
-                    size={19} 
+                    size={18} 
                     strokeWidth={isTabActive ? 2.4 : 1.75}
                     className={`transition-colors duration-150 ${
                       isTabActive ? 'text-accent' : 'text-muted/70 hover:text-fg'
@@ -8931,7 +8932,7 @@ export default function App() {
                     <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-accent shadow-xs" />
                   )}
                 </div>
-                <span className={`text-[10px] tracking-tight mt-1 leading-none transition-colors duration-150 ${
+                <span className={`text-[10px] tracking-tight mt-0.5 leading-none transition-colors duration-150 ${
                   isTabActive ? 'text-accent font-semibold' : 'text-meta font-medium'
                 }`}>
                   {tab.label}
