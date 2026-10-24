@@ -5520,7 +5520,7 @@ export default function App() {
           ) : (
             <Link 
               href="/sign-in"
-              className="min-h-[44px] px-3.5 py-2 text-xs font-semibold rounded-xl bg-accent text-accent-on hover:opacity-90 transition-opacity cursor-pointer shadow-xs shrink-0 inline-flex items-center justify-center active:scale-95"
+              className="h-8 px-3 text-xs font-semibold rounded-lg bg-accent text-accent-on hover:opacity-90 transition-all cursor-pointer shadow-2xs shrink-0 inline-flex items-center justify-center active:scale-95"
               title="Sign in to Theologica"
             >
               Sign In
@@ -5841,41 +5841,45 @@ export default function App() {
             >
               <header 
                 ref={mobileReaderHeaderRef}
-                className="min-h-[52px] border-b border-border/60 flex items-center justify-between px-2.5 sm:px-4 bg-bg shrink-0 relative z-20 py-2"
+                className="min-h-[50px] border-b border-border/50 flex items-center justify-between px-2 sm:px-3.5 bg-bg/85 backdrop-blur-xl shrink-0 relative z-20 py-1.5"
                 style={{
                   paddingTop: mobileTopPadding,
                 }}
               >
-                {/* Left: Book & Chapter Selector Trigger + Translation */}
-                <div className="flex items-center gap-1.5 min-w-0 flex-1 mr-1">
-                  <div ref={mobileReaderTitleRef} className="flex items-center min-w-0">
-                    <button 
-                      onClick={() => setMobileStudyView('chapters')} 
-                      className="min-h-[42px] flex items-center gap-1.5 py-1 px-2.5 sm:px-3 rounded-full bg-surface/80 hover:bg-surface border border-border-soft/60 shadow-2xs text-fg transition-all cursor-pointer active:scale-95 shrink-0 touch-manipulation" 
-                      title="Choose Book & Chapter"
-                    >
-                      <BookOpen size={16} className="text-accent shrink-0" />
-                      <span className="font-display text-[14.5px] sm:text-[16px] font-semibold whitespace-nowrap truncate max-w-[210px] xs:max-w-none">
-                        {activeBook.name} {activeChapter}
-                      </span>
-                      <ChevronDown size={14} className="text-muted shrink-0 opacity-60" />
-                    </button>
-                  </div>
-
-                  {/* Translation Selector */}
+                {/* Left: Translation (pinned to top-left corner) + Book & Chapter Selector */}
+                <div className="flex items-center flex-nowrap min-w-0 flex-1 mr-1 gap-1 xs:gap-1.5 overflow-hidden">
+                  {/* Translation Selector (top left corner, left of book) */}
                   <TranslationSelector 
                     currentTranslation={translation} 
                     onSelectTranslation={setTranslation}
                     theme={theme as 'dark' | 'light'}
+                    align="left"
+                    className="shrink-0"
                   />
+
+                  {/* Book & Chapter Selector Trigger */}
+                  <div ref={mobileReaderTitleRef} className="flex items-center min-w-0 flex-1 max-w-[190px] xs:max-w-[240px]">
+                    <button 
+                      type="button"
+                      onClick={() => setMobileStudyView('chapters')} 
+                      className="h-9 min-h-[36px] w-full flex items-center gap-1.5 py-1 px-2.5 rounded-full bg-surface/80 hover:bg-surface border border-border-soft/60 shadow-2xs text-fg transition-all cursor-pointer active:scale-95 touch-manipulation min-w-0" 
+                      title="Choose Book & Chapter"
+                    >
+                      <BookOpen size={14} className="text-accent shrink-0" />
+                      <span className="font-display text-[13.5px] sm:text-[15px] font-semibold whitespace-nowrap truncate min-w-0">
+                        {activeBook.name} {activeChapter}
+                      </span>
+                      <ChevronDown size={12} className="text-muted shrink-0 opacity-60 ml-auto" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Right: Actions */}
-                <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+                <div className="flex items-center gap-1 shrink-0">
                   {/* Quick Speech / Listen button */}
                   <button 
                     onClick={toggleSpeech} 
-                    className={`min-w-[40px] min-h-[40px] flex items-center justify-center rounded-full transition-all cursor-pointer shrink-0 ${
+                    className={`w-9 h-9 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-full transition-all cursor-pointer shrink-0 ${
                       isSpeaking 
                         ? 'bg-accent/15 text-accent animate-pulse border border-accent/30' 
                         : 'text-muted hover:text-fg hover:bg-surface/80 active:scale-95'
@@ -5883,7 +5887,7 @@ export default function App() {
                     title={isSpeaking ? "Stop reading chapter" : "Listen to chapter"}
                     aria-label={isSpeaking ? "Stop reading chapter" : "Listen to chapter"}
                   >
-                    {isSpeaking ? <VolumeX size={17} /> : <Volume2 size={17} />}
+                    {isSpeaking ? <VolumeX size={16} /> : <Volume2 size={16} />}
                   </button>
 
                   {/* Streak Flame (visible across all screens, matching the other mobile tabs) */}
@@ -5949,13 +5953,13 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => setMobileStudyView(prev => prev === 'tools' ? 'reader' : 'tools')}
-                    className={`min-w-[42px] min-h-[42px] flex items-center justify-center rounded-full bg-surface/70 hover:bg-surface border border-border-soft/50 text-muted hover:text-fg active:scale-95 transition-all cursor-pointer touch-manipulation ${
+                    className={`w-9 h-9 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-full bg-surface/70 hover:bg-surface border border-border-soft/50 text-muted hover:text-fg active:scale-95 transition-all cursor-pointer touch-manipulation ${
                       mobileStudyView === 'tools' ? 'bg-surface text-fg ring-1 ring-border-soft' : ''
                     }`}
                     title="Study tools & options"
                     aria-label="Study tools & options"
                   >
-                    <MoreVertical size={18} className="pointer-events-none" />
+                    <MoreVertical size={16} className="pointer-events-none" />
                   </button>
                 </div>
               </header>
@@ -6499,248 +6503,243 @@ export default function App() {
               className="absolute inset-0 z-30 w-full h-full border-l border-border bg-bg flex flex-col shadow-2xl will-change-transform"
             >
               <header 
-                className="min-h-[46px] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 text-[15px] font-medium text-fg shrink-0 gap-2 bg-bg py-1.5"
+                className="min-h-[50px] border-b border-border/50 flex items-center justify-between px-3 sm:px-4 text-[15px] font-medium text-fg shrink-0 gap-2 bg-bg/85 backdrop-blur-xl py-2"
                 style={{ paddingTop: mobileTopPadding }}
               >
                 <div className="flex items-center gap-1.5 min-w-0">
                   <button 
                     type="button"
                     onClick={() => setMobileStudyView('reader')} 
-                    className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2.5 -ml-1 text-fg-2 hover:text-fg rounded-xl hover:bg-surface shrink-0 cursor-pointer" 
+                    className="w-9 h-9 min-w-[36px] min-h-[36px] flex items-center justify-center -ml-1 text-fg-2 hover:text-fg rounded-full hover:bg-surface/80 shrink-0 cursor-pointer" 
                     title="Back to reader"
                     aria-label="Back to reader"
                   >
-                    <ChevronLeft size={22} />
+                    <ChevronLeft size={20} />
                   </button>
-                  <SlidersHorizontal size={16} className="text-accent shrink-0" />
-                  <span className="truncate font-semibold text-[15px]">Study Tools</span>
+                  <SlidersHorizontal size={15} className="text-accent shrink-0" />
+                  <span className="truncate font-semibold text-[15px] tracking-tight">Study Tools</span>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <span className="text-[11px] font-medium text-muted bg-surface px-2.5 py-1 rounded-full border border-border/50 truncate max-w-[130px]">
+                  <span className="text-[11px] font-medium text-muted bg-surface/80 px-2.5 py-1 rounded-full border border-border-soft/60 truncate max-w-[130px]">
                     {activeBook.name} {activeChapter}
                   </span>
                   <button
                     type="button"
                     onClick={() => setMobileStudyView('reader')}
-                    className="min-w-[36px] min-h-[36px] flex items-center justify-center text-muted hover:text-fg rounded-full cursor-pointer hover:bg-surface/80"
+                    className="w-8 h-8 flex items-center justify-center text-muted hover:text-fg rounded-full cursor-pointer hover:bg-surface/80"
                     title="Close study tools"
                     aria-label="Close study tools"
                   >
-                    <X size={17} />
+                    <X size={16} />
                   </button>
                 </div>
               </header>
 
-              <div className="flex-1 overflow-y-auto custom-scroll p-3.5 sm:p-4 space-y-3 pb-24">
-                {/* Featured: Open Study AI Assistant */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMobileStudyView('ai');
-                    scrollToBottomOnChatOpenRef.current = true;
-                    scrollChatToBottom();
-                  }}
-                  className="w-full p-3.5 rounded-2xl bg-gradient-to-br from-accent/15 via-accent/5 to-surface/80 border border-accent/30 text-left cursor-pointer transition-all active:scale-[0.98] shadow-xs group"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-xl bg-accent text-accent-on flex items-center justify-center shrink-0 shadow-xs">
-                        <Sparkles size={20} />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-[14.5px] font-semibold text-fg flex items-center gap-1.5 truncate">
-                          <span>Study AI Assistant</span>
-                          <span className="text-[9.5px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-full bg-accent/20 text-accent shrink-0">
-                            Slide Out
-                          </span>
-                        </div>
-                        <div className="text-[12px] text-muted truncate mt-0.5">
-                          Exegesis, theology & Greek/Hebrew
-                        </div>
-                      </div>
-                    </div>
-                    <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center text-accent group-hover:translate-x-0.5 transition-transform shrink-0">
-                      <ChevronRight size={16} />
-                    </div>
+              <div className="flex-1 overflow-y-auto custom-scroll p-3.5 sm:p-4 space-y-3.5 pb-24">
+                {/* Study & Exegesis Group */}
+                <div>
+                  <div className="text-[10.5px] font-bold uppercase tracking-wider text-muted px-1.5 mb-1.5">
+                    Study Tools
                   </div>
-                </button>
+                  <div className="rounded-2xl border border-border/60 bg-surface/50 backdrop-blur-md overflow-hidden divide-y divide-border/30 shadow-2xs">
+                    {/* Study AI Assistant (Clean, blended row) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileStudyView('ai');
+                        scrollToBottomOnChatOpenRef.current = true;
+                        scrollChatToBottom();
+                      }}
+                      className="w-full min-h-[48px] flex items-center justify-between px-3.5 py-2.5 hover:bg-fg/5 active:bg-fg/10 text-fg text-sm font-medium cursor-pointer transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-fg/5 text-fg-2 flex items-center justify-center shrink-0">
+                          <Sparkles size={16} className="text-accent" />
+                        </div>
+                        <div className="text-left min-w-0">
+                          <div className="text-[13.5px] font-semibold text-fg truncate">Study AI Assistant</div>
+                          <div className="text-[11px] text-muted font-normal truncate">Exegetical insights, context & theology</div>
+                        </div>
+                      </div>
+                      <ChevronRight size={16} className="text-muted/60 shrink-0 ml-2" />
+                    </button>
 
-                {/* Reading & Exegesis Group */}
-                <div className="rounded-2xl border border-border/70 bg-surface/40 overflow-hidden divide-y divide-border/40">
-                  {/* Reverse Interlinear */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handleToggleInterlinearMode();
-                    }}
-                    className={`w-full min-h-[50px] flex items-center justify-between px-3.5 py-3 hover:bg-fg/5 text-sm font-medium cursor-pointer transition-colors ${
-                      isInterlinearMode ? 'bg-accent/10 text-accent font-semibold' : 'text-fg'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isInterlinearMode ? 'bg-accent text-accent-on' : 'bg-fg/5 text-fg-2'}`}>
-                        <Languages size={17} />
+                    {/* Reverse Interlinear */}
+                    <button
+                      type="button"
+                      onClick={() => handleToggleInterlinearMode()}
+                      className={`w-full min-h-[48px] flex items-center justify-between px-3.5 py-2.5 hover:bg-fg/5 active:bg-fg/10 text-sm font-medium cursor-pointer transition-colors ${
+                        isInterlinearMode ? 'bg-accent/5' : ''
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isInterlinearMode ? 'bg-accent text-accent-on' : 'bg-fg/5 text-fg-2'}`}>
+                          <Languages size={16} />
+                        </div>
+                        <div className="text-left min-w-0">
+                          <div className="text-[13.5px] font-semibold text-fg truncate">Reverse Interlinear</div>
+                          <div className="text-[11px] text-muted font-normal truncate">Hebrew & Greek roots, Strong numbers</div>
+                        </div>
                       </div>
-                      <div className="text-left">
-                        <div className="text-[14px]">Reverse Interlinear</div>
-                        <div className="text-[11px] text-muted font-normal">Hebrew/Greek roots & Strong numbers</div>
-                      </div>
-                    </div>
-                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
-                      isInterlinearMode ? 'bg-accent text-accent-on' : 'bg-fg/5 text-muted'
-                    }`}>
-                      {isInterlinearMode ? 'Active' : 'Off'}
-                    </span>
-                  </button>
-
-                  {/* Read Chapter Aloud (TTS) */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      toggleSpeech();
-                    }}
-                    className="w-full min-h-[50px] flex items-center justify-between px-3.5 py-3 hover:bg-fg/5 text-fg text-sm font-medium cursor-pointer transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isSpeaking ? 'bg-accent text-accent-on animate-pulse' : 'bg-fg/5 text-fg-2'}`}>
-                        {isSpeaking ? <VolumeX size={17} /> : <Volume2 size={17} />}
-                      </div>
-                      <div className="text-left">
-                        <div className="text-[14px]">{isSpeaking ? 'Stop Reading Aloud' : 'Read Chapter Aloud'}</div>
-                        <div className="text-[11px] text-muted font-normal">Voice narration for current chapter</div>
-                      </div>
-                    </div>
-                    {isSpeaking && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-accent/20 text-accent animate-pulse">
-                        Playing
+                      <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded-md shrink-0 ml-2 ${
+                        isInterlinearMode ? 'bg-accent text-accent-on' : 'bg-fg/5 text-muted'
+                      }`}>
+                        {isInterlinearMode ? 'Active' : 'Off'}
                       </span>
-                    )}
-                  </button>
+                    </button>
 
-                  {/* Scripture Backlinks */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setBacklinksDrawerState({
-                        isOpen: true,
-                        reference: `${activeBook.name} ${activeChapter}`,
-                        backlinks: totalChapterBacklinks,
-                      });
-                      setMobileStudyView('reader');
-                    }}
-                    className="w-full min-h-[50px] flex items-center justify-between px-3.5 py-3 hover:bg-fg/5 text-fg text-sm font-medium cursor-pointer transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-fg/5 text-fg-2 flex items-center justify-center">
-                        <Layers size={17} />
+                    {/* Read Chapter Aloud (TTS) */}
+                    <button
+                      type="button"
+                      onClick={() => toggleSpeech()}
+                      className="w-full min-h-[48px] flex items-center justify-between px-3.5 py-2.5 hover:bg-fg/5 active:bg-fg/10 text-fg text-sm font-medium cursor-pointer transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isSpeaking ? 'bg-accent text-accent-on animate-pulse' : 'bg-fg/5 text-fg-2'}`}>
+                          {isSpeaking ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                        </div>
+                        <div className="text-left min-w-0">
+                          <div className="text-[13.5px] font-semibold text-fg truncate">{isSpeaking ? 'Stop Reading Aloud' : 'Read Chapter Aloud'}</div>
+                          <div className="text-[11px] text-muted font-normal truncate">High-quality voice narration</div>
+                        </div>
                       </div>
-                      <div className="text-left">
-                        <div className="text-[14px]">Scripture Backlinks</div>
-                        <div className="text-[11px] text-muted font-normal">Cross-references & thematic echoes</div>
-                      </div>
-                    </div>
-                    {totalChapterBacklinks.totalCount > 0 ? (
-                      <span className="min-w-[20px] h-5 px-1.5 bg-accent text-accent-on text-[11px] font-bold rounded-full flex items-center justify-center">
-                        {totalChapterBacklinks.totalCount}
-                      </span>
-                    ) : (
-                      <ChevronRight size={16} className="text-muted" />
-                    )}
-                  </button>
+                      {isSpeaking && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-accent/20 text-accent animate-pulse shrink-0 ml-2">
+                          Playing
+                        </span>
+                      )}
+                    </button>
 
-                  {/* Lectio Divina Guided Prayer */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsLectioModalOpen(true);
-                      setMobileStudyView('reader');
-                    }}
-                    className="w-full min-h-[50px] flex items-center justify-between px-3.5 py-3 hover:bg-fg/5 text-fg text-sm font-medium cursor-pointer transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-500 flex items-center justify-center">
-                        <Heart size={17} />
+                    {/* Scripture Backlinks */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBacklinksDrawerState({
+                          isOpen: true,
+                          reference: `${activeBook.name} ${activeChapter}`,
+                          backlinks: totalChapterBacklinks,
+                        });
+                        setMobileStudyView('reader');
+                      }}
+                      className="w-full min-h-[48px] flex items-center justify-between px-3.5 py-2.5 hover:bg-fg/5 active:bg-fg/10 text-fg text-sm font-medium cursor-pointer transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-fg/5 text-fg-2 flex items-center justify-center shrink-0">
+                          <Layers size={16} />
+                        </div>
+                        <div className="text-left min-w-0">
+                          <div className="text-[13.5px] font-semibold text-fg truncate">Scripture Backlinks</div>
+                          <div className="text-[11px] text-muted font-normal truncate">Cross-references & canvas connections</div>
+                        </div>
                       </div>
-                      <div className="text-left">
-                        <div className="text-[14px]">Lectio Divina</div>
-                        <div className="text-[11px] text-muted font-normal">4-step contemplative meditation</div>
+                      {totalChapterBacklinks.totalCount > 0 ? (
+                        <span className="min-w-[20px] h-5 px-1.5 bg-accent text-accent-on text-[11px] font-bold rounded-full flex items-center justify-center shrink-0 ml-2">
+                          {totalChapterBacklinks.totalCount}
+                        </span>
+                      ) : (
+                        <ChevronRight size={16} className="text-muted/60 shrink-0 ml-2" />
+                      )}
+                    </button>
+
+                    {/* Lectio Divina Guided Prayer */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsLectioModalOpen(true);
+                        setMobileStudyView('reader');
+                      }}
+                      className="w-full min-h-[48px] flex items-center justify-between px-3.5 py-2.5 hover:bg-fg/5 active:bg-fg/10 text-fg text-sm font-medium cursor-pointer transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0">
+                          <Heart size={16} />
+                        </div>
+                        <div className="text-left min-w-0">
+                          <div className="text-[13.5px] font-semibold text-fg truncate">Lectio Divina</div>
+                          <div className="text-[11px] text-muted font-normal truncate">4-step contemplative meditation</div>
+                        </div>
                       </div>
-                    </div>
-                    <ChevronRight size={16} className="text-muted" />
-                  </button>
+                      <ChevronRight size={16} className="text-muted/60 shrink-0 ml-2" />
+                    </button>
+                  </div>
                 </div>
 
-                {/* Navigation & Settings Group */}
-                <div className="rounded-2xl border border-border/70 bg-surface/40 overflow-hidden divide-y divide-border/40">
-                  {/* Reading Tracker */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveTab('tracker');
-                      setMobileStudyView('reader');
-                    }}
-                    className="w-full min-h-[50px] flex items-center justify-between px-3.5 py-3 hover:bg-fg/5 text-fg text-sm font-medium cursor-pointer transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-fg/5 text-fg-2 flex items-center justify-center">
-                        <Target size={17} />
+                {/* Workspace & Settings Group */}
+                <div>
+                  <div className="text-[10.5px] font-bold uppercase tracking-wider text-muted px-1.5 mb-1.5">
+                    Workspace & Settings
+                  </div>
+                  <div className="rounded-2xl border border-border/60 bg-surface/50 backdrop-blur-md overflow-hidden divide-y divide-border/30 shadow-2xs">
+                    {/* Reading Tracker */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTab('tracker');
+                        setMobileStudyView('reader');
+                      }}
+                      className="w-full min-h-[48px] flex items-center justify-between px-3.5 py-2.5 hover:bg-fg/5 active:bg-fg/10 text-fg text-sm font-medium cursor-pointer transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-fg/5 text-fg-2 flex items-center justify-center shrink-0">
+                          <Target size={16} />
+                        </div>
+                        <div className="text-left min-w-0">
+                          <div className="text-[13.5px] font-semibold text-fg truncate">Reading Tracker & Goals</div>
+                          <div className="text-[11px] text-muted font-normal truncate">Annual plan, chapter stats & streak</div>
+                        </div>
                       </div>
-                      <div className="text-left">
-                        <div className="text-[14px]">Reading Tracker & Progress</div>
-                        <div className="text-[11px] text-muted font-normal">Annual plan, chapter stats & streak</div>
-                      </div>
-                    </div>
-                    <ChevronRight size={16} className="text-muted" />
-                  </button>
+                      <ChevronRight size={16} className="text-muted/60 shrink-0 ml-2" />
+                    </button>
 
-                  {/* Display & Reader Settings */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsSettingsOpen(true);
-                    }}
-                    className="w-full min-h-[50px] flex items-center justify-between px-3.5 py-3 hover:bg-fg/5 text-fg text-sm font-medium cursor-pointer transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-fg/5 text-fg-2 flex items-center justify-center">
-                        <Settings size={17} />
+                    {/* Display & Reader Settings */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsSettingsOpen(true);
+                      }}
+                      className="w-full min-h-[48px] flex items-center justify-between px-3.5 py-2.5 hover:bg-fg/5 active:bg-fg/10 text-fg text-sm font-medium cursor-pointer transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-fg/5 text-fg-2 flex items-center justify-center shrink-0">
+                          <Settings size={16} />
+                        </div>
+                        <div className="text-left min-w-0">
+                          <div className="text-[13.5px] font-semibold text-fg truncate">Typography & Reader Display</div>
+                          <div className="text-[11px] text-muted font-normal truncate">Fonts, text size, theme & layout</div>
+                        </div>
                       </div>
-                      <div className="text-left">
-                        <div className="text-[14px]">Display & Reader Settings</div>
-                        <div className="text-[11px] text-muted font-normal">Typography, font size, theme & layout</div>
-                      </div>
-                    </div>
-                    <ChevronRight size={16} className="text-muted" />
-                  </button>
+                      <ChevronRight size={16} className="text-muted/60 shrink-0 ml-2" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Mark as Completed */}
-                <div className="pt-1">
+                <div className="pt-0.5">
                   <button
                     type="button"
                     onClick={() => toggleCompleted()}
-                    className={`w-full min-h-[56px] flex items-center justify-between p-3.5 rounded-2xl border transition-all cursor-pointer active:scale-[0.98] ${
+                    className={`w-full min-h-[52px] flex items-center justify-between p-3 rounded-2xl border transition-all cursor-pointer active:scale-[0.98] ${
                       isCompleted 
-                        ? 'bg-accent/15 border-accent/40 text-accent shadow-xs' 
-                        : 'bg-surface/70 border-border/70 hover:bg-surface text-fg'
+                        ? 'bg-accent/10 border-accent/35 text-accent shadow-2xs' 
+                        : 'bg-surface/60 border-border/60 hover:bg-surface text-fg'
                     }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
                         isCompleted ? 'bg-accent text-accent-on' : 'bg-fg/5 text-muted'
                       }`}>
-                        <Check size={18} strokeWidth={isCompleted ? 2.8 : 2} />
+                        <Check size={16} strokeWidth={isCompleted ? 2.8 : 2} />
                       </div>
-                      <div className="text-left">
-                        <div className="text-[14.5px] font-semibold">
+                      <div className="text-left min-w-0">
+                        <div className="text-[13.5px] font-semibold truncate">
                           {isCompleted ? 'Chapter Completed' : 'Mark as Completed'}
                         </div>
-                        <div className="text-[11px] text-muted font-normal">
+                        <div className="text-[11px] text-muted font-normal truncate">
                           {isCompleted ? 'Recorded in reading progress' : `Record ${activeBook.name} ${activeChapter} complete`}
                         </div>
                       </div>
                     </div>
-                    <span className={`text-[11px] font-bold px-3 py-1 rounded-full transition-colors ${
+                    <span className={`text-[10.5px] font-bold px-2.5 py-1 rounded-full shrink-0 ml-2 transition-colors ${
                       isCompleted ? 'bg-accent text-accent-on' : 'bg-fg/5 text-muted'
                     }`}>
                       {isCompleted ? 'Done' : 'Mark Done'}
@@ -9048,11 +9047,11 @@ export default function App() {
         >
           {[
             { id: 'study', label: 'Study', icon: BookOpen },
-            { id: 'chats', label: 'Study AI', icon: Sparkles },
-            { id: 'notes', label: 'Notes', icon: FileText },
-            { id: 'tracker', label: 'Tracker', icon: Target },
-            { id: 'devotional', label: 'Devotion', icon: Sun },
             { id: 'canvas', label: 'Canvas', icon: Workflow },
+            { id: 'devotional', label: 'Devotion', icon: Sun },
+            { id: 'notes', label: 'Notes', icon: FileText },
+            { id: 'chats', label: 'AI Chats', icon: Sparkles },
+            { id: 'tracker', label: 'Tracker', icon: Target },
           ].map(tab => {
             const isTabActive = activeTab === tab.id;
 
@@ -9074,23 +9073,20 @@ export default function App() {
                     scrollChatToBottom();
                   }
                 }}
-                className="flex-1 flex flex-col items-center justify-center h-[42px] py-0.5 transition-all relative cursor-pointer active:scale-90 touch-manipulation select-none"
+                className="flex-1 flex flex-col items-center justify-center h-[42px] py-0.5 transition-all duration-200 ease-out relative cursor-pointer active:scale-95 touch-manipulation select-none"
                 title={tab.label}
                 aria-label={tab.label}
               >
                 <div className="relative flex items-center justify-center">
                   <tab.icon 
                     size={18} 
-                    strokeWidth={isTabActive ? 2.4 : 1.75}
-                    className={`transition-colors duration-150 ${
-                      isTabActive ? 'text-accent' : 'text-muted/70 hover:text-fg'
+                    strokeWidth={isTabActive ? 2.2 : 1.7}
+                    className={`transition-all duration-200 ease-out ${
+                      isTabActive ? 'text-accent scale-105' : 'text-muted/70 hover:text-fg scale-100'
                     }`}
                   />
-                  {isTabActive && (
-                    <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-accent shadow-xs" />
-                  )}
                 </div>
-                <span className={`text-[10px] tracking-tight mt-0.5 leading-none transition-colors duration-150 ${
+                <span className={`text-[10px] tracking-tight mt-0.5 leading-none transition-all duration-200 ease-out ${
                   isTabActive ? 'text-accent font-semibold' : 'text-meta font-medium'
                 }`}>
                   {tab.label}
