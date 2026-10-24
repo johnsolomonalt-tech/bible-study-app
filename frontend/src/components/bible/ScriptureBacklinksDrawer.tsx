@@ -146,7 +146,7 @@ export function ScriptureBacklinksDrawer({
                 <div className="space-y-2.5">
                   <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-400">
                     <FileText size={14} className="text-amber-500" />
-                    <span>Personal Notes ({notes.length})</span>
+                    <span>Study Notes ({notes.length})</span>
                   </div>
 
                   <div className="space-y-2">

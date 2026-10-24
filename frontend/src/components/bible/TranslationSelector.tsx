@@ -28,16 +28,21 @@ export function TranslationSelector({
     ) || AVAILABLE_TRANSLATIONS[0];
 
   useEffect(() => {
+    if (!isOpen) return;
+
     const handleOutsideClick = (e: MouseEvent | TouchEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
     };
-    if (isOpen) {
+
+    const timer = setTimeout(() => {
       document.addEventListener('mousedown', handleOutsideClick);
       document.addEventListener('touchstart', handleOutsideClick);
-    }
+    }, 10);
+
     return () => {
+      clearTimeout(timer);
       document.removeEventListener('mousedown', handleOutsideClick);
       document.removeEventListener('touchstart', handleOutsideClick);
     };
@@ -50,10 +55,13 @@ export function TranslationSelector({
   };
 
   return (
-    <div className={`relative inline-block text-left ${className}`} ref={containerRef}>
+    <div className={`relative inline-block text-left ${isOpen ? 'z-50' : 'z-20'} ${className}`} ref={containerRef}>
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
         className="flex items-center gap-1 px-2.5 py-1 h-9 min-h-[36px] rounded-full bg-surface/80 hover:bg-surface border border-border-soft/60 hover:border-border-soft transition-all text-xs font-semibold text-fg cursor-pointer active:scale-95 shadow-2xs select-none shrink-0"
         title="Choose Bible Translation"
         aria-haspopup="true"
@@ -69,7 +77,10 @@ export function TranslationSelector({
       </button>
 
       {isOpen && (
-        <div className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} top-full mt-2 w-72 sm:w-80 max-w-[calc(100vw-24px)] rounded-2xl shadow-2xl border border-border-soft bg-surface/98 p-2 z-50 animate-in fade-in-50 zoom-in-95 backdrop-blur-2xl`}>
+        <div 
+          onClick={(e) => e.stopPropagation()}
+          className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} top-full mt-2 w-72 sm:w-80 max-w-[calc(100vw-24px)] rounded-2xl shadow-2xl border border-border-soft bg-surface p-2 z-50`}
+        >
           {/* Header */}
           <div className="px-3 py-2 border-b border-border-soft/60 mb-1.5 flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-meta">
@@ -84,8 +95,11 @@ export function TranslationSelector({
                 <button
                   key={t.id}
                   type="button"
-                  onClick={() => handleSelect(t)}
-                  className={`w-full flex items-center justify-between px-3 py-3 sm:py-2 min-h-[44px] rounded-xl text-left transition-colors cursor-pointer ${
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSelect(t);
+                  }}
+                  className={`w-full flex items-center justify-between px-3 py-3 sm:py-2 min-h-[44px] rounded-xl text-left transition-colors cursor-pointer touch-manipulation active:scale-[0.98] ${
                     isSelected
                       ? 'bg-accent/15 text-fg font-semibold border border-accent/30'
                       : 'hover:bg-fg/5 text-fg-2 hover:text-fg'

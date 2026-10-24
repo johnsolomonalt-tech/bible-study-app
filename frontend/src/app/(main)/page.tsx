@@ -3451,6 +3451,7 @@ export default function App() {
 
   // Contextual "Sync Your Study" Banner for Guests & Sign-in Cloud Sync
   const [isSyncBannerDismissed, setIsSyncBannerDismissed] = useState(false);
+  const [isSyncBannerExpanded, setIsSyncBannerExpanded] = useState(false);
   const hasGuestData = useMemo(() => {
     if (userId) return false;
     const hasLocalNotes = notes.length > 0;
@@ -5841,13 +5842,13 @@ export default function App() {
             >
               <header 
                 ref={mobileReaderHeaderRef}
-                className="min-h-[50px] border-b border-border/50 flex items-center justify-between px-2 sm:px-3.5 bg-bg/85 backdrop-blur-xl shrink-0 relative z-20 py-1.5"
+                className="min-h-[50px] border-b border-border/50 flex items-center justify-between px-2 sm:px-3.5 bg-bg/85 backdrop-blur-xl shrink-0 relative z-30 py-1.5"
                 style={{
                   paddingTop: mobileTopPadding,
                 }}
               >
                 {/* Left: Translation (pinned to top-left corner) + Book & Chapter Selector */}
-                <div className="flex items-center flex-nowrap min-w-0 flex-1 mr-1 gap-1 xs:gap-1.5 overflow-hidden">
+                <div className="flex items-center flex-nowrap min-w-0 flex-1 mr-1 gap-1 xs:gap-1.5">
                   {/* Translation Selector (top left corner, left of book) */}
                   <TranslationSelector 
                     currentTranslation={translation} 
@@ -5858,7 +5859,7 @@ export default function App() {
                   />
 
                   {/* Book & Chapter Selector Trigger */}
-                  <div ref={mobileReaderTitleRef} className="flex items-center min-w-0 flex-1 max-w-[190px] xs:max-w-[240px]">
+                  <div ref={mobileReaderTitleRef} className="flex items-center min-w-0 flex-1 max-w-[220px] xs:max-w-[280px] overflow-hidden">
                     <button 
                       type="button"
                       onClick={() => setMobileStudyView('chapters')} 
@@ -6273,17 +6274,36 @@ export default function App() {
                 <form onSubmit={handleSendMessage} className="p-3 border-t border-border bg-bg shrink-0">
                   {/* Contextual Sync Your Study Banner for Guests */}
                   {hasGuestData && !isSyncBannerDismissed && (
-                    <div className="mb-2 p-2 rounded-xl bg-[#c96442]/10 border border-[#c96442]/25 text-[#c96442] dark:text-[#e07a5f] flex items-center justify-between gap-1.5 text-xs animate-in fade-in duration-200">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <UploadCloud size={14} className="shrink-0" />
-                        <span className="truncate text-[11px]">
-                          Study saved locally. <Link href="/sign-in" className="underline font-semibold hover:opacity-80">Sign in</Link> to sync.
-                        </span>
+                    <div 
+                      onClick={() => setIsSyncBannerExpanded(prev => !prev)}
+                      className="mb-2 p-2 rounded-xl bg-[#c96442]/10 border border-[#c96442]/25 text-[#c96442] dark:text-[#e07a5f] flex items-start justify-between gap-1.5 text-xs animate-in fade-in duration-200 cursor-pointer select-none transition-all"
+                      title={isSyncBannerExpanded ? "Click to collapse" : "Click to view full message"}
+                    >
+                      <div className="flex items-start gap-1.5 min-w-0 flex-1">
+                        <UploadCloud size={14} className="shrink-0 mt-0.5" />
+                        <div className="min-w-0 flex-1">
+                          <p className={`text-[11px] leading-snug ${isSyncBannerExpanded ? '' : 'truncate'}`}>
+                            Study saved locally. <Link href="/sign-in" onClick={(e) => e.stopPropagation()} className="underline font-semibold hover:opacity-80">Sign in</Link> to sync across devices.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsSyncBannerExpanded(prev => !prev);
+                            }}
+                            className="text-[10px] opacity-75 hover:opacity-100 font-semibold underline mt-0.5 inline-block cursor-pointer"
+                          >
+                            {isSyncBannerExpanded ? 'Show less' : 'View full'}
+                          </button>
+                        </div>
                       </div>
                       <button
                         type="button"
-                        onClick={() => setIsSyncBannerDismissed(true)}
-                        className="p-1 rounded-md hover:bg-black/10 dark:hover:bg-white/10 text-inherit shrink-0 cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsSyncBannerDismissed(true);
+                        }}
+                        className="p-1 -mt-0.5 rounded-md hover:bg-black/10 dark:hover:bg-white/10 text-inherit shrink-0 cursor-pointer"
                         title="Dismiss notification"
                       >
                         <X size={12} />
@@ -7220,6 +7240,7 @@ export default function App() {
                             currentTranslation={translation} 
                             onSelectTranslation={setTranslation}
                             theme={theme as 'dark' | 'light'}
+                            align="right"
                           />
                         </div>
                       </div>
@@ -7540,17 +7561,36 @@ export default function App() {
                 <form onSubmit={handleSendMessage} className="p-4 border-t border-border bg-bg shrink-0">
                   {/* Contextual Sync Your Study Banner for Guests */}
                   {hasGuestData && !isSyncBannerDismissed && (
-                    <div className="mb-2 p-2 rounded-xl bg-[#c96442]/10 border border-[#c96442]/25 text-[#c96442] dark:text-[#e07a5f] flex items-center justify-between gap-1.5 text-xs animate-in fade-in duration-200">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <UploadCloud size={14} className="shrink-0" />
-                        <span className="truncate text-[11px]">
-                          Study saved locally. <Link href="/sign-in" className="underline font-semibold hover:opacity-80">Sign in</Link> to sync across devices.
-                        </span>
+                    <div 
+                      onClick={() => setIsSyncBannerExpanded(prev => !prev)}
+                      className="mb-2 p-2 rounded-xl bg-[#c96442]/10 border border-[#c96442]/25 text-[#c96442] dark:text-[#e07a5f] flex items-start justify-between gap-1.5 text-xs animate-in fade-in duration-200 cursor-pointer select-none transition-all"
+                      title={isSyncBannerExpanded ? "Click to collapse" : "Click to view full message"}
+                    >
+                      <div className="flex items-start gap-1.5 min-w-0 flex-1">
+                        <UploadCloud size={14} className="shrink-0 mt-0.5" />
+                        <div className="min-w-0 flex-1">
+                          <p className={`text-[11px] leading-snug ${isSyncBannerExpanded ? '' : 'truncate'}`}>
+                            Study saved locally. <Link href="/sign-in" onClick={(e) => e.stopPropagation()} className="underline font-semibold hover:opacity-80">Sign in</Link> to sync across devices.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsSyncBannerExpanded(prev => !prev);
+                            }}
+                            className="text-[10px] opacity-75 hover:opacity-100 font-semibold underline mt-0.5 inline-block cursor-pointer"
+                          >
+                            {isSyncBannerExpanded ? 'Show less' : 'View full'}
+                          </button>
+                        </div>
                       </div>
                       <button
                         type="button"
-                        onClick={() => setIsSyncBannerDismissed(true)}
-                        className="p-1 rounded-md hover:bg-black/10 dark:hover:bg-white/10 text-inherit shrink-0 cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsSyncBannerDismissed(true);
+                        }}
+                        className="p-1 -mt-0.5 rounded-md hover:bg-black/10 dark:hover:bg-white/10 text-inherit shrink-0 cursor-pointer"
                         title="Dismiss notification"
                       >
                         <X size={12} />
@@ -8558,17 +8598,36 @@ export default function App() {
                 <div className="flex flex-col max-w-4xl mx-auto w-full relative">
                   {/* Contextual Sync Your Study Banner for Guests */}
                   {hasGuestData && !isSyncBannerDismissed && (
-                    <div className="mb-2 p-2.5 rounded-xl bg-[#c96442]/10 border border-[#c96442]/25 text-[#c96442] dark:text-[#e07a5f] flex items-center justify-between gap-2 text-xs animate-in fade-in duration-200">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <UploadCloud size={15} className="shrink-0" />
-                        <span className="truncate text-[12px]">
-                          Your study notes & chats are saved locally on this device. <Link href="/sign-in" className="underline font-semibold hover:opacity-80">Sign in</Link> to sync across your devices.
-                        </span>
+                    <div 
+                      onClick={() => setIsSyncBannerExpanded(prev => !prev)}
+                      className="mb-2 p-2.5 rounded-xl bg-[#c96442]/10 border border-[#c96442]/25 text-[#c96442] dark:text-[#e07a5f] flex items-start justify-between gap-2 text-xs animate-in fade-in duration-200 cursor-pointer select-none transition-all"
+                      title={isSyncBannerExpanded ? "Click to collapse" : "Click to view full message"}
+                    >
+                      <div className="flex items-start gap-2 min-w-0 flex-1">
+                        <UploadCloud size={15} className="shrink-0 mt-0.5" />
+                        <div className="min-w-0 flex-1">
+                          <p className={`text-[12px] leading-snug ${isSyncBannerExpanded ? '' : 'truncate'}`}>
+                            Your study notes & chats are saved locally on this device. <Link href="/sign-in" onClick={(e) => e.stopPropagation()} className="underline font-semibold hover:opacity-80">Sign in</Link> to sync across your devices.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsSyncBannerExpanded(prev => !prev);
+                            }}
+                            className="text-[10.5px] opacity-75 hover:opacity-100 font-semibold underline mt-0.5 inline-block cursor-pointer"
+                          >
+                            {isSyncBannerExpanded ? 'Show less' : 'View full'}
+                          </button>
+                        </div>
                       </div>
                       <button
                         type="button"
-                        onClick={() => setIsSyncBannerDismissed(true)}
-                        className="p-1 rounded-md hover:bg-black/10 dark:hover:bg-white/10 text-inherit shrink-0 cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsSyncBannerDismissed(true);
+                        }}
+                        className="p-1 -mt-0.5 rounded-md hover:bg-black/10 dark:hover:bg-white/10 text-inherit shrink-0 cursor-pointer"
                         title="Dismiss notification"
                       >
                         <X size={13} />
@@ -9048,7 +9107,7 @@ export default function App() {
           {[
             { id: 'study', label: 'Study', icon: BookOpen },
             { id: 'canvas', label: 'Canvas', icon: Workflow },
-            { id: 'devotional', label: 'Devotion', icon: Sun },
+            { id: 'devotional', label: 'Devotional', icon: Sun },
             { id: 'notes', label: 'Notes', icon: FileText },
             { id: 'chats', label: 'AI Chats', icon: Sparkles },
             { id: 'tracker', label: 'Tracker', icon: Target },
