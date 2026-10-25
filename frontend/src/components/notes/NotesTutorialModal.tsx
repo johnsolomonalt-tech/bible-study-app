@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Lightbulb, X, ChevronRight, ChevronLeft, BookOpen, Sparkles, 
-  Highlighter, Workflow, Download, CheckCircle2, FileText, ArrowRight
+  Highlighter, Workflow, Download, CheckCircle2, FileText, ArrowRight, Check
 } from 'lucide-react';
 
 interface NotesTutorialModalProps {
@@ -14,6 +14,7 @@ interface NotesTutorialModalProps {
 interface TutorialStep {
   title: string;
   tagline: string;
+  shortLabel: string;
   badge: string;
   icon: React.ReactNode;
   content: string;
@@ -46,6 +47,7 @@ export function NotesTutorialModal({ isOpen, onClose }: NotesTutorialModalProps)
     {
       title: "Distraction-Free Scripture Journaling",
       tagline: "Effortless Writing with Live Preview",
+      shortLabel: "Writing",
       badge: "Step 1 of 5",
       icon: <FileText className="text-accent" size={24} />,
       content:
@@ -77,6 +79,7 @@ export function NotesTutorialModal({ isOpen, onClose }: NotesTutorialModalProps)
     {
       title: "Interactive Scripture Linking",
       tagline: "Connect Verses Automatically",
+      shortLabel: "Verses",
       badge: "Step 2 of 5",
       icon: <BookOpen className="text-accent" size={24} />,
       content:
@@ -110,6 +113,7 @@ export function NotesTutorialModal({ isOpen, onClose }: NotesTutorialModalProps)
     {
       title: "Study Highlights Automatic Sync",
       tagline: "Your Reading Flow, Centralized",
+      shortLabel: "Highlights",
       badge: "Step 3 of 5",
       icon: <Highlighter className="text-accent" size={24} />,
       content:
@@ -139,6 +143,7 @@ export function NotesTutorialModal({ isOpen, onClose }: NotesTutorialModalProps)
     {
       title: "AI Theological Homiletics & Outlines",
       tagline: "Expository Depth in Seconds",
+      shortLabel: "Study AI",
       badge: "Step 4 of 5",
       icon: <Sparkles className="text-accent" size={24} />,
       content:
@@ -170,6 +175,7 @@ export function NotesTutorialModal({ isOpen, onClose }: NotesTutorialModalProps)
     {
       title: "Export to PDF & Drop onto Canvas",
       tagline: "Take Your Study Anywhere",
+      shortLabel: "Canvas",
       badge: "Step 5 of 5",
       icon: <Workflow className="text-accent" size={24} />,
       content:
@@ -198,6 +204,7 @@ export function NotesTutorialModal({ isOpen, onClose }: NotesTutorialModalProps)
   ];
 
   const step = TUTORIAL_STEPS[currentStep];
+  const progressPercent = Math.round(((currentStep + 1) / TUTORIAL_STEPS.length) * 100);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -207,16 +214,21 @@ export function NotesTutorialModal({ isOpen, onClose }: NotesTutorialModalProps)
         aria-labelledby="notes-tutorial-title"
       >
         {/* Header Bar */}
-        <div className="px-5 py-4 border-b border-border/70 flex items-center justify-between bg-surface/80">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-500 border border-amber-500/30 flex items-center justify-center">
-              <Lightbulb size={18} />
+        <div className="px-5 py-3.5 flex items-center justify-between bg-surface/90">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-500 border border-amber-500/30 flex items-center justify-center shadow-2xs shrink-0">
+              <Lightbulb size={17} />
             </div>
             <div>
-              <h2 id="notes-tutorial-title" className="text-sm font-bold text-fg">
-                Notes Workspace Guide
-              </h2>
-              <p className="text-[11px] text-meta">{step.badge} • {step.tagline}</p>
+              <div className="flex items-center gap-2">
+                <h2 id="notes-tutorial-title" className="text-sm font-bold text-fg">
+                  Notes Workspace Guide
+                </h2>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/25">
+                  {progressPercent}% Complete
+                </span>
+              </div>
+              <p className="text-[11px] text-meta">Step {currentStep + 1} of {TUTORIAL_STEPS.length} • {step.tagline}</p>
             </div>
           </div>
 
@@ -230,10 +242,51 @@ export function NotesTutorialModal({ isOpen, onClose }: NotesTutorialModalProps)
           </button>
         </div>
 
-        {/* Step Content */}
-        <div className="p-6 space-y-5 overflow-y-auto max-h-[calc(85vh-130px)] custom-scroll">
+        {/* Continuous Linear Progress Bar (Smooth Animated Accent) */}
+        <div className="w-full h-1.5 bg-bg/80 relative overflow-hidden border-b border-border/60">
+          <div 
+            className="h-full bg-accent transition-all duration-500 ease-out shadow-[0_0_8px_rgba(201,100,66,0.6)]"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
+
+        {/* Segmented Clickable Step Pills */}
+        <div className="px-5 pt-3 pb-1 bg-surface/40 border-b border-border/40 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+          {TUTORIAL_STEPS.map((s, idx) => {
+            const isCurrent = currentStep === idx;
+            const isPast = currentStep > idx;
+            return (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => setCurrentStep(idx)}
+                className={`flex-1 min-w-[70px] py-1 px-1.5 rounded-lg text-center text-[10.5px] font-semibold transition-all cursor-pointer flex items-center justify-center gap-1 border ${
+                  isCurrent
+                    ? 'bg-accent text-accent-on border-accent shadow-xs'
+                    : isPast
+                    ? 'bg-accent/10 text-accent border-accent/25 hover:bg-accent/20'
+                    : 'bg-surface/60 text-muted border-border/60 hover:text-fg hover:bg-surface'
+                }`}
+                title={`Jump to Step ${idx + 1}: ${s.title}`}
+              >
+                {isPast ? (
+                  <Check size={11} className="stroke-[2.5]" />
+                ) : (
+                  <span>{idx + 1}.</span>
+                )}
+                <span className="truncate">{s.shortLabel}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Step Content with Smooth Animation */}
+        <div 
+          key={currentStep}
+          className="p-6 space-y-5 overflow-y-auto max-h-[calc(85vh-160px)] custom-scroll animate-in fade-in slide-in-from-right-3 duration-300"
+        >
           {/* Mockup Preview Area */}
-          <div className="w-full transition-all duration-300">
+          <div className="w-full">
             {step.mockup}
           </div>
 
@@ -267,22 +320,13 @@ export function NotesTutorialModal({ isOpen, onClose }: NotesTutorialModalProps)
         </div>
 
         {/* Footer Navigation Bar */}
-        <div className="px-6 py-4 border-t border-border/70 flex items-center justify-between bg-surface/50">
-          {/* Progress Indicator Dots */}
-          <div className="flex items-center gap-1.5">
-            {TUTORIAL_STEPS.map((_, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => setCurrentStep(idx)}
-                className={`h-2 rounded-full transition-all cursor-pointer ${
-                  currentStep === idx
-                    ? 'w-6 bg-accent shadow-2xs'
-                    : 'w-2 bg-border hover:bg-muted'
-                }`}
-                aria-label={`Go to step ${idx + 1}`}
-              />
-            ))}
+        <div className="px-5 sm:px-6 py-3.5 border-t border-border/70 flex items-center justify-between bg-surface/60">
+          {/* Step Counter Indicator */}
+          <div className="text-xs text-muted font-medium flex items-center gap-1.5">
+            <span>Step</span>
+            <span className="font-bold text-fg">{currentStep + 1}</span>
+            <span>of</span>
+            <span className="font-bold text-fg">{TUTORIAL_STEPS.length}</span>
           </div>
 
           {/* Navigation Buttons */}
@@ -291,7 +335,7 @@ export function NotesTutorialModal({ isOpen, onClose }: NotesTutorialModalProps)
               <button
                 type="button"
                 onClick={() => setCurrentStep((prev) => Math.max(prev - 1, 0))}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-surface border border-border text-xs font-semibold text-fg hover:text-accent transition-all cursor-pointer"
+                className="inline-flex items-center gap-1 px-3.5 py-1.5 rounded-xl bg-surface border border-border text-xs font-semibold text-fg hover:text-accent hover:border-accent/40 active:scale-95 transition-all cursor-pointer"
               >
                 <ChevronLeft size={14} />
                 <span>Back</span>
@@ -304,7 +348,7 @@ export function NotesTutorialModal({ isOpen, onClose }: NotesTutorialModalProps)
                 onClick={() => setCurrentStep((prev) => Math.min(prev + 1, TUTORIAL_STEPS.length - 1))}
                 className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-accent text-accent-on text-xs font-semibold hover:opacity-95 active:scale-95 transition-all shadow-xs cursor-pointer"
               >
-                <span>Next</span>
+                <span>Next Step</span>
                 <ChevronRight size={14} />
               </button>
             ) : (
