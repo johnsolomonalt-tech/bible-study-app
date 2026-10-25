@@ -1390,64 +1390,137 @@ export default function App() {
   const [mobileChatView, setMobileChatView] = useState<'chat' | 'list'>('chat');
   const [isChatInputFocused, setIsChatInputFocused] = useState(false);
 
-  // Swipe gesture detection for Mobile AI Chats conversation drawer
-  const chatSwipeStartXRef = useRef<number | null>(null);
-  const chatSwipeStartYRef = useRef<number | null>(null);
-
-  const handleConversationTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length === 1) {
-      chatSwipeStartXRef.current = e.touches[0].clientX;
-      chatSwipeStartYRef.current = e.touches[0].clientY;
-    }
-  };
-
-  const handleConversationTouchEnd = (e: React.TouchEvent) => {
-    if (chatSwipeStartXRef.current === null || chatSwipeStartYRef.current === null) return;
-    const deltaX = e.changedTouches[0].clientX - chatSwipeStartXRef.current;
-    const deltaY = e.changedTouches[0].clientY - chatSwipeStartYRef.current;
-
-    // Swiping right-to-left (deltaX < -45, predominantly horizontal) collapses/closes conversations
-    if (deltaX < -45 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2) {
-      setMobileChatView('chat');
-    }
-    chatSwipeStartXRef.current = null;
-    chatSwipeStartYRef.current = null;
-  };
+  // Real-time touch dragging for Mobile AI Chats conversation drawer (smooth slide-out with finger)
+  const [isChatDrawerDragging, setIsChatDrawerDragging] = useState(false);
+  const [chatDrawerOffset, setChatDrawerOffset] = useState(0);
+  const chatDrawerTouchStartXRef = useRef<number>(0);
+  const chatDrawerTouchStartYRef = useRef<number>(0);
+  const chatDrawerTouchTimeRef = useRef<number>(0);
+  const chatDrawerDragLockedRef = useRef<'horizontal' | 'vertical' | null>(null);
+  const chatDrawerInitialViewRef = useRef<'chat' | 'list'>('chat');
 
   const handleChatTouchStart = (e: React.TouchEvent) => {
     // Prevent opening conversations drawer if user is typing, text box is focused, or input is active
     const activeEl = typeof document !== 'undefined' ? document.activeElement : null;
     const isInputActive = activeEl && (activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'INPUT' || (activeEl as HTMLElement).isContentEditable);
     if (isChatInputFocused || isInputActive || isMobileTyping) {
-      chatSwipeStartXRef.current = null;
-      chatSwipeStartYRef.current = null;
+      chatDrawerTouchStartXRef.current = 0;
+      chatDrawerDragLockedRef.current = null;
       return;
     }
     if (e.touches.length === 1) {
-      chatSwipeStartXRef.current = e.touches[0].clientX;
-      chatSwipeStartYRef.current = e.touches[0].clientY;
+      chatDrawerTouchStartXRef.current = e.touches[0].clientX;
+      chatDrawerTouchStartYRef.current = e.touches[0].clientY;
+      chatDrawerTouchTimeRef.current = Date.now();
+      chatDrawerDragLockedRef.current = null;
+      chatDrawerInitialViewRef.current = 'chat';
+    }
+  };
+
+  const handleChatTouchMove = (e: React.TouchEvent) => {
+    if (mobileChatView !== 'chat' || e.touches.length !== 1) return;
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+    const dx = currentX - chatDrawerTouchStartXRef.current;
+    const dy = currentY - chatDrawerTouchStartYRef.current;
+    const startX = chatDrawerTouchStartXRef.current;
+    const winW = typeof window !== 'undefined' ? window.innerWidth : 380;
+    const chatDrawerWidth = Math.min(winW * 0.85, 320);
+
+    if (chatDrawerDragLockedRef.current === null) {
+      if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) {
+        chatDrawerDragLockedRef.current = 'vertical';
+      } else if (dx > 8 && Math.abs(dx) > Math.abs(dy) * 1.1) {
+        // Edge activation zone so inner-chat horizontal swipes aren't hijacked
+        if (startX <= 44) {
+          chatDrawerDragLockedRef.current = 'horizontal';
+          setIsChatDrawerDragging(true);
+        }
+      }
+    }
+
+    if (chatDrawerDragLockedRef.current === 'horizontal') {
+      setChatDrawerOffset(Math.max(0, Math.min(chatDrawerWidth, dx)));
     }
   };
 
   const handleChatTouchEnd = (e: React.TouchEvent) => {
-    const activeEl = typeof document !== 'undefined' ? document.activeElement : null;
-    const isInputActive = activeEl && (activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'INPUT' || (activeEl as HTMLElement).isContentEditable);
-    if (isChatInputFocused || isInputActive || isMobileTyping) {
-      chatSwipeStartXRef.current = null;
-      chatSwipeStartYRef.current = null;
-      return;
-    }
-    if (chatSwipeStartXRef.current === null || chatSwipeStartYRef.current === null) return;
-    const startX = chatSwipeStartXRef.current;
-    const deltaX = e.changedTouches[0].clientX - startX;
-    const deltaY = e.changedTouches[0].clientY - chatSwipeStartYRef.current;
+    if (chatDrawerDragLockedRef.current === 'horizontal' && chatDrawerInitialViewRef.current === 'chat') {
+      const winW = typeof window !== 'undefined' ? window.innerWidth : 380;
+      const chatDrawerWidth = Math.min(winW * 0.85, 320);
+      const dx = e.changedTouches[0].clientX - chatDrawerTouchStartXRef.current;
+      const dt = Date.now() - chatDrawerTouchTimeRef.current;
+      const velocity = dx / Math.max(1, dt);
+      const shouldOpen = dx > chatDrawerWidth * 0.38 || (velocity > 0.32 && dx > 30);
 
-    // Edge swipe from left edge (startX < 60) towards right (deltaX > 45) opens conversations
-    if (startX < 60 && deltaX > 45 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2) {
-      setMobileChatView('list');
+      setIsChatDrawerDragging(false);
+      if (shouldOpen) {
+        setChatDrawerOffset(chatDrawerWidth);
+        setTimeout(() => {
+          setMobileChatView('list');
+          setChatDrawerOffset(0);
+        }, 280);
+      } else {
+        setChatDrawerOffset(0);
+      }
     }
-    chatSwipeStartXRef.current = null;
-    chatSwipeStartYRef.current = null;
+    chatDrawerDragLockedRef.current = null;
+  };
+
+  const handleConversationTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      chatDrawerTouchStartXRef.current = e.touches[0].clientX;
+      chatDrawerTouchStartYRef.current = e.touches[0].clientY;
+      chatDrawerTouchTimeRef.current = Date.now();
+      chatDrawerDragLockedRef.current = null;
+      chatDrawerInitialViewRef.current = 'list';
+    }
+  };
+
+  const handleConversationTouchMove = (e: React.TouchEvent) => {
+    if (mobileChatView !== 'list' || e.touches.length !== 1) return;
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+    const dx = currentX - chatDrawerTouchStartXRef.current;
+    const dy = currentY - chatDrawerTouchStartYRef.current;
+    const winW = typeof window !== 'undefined' ? window.innerWidth : 380;
+    const chatDrawerWidth = Math.min(winW * 0.85, 320);
+
+    if (chatDrawerDragLockedRef.current === null) {
+      if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) {
+        chatDrawerDragLockedRef.current = 'vertical';
+      } else if (dx < -8 && Math.abs(dx) > Math.abs(dy) * 1.1) {
+        chatDrawerDragLockedRef.current = 'horizontal';
+        setIsChatDrawerDragging(true);
+      }
+    }
+
+    if (chatDrawerDragLockedRef.current === 'horizontal') {
+      setChatDrawerOffset(Math.min(0, Math.max(-chatDrawerWidth, dx)));
+    }
+  };
+
+  const handleConversationTouchEnd = (e: React.TouchEvent) => {
+    if (chatDrawerDragLockedRef.current === 'horizontal' && chatDrawerInitialViewRef.current === 'list') {
+      const winW = typeof window !== 'undefined' ? window.innerWidth : 380;
+      const chatDrawerWidth = Math.min(winW * 0.85, 320);
+      const dx = e.changedTouches[0].clientX - chatDrawerTouchStartXRef.current;
+      const dt = Date.now() - chatDrawerTouchTimeRef.current;
+      const velocity = dx / Math.max(1, dt);
+      const shouldClose = Math.abs(dx) > chatDrawerWidth * 0.35 || (velocity < -0.32 && dx < -30);
+
+      setIsChatDrawerDragging(false);
+      if (shouldClose) {
+        setChatDrawerOffset(-chatDrawerWidth);
+        setTimeout(() => {
+          setMobileChatView('chat');
+          setChatDrawerOffset(0);
+        }, 280);
+      } else {
+        setChatDrawerOffset(0);
+      }
+    }
+    chatDrawerDragLockedRef.current = null;
   };
 
   // Mobile Standalone PWA detection and safe-area top padding
@@ -1554,7 +1627,7 @@ export default function App() {
       const velocity = dx / Math.max(1, dt);
 
       if (mobileDragSidebar === 'chapters') {
-        const shouldOpen = dx > winW * 0.45 || (velocity > 0.35 && dx > 40);
+        const shouldOpen = dx > winW * 0.38 || (velocity > 0.30 && dx > 35);
         setIsMobileDragging(false);
         if (shouldOpen) {
           setMobileDragOffset(winW);
@@ -1562,15 +1635,15 @@ export default function App() {
             setMobileStudyView('chapters');
             setMobileDragSidebar(null);
             setMobileDragOffset(0);
-          }, 260);
+          }, 280);
         } else {
           setMobileDragOffset(0);
           setTimeout(() => {
             setMobileDragSidebar(null);
-          }, 260);
+          }, 280);
         }
       } else if (mobileDragSidebar === 'ai') {
-        const shouldOpen = -dx > winW * 0.45 || (velocity < -0.35 && -dx > 40);
+        const shouldOpen = -dx > winW * 0.38 || (velocity < -0.30 && -dx > 35);
         setIsMobileDragging(false);
         if (shouldOpen) {
           setMobileDragOffset(winW);
@@ -1580,12 +1653,12 @@ export default function App() {
             scrollChatToBottom();
             setMobileDragSidebar(null);
             setMobileDragOffset(0);
-          }, 260);
+          }, 280);
         } else {
           setMobileDragOffset(0);
           setTimeout(() => {
             setMobileDragSidebar(null);
-          }, 260);
+          }, 280);
         }
       }
     }
@@ -1631,7 +1704,7 @@ export default function App() {
       const dx = e.changedTouches[0].clientX - mobileTouchStartXRef.current;
       const dt = Date.now() - mobileTouchTimeRef.current;
       const velocity = dx / Math.max(1, dt);
-      const shouldClose = Math.abs(dx) > winW * 0.45 || (velocity < -0.35 && dx < -40);
+      const shouldClose = Math.abs(dx) > winW * 0.35 || (velocity < -0.30 && dx < -35);
 
       setIsMobileDragging(false);
       if (shouldClose) {
@@ -1640,12 +1713,12 @@ export default function App() {
           setMobileStudyView('reader');
           setMobileDragSidebar(null);
           setMobileDragOffset(0);
-        }, 260);
+        }, 280);
       } else {
         setMobileDragOffset(0);
         setTimeout(() => {
           setMobileDragSidebar(null);
-        }, 260);
+        }, 280);
       }
     }
     mobileDragLockedRef.current = null;
@@ -1690,7 +1763,7 @@ export default function App() {
       const dx = e.changedTouches[0].clientX - mobileTouchStartXRef.current;
       const dt = Date.now() - mobileTouchTimeRef.current;
       const velocity = dx / Math.max(1, dt);
-      const shouldClose = dx > winW * 0.45 || (velocity > 0.35 && dx > 40);
+      const shouldClose = dx > winW * 0.35 || (velocity > 0.30 && dx > 35);
 
       setIsMobileDragging(false);
       if (shouldClose) {
@@ -1699,12 +1772,12 @@ export default function App() {
           setMobileStudyView('reader');
           setMobileDragSidebar(null);
           setMobileDragOffset(0);
-        }, 260);
+        }, 280);
       } else {
         setMobileDragOffset(0);
         setTimeout(() => {
           setMobileDragSidebar(null);
-        }, 260);
+        }, 280);
       }
     }
     mobileDragLockedRef.current = null;
@@ -1749,7 +1822,7 @@ export default function App() {
       const dx = e.changedTouches[0].clientX - mobileTouchStartXRef.current;
       const dt = Date.now() - mobileTouchTimeRef.current;
       const velocity = dx / Math.max(1, dt);
-      const shouldClose = dx > winW * 0.45 || (velocity > 0.35 && dx > 40);
+      const shouldClose = dx > winW * 0.35 || (velocity > 0.30 && dx > 35);
 
       setIsMobileDragging(false);
       if (shouldClose) {
@@ -1758,12 +1831,12 @@ export default function App() {
           setMobileStudyView('reader');
           setMobileDragSidebar(null);
           setMobileDragOffset(0);
-        }, 260);
+        }, 280);
       } else {
         setMobileDragOffset(0);
         setTimeout(() => {
           setMobileDragSidebar(null);
-        }, 260);
+        }, 280);
       }
     }
     mobileDragLockedRef.current = null;
@@ -5417,45 +5490,45 @@ export default function App() {
     );
   }
 
-  // Dynamic CSS transforms for smooth mobile sidebar sliding
+  // Dynamic CSS transforms for smooth mobile study sidebar sliding (hardware accelerated)
   const isBookSelectorActive = mobileStudyView === 'chapters' || mobileDragSidebar === 'chapters';
   const isStudyAiActive = mobileStudyView === 'ai' || mobileDragSidebar === 'ai';
   const isStudyToolsActive = mobileStudyView === 'tools' || mobileDragSidebar === 'tools';
 
-  let bookSelectorTransform = 'translateX(-100%)';
+  let bookSelectorTransform = 'translate3d(-100%, 0, 0)';
   if (mobileStudyView === 'chapters') {
     if (mobileDragSidebar === 'chapters') {
-      bookSelectorTransform = `translateX(${mobileDragOffset}px)`;
+      bookSelectorTransform = `translate3d(${mobileDragOffset}px, 0, 0)`;
     } else {
-      bookSelectorTransform = 'translateX(0px)';
+      bookSelectorTransform = 'translate3d(0px, 0, 0)';
     }
   } else if (mobileDragSidebar === 'chapters') {
-    bookSelectorTransform = `translateX(calc(-100% + ${mobileDragOffset}px))`;
+    bookSelectorTransform = `translate3d(calc(-100% + ${mobileDragOffset}px), 0, 0)`;
   }
 
-  let studyAiTransform = 'translateX(100%)';
+  let studyAiTransform = 'translate3d(100%, 0, 0)';
   if (mobileStudyView === 'ai') {
     if (mobileDragSidebar === 'ai') {
-      studyAiTransform = `translateX(${mobileDragOffset}px)`;
+      studyAiTransform = `translate3d(${mobileDragOffset}px, 0, 0)`;
     } else {
-      studyAiTransform = 'translateX(0px)';
+      studyAiTransform = 'translate3d(0px, 0, 0)';
     }
   } else if (mobileDragSidebar === 'ai') {
-    studyAiTransform = `translateX(calc(100% - ${mobileDragOffset}px))`;
+    studyAiTransform = `translate3d(calc(100% - ${mobileDragOffset}px), 0, 0)`;
   }
 
-  let studyToolsTransform = 'translateX(100%)';
+  let studyToolsTransform = 'translate3d(100%, 0, 0)';
   if (mobileStudyView === 'tools') {
     if (mobileDragSidebar === 'tools') {
-      studyToolsTransform = `translateX(${mobileDragOffset}px)`;
+      studyToolsTransform = `translate3d(${mobileDragOffset}px, 0, 0)`;
     } else {
-      studyToolsTransform = 'translateX(0px)';
+      studyToolsTransform = 'translate3d(0px, 0, 0)';
     }
   } else if (mobileDragSidebar === 'tools') {
-    studyToolsTransform = `translateX(calc(100% - ${mobileDragOffset}px))`;
+    studyToolsTransform = `translate3d(calc(100% - ${mobileDragOffset}px), 0, 0)`;
   }
 
-  // Backdrop opacity calculation
+  // Backdrop opacity calculation for study drawers
   let backdropOpacity = 0;
   if (mobileStudyView === 'chapters') {
     const winW = typeof window !== 'undefined' ? window.innerWidth : 380;
@@ -5473,6 +5546,35 @@ export default function App() {
     const winW = typeof window !== 'undefined' ? window.innerWidth : 380;
     const progress = Math.max(0, mobileDragOffset / winW);
     backdropOpacity = progress * 0.45;
+  }
+
+  // Dynamic CSS transforms & backdrop for smooth AI Chats conversation drawer sliding (finger-tracking)
+  const isChatDrawerActive = mobileChatView === 'list' || isChatDrawerDragging;
+  const mobileChatWinW = typeof window !== 'undefined' ? window.innerWidth : 380;
+  const chatDrawerWidth = Math.min(mobileChatWinW * 0.85, 320);
+
+  let chatDrawerTransform = 'translate3d(-100%, 0, 0)';
+  if (mobileChatView === 'list') {
+    if (isChatDrawerDragging && chatDrawerInitialViewRef.current === 'list') {
+      chatDrawerTransform = `translate3d(${chatDrawerOffset}px, 0, 0)`;
+    } else {
+      chatDrawerTransform = 'translate3d(0px, 0, 0)';
+    }
+  } else if (isChatDrawerDragging && chatDrawerInitialViewRef.current === 'chat') {
+    chatDrawerTransform = `translate3d(calc(-100% + ${chatDrawerOffset}px), 0, 0)`;
+  }
+
+  let chatBackdropOpacity = 0;
+  if (mobileChatView === 'list') {
+    if (isChatDrawerDragging && chatDrawerInitialViewRef.current === 'list') {
+      const progress = Math.max(0, 1 + chatDrawerOffset / chatDrawerWidth);
+      chatBackdropOpacity = progress * 0.45;
+    } else {
+      chatBackdropOpacity = 0.45;
+    }
+  } else if (isChatDrawerDragging && chatDrawerInitialViewRef.current === 'chat') {
+    const progress = Math.max(0, chatDrawerOffset / chatDrawerWidth);
+    chatBackdropOpacity = progress * 0.45;
   }
 
   return (
@@ -5689,7 +5791,7 @@ export default function App() {
               onTouchEnd={handleBookSelectorTouchEnd}
               style={{
                 transform: bookSelectorTransform,
-                transition: isMobileDragging ? 'none' : 'transform 0.28s cubic-bezier(0.25, 1, 0.5, 1)',
+                transition: isMobileDragging ? 'none' : 'transform 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
                 pointerEvents: isBookSelectorActive ? 'auto' : 'none',
                 visibility: isBookSelectorActive ? 'visible' : 'hidden',
               }}
@@ -6278,8 +6380,12 @@ export default function App() {
             {/* Backdrop overlay for drawers */}
             {(isBookSelectorActive || isStudyAiActive || isStudyToolsActive) && backdropOpacity > 0 && (
               <div 
-                className="absolute inset-0 bg-black/45 z-20 transition-opacity duration-200"
-                style={{ opacity: backdropOpacity }}
+                className="absolute inset-0 bg-black/45 z-20 will-change-[opacity]"
+                style={{
+                  opacity: backdropOpacity,
+                  transition: isMobileDragging ? 'none' : 'opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
+                  pointerEvents: backdropOpacity > 0.05 ? 'auto' : 'none',
+                }}
                 onClick={() => {
                   setMobileStudyView('reader');
                   setMobileDragSidebar(null);
@@ -6295,7 +6401,7 @@ export default function App() {
               onTouchEnd={handleMobileStudyAiTouchEnd}
               style={{
                 transform: studyAiTransform,
-                transition: isMobileDragging ? 'none' : 'transform 0.28s cubic-bezier(0.25, 1, 0.5, 1)',
+                transition: isMobileDragging ? 'none' : 'transform 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
                 pointerEvents: isStudyAiActive ? 'auto' : 'none',
                 visibility: isStudyAiActive ? 'visible' : 'hidden',
               }}
@@ -6566,7 +6672,7 @@ export default function App() {
               onTouchEnd={handleMobileStudyToolsTouchEnd}
               style={{
                 transform: studyToolsTransform,
-                transition: isMobileDragging ? 'none' : 'transform 0.28s cubic-bezier(0.25, 1, 0.5, 1)',
+                transition: isMobileDragging ? 'none' : 'transform 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
                 pointerEvents: isStudyToolsActive ? 'auto' : 'none',
                 visibility: isStudyToolsActive ? 'visible' : 'hidden',
               }}
@@ -8405,20 +8511,37 @@ export default function App() {
         {activeTab === 'chats' && (
           <div className="flex w-full h-full min-h-0 overflow-hidden relative">
             {/* Backdrop overlay on mobile when conversations drawer is open */}
-            <div 
-              onClick={() => setMobileChatView('chat')}
-              className={`lg:hidden absolute inset-0 z-20 bg-black/40 backdrop-blur-[2px] transition-opacity duration-300 ${
-                mobileChatView === 'list' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-              }`}
-            />
+            {isChatDrawerActive && chatBackdropOpacity > 0 && (
+              <div 
+                onClick={() => {
+                  setMobileChatView('chat');
+                  setIsChatDrawerDragging(false);
+                  setChatDrawerOffset(0);
+                }}
+                onTouchStart={handleConversationTouchStart}
+                onTouchMove={handleConversationTouchMove}
+                onTouchEnd={handleConversationTouchEnd}
+                className="lg:hidden absolute inset-0 z-20 bg-black/45 will-change-[opacity]"
+                style={{
+                  opacity: chatBackdropOpacity,
+                  transition: isChatDrawerDragging ? 'none' : 'opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
+                  pointerEvents: chatBackdropOpacity > 0.05 ? 'auto' : 'none',
+                }}
+              />
+            )}
 
             <aside 
               onTouchStart={handleConversationTouchStart}
+              onTouchMove={handleConversationTouchMove}
               onTouchEnd={handleConversationTouchEnd}
-              className={`absolute lg:relative inset-y-0 left-0 z-30 lg:z-auto w-[85vw] max-w-[320px] lg:w-[280px] h-full min-h-0 border-r border-border bg-bg flex flex-col shrink-0 overflow-hidden shadow-2xl lg:shadow-none transition-transform duration-300 ease-out ${
-                mobileChatView === 'list' 
-                  ? 'translate-x-0 pointer-events-auto' 
-                  : '-translate-x-full lg:translate-x-0 pointer-events-none lg:pointer-events-auto'
+              style={{
+                transform: chatDrawerTransform,
+                transition: isChatDrawerDragging ? 'none' : 'transform 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
+                pointerEvents: isChatDrawerActive ? 'auto' : 'none',
+                visibility: isChatDrawerActive ? 'visible' : 'hidden',
+              }}
+              className={`absolute lg:relative inset-y-0 left-0 z-30 lg:z-auto w-[85vw] max-w-[320px] lg:w-[280px] h-full min-h-0 border-r border-border bg-bg flex flex-col shrink-0 overflow-hidden shadow-2xl lg:shadow-none lg:!translate-x-0 lg:!pointer-events-auto lg:!visible lg:!transition-none will-change-transform ${
+                mobileChatView === 'list' ? 'pointer-events-auto' : 'lg:pointer-events-auto'
               }`}
             >
               <header 
@@ -8505,6 +8628,7 @@ export default function App() {
             
             <section 
               onTouchStart={handleChatTouchStart}
+              onTouchMove={handleChatTouchMove}
               onTouchEnd={handleChatTouchEnd}
               className="relative flex-1 h-full min-h-0 flex flex-col bg-bg overflow-hidden"
               onDragEnter={handleChatDragEnter}
