@@ -873,9 +873,30 @@ export default function App() {
         window.history.replaceState(null, '', newPath);
       }
     }
-    if (activeTab === 'devotional') {
-      recordHabitActivity('devotional');
-    }
+  }, [activeTab]);
+
+  // Require staying on the Devotional tab for at least 5 active seconds to count toward daily streak
+  useEffect(() => {
+    if (activeTab !== 'devotional') return;
+
+    let activeElapsedMs = 0;
+    const intervalMs = 250;
+    const targetMs = 5000;
+
+    const interval = setInterval(() => {
+      // Pause timer if user switched away to another browser tab or app
+      if (typeof document !== 'undefined' && document.hidden) {
+        return;
+      }
+      activeElapsedMs += intervalMs;
+      if (activeElapsedMs >= targetMs) {
+        clearInterval(interval);
+        recordHabitActivity('devotional');
+        queueStreakPush(fetchWithAuth, dailyChapterGoalRef.current, 100);
+      }
+    }, intervalMs);
+
+    return () => clearInterval(interval);
   }, [activeTab]);
   
   // Devotional State
@@ -5437,7 +5458,7 @@ export default function App() {
     if (!prevStatus) {
       recordHabitActivity('scripture', { chapterId: currentChapterId });
     } else {
-      unmarkChapterActivity(Math.max(0, completedChapters.length - 1));
+      unmarkChapterActivity(1);
     }
     await fetchWithAuth(`${API_URL}/api/tracker`, {
       method: 'POST',
@@ -5466,7 +5487,7 @@ export default function App() {
     if (!checked) {
       recordHabitActivity('scripture', { chapterId: id });
     } else {
-      unmarkChapterActivity(Math.max(0, completedChapters.length - 1));
+      unmarkChapterActivity(1);
     }
     await fetchWithAuth(`${API_URL}/api/tracker`, {
       method: 'POST',
@@ -5485,7 +5506,7 @@ export default function App() {
     if (isAllCompleted) {
       // Unmark all chapters of this book
       setCompletedChapters(prev => prev.filter(id => !id.startsWith(`${book.name}-`)));
-      unmarkChapterActivity(Math.max(0, completedChapters.length - completedInBook.length));
+      unmarkChapterActivity(completedInBook.length);
       await fetchWithAuth(`${API_URL}/api/tracker`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -9119,12 +9140,12 @@ export default function App() {
                                   title={allRead ? `Unmark all ${book.chapters} chapters of ${book.name}` : `Mark all ${book.chapters} chapters of ${book.name} as read in one click`}
                                   className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[12px] font-medium transition-all cursor-pointer ${
                                     allRead
-                                      ? 'bg-accent/15 text-accent hover:bg-accent/25 border border-accent/30'
+                                      ? 'bg-accent/15 text-accent hover:bg-accent/25 border border-accent/30 font-semibold'
                                       : 'bg-bg text-muted hover:text-fg hover:bg-border-soft border border-border/60'
                                   }`}
                                 >
                                   {allRead ? <CheckCheck size={13} strokeWidth={2.4} /> : <Check size={13} strokeWidth={2} />}
-                                  <span>{allRead ? 'All read' : 'Mark all'}</span>
+                                  <span>Mark All</span>
                                 </span>
                                 <span className="text-[13px] text-muted font-mono bg-bg px-2 py-1 rounded-md">
                                   {trackerFormat === 'percent' ? `${Math.round((comp / book.chapters) * 100) || 0}%` : `${comp}/${book.chapters}`}
@@ -9134,22 +9155,10 @@ export default function App() {
                             
                             {isBookExpanded && (
                               <div className="p-4 pt-0 border-t border-border bg-bg">
-                                <div className="flex items-center justify-between pt-3 pb-1 border-b border-border/40">
+                                <div className="pt-3 pb-1.5 border-b border-border/40">
                                   <span className="text-xs font-semibold uppercase tracking-wider text-muted">
                                     Chapters (1–{book.chapters})
                                   </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => toggleBookAllChapters(book)}
-                                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                                      allRead
-                                        ? 'bg-accent/15 text-accent hover:bg-accent/25 border border-accent/30'
-                                        : 'bg-surface text-muted hover:text-fg hover:bg-border-soft border border-border/60'
-                                    }`}
-                                  >
-                                    {allRead ? <CheckCheck size={13} strokeWidth={2.4} /> : <Check size={13} strokeWidth={2} />}
-                                    <span>{allRead ? 'Unmark All Chapters' : `Mark All (${book.chapters})`}</span>
-                                  </button>
                                 </div>
 
                                 <div 
@@ -9239,12 +9248,12 @@ export default function App() {
                                   title={allRead ? `Unmark all ${book.chapters} chapters of ${book.name}` : `Mark all ${book.chapters} chapters of ${book.name} as read in one click`}
                                   className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[12px] font-medium transition-all cursor-pointer ${
                                     allRead
-                                      ? 'bg-accent/15 text-accent hover:bg-accent/25 border border-accent/30'
+                                      ? 'bg-accent/15 text-accent hover:bg-accent/25 border border-accent/30 font-semibold'
                                       : 'bg-bg text-muted hover:text-fg hover:bg-border-soft border border-border/60'
                                   }`}
                                 >
                                   {allRead ? <CheckCheck size={13} strokeWidth={2.4} /> : <Check size={13} strokeWidth={2} />}
-                                  <span>{allRead ? 'All read' : 'Mark all'}</span>
+                                  <span>Mark All</span>
                                 </span>
                                 <span className="text-[13px] text-muted font-mono bg-bg px-2 py-1 rounded-md">
                                   {trackerFormat === 'percent' ? `${Math.round((comp / book.chapters) * 100) || 0}%` : `${comp}/${book.chapters}`}
@@ -9254,22 +9263,10 @@ export default function App() {
                             
                             {isBookExpanded && (
                               <div className="p-4 pt-0 border-t border-border bg-bg">
-                                <div className="flex items-center justify-between pt-3 pb-1 border-b border-border/40">
+                                <div className="pt-3 pb-1.5 border-b border-border/40">
                                   <span className="text-xs font-semibold uppercase tracking-wider text-muted">
                                     Chapters (1–{book.chapters})
                                   </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => toggleBookAllChapters(book)}
-                                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                                      allRead
-                                        ? 'bg-accent/15 text-accent hover:bg-accent/25 border border-accent/30'
-                                        : 'bg-surface text-muted hover:text-fg hover:bg-border-soft border border-border/60'
-                                    }`}
-                                  >
-                                    {allRead ? <CheckCheck size={13} strokeWidth={2.4} /> : <Check size={13} strokeWidth={2} />}
-                                    <span>{allRead ? 'Unmark All Chapters' : `Mark All (${book.chapters})`}</span>
-                                  </button>
                                 </div>
 
                                 <div 

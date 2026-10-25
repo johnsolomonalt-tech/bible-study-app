@@ -404,14 +404,15 @@ export function recordHabitActivity(
 }
 
 /**
- * Remove a chapter or activity if untoggled
+ * Remove a chapter or activity if untoggled (deducts from today's completed chapters)
  */
-export function unmarkChapterActivity(chaptersRemainingToday: number): StreakData {
+export function unmarkChapterActivity(chaptersToDeduct = 1): StreakData {
   const raw = loadRawStorage();
   const todayStr = getLocalDateString();
   const todayHabits = loadTodayHabits(todayStr);
 
-  todayHabits.chaptersCompletedToday = Math.max(0, chaptersRemainingToday);
+  const currentCount = todayHabits.chaptersCompletedToday || 0;
+  todayHabits.chaptersCompletedToday = Math.max(0, currentCount - Math.max(1, chaptersToDeduct));
   if (todayHabits.chaptersCompletedToday === 0) {
     todayHabits.scripture = false;
   }
@@ -420,7 +421,6 @@ export function unmarkChapterActivity(chaptersRemainingToday: number): StreakDat
   // If no habits done today at all, remove today from activeDates
   if (!todayHabits.scripture && !todayHabits.devotional && !todayHabits.prayer) {
     const filtered = raw.activeDates.filter(d => d !== todayStr);
-    const { streak: currentStreak } = calculateStreakNumber(filtered);
     saveRawStorage({
       ...raw,
       activeDates: filtered,
