@@ -45,6 +45,7 @@ export function TrackerStreakHero({
   const [isEditPaceOpen, setIsEditPaceOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isDailyVerseOpen, setIsDailyVerseOpen] = useState(false);
+  const [isQuoteExpanded, setIsQuoteExpanded] = useState(false);
   const [quote] = useState(getTodayStreakQuote());
 
   useEffect(() => {
@@ -91,7 +92,7 @@ export function TrackerStreakHero({
                 ? 'bg-amber-500/20 text-amber-500 border-amber-500/40 shadow-amber-500/15'
                 : 'bg-surface text-muted border-border'
             }`}>
-              <AnimatedStreakFlame size={26} streak={streakData.currentStreak} isGlowing={streakData.isCompletedToday} />
+              <AnimatedStreakFlame size={38} streak={streakData.currentStreak} isGlowing={streakData.isCompletedToday} />
             </div>
           </div>
 
@@ -267,7 +268,7 @@ export function TrackerStreakHero({
                   : 'bg-surface text-muted border border-border/40 group-hover:text-fg'
               }`}>
                 {day.isCompleted ? (
-                  <Flame size={18} className="fill-white" />
+                  <Flame size={22} className="fill-white" />
                 ) : (
                   <span className="text-xs font-semibold">{day.dayNumber}</span>
                 )}
@@ -313,7 +314,13 @@ export function TrackerStreakHero({
             <Sparkles size={13} />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="italic text-fg font-serif truncate sm:whitespace-normal text-xs leading-relaxed">
+            <p 
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsQuoteExpanded(prev => !prev);
+              }}
+              className={`italic text-fg font-serif text-xs leading-relaxed cursor-pointer ${isQuoteExpanded ? 'whitespace-normal' : 'truncate sm:whitespace-normal'}`}
+            >
               &ldquo;{quote.text}&rdquo;
             </p>
             <div className="flex items-center gap-2">

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, 
@@ -31,6 +32,11 @@ export function ReadingCalendarModal({
   totalActiveDays = 0,
 }: ReadingCalendarModalProps) {
   const [currentDate, setCurrentDate] = useState(() => new Date());
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Set of fast-lookup dates
   const activeSet = React.useMemo(() => new Set(activeDates), [activeDates]);
@@ -92,7 +98,9 @@ export function ReadingCalendarModal({
     return count;
   }, [year, month, daysInMonth, activeSet]);
 
-  return (
+  if (!isOpen || !mounted || typeof document === 'undefined') return null;
+
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center modal-safe-overlay select-none overflow-y-auto">
@@ -280,6 +288,7 @@ export function ReadingCalendarModal({
           </motion.div>
         </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }

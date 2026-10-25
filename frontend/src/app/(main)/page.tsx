@@ -5842,13 +5842,13 @@ export default function App() {
             >
               <header 
                 ref={mobileReaderHeaderRef}
-                className="min-h-[50px] border-b border-border/50 flex items-center justify-between px-2 sm:px-3.5 bg-bg/85 backdrop-blur-xl shrink-0 relative z-30 py-1.5"
+                className="min-h-[50px] border-b border-border/50 flex items-center justify-between px-1.5 xs:px-2.5 sm:px-3.5 bg-bg/85 backdrop-blur-xl shrink-0 relative z-30 py-1.5"
                 style={{
                   paddingTop: mobileTopPadding,
                 }}
               >
                 {/* Left: Translation (pinned to top-left corner) + Book & Chapter Selector */}
-                <div className="flex items-center flex-nowrap min-w-0 flex-1 mr-1 gap-1 xs:gap-1.5">
+                <div className="flex items-center flex-nowrap min-w-0 flex-1 mr-1 gap-1">
                   {/* Translation Selector (top left corner, left of book) */}
                   <TranslationSelector 
                     currentTranslation={translation} 
@@ -5858,29 +5858,33 @@ export default function App() {
                     className="shrink-0"
                   />
 
-                  {/* Book & Chapter Selector Trigger */}
-                  <div ref={mobileReaderTitleRef} className="flex items-center min-w-0 flex-1 max-w-[220px] xs:max-w-[280px] overflow-hidden">
+                  {/* Book & Chapter Selector Trigger — fits long names like Song of Solomon without truncating */}
+                  <div ref={mobileReaderTitleRef} className="flex items-center min-w-0 flex-1 overflow-hidden">
                     <button 
                       type="button"
                       onClick={() => setMobileStudyView('chapters')} 
-                      className="h-9 min-h-[36px] w-full flex items-center gap-1.5 py-1 px-2.5 rounded-full bg-surface/80 hover:bg-surface border border-border-soft/60 shadow-2xs text-fg transition-all cursor-pointer active:scale-95 touch-manipulation min-w-0" 
+                      className="h-8.5 min-h-[34px] w-full flex items-center gap-1 py-1 px-2 rounded-full bg-surface/80 hover:bg-surface border border-border-soft/60 shadow-2xs text-fg transition-all cursor-pointer active:scale-95 touch-manipulation min-w-0" 
                       title="Choose Book & Chapter"
                     >
-                      <BookOpen size={14} className="text-accent shrink-0" />
-                      <span className="font-display text-[13.5px] sm:text-[15px] font-semibold whitespace-nowrap truncate min-w-0">
+                      <BookOpen size={13} className="text-accent shrink-0" />
+                      <span className={`font-display font-semibold whitespace-nowrap min-w-0 ${
+                        (activeBook.name.length + String(activeChapter).length) > 13
+                          ? 'text-[12px] xs:text-[13px] sm:text-[14.5px]'
+                          : 'text-[13px] xs:text-[14px] sm:text-[15px]'
+                      }`}>
                         {activeBook.name} {activeChapter}
                       </span>
-                      <ChevronDown size={12} className="text-muted shrink-0 opacity-60 ml-auto" />
+                      <ChevronDown size={11} className="text-muted shrink-0 opacity-60 ml-auto" />
                     </button>
                   </div>
                 </div>
 
                 {/* Right: Actions */}
-                <div className="flex items-center gap-1 shrink-0">
+                <div className="flex items-center gap-0.5 xs:gap-1 shrink-0">
                   {/* Quick Speech / Listen button */}
                   <button 
                     onClick={toggleSpeech} 
-                    className={`w-9 h-9 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-full transition-all cursor-pointer shrink-0 ${
+                    className={`w-8.5 h-8.5 min-w-[34px] min-h-[34px] flex items-center justify-center rounded-full transition-all cursor-pointer shrink-0 ${
                       isSpeaking 
                         ? 'bg-accent/15 text-accent animate-pulse border border-accent/30' 
                         : 'text-muted hover:text-fg hover:bg-surface/80 active:scale-95'
@@ -5888,7 +5892,7 @@ export default function App() {
                     title={isSpeaking ? "Stop reading chapter" : "Listen to chapter"}
                     aria-label={isSpeaking ? "Stop reading chapter" : "Listen to chapter"}
                   >
-                    {isSpeaking ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                    {isSpeaking ? <VolumeX size={15} /> : <Volume2 size={15} />}
                   </button>
 
                   {/* Streak Flame (visible across all screens, matching the other mobile tabs) */}
@@ -5954,7 +5958,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => setMobileStudyView(prev => prev === 'tools' ? 'reader' : 'tools')}
-                    className={`w-9 h-9 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-full bg-surface/70 hover:bg-surface border border-border-soft/50 text-muted hover:text-fg active:scale-95 transition-all cursor-pointer touch-manipulation ${
+                    className={`w-8.5 h-8.5 min-w-[34px] min-h-[34px] flex items-center justify-center rounded-full bg-surface/70 hover:bg-surface border border-border-soft/50 text-muted hover:text-fg active:scale-95 transition-all cursor-pointer touch-manipulation ${
                       mobileStudyView === 'tools' ? 'bg-surface text-fg ring-1 ring-border-soft' : ''
                     }`}
                     title="Study tools & options"
@@ -6276,26 +6280,13 @@ export default function App() {
                   {hasGuestData && !isSyncBannerDismissed && (
                     <div 
                       onClick={() => setIsSyncBannerExpanded(prev => !prev)}
-                      className="mb-2 p-2 rounded-xl bg-[#c96442]/10 border border-[#c96442]/25 text-[#c96442] dark:text-[#e07a5f] flex items-start justify-between gap-1.5 text-xs animate-in fade-in duration-200 cursor-pointer select-none transition-all"
-                      title={isSyncBannerExpanded ? "Click to collapse" : "Click to view full message"}
+                      className="mb-2 p-2 rounded-xl bg-[#c96442]/10 border border-[#c96442]/25 text-[#c96442] dark:text-[#e07a5f] flex items-center justify-between gap-1.5 text-xs animate-in fade-in duration-200 cursor-pointer select-none transition-all"
                     >
-                      <div className="flex items-start gap-1.5 min-w-0 flex-1">
-                        <UploadCloud size={14} className="shrink-0 mt-0.5" />
-                        <div className="min-w-0 flex-1">
-                          <p className={`text-[11px] leading-snug ${isSyncBannerExpanded ? '' : 'truncate'}`}>
-                            Study saved locally. <Link href="/sign-in" onClick={(e) => e.stopPropagation()} className="underline font-semibold hover:opacity-80">Sign in</Link> to sync across devices.
-                          </p>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setIsSyncBannerExpanded(prev => !prev);
-                            }}
-                            className="text-[10px] opacity-75 hover:opacity-100 font-semibold underline mt-0.5 inline-block cursor-pointer"
-                          >
-                            {isSyncBannerExpanded ? 'Show less' : 'View full'}
-                          </button>
-                        </div>
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <UploadCloud size={14} className="shrink-0" />
+                        <p className={`text-[11px] leading-snug min-w-0 ${isSyncBannerExpanded ? 'whitespace-normal' : 'truncate'}`}>
+                          Study saved locally. <Link href="/sign-in" onClick={(e) => e.stopPropagation()} className="underline font-semibold hover:opacity-80">Sign in</Link> to sync across devices.
+                        </p>
                       </div>
                       <button
                         type="button"
@@ -6303,7 +6294,7 @@ export default function App() {
                           e.stopPropagation();
                           setIsSyncBannerDismissed(true);
                         }}
-                        className="p-1 -mt-0.5 rounded-md hover:bg-black/10 dark:hover:bg-white/10 text-inherit shrink-0 cursor-pointer"
+                        className="p-1 rounded-md hover:bg-black/10 dark:hover:bg-white/10 text-inherit shrink-0 cursor-pointer"
                         title="Dismiss notification"
                       >
                         <X size={12} />
@@ -6501,7 +6492,7 @@ export default function App() {
                         <Send size={16} />
                       </button>
                     </div>
-                    <p className="text-[10px] text-meta text-center mt-1 px-1 select-none leading-tight truncate">
+                    <p className="text-[10px] text-meta text-center mt-1 px-1 select-none leading-tight">
                       Theologica AI can produce inaccuracies. Always cross-reference with Scripture.
                     </p>
                   </div>
@@ -7563,26 +7554,13 @@ export default function App() {
                   {hasGuestData && !isSyncBannerDismissed && (
                     <div 
                       onClick={() => setIsSyncBannerExpanded(prev => !prev)}
-                      className="mb-2 p-2 rounded-xl bg-[#c96442]/10 border border-[#c96442]/25 text-[#c96442] dark:text-[#e07a5f] flex items-start justify-between gap-1.5 text-xs animate-in fade-in duration-200 cursor-pointer select-none transition-all"
-                      title={isSyncBannerExpanded ? "Click to collapse" : "Click to view full message"}
+                      className="mb-2 p-2 rounded-xl bg-[#c96442]/10 border border-[#c96442]/25 text-[#c96442] dark:text-[#e07a5f] flex items-center justify-between gap-1.5 text-xs animate-in fade-in duration-200 cursor-pointer select-none transition-all"
                     >
-                      <div className="flex items-start gap-1.5 min-w-0 flex-1">
-                        <UploadCloud size={14} className="shrink-0 mt-0.5" />
-                        <div className="min-w-0 flex-1">
-                          <p className={`text-[11px] leading-snug ${isSyncBannerExpanded ? '' : 'truncate'}`}>
-                            Study saved locally. <Link href="/sign-in" onClick={(e) => e.stopPropagation()} className="underline font-semibold hover:opacity-80">Sign in</Link> to sync across devices.
-                          </p>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setIsSyncBannerExpanded(prev => !prev);
-                            }}
-                            className="text-[10px] opacity-75 hover:opacity-100 font-semibold underline mt-0.5 inline-block cursor-pointer"
-                          >
-                            {isSyncBannerExpanded ? 'Show less' : 'View full'}
-                          </button>
-                        </div>
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <UploadCloud size={14} className="shrink-0" />
+                        <p className={`text-[11px] leading-snug min-w-0 ${isSyncBannerExpanded ? 'whitespace-normal' : 'truncate'}`}>
+                          Study saved locally. <Link href="/sign-in" onClick={(e) => e.stopPropagation()} className="underline font-semibold hover:opacity-80">Sign in</Link> to sync across devices.
+                        </p>
                       </div>
                       <button
                         type="button"
@@ -7590,7 +7568,7 @@ export default function App() {
                           e.stopPropagation();
                           setIsSyncBannerDismissed(true);
                         }}
-                        className="p-1 -mt-0.5 rounded-md hover:bg-black/10 dark:hover:bg-white/10 text-inherit shrink-0 cursor-pointer"
+                        className="p-1 rounded-md hover:bg-black/10 dark:hover:bg-white/10 text-inherit shrink-0 cursor-pointer"
                         title="Dismiss notification"
                       >
                         <X size={12} />
@@ -8600,26 +8578,13 @@ export default function App() {
                   {hasGuestData && !isSyncBannerDismissed && (
                     <div 
                       onClick={() => setIsSyncBannerExpanded(prev => !prev)}
-                      className="mb-2 p-2.5 rounded-xl bg-[#c96442]/10 border border-[#c96442]/25 text-[#c96442] dark:text-[#e07a5f] flex items-start justify-between gap-2 text-xs animate-in fade-in duration-200 cursor-pointer select-none transition-all"
-                      title={isSyncBannerExpanded ? "Click to collapse" : "Click to view full message"}
+                      className="mb-2 p-2.5 rounded-xl bg-[#c96442]/10 border border-[#c96442]/25 text-[#c96442] dark:text-[#e07a5f] flex items-center justify-between gap-2 text-xs animate-in fade-in duration-200 cursor-pointer select-none transition-all"
                     >
-                      <div className="flex items-start gap-2 min-w-0 flex-1">
-                        <UploadCloud size={15} className="shrink-0 mt-0.5" />
-                        <div className="min-w-0 flex-1">
-                          <p className={`text-[12px] leading-snug ${isSyncBannerExpanded ? '' : 'truncate'}`}>
-                            Your study notes & chats are saved locally on this device. <Link href="/sign-in" onClick={(e) => e.stopPropagation()} className="underline font-semibold hover:opacity-80">Sign in</Link> to sync across your devices.
-                          </p>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setIsSyncBannerExpanded(prev => !prev);
-                            }}
-                            className="text-[10.5px] opacity-75 hover:opacity-100 font-semibold underline mt-0.5 inline-block cursor-pointer"
-                          >
-                            {isSyncBannerExpanded ? 'Show less' : 'View full'}
-                          </button>
-                        </div>
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <UploadCloud size={15} className="shrink-0" />
+                        <p className={`text-[12px] leading-snug min-w-0 ${isSyncBannerExpanded ? 'whitespace-normal' : 'truncate'}`}>
+                          Your study notes & chats are saved locally on this device. <Link href="/sign-in" onClick={(e) => e.stopPropagation()} className="underline font-semibold hover:opacity-80">Sign in</Link> to sync across your devices.
+                        </p>
                       </div>
                       <button
                         type="button"
@@ -8627,7 +8592,7 @@ export default function App() {
                           e.stopPropagation();
                           setIsSyncBannerDismissed(true);
                         }}
-                        className="p-1 -mt-0.5 rounded-md hover:bg-black/10 dark:hover:bg-white/10 text-inherit shrink-0 cursor-pointer"
+                        className="p-1 rounded-md hover:bg-black/10 dark:hover:bg-white/10 text-inherit shrink-0 cursor-pointer"
                         title="Dismiss notification"
                       >
                         <X size={13} />

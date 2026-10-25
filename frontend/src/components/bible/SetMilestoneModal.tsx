@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Target, 
@@ -48,6 +49,11 @@ export function SetMilestoneModal({
 }: SetMilestoneModalProps) {
   const [selectedDays, setSelectedDays] = useState<number>(currentMilestoneDays || 7);
   const [customInput, setCustomInput] = useState<string>(String(currentMilestoneDays || 7));
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -98,10 +104,12 @@ export function SetMilestoneModal({
     onClose();
   };
 
-  return (
+  if (!isOpen || !mounted || typeof document === 'undefined') return null;
+
+  return createPortal(
     <AnimatePresence>
       <div 
-        className="fixed inset-0 z-50 flex items-center justify-center modal-safe-overlay bg-black/60 backdrop-blur-sm"
+        className="fixed inset-0 z-[110] flex items-center justify-center modal-safe-overlay bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       >
         <motion.div
@@ -309,6 +317,7 @@ export function SetMilestoneModal({
           </div>
         </motion.div>
       </div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }

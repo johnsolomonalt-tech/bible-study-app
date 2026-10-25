@@ -62,7 +62,7 @@ export function TranslationSelector({
           e.stopPropagation();
           setIsOpen(!isOpen);
         }}
-        className="flex items-center gap-1 px-2.5 py-1 h-9 min-h-[36px] rounded-full bg-surface/80 hover:bg-surface border border-border-soft/60 hover:border-border-soft transition-all text-xs font-semibold text-fg cursor-pointer active:scale-95 shadow-2xs select-none shrink-0"
+        className="flex items-center gap-0.5 px-2 py-1 h-8.5 min-h-[34px] rounded-full bg-surface/80 hover:bg-surface border border-border-soft/60 hover:border-border-soft transition-all text-xs font-semibold text-fg cursor-pointer active:scale-95 shadow-2xs select-none shrink-0"
         title="Choose Bible Translation"
         aria-haspopup="true"
         aria-expanded={isOpen}

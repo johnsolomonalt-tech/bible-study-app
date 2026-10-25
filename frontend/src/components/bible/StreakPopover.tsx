@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Flame, 
@@ -39,7 +40,12 @@ export function StreakPopover({
   onNavigateToVerse,
 }: StreakPopoverProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [streakData, setStreakData] = useState<StreakData>(getStreakData());
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   const [activeTab, setActiveTab] = useState<'rhythm' | 'milestones'>('rhythm');
   const [currentQuote] = useState(getTodayStreakQuote());
   const [encouragementSeed] = useState(0);
@@ -83,11 +89,12 @@ export function StreakPopover({
       {/* Top Header Flame Pill Button */}
       <button
         type="button"
-        onClick={() => {
+        onClick={(e) => {
+          e.stopPropagation();
           setStreakData(getStreakData());
           setIsOpen(true);
         }}
-        className={`flex items-center gap-1.5 px-3 py-2 min-h-[44px] sm:min-h-0 sm:py-1.5 sm:px-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer select-none active:scale-95 ${
+        className={`flex items-center gap-1.5 px-2.5 py-1.5 min-h-[36px] sm:min-h-0 sm:py-1.5 sm:px-2.5 rounded-full border text-xs font-semibold transition-all cursor-pointer select-none active:scale-95 ${
           isGlowing
             ? 'bg-amber-500/15 border-amber-500/35 text-amber-500 dark:text-amber-400 hover:bg-amber-500/25 shadow-xs shadow-amber-500/10'
             : streak > 0
@@ -99,7 +106,7 @@ export function StreakPopover({
       >
         <div className="relative flex items-center justify-center">
           <AnimatedStreakFlame 
-            size={16} 
+            size={20} 
             streak={streak} 
             isGlowing={isGlowing} 
           />
@@ -112,13 +119,17 @@ export function StreakPopover({
         </span>
       </button>
 
-      {/* Streak & Daily Rhythm Drawer / Modal */}
-      <AnimatePresence>
-        {isOpen && (
-          <div 
-            className="fixed inset-0 z-50 flex items-center justify-center modal-safe-overlay bg-black/60 backdrop-blur-sm"
-            onClick={() => setIsOpen(false)}
-          >
+      {/* Streak & Daily Rhythm Drawer / Modal mounted via Portal directly to body */}
+      {mounted && typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {isOpen && (
+            <div 
+              className="fixed inset-0 z-[100] flex items-center justify-center modal-safe-overlay bg-black/60 backdrop-blur-sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsOpen(false);
+              }}
+            >
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -142,7 +153,7 @@ export function StreakPopover({
                   <div className="relative mb-3 flex flex-col items-center">
                     <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shadow-lg shadow-amber-500/15 overflow-hidden">
                       <AnimatedStreakFlame 
-                        size={42} 
+                        size={52} 
                         streak={streak} 
                         isGlowing={isGlowing} 
                       />
@@ -505,7 +516,9 @@ export function StreakPopover({
             </motion.div>
           </div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+      document.body
+    )}
 
       {/* Set Milestone Goal Modal */}
       <SetMilestoneModal

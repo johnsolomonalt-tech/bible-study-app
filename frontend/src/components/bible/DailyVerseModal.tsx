@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, 
@@ -44,6 +45,11 @@ export function DailyVerseModal({
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const parsed = parseVerseReference(verseRef);
 
@@ -174,12 +180,12 @@ export function DailyVerseModal({
     window.speechSynthesis.speak(utterance);
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted || typeof document === 'undefined') return null;
 
-  return (
+  return createPortal(
     <AnimatePresence>
       <div 
-        className="fixed inset-0 z-[100] flex items-center justify-center modal-safe-overlay bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+        className="fixed inset-0 z-[120] flex items-center justify-center modal-safe-overlay bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
         onClick={onClose}
       >
         <motion.div 
@@ -353,6 +359,7 @@ export function DailyVerseModal({
           </div>
         </motion.div>
       </div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
