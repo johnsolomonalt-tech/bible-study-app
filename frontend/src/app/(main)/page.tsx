@@ -5,7 +5,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } fr
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useAuth, UserButton, SignIn, SignInButton } from '@clerk/nextjs';
-import { Send, Plus, Layout, Edit, Sparkles, Target, Check, Copy, ChevronRight, ChevronLeft, ChevronDown, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquare, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow, ShieldCheck, Heart, Layers, Languages, MoreVertical, MoreHorizontal, Search, BookMarked, Quote, Compass, ArrowRight, Square, BrainCircuit, FileText, UploadCloud, Menu, SlidersHorizontal } from 'lucide-react';
+import { Send, Plus, Layout, Edit, Sparkles, Target, Check, CheckCheck, Copy, ChevronRight, ChevronLeft, ChevronDown, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquare, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow, ShieldCheck, Heart, Layers, Languages, MoreVertical, MoreHorizontal, Search, BookMarked, Quote, Compass, ArrowRight, Square, BrainCircuit, FileText, UploadCloud, Menu, SlidersHorizontal } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import TextareaAutosize from 'react-textarea-autosize';
 import { getDevotionalForDay, fetchDevotionalForDay, DevotionalEntry, getDevotionalBody } from '../../lib/devotionals';
@@ -5448,7 +5448,19 @@ export default function App() {
     queueStreakPush(fetchWithAuth, dailyChapterGoalRef.current, 100);
   };
 
+  const lastMobileChapterTapRef = useRef<{ id: string; time: number } | null>(null);
+  const chapterGridTouchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
+
   const toggleAnyChapter = async (id: string) => {
+    // If recently toggled via mobile nearest-button touch handler, ignore synthetic duplicate click
+    if (
+      lastMobileChapterTapRef.current &&
+      lastMobileChapterTapRef.current.id === id &&
+      Date.now() - lastMobileChapterTapRef.current.time < 450
+    ) {
+      return;
+    }
+
     const checked = completedChapters.includes(id);
     setCompletedChapters(prev => checked ? prev.filter(c => c !== id) : [...prev, id]);
     if (!checked) {
@@ -5463,6 +5475,86 @@ export default function App() {
     });
     trackClientEvent('reading_tracker_updated');
     queueStreakPush(fetchWithAuth, dailyChapterGoalRef.current, 100);
+  };
+
+  const toggleBookAllChapters = async (book: { name: string; chapters: number }) => {
+    const allIds = Array.from({ length: book.chapters }, (_, i) => `${book.name}-${i + 1}`);
+    const completedInBook = completedChapters.filter(id => id.startsWith(`${book.name}-`));
+    const isAllCompleted = completedInBook.length === book.chapters;
+
+    if (isAllCompleted) {
+      // Unmark all chapters of this book
+      setCompletedChapters(prev => prev.filter(id => !id.startsWith(`${book.name}-`)));
+      unmarkChapterActivity(Math.max(0, completedChapters.length - completedInBook.length));
+      await fetchWithAuth(`${API_URL}/api/tracker`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chapterIds: allIds, action: 'unmark' })
+      });
+    } else {
+      // Mark all chapters of this book as completed
+      const newChapters = allIds.filter(id => !completedChapters.includes(id));
+      setCompletedChapters(prev => Array.from(new Set([...prev, ...allIds])));
+      newChapters.forEach(id => recordHabitActivity('scripture', { chapterId: id }));
+      await fetchWithAuth(`${API_URL}/api/tracker`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chapterIds: allIds, action: 'mark' })
+      });
+    }
+    trackClientEvent('reading_tracker_updated');
+    queueStreakPush(fetchWithAuth, dailyChapterGoalRef.current, 100);
+  };
+
+  const handleChapterGridTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      chapterGridTouchStartRef.current = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY,
+        time: Date.now(),
+      };
+    }
+  };
+
+  const handleChapterGridTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!chapterGridTouchStartRef.current) return;
+    const start = chapterGridTouchStartRef.current;
+    chapterGridTouchStartRef.current = null;
+
+    if (e.changedTouches.length !== 1) return;
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    const dt = Date.now() - start.time;
+
+    // Must be an intentional tap (not a scroll or drag: < 12px travel, < 500ms duration)
+    if (Math.hypot(dx, dy) > 12 || dt > 500) return;
+
+    // Find all chapter buttons within this grid
+    const container = e.currentTarget;
+    const buttons = container.querySelectorAll<HTMLButtonElement>('button[data-chapter-id]');
+    if (buttons.length === 0) return;
+
+    let closestId: string | null = null;
+    let closestDistSq = Infinity;
+
+    buttons.forEach(btn => {
+      const rect = btn.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const distSq = (touch.clientX - cx) ** 2 + (touch.clientY - cy) ** 2;
+      if (distSq < closestDistSq) {
+        closestDistSq = distSq;
+        closestId = btn.getAttribute('data-chapter-id');
+      }
+    });
+
+    // Proximity threshold: within 56px of the button center (covers the 44px button, plus the gap between buttons and edges)
+    if (closestId && closestDistSq <= 56 * 56) {
+      e.preventDefault();
+      lastMobileChapterTapRef.current = { id: closestId, time: Date.now() };
+      toggleAnyChapter(closestId);
+    }
   };
 
   if (!isLoaded && !authTimeout) {
@@ -8508,42 +8600,9 @@ export default function App() {
         )}
 
         {/* AI CHATS TAB */}
-        {activeTab === 'chats' && (
-          <div className="flex w-full h-full min-h-0 overflow-hidden relative">
-            {/* Backdrop overlay on mobile when conversations drawer is open */}
-            {isChatDrawerActive && chatBackdropOpacity > 0 && (
-              <div 
-                onClick={() => {
-                  setMobileChatView('chat');
-                  setIsChatDrawerDragging(false);
-                  setChatDrawerOffset(0);
-                }}
-                onTouchStart={handleConversationTouchStart}
-                onTouchMove={handleConversationTouchMove}
-                onTouchEnd={handleConversationTouchEnd}
-                className="lg:hidden absolute inset-0 z-20 bg-black/45 will-change-[opacity]"
-                style={{
-                  opacity: chatBackdropOpacity,
-                  transition: isChatDrawerDragging ? 'none' : 'opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
-                  pointerEvents: chatBackdropOpacity > 0.05 ? 'auto' : 'none',
-                }}
-              />
-            )}
-
-            <aside 
-              onTouchStart={handleConversationTouchStart}
-              onTouchMove={handleConversationTouchMove}
-              onTouchEnd={handleConversationTouchEnd}
-              style={{
-                transform: chatDrawerTransform,
-                transition: isChatDrawerDragging ? 'none' : 'transform 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
-                pointerEvents: isChatDrawerActive ? 'auto' : 'none',
-                visibility: isChatDrawerActive ? 'visible' : 'hidden',
-              }}
-              className={`absolute lg:relative inset-y-0 left-0 z-30 lg:z-auto w-[85vw] max-w-[320px] lg:w-[280px] h-full min-h-0 border-r border-border bg-bg flex flex-col shrink-0 overflow-hidden shadow-2xl lg:shadow-none lg:!translate-x-0 lg:!pointer-events-auto lg:!visible lg:!transition-none will-change-transform ${
-                mobileChatView === 'list' ? 'pointer-events-auto' : 'lg:pointer-events-auto'
-              }`}
-            >
+        {activeTab === 'chats' && (() => {
+          const chatSidebarContent = (
+            <>
               <header 
                 className="min-h-[46px] lg:min-h-[60px] border-b border-border flex items-center justify-between px-4 sm:px-5 shrink-0 bg-bg py-1.5 lg:py-0"
               >
@@ -8595,6 +8654,7 @@ export default function App() {
                     key={c.id} 
                     onClick={() => {
                       openExistingChat(c.id);
+                      setMobileChatView('chat');
                     }} 
                     className={`group flex items-center justify-between w-full px-4 py-3 rounded-lg text-[14px] transition-colors cursor-pointer ${activeChatId === c.id ? 'bg-surface text-fg ring-shadow font-medium' : 'text-muted hover:bg-surface hover:text-fg'}`}
                   >
@@ -8624,13 +8684,58 @@ export default function App() {
                   </div>
                 ))}
               </div>
-            </aside>
-            
-            <section 
-              onTouchStart={handleChatTouchStart}
-              onTouchMove={handleChatTouchMove}
-              onTouchEnd={handleChatTouchEnd}
-              className="relative flex-1 h-full min-h-0 flex flex-col bg-bg overflow-hidden"
+            </>
+          );
+
+          return (
+            <div className="flex w-full h-full min-h-0 overflow-hidden relative">
+              {/* Desktop Persistent Sidebar (Always visible on desktop screen >= 1024px) */}
+              <aside className="hidden lg:flex relative inset-auto z-auto w-[280px] h-full min-h-0 border-r border-border bg-bg flex-col shrink-0 overflow-hidden">
+                {chatSidebarContent}
+              </aside>
+
+              {/* Mobile Drawer (Finger-tracking touch slide-out & backdrop) */}
+              <div className="lg:hidden">
+                {isChatDrawerActive && chatBackdropOpacity > 0 && (
+                  <div 
+                    onClick={() => {
+                      setMobileChatView('chat');
+                      setIsChatDrawerDragging(false);
+                      setChatDrawerOffset(0);
+                    }}
+                    onTouchStart={handleConversationTouchStart}
+                    onTouchMove={handleConversationTouchMove}
+                    onTouchEnd={handleConversationTouchEnd}
+                    className="absolute inset-0 z-20 bg-black/45 will-change-[opacity]"
+                    style={{
+                      opacity: chatBackdropOpacity,
+                      transition: isChatDrawerDragging ? 'none' : 'opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
+                      pointerEvents: chatBackdropOpacity > 0.05 ? 'auto' : 'none',
+                    }}
+                  />
+                )}
+
+                <aside 
+                  onTouchStart={handleConversationTouchStart}
+                  onTouchMove={handleConversationTouchMove}
+                  onTouchEnd={handleConversationTouchEnd}
+                  style={{
+                    transform: chatDrawerTransform,
+                    transition: isChatDrawerDragging ? 'none' : 'transform 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
+                    pointerEvents: isChatDrawerActive ? 'auto' : 'none',
+                    visibility: isChatDrawerActive ? 'visible' : 'hidden',
+                  }}
+                  className="absolute inset-y-0 left-0 z-30 w-[85vw] max-w-[320px] h-full min-h-0 border-r border-border bg-bg flex flex-col shrink-0 overflow-hidden shadow-2xl will-change-transform"
+                >
+                  {chatSidebarContent}
+                </aside>
+              </div>
+
+              <section 
+                onTouchStart={handleChatTouchStart}
+                onTouchMove={handleChatTouchMove}
+                onTouchEnd={handleChatTouchEnd}
+                className="relative flex-1 h-full min-h-0 flex flex-col bg-bg overflow-hidden"
               onDragEnter={handleChatDragEnter}
               onDragOver={handleChatDragOver}
               onDragLeave={handleChatDragLeave}
@@ -8911,8 +9016,9 @@ export default function App() {
                 </div>
               </form>
             </section>
-          </div>
-        )}
+            </div>
+          );
+        })()}
 
         {/* TRACKER TAB */}
         {activeTab === 'tracker' && (() => {
@@ -8986,6 +9092,8 @@ export default function App() {
                     <div className="mt-4 flex flex-col gap-3 pl-4 border-l-2 border-border">
                       {OT_BOOKS.map(book => {
                         const isBookExpanded = expandedBooks.includes(book.name);
+                        const comp = completedChapters.filter(c => c.startsWith(book.name + '-')).length;
+                        const allRead = comp === book.chapters;
                         return (
                           <div key={book.name} className="bg-surface rounded-[16px] overflow-hidden ring-1 ring-border">
                             <button 
@@ -8994,23 +9102,68 @@ export default function App() {
                             >
                               <h3 className="font-medium text-[15px] text-fg">{book.name}</h3>
                               
-                              <span className="text-[13px] text-muted font-mono bg-bg px-2 py-1 rounded-md">
-                                {(() => {
-                                  const comp = completedChapters.filter(c => c.startsWith(book.name + '-')).length;
-                                  return trackerFormat === 'percent' ? `${Math.round((comp / book.chapters) * 100) || 0}%` : `${comp}/${book.chapters}`;
-                                })()}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleBookAllChapters(book);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.stopPropagation();
+                                      toggleBookAllChapters(book);
+                                    }
+                                  }}
+                                  title={allRead ? `Unmark all ${book.chapters} chapters of ${book.name}` : `Mark all ${book.chapters} chapters of ${book.name} as read in one click`}
+                                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[12px] font-medium transition-all cursor-pointer ${
+                                    allRead
+                                      ? 'bg-accent/15 text-accent hover:bg-accent/25 border border-accent/30'
+                                      : 'bg-bg text-muted hover:text-fg hover:bg-border-soft border border-border/60'
+                                  }`}
+                                >
+                                  {allRead ? <CheckCheck size={13} strokeWidth={2.4} /> : <Check size={13} strokeWidth={2} />}
+                                  <span>{allRead ? 'All read' : 'Mark all'}</span>
+                                </span>
+                                <span className="text-[13px] text-muted font-mono bg-bg px-2 py-1 rounded-md">
+                                  {trackerFormat === 'percent' ? `${Math.round((comp / book.chapters) * 100) || 0}%` : `${comp}/${book.chapters}`}
+                                </span>
+                              </div>
                             </button>
                             
                             {isBookExpanded && (
                               <div className="p-4 pt-0 border-t border-border bg-bg">
-                                <div className="flex flex-wrap gap-2 mt-4">
+                                <div className="flex items-center justify-between pt-3 pb-1 border-b border-border/40">
+                                  <span className="text-xs font-semibold uppercase tracking-wider text-muted">
+                                    Chapters (1–{book.chapters})
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleBookAllChapters(book)}
+                                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                                      allRead
+                                        ? 'bg-accent/15 text-accent hover:bg-accent/25 border border-accent/30'
+                                        : 'bg-surface text-muted hover:text-fg hover:bg-border-soft border border-border/60'
+                                    }`}
+                                  >
+                                    {allRead ? <CheckCheck size={13} strokeWidth={2.4} /> : <Check size={13} strokeWidth={2} />}
+                                    <span>{allRead ? 'Unmark All Chapters' : `Mark All (${book.chapters})`}</span>
+                                  </button>
+                                </div>
+
+                                <div 
+                                  className="flex flex-wrap gap-2 mt-4 select-none touch-manipulation"
+                                  onTouchStart={handleChapterGridTouchStart}
+                                  onTouchEnd={handleChapterGridTouchEnd}
+                                >
                                   {Array.from({ length: book.chapters }).map((_, i) => {
                                     const id = `${book.name}-${i + 1}`;
                                     const isChecked = completedChapters.includes(id);
                                     return (
                                       <button
                                         key={i}
+                                        data-chapter-id={id}
                                         onClick={() => toggleAnyChapter(id)}
                                         className={`w-11 h-11 lg:w-9 lg:h-9 rounded-xl text-xs font-semibold flex items-center justify-center transition-all cursor-pointer ${
                                           isChecked 
@@ -9020,7 +9173,7 @@ export default function App() {
                                       >
                                         {i + 1}
                                       </button>
-                                    )
+                                    );
                                   })}
                                 </div>
                               </div>
@@ -9059,6 +9212,8 @@ export default function App() {
                     <div className="mt-4 flex flex-col gap-3 pl-4 border-l-2 border-border">
                       {NT_BOOKS.map(book => {
                         const isBookExpanded = expandedBooks.includes(book.name);
+                        const comp = completedChapters.filter(c => c.startsWith(book.name + '-')).length;
+                        const allRead = comp === book.chapters;
                         return (
                           <div key={book.name} className="bg-surface rounded-[16px] overflow-hidden ring-1 ring-border">
                             <button 
@@ -9067,23 +9222,68 @@ export default function App() {
                             >
                               <h3 className="font-medium text-[15px] text-fg">{book.name}</h3>
                               
-                              <span className="text-[13px] text-muted font-mono bg-bg px-2 py-1 rounded-md">
-                                {(() => {
-                                  const comp = completedChapters.filter(c => c.startsWith(book.name + '-')).length;
-                                  return trackerFormat === 'percent' ? `${Math.round((comp / book.chapters) * 100) || 0}%` : `${comp}/${book.chapters}`;
-                                })()}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleBookAllChapters(book);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.stopPropagation();
+                                      toggleBookAllChapters(book);
+                                    }
+                                  }}
+                                  title={allRead ? `Unmark all ${book.chapters} chapters of ${book.name}` : `Mark all ${book.chapters} chapters of ${book.name} as read in one click`}
+                                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[12px] font-medium transition-all cursor-pointer ${
+                                    allRead
+                                      ? 'bg-accent/15 text-accent hover:bg-accent/25 border border-accent/30'
+                                      : 'bg-bg text-muted hover:text-fg hover:bg-border-soft border border-border/60'
+                                  }`}
+                                >
+                                  {allRead ? <CheckCheck size={13} strokeWidth={2.4} /> : <Check size={13} strokeWidth={2} />}
+                                  <span>{allRead ? 'All read' : 'Mark all'}</span>
+                                </span>
+                                <span className="text-[13px] text-muted font-mono bg-bg px-2 py-1 rounded-md">
+                                  {trackerFormat === 'percent' ? `${Math.round((comp / book.chapters) * 100) || 0}%` : `${comp}/${book.chapters}`}
+                                </span>
+                              </div>
                             </button>
                             
                             {isBookExpanded && (
                               <div className="p-4 pt-0 border-t border-border bg-bg">
-                                <div className="flex flex-wrap gap-2 mt-4">
+                                <div className="flex items-center justify-between pt-3 pb-1 border-b border-border/40">
+                                  <span className="text-xs font-semibold uppercase tracking-wider text-muted">
+                                    Chapters (1–{book.chapters})
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleBookAllChapters(book)}
+                                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                                      allRead
+                                        ? 'bg-accent/15 text-accent hover:bg-accent/25 border border-accent/30'
+                                        : 'bg-surface text-muted hover:text-fg hover:bg-border-soft border border-border/60'
+                                    }`}
+                                  >
+                                    {allRead ? <CheckCheck size={13} strokeWidth={2.4} /> : <Check size={13} strokeWidth={2} />}
+                                    <span>{allRead ? 'Unmark All Chapters' : `Mark All (${book.chapters})`}</span>
+                                  </button>
+                                </div>
+
+                                <div 
+                                  className="flex flex-wrap gap-2 mt-4 select-none touch-manipulation"
+                                  onTouchStart={handleChapterGridTouchStart}
+                                  onTouchEnd={handleChapterGridTouchEnd}
+                                >
                                   {Array.from({ length: book.chapters }).map((_, i) => {
                                     const id = `${book.name}-${i + 1}`;
                                     const isChecked = completedChapters.includes(id);
                                     return (
                                       <button
                                         key={i}
+                                        data-chapter-id={id}
                                         onClick={() => toggleAnyChapter(id)}
                                         className={`w-11 h-11 lg:w-9 lg:h-9 rounded-xl text-xs font-semibold flex items-center justify-center transition-all cursor-pointer ${
                                           isChecked 
@@ -9093,7 +9293,7 @@ export default function App() {
                                       >
                                         {i + 1}
                                       </button>
-                                    )
+                                    );
                                   })}
                                 </div>
                               </div>

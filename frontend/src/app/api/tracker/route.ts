@@ -24,6 +24,32 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
+
+    // Support batch chapter operations (e.g. mark/unmark all chapters of a book in one click)
+    if (Array.isArray(body?.chapterIds)) {
+      const validIds = body.chapterIds
+        .filter((id: unknown): id is string => typeof id === 'string' && id.length <= 50 && /^[1-3]?[A-Za-z ]+-\d+$/.test(id));
+
+      if (validIds.length === 0) {
+        return NextResponse.json({ error: 'No valid chapter IDs provided' }, { status: 400 });
+      }
+
+      const action = body.action === 'unmark' ? 'unmark' : 'mark';
+      if (action === 'unmark') {
+        await prisma.tracker.deleteMany({
+          where: { userId, chapterId: { in: validIds } }
+        });
+        return NextResponse.json({ success: true, count: validIds.length, action: 'unmark' });
+      } else {
+        const data = validIds.map((chapterId: string) => ({ userId, chapterId }));
+        await prisma.tracker.createMany({
+          data,
+          skipDuplicates: true
+        });
+        return NextResponse.json({ success: true, count: validIds.length, action: 'mark' });
+      }
+    }
+
     const chapterId = typeof body?.chapterId === 'string' ? body.chapterId.trim() : '';
 
     if (!chapterId || chapterId.length > 50 || !/^[1-3]?[A-Za-z ]+-\d+$/.test(chapterId)) {
