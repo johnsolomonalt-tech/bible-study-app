@@ -1007,6 +1007,7 @@ export default function App() {
   });
   const [isMobileTyping, setIsMobileTyping] = useState(false);
   const activeTabRef = useRef(activeTab);
+  const isHomeSuggestionsActiveRef = useRef(true);
   useEffect(() => {
     activeTabRef.current = activeTab;
     if (activeTab === 'canvas') {
@@ -1035,6 +1036,10 @@ export default function App() {
       if (isInputElement(e.target as Element)) {
         setIsMobileTyping(true);
         const target = e.target as HTMLElement;
+        const isChatInput = target.getAttribute('placeholder')?.includes('Ask anything') || target.getAttribute('placeholder')?.includes('Study AI');
+        if (isChatInput && isHomeSuggestionsActiveRef.current) {
+          return;
+        }
         setTimeout(() => {
           try {
             target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -3457,6 +3462,49 @@ export default function App() {
 
   const activeNote = notes.find(n => n.id === activeNoteId) || { id: 0, title: 'No Note Selected', content: '' };
   const activeChat = (activeChatId ? chats.find(c => c.id === activeChatId) : null) || { id: 0, title: 'New Conversation', messages: [] };
+
+  const isChatEmptyHome = activeChat.messages.length === 0;
+  const isHomeTypingLocked = isChatEmptyHome && (isChatInputFocused || isMobileTyping);
+  isHomeSuggestionsActiveRef.current = isChatEmptyHome;
+
+  // Prevent scrolling on the AI chat home suggestions screen when focused in the text box
+  useEffect(() => {
+    if (!isHomeTypingLocked) return;
+
+    if (mobileStudyChatScrollRef.current) {
+      mobileStudyChatScrollRef.current.scrollTop = 0;
+    }
+    if (desktopStudyChatScrollRef.current) {
+      desktopStudyChatScrollRef.current.scrollTop = 0;
+    }
+    if (fullChatScrollRef.current) {
+      fullChatScrollRef.current.scrollTop = 0;
+    }
+
+    const preventTouchScroll = (e: TouchEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT')) {
+        return;
+      }
+      e.preventDefault();
+    };
+
+    const preventWheelScroll = (e: WheelEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT')) {
+        return;
+      }
+      e.preventDefault();
+    };
+
+    window.addEventListener('touchmove', preventTouchScroll, { passive: false });
+    window.addEventListener('wheel', preventWheelScroll, { passive: false });
+
+    return () => {
+      window.removeEventListener('touchmove', preventTouchScroll);
+      window.removeEventListener('wheel', preventWheelScroll);
+    };
+  }, [isHomeTypingLocked]);
 
   const LOCAL_HIGHLIGHTS_KEY = 'theologica_local_highlights_v1';
 
@@ -6288,7 +6336,12 @@ export default function App() {
               <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                 <div
                   ref={mobileStudyChatScrollRef}
-                  className={`flex-1 min-h-0 overflow-y-auto custom-scroll ${activeChat.messages.length === 0 && !isAiTyping ? 'flex flex-col' : 'space-y-4'} p-3 sm:p-4`}
+                  style={isHomeTypingLocked ? { overflow: 'hidden', touchAction: 'none', overscrollBehavior: 'none' } : undefined}
+                  className={`flex-1 min-h-0 ${
+                    isHomeTypingLocked
+                      ? 'overflow-hidden overscroll-none touch-none select-none'
+                      : 'overflow-y-auto custom-scroll'
+                  } ${activeChat.messages.length === 0 && !isAiTyping ? 'flex flex-col' : 'space-y-4'} p-3 sm:p-4`}
                 >
                   {activeChat.messages.length === 0 ? (
                     <ChatEmptyState
@@ -7520,7 +7573,12 @@ export default function App() {
               </header>
               <div
                 ref={desktopStudyChatScrollRef}
-                className={`flex-1 min-h-0 overflow-y-auto custom-scroll ${activeChat.messages.length === 0 && !isAiTyping ? 'flex flex-col' : 'space-y-6'} p-4`}
+                style={isHomeTypingLocked ? { overflow: 'hidden', touchAction: 'none', overscrollBehavior: 'none' } : undefined}
+                className={`flex-1 min-h-0 ${
+                  isHomeTypingLocked
+                    ? 'overflow-hidden overscroll-none touch-none select-none'
+                    : 'overflow-y-auto custom-scroll'
+                } ${activeChat.messages.length === 0 && !isAiTyping ? 'flex flex-col' : 'space-y-6'} p-4`}
               >
                 {activeChat.messages.length === 0 ? (
                   <ChatEmptyState
@@ -8507,7 +8565,12 @@ export default function App() {
               </header>
               <div
                 ref={fullChatScrollRef}
-                className={`flex-1 min-h-0 overflow-y-auto custom-scroll ${activeChat.messages.length === 0 && !isAiTyping ? 'flex flex-col' : 'space-y-6 sm:space-y-8'} p-2.5 sm:p-8 lg:p-12`}
+                style={isHomeTypingLocked ? { overflow: 'hidden', touchAction: 'none', overscrollBehavior: 'none' } : undefined}
+                className={`flex-1 min-h-0 ${
+                  isHomeTypingLocked
+                    ? 'overflow-hidden overscroll-none touch-none select-none'
+                    : 'overflow-y-auto custom-scroll'
+                } ${activeChat.messages.length === 0 && !isAiTyping ? 'flex flex-col' : 'space-y-6 sm:space-y-8'} p-2.5 sm:p-8 lg:p-12`}
               >
                 {activeChat.messages.length === 0 ? (
                   <ChatEmptyState
