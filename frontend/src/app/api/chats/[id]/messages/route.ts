@@ -25,6 +25,12 @@ const SYSTEM_INSTRUCTION = `You are 'Theologica AI', an intelligent Bible study 
 STRICT RULES:
 1. Under NO CIRCUMSTANCES should you ever mention or reveal that you are developed by Google, that you are the Gemini model, or that you use Google's infrastructure. If asked about your identity, you are exclusively 'Theologica AI', created for this specific Bible app.
 2. IMPORTANT THEOLOGICAL GUIDELINES: You are specifically a Christian guide. If a user asks you for reasons to believe in other religions (like Islam, the Quran, Hinduism, Buddhism, etc.), you must politely decline and state that your purpose is to guide them through Christianity and the Bible. Do not defend, promote, or provide apologetics for other religions. Keep all answers firmly rooted in a Christian perspective.
+3. MANDATORY CLARIFICATION FOR UNSPECIFIED OR AMBIGUOUS CHAPTER/PASSAGE QUERIES:
+If the user asks about "this chapter", "the chapter", "this passage", "the story", or "these verses" (e.g., "What does this chapter mean?", "Explain the chapter", "What happened in this chapter?", "Summarize this passage", "What is the key message?") and does NOT specify WHICH book or chapter they are referring to, and NO specific Scripture passage was attached in the prompt or conversation:
+- Under NO CIRCUMSTANCES should you invent, assume, guess, or pick a random chapter to answer about!
+- You MUST politely ask the user for clarification before answering:
+  "Which book and chapter would you like to explore? (For example: **Genesis 1**, **Psalm 23**, or **Romans 8**). Tell me the passage you're reading, and I will be glad to walk through it with you!"
+- Only provide an exegesis or chapter breakdown when the specific biblical book and chapter are clearly identified either in the prompt or in the attached Scripture ground truth context.
 
 MANDATORY THEOLOGICAL REASONING PROCESS (THINKING TRACE):
 At the very beginning of every study response, before providing your final answer, you MUST conduct your internal theological thinking and exegetical analysis enclosed strictly within __THOUGHT__ and __END_THOUGHT__ tags:
@@ -46,6 +52,11 @@ CONCISE, FOCUSED RESPONSES:
 - Keep your final responses concise, punchy, and clear. Avoid filler, longwinded pleasantries, or excessive repetition.
 - Aim for high-density biblical insight: answer the question directly, provide the core scripture context clearly, and offer a practical takeaway in 2 to 4 focused paragraphs or clean bullet points unless the user specifically asks for an extensive treatise.
 - Speak with natural human warmth, theological clarity, and reverence.
+
+CONSULTED RESEARCH SOURCES:
+At the very end of your response (before __SUGGESTED_FOLLOW_UPS__), cite 3 to 5 real, diverse, specific web sources, lexicons, or commentaries that substantiate your answer, formatted strictly as:
+__SOURCES__[{"title": "Specific Title", "url": "https://...", "domain": "domain.org", "snippet": "Specific 1-sentence description"}]__END_SOURCES__
+Do not repeat generic homepages; provide specific, tailored links based on the exact inquiry.
 
 TAILORED FOLLOW-UP QUESTIONS:
 At the very end of every study response (after all your text), provide exactly 3 concise, deeply engaging follow-up questions tailored specifically to the verses and theological themes you just discussed. Format them strictly on a single line at the very end as:
@@ -216,8 +227,11 @@ async function saveOrMockMessage(data: { content: string; role: string; chatId: 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const identity = await resolveChatIdentity(req);
-  const chatId = Number(id);
-  if (!identity || !isValidDbId(chatId) || !(await ownsChat(identity, chatId))) {
+  let chatId = Number(id);
+  if (!isValidDbId(chatId) && typeof chatId === 'number' && chatId > 0) {
+    chatId = (chatId % 2000000000) + 1;
+  }
+  if (!isValidDbId(chatId) || !(await ownsChat(identity, chatId))) {
     return NextResponse.json({ error: 'Chat not found.' }, { status: 404 });
   }
   if (identity.kind === 'user' && process.env.DATABASE_URL) {
@@ -479,6 +493,17 @@ Do NOT inject original Hebrew/Greek characters, Strong's concordance numbers, or
     effectiveSystemInstruction += `\n\n${THEOLOGICAL_LENSES[theologicalLens]}`;
   }
 
+  // Detect if user asks about a chapter/passage without specifying which book or chapter
+  const isVagueChapterPrompt = !resolvedGroundTruth && 
+    /\b(this\s+chapter|the\s+chapter|this\s+passage|the\s+passage|these\s+verses|this\s+story)\b/i.test(content) &&
+    !new RegExp(BIBLE_VERSE_REGEX.source, 'i').test(content);
+
+  if (isVagueChapterPrompt) {
+    effectiveSystemInstruction += `\n\n[USER QUERY AMBIGUITY NOTICE]
+The user's inquiry asks about a chapter or passage ("${content}") without identifying which biblical book or chapter they are studying, and no scripture text was attached.
+Do NOT guess or answer about a random chapter! Politely ask the user which book and chapter they would like to study (for example: Genesis 1, Psalm 23, or Romans 8).`;
+  }
+
   // Build current message parts — support optional inline image
   type Part = { text: string } | { inlineData: { mimeType: string; data: string } };
   const messageParts: Part[] = [];
@@ -602,8 +627,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const identity = await resolveChatIdentity(req);
   const userId = identity?.userId || null;
-  const chatId = Number(id);
-  if (!identity || !isValidDbId(chatId) || !(await ownsChat(identity, chatId))) {
+  let chatId = Number(id);
+  if (!isValidDbId(chatId) && typeof chatId === 'number' && chatId > 0) {
+    chatId = (chatId % 2000000000) + 1;
+  }
+  if (!isValidDbId(chatId) || !(await ownsChat(identity, chatId))) {
     return NextResponse.json({ error: 'Chat not found.' }, { status: 404 });
   }
 

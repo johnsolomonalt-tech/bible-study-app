@@ -7,8 +7,11 @@ type Context = { params: Promise<{ id: string }> };
 
 async function authorizedChat(req: Request, rawId: string) {
   const identity = await resolveChatIdentity(req);
-  const chatId = Number(rawId);
-  if (!identity || !isValidDbId(chatId) || !(await ownsChat(identity, chatId))) return null;
+  let chatId = Number(rawId);
+  if (!isValidDbId(chatId) && typeof chatId === 'number' && chatId > 0) {
+    chatId = (chatId % 2000000000) + 1;
+  }
+  if (!isValidDbId(chatId) || !(await ownsChat(identity, chatId))) return null;
   return { identity, chatId };
 }
 

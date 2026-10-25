@@ -39,8 +39,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const identity = await resolveChatIdentity(req);
   const userId = identity?.userId || null;
-  const chatId = Number(id);
-  if (!identity || !isValidDbId(chatId) || !(await ownsChat(identity, chatId))) {
+  let chatId = Number(id);
+  if (!isValidDbId(chatId) && typeof chatId === 'number' && chatId > 0) {
+    chatId = (chatId % 2000000000) + 1;
+  }
+  if (!isValidDbId(chatId) || !(await ownsChat(identity, chatId))) {
     return NextResponse.json({ error: 'Chat not found.' }, { status: 404 });
   }
   const ip = getClientIp(req);

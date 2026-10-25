@@ -89,8 +89,42 @@ function getBibleHubSlug(bookName: string): string {
 }
 
 /**
+ * Extracts dominant theological topics from text to generate tailored research deep-links.
+ */
+function extractPrimaryTopic(text: string): string | null {
+  const topics: { pattern: RegExp; name: string }[] = [
+    { pattern: /\bresurrection|risen|empty tomb\b/i, name: 'Resurrection of Jesus' },
+    { pattern: /\btrinity|triune|father son and holy spirit\b/i, name: 'Doctrine of the Trinity' },
+    { pattern: /\bincarnat|word became flesh|hypostatic\b/i, name: 'Incarnation of Christ' },
+    { pattern: /\batonement|propitiat|substitutionary|cross\b/i, name: 'Atonement of Christ' },
+    { pattern: /\bjustif|faith alone|sola fide|imputed\b/i, name: 'Justification by Faith' },
+    { pattern: /\bcovenant|abrahamic|davidic|mosaic|new covenant\b/i, name: 'Biblical Covenants' },
+    { pattern: /\bgrace|unmerited favor|mercy\b/i, name: 'God Grace and Mercy' },
+    { pattern: /\bprayer|intercession|petition|supplication\b/i, name: 'Christian Prayer' },
+    { pattern: /\bholy spirit|pneumat|paraclete|spiritual gifts\b/i, name: 'Work of the Holy Spirit' },
+    { pattern: /\bcreation|ex nihilo|genesis 1|image of god\b/i, name: 'Biblical Creation' },
+    { pattern: /\bdead sea scrolls|qumran|ancient manuscripts\b/i, name: 'Dead Sea Scrolls' },
+    { pattern: /\barchaeolog|excavat|near east discoveries\b/i, name: 'Biblical Archaeology' },
+    { pattern: /\bpatristic|early church fathers|augustine|chrysostom\b/i, name: 'Early Church Fathers' },
+    { pattern: /\breformation|calvin|luther|solas\b/i, name: 'Protestant Reformation' },
+    { pattern: /\bfaith|trust|assurance|hope\b/i, name: 'Christian Faith and Trust' },
+    { pattern: /\blove|agape|hesed|charity\b/i, name: 'Biblical Love Agape' },
+    { pattern: /\bpeace|shalom|reconciliation\b/i, name: 'Biblical Shalom Peace' },
+    { pattern: /\blaw and gospel|ten commandments|decalogue\b/i, name: 'Law and Gospel' },
+    { pattern: /\bbeatitudes|sermon on the mount\b/i, name: 'Sermon on the Mount' },
+    { pattern: /\bparables|prodigal son|good samaritan\b/i, name: 'Parables of Jesus' },
+  ];
+
+  for (const t of topics) {
+    if (t.pattern.test(text)) return t.name;
+  }
+  return null;
+}
+
+/**
  * Builds verified external Bible study web sources from AI response content,
- * active theological lens, and RAG ground truth.
+ * active theological lens, and RAG ground truth. Generates dynamic, diverse sources
+ * tailored to the exact topic, passage, or historical period.
  */
 export function extractVerifiedSources(
   content: string,
@@ -100,13 +134,15 @@ export function extractVerifiedSources(
   if (!content) return [];
 
   const sources: ChatSourceItem[] = [];
-  const seenUrls = new Set<string>();
+  const seenDomains = new Set<string>();
 
   const addSource = (item: ChatSourceItem) => {
-    if (!seenUrls.has(item.url)) {
-      seenUrls.add(item.url);
-      sources.push(item);
+    // Encourage domain diversity — avoid loading 3 cards from the exact same site
+    if (seenDomains.has(item.domain) && seenDomains.size >= 3) {
+      return;
     }
+    seenDomains.add(item.domain);
+    sources.push(item);
   };
 
   // 1. Check for custom markdown links [Title](https://...) inside the message text
@@ -123,7 +159,7 @@ export function extractVerifiedSources(
         title: title.length > 55 ? `${title.slice(0, 52)}...` : title,
         url,
         domain,
-        snippet: `Direct link referenced in study response from ${domain}.`,
+        snippet: `Direct reference cited in study response from ${domain}.`,
         category: 'academic',
       });
     } catch {
@@ -162,158 +198,194 @@ export function extractVerifiedSources(
     }
   }
 
-  // 3. Generate primary scripture & interlinear source cards for detected verses
+  // 3. Primary Scripture interlinear / morphological tools
   if (detectedReferences.length > 0) {
     const primary = detectedReferences[0];
     const hubSlug = getBibleHubSlug(primary.book);
 
-    // Bible Hub Interlinear & Lexicon
+    // Bible Hub Interlinear
     addSource({
       id: `biblehub-interlinear-${primary.fullRef}`,
       title: `Bible Hub · ${primary.fullRef} Interlinear & Lexicon`,
       url: `https://biblehub.com/interlinear/${hubSlug}/${primary.chapter}-${primary.verse}.htm`,
       domain: 'biblehub.com',
-      snippet: `Original Hebrew & Greek interlinear parsing, Strong's Concordance numbering, and verse-by-verse classic commentaries for ${primary.fullRef}.`,
+      snippet: `Original Hebrew & Greek interlinear parsing, Strong's Concordance numbering, and verse-by-verse grammar.`,
       category: 'lexicon',
       highlightReference: primary.fullRef,
     });
 
-    // Blue Letter Bible Study Tools & Lexicon
+    // Blue Letter Bible
     addSource({
       id: `blb-${primary.fullRef}`,
-      title: `Blue Letter Bible · ${primary.fullRef} Study Tools`,
+      title: `Blue Letter Bible · ${primary.fullRef} Exegesis`,
       url: `https://www.blueletterbible.org/search/preSearch.cfm?Criteria=${encodeURIComponent(primary.fullRef)}`,
       domain: 'blueletterbible.org',
-      snippet: `Morphological roots, Gesenius Hebrew-Chaldee lexicon, Thayer Greek lexicon, and Treasury of Scripture Knowledge cross-references.`,
+      snippet: `Morphological parsing, Gesenius Hebrew/Thayer Greek lexicons, and Treasury of Scripture Knowledge.`,
       category: 'scripture',
       highlightReference: primary.fullRef,
     });
+  }
 
-    // STEP Bible (Tyndale House Cambridge)
-    addSource({
-      id: `stepbible-${primary.book}-${primary.chapter}`,
-      title: `STEP Bible (Tyndale House Cambridge) · ${primary.book} ${primary.chapter}`,
-      url: `https://www.stepbible.org/?q=version=BSB|reference=${encodeURIComponent(`${primary.book}.${primary.chapter}.${primary.verse}`)}`,
-      domain: 'stepbible.org',
-      snippet: `Academic manuscript witnesses (Dead Sea Scrolls, Septuagint, Masoretic Text) and Tyndale House grammatical research.`,
-      category: 'academic',
-      highlightReference: primary.fullRef,
-    });
+  // 4. Topic-Specific Rich Scholarly & Historical Domains
+  const primaryTopic = extractPrimaryTopic(content);
 
-    // Bible Gateway translation comparison
-    addSource({
-      id: `biblegateway-${primary.fullRef}`,
-      title: `Bible Gateway · ${primary.fullRef} Parallel Translations`,
-      url: `https://www.biblegateway.com/passage/?search=${encodeURIComponent(primary.fullRef)}&version=BSB`,
-      domain: 'biblegateway.com',
-      snippet: `Parallel English translations, contextual chapter reading, and canonical cross-comparisons.`,
-      category: 'scripture',
-      highlightReference: primary.fullRef,
-    });
-
-    // If second verse exists, link its Bible Hub commentary
-    if (detectedReferences.length > 1) {
-      const secondary = detectedReferences[1];
-      const secSlug = getBibleHubSlug(secondary.book);
+  // Archaeology & Ancient Context
+  const hasArchaeology = /archaeol|excavat|dead sea scrolls|qumran|ancient near east|second temple|babylon|assyria|egypt/i.test(content);
+  if (hasArchaeology) {
+    if (/dead sea scrolls|qumran/i.test(content)) {
       addSource({
-        id: `biblehub-commentary-${secondary.fullRef}`,
-        title: `Bible Hub · ${secondary.fullRef} Commentaries`,
-        url: `https://biblehub.com/commentaries/${secSlug}/${secondary.chapter}-${secondary.verse}.htm`,
-        domain: 'biblehub.com',
-        snippet: `Historical expository commentaries (Matthew Henry, Ellicott, Cambridge Bible for Schools, Barnes Notes).`,
-        category: 'commentary',
-        highlightReference: secondary.fullRef,
+        id: 'dead-sea-scrolls',
+        title: 'Leon Levy Dead Sea Scrolls Digital Library',
+        url: 'https://www.deadseascrolls.org.il/',
+        domain: 'deadseascrolls.org.il',
+        snippet: 'Digitized high-resolution multispectral imagery of Biblical manuscripts from Qumran caves.',
+        category: 'academic',
+      });
+    } else {
+      addSource({
+        id: 'biblical-archaeology',
+        title: 'Biblical Archaeology Society · Ancient Discoveries',
+        url: 'https://www.biblicalarchaeology.org/',
+        domain: 'biblicalarchaeology.org',
+        snippet: 'Scholarly archaeological excavations, material culture, and historical inscriptions verifying Scripture.',
+        category: 'academic',
       });
     }
   }
 
-  // 4. Check for Hebrew / Greek roots or Strong's Concordance mentions
-  const hasStrongNumber = /strong'?s\s*([GH]\d+)/i.exec(content);
-  if (hasStrongNumber) {
-    const num = hasStrongNumber[1].toLowerCase();
-    addSource({
-      id: `blb-lexicon-${num}`,
-      title: `Blue Letter Bible · Strong's ${num.toUpperCase()} Lexicon`,
-      url: `https://www.blueletterbible.org/lexicon/${num}/kjv/wlc/0-1/`,
-      domain: 'blueletterbible.org',
-      snippet: `Complete lexical definition, Hebrew/Greek etymological root tree, and Scripture occurrence concordance.`,
-      category: 'lexicon',
-    });
-  }
-
-  // 5. Theological Lens & Historical Church Sources
-  const hasPatristicTerms = /augustine|chrysostom|irenaeus|athanasius|patristic|early church|desert fathers|cappadocian|tertullian|nicene/i.test(content) || lens === 'patristic';
-  if (hasPatristicTerms) {
+  // Patristic & Church History
+  const hasPatristic = /augustine|chrysostom|irenaeus|athanasius|patristic|early church|desert fathers|nicene|creed/i.test(content) || lens === 'patristic';
+  if (hasPatristic) {
     addSource({
       id: 'ccel-fathers',
       title: 'Christian Classics Ethereal Library · Early Church Fathers',
       url: 'https://www.ccel.org/fathers',
       domain: 'ccel.org',
-      snippet: 'Primary historical source texts of the Ante-Nicene, Nicene, and Post-Nicene Fathers (Philip Schaff collection).',
+      snippet: 'Primary source texts of the Ante-Nicene, Nicene, and Post-Nicene Fathers (Philip Schaff collection).',
       category: 'history',
     });
     addSource({
       id: 'newadvent-fathers',
-      title: 'New Advent · Fathers of the Church',
+      title: 'New Advent · Patristic Homilies & Council Canons',
       url: 'https://www.newadvent.org/fathers/',
       domain: 'newadvent.org',
-      snippet: 'Unabridged ancient Greek and Latin Patristic homilies, ecumenical council canons, and historic treatises.',
+      snippet: 'Ancient Greek and Latin Church Father homilies, theological apologetics, and historical creeds.',
       category: 'history',
     });
   }
 
-  const hasReformationTerms = /calvin|luther|spurgeon|edwards|reformation|puritan|sola fide|solas|westminster|covenant theology/i.test(content) || lens === 'reformation';
-  if (hasReformationTerms) {
+  // Reformation & Historic Expositions
+  const hasReformation = /calvin|luther|spurgeon|puritan|sola fide|solas|westminster|edwards|owen/i.test(content) || lens === 'reformation';
+  if (hasReformation) {
+    if (/spurgeon/i.test(content)) {
+      addSource({
+        id: 'spurgeon-center',
+        title: 'The Spurgeon Center · Historical Sermons & Expository Archives',
+        url: 'https://www.spurgeon.org/resource-library/',
+        domain: 'spurgeon.org',
+        snippet: 'Charles Spurgeon unabridged expository sermons, Treasury of David commentaries, and pastoral works.',
+        category: 'commentary',
+      });
+    } else {
+      addSource({
+        id: 'monergism-reformation',
+        title: 'Monergism · Historic Reformation & Doctrines of Grace',
+        url: 'https://www.monergism.com/',
+        domain: 'monergism.com',
+        snippet: 'Historical Protestant theology, Five Solas expositions, Puritan writings, and historic confessions.',
+        category: 'theology',
+      });
+      addSource({
+        id: 'ligonier-articles',
+        title: 'Ligonier Ministries · Reformed Theology & Biblical Studies',
+        url: 'https://www.ligonier.org/',
+        domain: 'ligonier.org',
+        snippet: 'Classical evangelical theology, historical confessions, and systematic scriptural commentary.',
+        category: 'theology',
+      });
+    }
+  }
+
+  // Biblical Theology & Redemptive Themes
+  const hasTheologyTheme = /covenant|typology|christology|creation|exile|messiah|temple|kingdom of god/i.test(content) || lens === 'canonical';
+  if (hasTheologyTheme) {
     addSource({
-      id: 'monergism-theology',
-      title: 'Monergism · Historic Reformation & Doctrines of Grace',
-      url: 'https://www.monergism.com/',
-      domain: 'monergism.com',
-      snippet: 'Primary historical Reformed theology, Five Solas expositions, Puritan writings, and historic confessions.',
+      id: 'bibleproject-explore',
+      title: 'BibleProject · Biblical Themes & Literary Design Patterns',
+      url: 'https://bibleproject.com/explore/',
+      domain: 'bibleproject.com',
+      snippet: 'Visual biblical theology, cross-canonical design patterns, and Old/New Testament organic continuity.',
       category: 'theology',
     });
+  }
+
+  // Academic / Manuscript Research (STEP Bible Tyndale House)
+  if (lens === 'scholarly' || /manuscript|textual variant|septuagint|masoretic|hebrew root|greek root/i.test(content)) {
     addSource({
-      id: 'ccel-calvin',
-      title: "Christian Classics Ethereal Library · Calvin's Commentaries",
-      url: 'https://www.ccel.org/ccel/calvin',
-      domain: 'ccel.org',
-      snippet: 'Classic Reformation expository commentaries and John Calvin Institutes of the Christian Religion.',
+      id: 'stepbible-academic',
+      title: 'STEP Bible (Tyndale House Cambridge)',
+      url: 'https://www.stepbible.org/',
+      domain: 'stepbible.org',
+      snippet: 'Tyndale House Cambridge grammatical analysis, Dead Sea Scroll witnesses, and ancient manuscripts.',
+      category: 'academic',
+    });
+  }
+
+  // Devotional, Prayer & Christian Living
+  if (lens === 'contemplative' || /devotion|prayer|meditat|abide|spiritual formation|intimacy with god/i.test(content)) {
+    addSource({
+      id: 'desiringgod-articles',
+      title: 'Desiring God · Biblical Reflections & Devotional Exegesis',
+      url: 'https://www.desiringgod.org/',
+      domain: 'desiringgod.org',
+      snippet: 'Christ-centered pastoral theology, contemplative meditations on Scripture, and spiritual formation.',
+      category: 'theology',
+    });
+  }
+
+  // Topic-Aware Dynamic Search Deep-Links (prevents repeating the same generic root pages)
+  if (primaryTopic) {
+    addSource({
+      id: `tgc-topic-${primaryTopic}`,
+      title: `The Gospel Coalition · ${primaryTopic}`,
+      url: `https://www.thegospelcoalition.org/?s=${encodeURIComponent(primaryTopic)}`,
+      domain: 'thegospelcoalition.org',
+      snippet: `Scholarly essays, pastoral perspectives, and expository commentary on ${primaryTopic}.`,
+      category: 'commentary',
+    });
+
+    addSource({
+      id: `gotquestions-topic-${primaryTopic}`,
+      title: `GotQuestions.org · ${primaryTopic}`,
+      url: `https://www.gotquestions.org/search.html?q=${encodeURIComponent(primaryTopic)}`,
+      domain: 'gotquestions.org',
+      snippet: `Orthodox Christian biblical answers and cross-canonical examination concerning ${primaryTopic}.`,
+      category: 'theology',
+    });
+  } else {
+    // If no specific topic matched, provide Bible Gateway passage lookup or TGC
+    if (detectedReferences.length > 0) {
+      const ref = detectedReferences[0].fullRef;
+      addSource({
+        id: `biblegateway-${ref}`,
+        title: `Bible Gateway · ${ref} Text & Parallels`,
+        url: `https://www.biblegateway.com/passage/?search=${encodeURIComponent(ref)}&version=BSB`,
+        domain: 'biblegateway.com',
+        snippet: `Parallel translation comparison, canonical context, and scholarly Bible dictionaries.`,
+        category: 'scripture',
+      });
+    }
+
+    addSource({
+      id: 'tgc-commentary',
+      title: 'The Gospel Coalition · Expository Commentary',
+      url: 'https://www.thegospelcoalition.org/commentary/',
+      domain: 'thegospelcoalition.org',
+      snippet: 'Theological essays, biblical book overviews, and orthodox Christian scholarly commentaries.',
       category: 'commentary',
     });
   }
 
-  // 6. Biblical Theology, Covenant Design & Pastoral Reflections
-  const hasBiblicalTheology = /covenant|typology|christology|creation|exile|messiah|temple|kingdom of god/i.test(content) || lens === 'canonical';
-  if (hasBiblicalTheology) {
-    addSource({
-      id: 'bibleproject-explore',
-      title: 'BibleProject · Biblical Themes & Literary Design',
-      url: 'https://bibleproject.com/explore/',
-      domain: 'bibleproject.com',
-      snippet: 'Visual biblical theology, cross-canonical design patterns, and Old/New Testament organic unity.',
-      category: 'theology',
-    });
-  }
-
-  // 7. General Orthodox Christianity & Expository Essays Fallback
-  addSource({
-    id: 'tgc-commentary',
-    title: 'The Gospel Coalition · Expository Commentary & Essays',
-    url: 'https://www.thegospelcoalition.org/commentary/',
-    domain: 'thegospelcoalition.org',
-    snippet: 'Theological essays, biblical book overviews, and orthodox Christian scholarly commentaries.',
-    category: 'commentary',
-  });
-
-  addSource({
-    id: 'gotquestions-search',
-    title: 'GotQuestions.org · Christian Bible Answers',
-    url: 'https://www.gotquestions.org/',
-    domain: 'gotquestions.org',
-    snippet: 'Orthodox Christian apologetics, verse cross-examinations, and systematic theological overviews.',
-    category: 'theology',
-  });
-
-  // Return the top 4-6 most relevant sources
+  // Return the top 4-5 diverse, domain-distinct sources
   return sources.slice(0, 5);
 }

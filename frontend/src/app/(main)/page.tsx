@@ -4956,6 +4956,7 @@ export default function App() {
     if (!textToSend.trim() && !chatImage && !attachedFile) return;
     
     setChatQuotes([]);
+    setAttachedScripture(null);
     const currentImage = chatImage;
     const currentAttached = attachedFile;
     setChatImage(null);
@@ -4978,7 +4979,7 @@ export default function App() {
 
     // Create a new chat automatically if none exists
     if (!targetChatId) {
-      let createdChatId = Date.now();
+      let createdChatId = Math.floor(Math.random() * 2000000000) + 1;
       let newChat: any = {
         id: createdChatId,
         title: 'New Conversation',
@@ -5148,7 +5149,7 @@ export default function App() {
             }));
           } else if (streamError) {
             const errorMsg = { 
-              id: Date.now(), 
+              id: Math.floor(Math.random() * 2000000000) + 1, 
               chatId: targetChatId, 
               role: 'model', 
               content: `**Error:** ${streamError}. Please try sending your message again.` 
@@ -5185,11 +5186,35 @@ export default function App() {
         }
       } else {
         const errorData = await res.json().catch(() => null);
+        const errMsgText = String(errorData?.details || errorData?.error || '');
+
+        // Auto-recover seamlessly if chat session ID was rejected or out-of-sync
+        if (res.status === 404 || errMsgText.toLowerCase().includes('chat not found')) {
+          try {
+            console.warn('Chat ID out-of-sync, creating fresh conversation and auto-retrying message...');
+            const newChatRes = await fetchWithAuth(`${API_URL}/api/chats`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ title: 'New Conversation' })
+            });
+            if (newChatRes.ok) {
+              const freshChat = await newChatRes.json();
+              if (freshChat?.id) {
+                setActiveChatId(freshChat.id);
+                setChats(prev => prev.map(c => c.id === targetChatId ? { ...c, id: freshChat.id } : c));
+                return handleSendMessage(undefined, currentInput);
+              }
+            }
+          } catch (recoveryErr) {
+            console.error('Chat auto-recovery failed:', recoveryErr);
+          }
+        }
+
         const errorMsg = { 
-          id: Date.now(), 
+          id: Math.floor(Math.random() * 2000000000) + 1, 
           chatId: targetChatId, 
           role: 'model', 
-          content: `**Error:** ${errorData?.details || errorData?.error || 'Failed to get response from AI'}` 
+          content: `**Error:** ${errMsgText || 'Failed to get response from AI'}` 
         };
         setChats(prev => prev.map(c => {
           if (c.id === targetChatId) {
@@ -5201,7 +5226,7 @@ export default function App() {
     } catch (networkErr: any) {
       console.error('Chat request network failure:', networkErr);
       const errorMsg = { 
-        id: Date.now(), 
+        id: Math.floor(Math.random() * 2000000000) + 1, 
         chatId: targetChatId, 
         role: 'model', 
         content: '**Connection Error:** Unable to connect to Theologica AI. Please check your internet connection and try again.' 
@@ -8963,7 +8988,7 @@ export default function App() {
             onSelectNote={setActiveNoteId}
             onCreateNote={async (initialData) => {
               const tempNote: NoteItem = {
-                id: Date.now(),
+                id: Math.floor(Math.random() * 2000000000) + 1,
                 title: initialData?.title || 'New Note',
                 content: initialData?.content || '',
                 createdAt: new Date().toISOString(),
