@@ -1383,6 +1383,7 @@ export default function App() {
   const [chats, setChats] = useState<{id: number, title: string, messages: {role: string, content: string}[]}[]>([]);
   const [activeChatId, setActiveChatId] = useState<number | null>(null);
   const [mobileChatView, setMobileChatView] = useState<'chat' | 'list'>('chat');
+  const [isChatInputFocused, setIsChatInputFocused] = useState(false);
 
   // Swipe gesture detection for Mobile AI Chats conversation drawer
   const chatSwipeStartXRef = useRef<number | null>(null);
@@ -1409,6 +1410,14 @@ export default function App() {
   };
 
   const handleChatTouchStart = (e: React.TouchEvent) => {
+    // Prevent opening conversations drawer if user is typing, text box is focused, or input is active
+    const activeEl = typeof document !== 'undefined' ? document.activeElement : null;
+    const isInputActive = activeEl && (activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'INPUT' || (activeEl as HTMLElement).isContentEditable);
+    if (isChatInputFocused || isInputActive || isMobileTyping) {
+      chatSwipeStartXRef.current = null;
+      chatSwipeStartYRef.current = null;
+      return;
+    }
     if (e.touches.length === 1) {
       chatSwipeStartXRef.current = e.touches[0].clientX;
       chatSwipeStartYRef.current = e.touches[0].clientY;
@@ -1416,6 +1425,13 @@ export default function App() {
   };
 
   const handleChatTouchEnd = (e: React.TouchEvent) => {
+    const activeEl = typeof document !== 'undefined' ? document.activeElement : null;
+    const isInputActive = activeEl && (activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'INPUT' || (activeEl as HTMLElement).isContentEditable);
+    if (isChatInputFocused || isInputActive || isMobileTyping) {
+      chatSwipeStartXRef.current = null;
+      chatSwipeStartYRef.current = null;
+      return;
+    }
     if (chatSwipeStartXRef.current === null || chatSwipeStartYRef.current === null) return;
     const startX = chatSwipeStartXRef.current;
     const deltaX = e.changedTouches[0].clientX - startX;
@@ -6338,41 +6354,7 @@ export default function App() {
                           <X size={11} />
                         </button>
                       </div>
-                    ) : (
-                      <div className="mb-2 flex items-center gap-1.5 flex-wrap">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const vNum = selectionVerse || 1;
-                            const vObj = bibleVerses.find(v => v.verse === vNum) || bibleVerses[0];
-                            setAttachedScripture({
-                              reference: `${activeBook.name} ${activeChapter}:${vNum}`,
-                              text: cleanVerseText(vObj?.text || ''),
-                              translation: translation.toUpperCase(),
-                              isSpecificVerse: true,
-                            });
-                          }}
-                          className="inline-flex items-center gap-1 self-start px-2 py-0.5 rounded-lg border border-dashed border-border-soft hover:border-accent/40 text-[10px] text-meta hover:text-fg transition-colors cursor-pointer"
-                        >
-                          <BookOpen size={10} className="text-accent" />
-                          <span>+ Attach Verse ({activeBook.name} {activeChapter}:{selectionVerse || 1})</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAttachedScripture({
-                              reference: `${activeBook.name} ${activeChapter}`,
-                              text: bibleVerses.slice(0, 30).map(v => `${v.verse}. ${cleanVerseText(v.text)}`).join(' '),
-                              translation: translation.toUpperCase(),
-                              isSpecificVerse: false,
-                            });
-                          }}
-                          className="inline-flex items-center gap-1 self-start px-2 py-0.5 rounded-lg border border-dashed border-border-soft hover:border-accent/40 text-[10px] text-meta hover:text-fg transition-colors cursor-pointer"
-                        >
-                          <span>+ Attach Chapter</span>
-                        </button>
-                      </div>
-                    )}
+                    ) : null}
 
                     {chatQuotes.length > 0 && (
                       <div className="mb-2">
@@ -6473,7 +6455,11 @@ export default function App() {
                       />
                     )}
 
-                    <div className="relative flex items-end bg-surface border border-border-soft/80 rounded-2xl shadow-sm focus-within:border-accent/60 focus-within:ring-2 focus-within:ring-accent/20 transition-all p-1.5">
+                    <div 
+                      onTouchStart={(e) => e.stopPropagation()}
+                      onTouchEnd={(e) => e.stopPropagation()}
+                      className="relative flex items-end bg-surface border border-border-soft/80 rounded-2xl shadow-sm focus-within:border-accent/60 focus-within:ring-2 focus-within:ring-accent/20 transition-all p-1.5"
+                    >
                       <button 
                         type="button" 
                         onClick={() => imageFileRef.current?.click()} 
@@ -6490,6 +6476,8 @@ export default function App() {
                         className="flex-1 bg-transparent text-fg pl-1 pr-12 py-2.5 text-[16px] placeholder:text-meta focus:outline-none resize-none" 
                         placeholder={!isOnline ? "Study AI is unavailable offline" : "Ask anything (type / for commands)..."} 
                         value={chatInput}
+                        onFocus={() => setIsChatInputFocused(true)}
+                        onBlur={() => setTimeout(() => setIsChatInputFocused(false), 150)}
                         onChange={(e) => {
                           setChatInput(e.target.value);
                           if (e.target.value.startsWith('/')) {
@@ -7598,41 +7586,7 @@ export default function App() {
                           <X size={11} />
                         </button>
                       </div>
-                    ) : (
-                      <div className="mb-2.5 flex items-center gap-2 flex-wrap">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const vNum = selectionVerse || 1;
-                            const vObj = bibleVerses.find(v => v.verse === vNum) || bibleVerses[0];
-                            setAttachedScripture({
-                              reference: `${activeBook.name} ${activeChapter}:${vNum}`,
-                              text: cleanVerseText(vObj?.text || ''),
-                              translation: translation.toUpperCase(),
-                              isSpecificVerse: true,
-                            });
-                          }}
-                          className="inline-flex items-center gap-1.5 self-start px-2.5 py-1 rounded-lg border border-dashed border-border-soft hover:border-accent/50 text-[11px] text-meta hover:text-fg transition-all cursor-pointer bg-surface/40 hover:bg-surface"
-                        >
-                          <BookOpen size={11} className="text-accent" />
-                          <span>+ Attach Verse ({activeBook.name} {activeChapter}:{selectionVerse || 1})</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAttachedScripture({
-                              reference: `${activeBook.name} ${activeChapter}`,
-                              text: bibleVerses.slice(0, 30).map(v => `${v.verse}. ${cleanVerseText(v.text)}`).join(' '),
-                              translation: translation.toUpperCase(),
-                              isSpecificVerse: false,
-                            });
-                          }}
-                          className="inline-flex items-center gap-1.5 self-start px-2.5 py-1 rounded-lg border border-dashed border-border-soft hover:border-accent/50 text-[11px] text-meta hover:text-fg transition-all cursor-pointer bg-surface/20 hover:bg-surface"
-                        >
-                          <span>+ Attach Chapter</span>
-                        </button>
-                      </div>
-                    )}
+                    ) : null}
 
                     {chatQuotes.length > 0 && (
                       <div className="mb-2.5">
@@ -7734,7 +7688,11 @@ export default function App() {
                       />
                     )}
 
-                    <div className="relative flex items-end bg-surface border border-border-soft/80 rounded-2xl shadow-sm focus-within:border-accent/60 focus-within:ring-2 focus-within:ring-accent/20 transition-all p-1.5">
+                    <div 
+                      onTouchStart={(e) => e.stopPropagation()}
+                      onTouchEnd={(e) => e.stopPropagation()}
+                      className="relative flex items-end bg-surface border border-border-soft/80 rounded-2xl shadow-sm focus-within:border-accent/60 focus-within:ring-2 focus-within:ring-accent/20 transition-all p-1.5"
+                    >
                       <button 
                         type="button" 
                         onClick={() => imageFileRef.current?.click()} 
@@ -7749,6 +7707,8 @@ export default function App() {
                         minRows={1}
                         maxRows={6}
                         value={chatInput} 
+                        onFocus={() => setIsChatInputFocused(true)}
+                        onBlur={() => setTimeout(() => setIsChatInputFocused(false), 150)}
                         onChange={e => {
                           setChatInput(e.target.value);
                           if (e.target.value.startsWith('/')) {
@@ -8513,8 +8473,19 @@ export default function App() {
               >
                 <div className="flex items-center min-w-0 mr-2 flex-1">
                   <button 
-                    onClick={() => setMobileChatView('list')} 
-                    className="lg:hidden w-9 h-9 p-1.5 mr-2 text-fg-2 hover:text-fg hover:bg-surface rounded-full transition-colors shrink-0 cursor-pointer flex items-center justify-center active:scale-95"
+                    onClick={() => {
+                      const activeEl = typeof document !== 'undefined' ? document.activeElement : null;
+                      const isInputActive = activeEl && (activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'INPUT');
+                      if (isChatInputFocused || isInputActive || isMobileTyping) {
+                        (activeEl as HTMLElement)?.blur();
+                        return;
+                      }
+                      setMobileChatView('list');
+                    }} 
+                    disabled={isChatInputFocused || isMobileTyping}
+                    className={`lg:hidden w-9 h-9 p-1.5 mr-2 text-fg-2 hover:text-fg hover:bg-surface rounded-full transition-all shrink-0 cursor-pointer flex items-center justify-center active:scale-95 ${
+                      (isChatInputFocused || isMobileTyping) ? 'opacity-30 pointer-events-none' : ''
+                    }`}
                     title="Open Conversations"
                     aria-label="Open Conversations"
                   >
@@ -8603,41 +8574,7 @@ export default function App() {
                         <X size={12} />
                       </button>
                     </div>
-                  ) : (
-                    <div className="mb-1.5 sm:mb-2.5 flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const vNum = selectionVerse || 1;
-                          const vObj = bibleVerses.find(v => v.verse === vNum) || bibleVerses[0];
-                          setAttachedScripture({
-                            reference: `${activeBook.name} ${activeChapter}:${vNum}`,
-                            text: cleanVerseText(vObj?.text || ''),
-                            translation: translation.toUpperCase(),
-                            isSpecificVerse: true,
-                          });
-                        }}
-                        className="inline-flex items-center gap-1.5 self-start px-2.5 py-1 rounded-xl border border-dashed border-border-soft hover:border-accent/50 text-[11px] text-meta hover:text-fg transition-all cursor-pointer bg-surface/40 hover:bg-surface"
-                      >
-                        <BookOpen size={12} className="text-accent" />
-                        <span>+ Attach Verse ({activeBook.name} {activeChapter}:{selectionVerse || 1})</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAttachedScripture({
-                            reference: `${activeBook.name} ${activeChapter}`,
-                            text: bibleVerses.slice(0, 30).map(v => `${v.verse}. ${cleanVerseText(v.text)}`).join(' '),
-                            translation: translation.toUpperCase(),
-                            isSpecificVerse: false,
-                          });
-                        }}
-                        className="inline-flex items-center gap-1.5 self-start px-2.5 py-1 rounded-xl border border-dashed border-border-soft hover:border-accent/50 text-[11px] text-meta hover:text-fg transition-all cursor-pointer bg-surface/20 hover:bg-surface"
-                      >
-                        <span>+ Attach Chapter ({activeBook.name} {activeChapter})</span>
-                      </button>
-                    </div>
-                  )}
+                  ) : null}
 
                   {chatQuotes.length > 0 && (
                     <div className="mb-3 max-w-3xl">
@@ -8738,7 +8675,11 @@ export default function App() {
                     />
                   )}
 
-                  <div className="relative flex items-end bg-surface border border-border-soft/80 rounded-2xl shadow-md focus-within:border-accent/60 focus-within:ring-2 focus-within:ring-accent/20 transition-all p-2">
+                  <div 
+                    onTouchStart={(e) => e.stopPropagation()}
+                    onTouchEnd={(e) => e.stopPropagation()}
+                    className="relative flex items-end bg-surface border border-border-soft/80 rounded-2xl shadow-md focus-within:border-accent/60 focus-within:ring-2 focus-within:ring-accent/20 transition-all p-2"
+                  >
                     <button 
                       type="button" 
                       onClick={() => imageFileRef.current?.click()} 
@@ -8753,6 +8694,8 @@ export default function App() {
                       minRows={1}
                       maxRows={6}
                       value={chatInput} 
+                      onFocus={() => setIsChatInputFocused(true)}
+                      onBlur={() => setTimeout(() => setIsChatInputFocused(false), 150)}
                       onChange={e => {
                         setChatInput(e.target.value);
                         if (e.target.value.startsWith('/')) {

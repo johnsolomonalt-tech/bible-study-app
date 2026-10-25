@@ -222,15 +222,15 @@ export function SetMilestoneModal({
                     >
                       <span className="text-xl shrink-0 mt-0.5">{preset.badge}</span>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <h4 className="text-xs font-bold text-fg truncate">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h4 className="text-xs font-bold text-fg whitespace-normal">
                             {preset.title}
                           </h4>
                           <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-surface border border-border text-muted shrink-0">
                             {preset.days}d
                           </span>
                         </div>
-                        <p className="text-[11px] text-muted leading-tight mt-0.5 line-clamp-2">
+                        <p className="text-[11px] text-muted leading-relaxed mt-1 whitespace-normal break-words">
                           {preset.description}
                         </p>
                       </div>

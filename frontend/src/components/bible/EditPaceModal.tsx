@@ -217,13 +217,13 @@ export function EditPaceModal({
                               {preset.title}
                             </span>
                             {preset.badge && (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-500 border border-amber-500/30 flex items-center gap-1">
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-500 border border-amber-500/30 flex items-center gap-1 shrink-0">
                                 <Sparkles size={10} />
                                 {preset.badge}
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-muted truncate">
+                          <p className="text-xs text-muted leading-relaxed mt-0.5 whitespace-normal break-words">
                             {preset.description}
                           </p>
                         </div>
@@ -319,7 +319,7 @@ export function EditPaceModal({
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted block mb-1">
                     Finish By
                   </span>
-                  <div className="text-sm font-bold text-accent truncate mt-1">
+                  <div className="text-sm font-bold text-accent mt-1 whitespace-normal break-words">
                     {finishDateStr}
                   </div>
                   <span className="text-[10px] text-muted">

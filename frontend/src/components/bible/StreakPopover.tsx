@@ -343,8 +343,8 @@ export function StreakPopover({
                             {streakData.targetMilestone.badge}
                           </span>
                           <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <h3 className="text-xs font-bold text-fg truncate">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="text-xs font-bold text-fg whitespace-normal">
                                 Milestone: {streakData.targetMilestone.title}
                               </h3>
                               {streakData.targetMilestone.isEarned && (
@@ -353,7 +353,7 @@ export function StreakPopover({
                                 </span>
                               )}
                             </div>
-                            <div className="text-[11px] text-muted truncate">
+                            <div className="text-[11px] text-muted leading-relaxed mt-0.5 whitespace-normal break-words">
                               {streakData.targetMilestone.isEarned 
                                 ? 'Milestone achieved! Set your next milestone.' 
                                 : `${streak} of ${streakData.targetMilestone.days} days completed • ${streakData.targetMilestone.daysRemaining} to go`}
@@ -391,20 +391,15 @@ export function StreakPopover({
                     <div 
                       onClick={() => setIsDailyVerseOpen(true)}
                       className="p-3.5 sm:p-4 rounded-2xl bg-surface/60 hover:bg-surface border border-border/60 hover:border-accent/40 space-y-2 relative cursor-pointer transition-all active:scale-[0.99] group/scripture"
-                      title="Tap to read full scripture verse"
                     >
                       <div className="flex items-center justify-between text-muted pb-1 border-b border-border/40">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-muted flex items-center gap-1.5">
                           <Sparkles size={11} className="text-accent" />
                           <span>Words of Scripture</span>
                         </span>
-                        <span className="text-[10px] text-accent font-semibold flex items-center gap-1 group-hover/scripture:underline">
-                          <span>Read Full Verse</span>
-                          <ChevronRight size={11} />
-                        </span>
                       </div>
                       <blockquote className="text-center space-y-1.5 pt-0.5">
-                        <p className="text-xs sm:text-sm italic text-fg font-serif leading-relaxed">
+                        <p className="text-xs sm:text-sm italic text-fg font-serif leading-relaxed whitespace-normal break-words">
                           &ldquo;{currentQuote.text}&rdquo;
                         </p>
                         <cite className="text-[11px] font-semibold text-accent not-italic block">

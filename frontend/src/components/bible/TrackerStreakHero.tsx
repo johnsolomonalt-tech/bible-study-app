@@ -45,26 +45,7 @@ export function TrackerStreakHero({
   const [isEditPaceOpen, setIsEditPaceOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isDailyVerseOpen, setIsDailyVerseOpen] = useState(false);
-  const [isQuoteExpanded, setIsQuoteExpanded] = useState(false);
-  const [isQuoteOverflowing, setIsQuoteOverflowing] = useState(false);
-  const quoteTextRef = useRef<HTMLParagraphElement>(null);
   const [quote] = useState(getTodayStreakQuote());
-
-  useEffect(() => {
-    const checkQuoteOverflow = () => {
-      if (quoteTextRef.current) {
-        // Only consider overflowing if on small mobile screen and text is actually truncated
-        const isMobileScreen = typeof window !== 'undefined' && window.innerWidth < 640;
-        const hasOverflow = isMobileScreen && (quoteTextRef.current.scrollWidth > quoteTextRef.current.clientWidth + 2);
-        setIsQuoteOverflowing(hasOverflow);
-      }
-    };
-    checkQuoteOverflow();
-    window.addEventListener('resize', checkQuoteOverflow);
-    return () => window.removeEventListener('resize', checkQuoteOverflow);
-  }, [quote.text]);
-
-  const canExpandQuote = isQuoteOverflowing || isQuoteExpanded;
 
   useEffect(() => {
     const handleUpdate = () => setStreakData(getStreakData());
@@ -322,36 +303,21 @@ export function TrackerStreakHero({
           </button>
         </div>
 
-        {/* Scripture Encouragement Bar */}
+        {/* Scripture Encouragement Bar - Full verse displayed at all times */}
         <div 
           onClick={() => setIsDailyVerseOpen(true)}
-          className="mt-4 pt-4 border-t border-border/50 flex items-center gap-2.5 text-xs cursor-pointer hover:opacity-90 transition-opacity group/tracker-quote"
-          title="Tap to read full scripture verse"
+          className="mt-4 pt-4 border-t border-border/50 flex items-start gap-3 text-xs cursor-pointer hover:opacity-95 transition-opacity group/tracker-quote"
         >
-          <div className="w-7 h-7 rounded-xl bg-accent/10 group-hover/tracker-quote:bg-accent/20 border border-accent/20 flex items-center justify-center shrink-0 text-accent transition-colors">
+          <div className="w-7 h-7 rounded-xl bg-accent/10 group-hover/tracker-quote:bg-accent/20 border border-accent/20 flex items-center justify-center shrink-0 text-accent transition-colors mt-0.5">
             <Sparkles size={13} />
           </div>
           <div className="min-w-0 flex-1">
-            <p 
-              ref={quoteTextRef}
-              onClick={(e) => {
-                if (canExpandQuote) {
-                  e.stopPropagation();
-                  setIsQuoteExpanded(prev => !prev);
-                }
-              }}
-              className={`italic text-fg font-serif text-xs leading-relaxed ${
-                canExpandQuote ? 'cursor-pointer hover:opacity-80' : 'cursor-default'
-              } ${isQuoteExpanded ? 'whitespace-normal' : 'truncate sm:whitespace-normal'}`}
-            >
+            <p className="italic text-fg font-serif text-xs sm:text-sm leading-relaxed whitespace-normal break-words">
               &ldquo;{quote.text}&rdquo;
             </p>
-            <div className="flex items-center gap-2">
+            <div className="mt-1 flex items-center gap-2">
               <span className="text-[11px] font-semibold text-accent not-italic">
                 — {quote.reference}
-              </span>
-              <span className="text-[10px] text-muted group-hover/tracker-quote:text-accent transition-colors font-medium">
-                • Tap to read full verse
               </span>
             </div>
           </div>
