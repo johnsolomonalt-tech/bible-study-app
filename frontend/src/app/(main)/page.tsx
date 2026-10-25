@@ -6236,7 +6236,7 @@ export default function App() {
               <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                 <div
                   ref={mobileStudyChatScrollRef}
-                  className={`flex-1 min-h-0 ${activeChat.messages.length === 0 && !isAiTyping ? 'overflow-hidden flex flex-col justify-center' : 'overflow-y-auto custom-scroll space-y-4'} p-3 sm:p-4`}
+                  className={`flex-1 min-h-0 overflow-y-auto custom-scroll ${activeChat.messages.length === 0 && !isAiTyping ? 'flex flex-col' : 'space-y-4'} p-3 sm:p-4`}
                 >
                   {activeChat.messages.length === 0 ? (
                     <ChatEmptyState
@@ -7496,7 +7496,7 @@ export default function App() {
               </header>
               <div
                 ref={desktopStudyChatScrollRef}
-                className={`flex-1 min-h-0 ${activeChat.messages.length === 0 && !isAiTyping ? 'overflow-hidden flex flex-col justify-center' : 'overflow-y-auto custom-scroll space-y-6'} p-4`}
+                className={`flex-1 min-h-0 overflow-y-auto custom-scroll ${activeChat.messages.length === 0 && !isAiTyping ? 'flex flex-col' : 'space-y-6'} p-4`}
               >
                 {activeChat.messages.length === 0 ? (
                   <ChatEmptyState
@@ -8500,7 +8500,7 @@ export default function App() {
               </header>
               <div
                 ref={fullChatScrollRef}
-                className={`flex-1 min-h-0 ${activeChat.messages.length === 0 && !isAiTyping ? 'overflow-hidden flex flex-col justify-center' : 'overflow-y-auto custom-scroll space-y-6 sm:space-y-8'} p-2.5 sm:p-8 lg:p-12`}
+                className={`flex-1 min-h-0 overflow-y-auto custom-scroll ${activeChat.messages.length === 0 && !isAiTyping ? 'flex flex-col' : 'space-y-6 sm:space-y-8'} p-2.5 sm:p-8 lg:p-12`}
               >
                 {activeChat.messages.length === 0 ? (
                   <ChatEmptyState

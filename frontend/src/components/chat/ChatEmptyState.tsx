@@ -317,38 +317,38 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
   ];
 
   return (
-    <div className={`flex flex-col items-center justify-center w-full select-none ${isCompact ? 'py-1 px-1' : 'py-1 sm:py-4 px-1.5 sm:px-6 max-w-4xl mx-auto'} animate-in fade-in duration-300`}>
+    <div className={`flex flex-col items-center justify-center w-full select-none my-auto ${isCompact ? 'py-1 px-1' : 'py-1 sm:py-4 px-1.5 sm:px-6 max-w-4xl mx-auto'} animate-in fade-in duration-300`}>
       {/* Scriptorium Crest & Hero Title */}
-      <div className="flex flex-col items-center mb-2.5 sm:mb-4">
-        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-accent/10 border border-accent/25 flex items-center justify-center text-accent shadow-inner relative mb-1.5 sm:mb-2.5">
-          <BookOpen size={18} className="sm:hidden" />
+      <div className="flex flex-col items-center mb-2 sm:mb-4">
+        <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-accent/10 border border-accent/25 flex items-center justify-center text-accent shadow-inner relative mb-1 sm:mb-2.5">
+          <BookOpen size={16} className="sm:hidden" />
           <BookOpen size={22} className="hidden sm:block" />
-          <div className="absolute -top-1 -right-1 w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-surface border border-accent/40 flex items-center justify-center text-accent shadow-2xs">
-            <Sparkles size={8} className="sm:hidden" />
+          <div className="absolute -top-1 -right-1 w-3 h-3 sm:w-4 sm:h-4 rounded-full bg-surface border border-accent/40 flex items-center justify-center text-accent shadow-2xs">
+            <Sparkles size={7} className="sm:hidden" />
             <Sparkles size={10} className="hidden sm:block" />
           </div>
         </div>
 
-        <h1 className="text-[17px] sm:text-xl font-serif font-normal text-fg text-center leading-tight">
+        <h1 className="text-[15px] sm:text-xl font-serif font-medium text-fg text-center leading-tight">
           Theologica Study AI
         </h1>
-        <p className="text-[11px] sm:text-[13px] text-muted text-center max-w-xs sm:max-w-md mt-0.5 leading-snug">
+        <p className="text-[10.5px] sm:text-[13px] text-muted text-center max-w-xs sm:max-w-md mt-0.5 leading-snug">
           Original languages, historic theology, and Christ-centered exegesis.
         </p>
       </div>
 
       {/* Active Scripture & Study Chapter Action Bar */}
-      <div className="w-full max-w-md sm:max-w-xl mb-3 sm:mb-4 p-2.5 rounded-xl bg-surface/70 border border-border-soft/70 shadow-2xs flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
+      <div className="w-full max-w-md sm:max-w-xl mb-2 sm:mb-4 p-2 sm:p-2.5 rounded-xl bg-surface/70 border border-border-soft/70 shadow-2xs flex items-center justify-between gap-1.5">
+        <div className="flex items-center gap-1.5 min-w-0">
           <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: currentLensMeta.accentColor }} />
-          <div className="min-w-0 flex items-center gap-1.5 flex-wrap">
-            <span className="text-[12px] sm:text-[13px] font-semibold text-fg truncate">
+          <div className="min-w-0 flex items-center gap-1 sm:gap-1.5 flex-wrap">
+            <span className="text-[11.5px] sm:text-[13px] font-semibold text-fg truncate">
               {activeBook.name} {activeChapter}
             </span>
             <span className="text-[9px] sm:text-[10px] uppercase font-bold text-muted bg-surface-hover px-1.5 py-0.5 rounded">
               {translation}
             </span>
-            <span className="text-[10px] sm:text-[11px] font-medium truncate" style={{ color: currentLensMeta.accentColor }}>
+            <span className="text-[9.5px] sm:text-[11px] font-medium truncate" style={{ color: currentLensMeta.accentColor }}>
               · {currentLensMeta.name}
             </span>
           </div>
@@ -357,7 +357,7 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
         <button
           type="button"
           onClick={() => onSelectPrompt(`Please provide a comprehensive study of ${activeBook.name} ${activeChapter} (${translation}). Include original language root words, theological themes, and historical context.`)}
-          className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-accent/15 hover:bg-accent text-accent hover:text-white text-[11px] font-semibold transition-all cursor-pointer shadow-2xs active:scale-95"
+          className="shrink-0 inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg bg-accent/15 hover:bg-accent text-accent hover:text-white text-[10.5px] sm:text-[11px] font-semibold transition-all cursor-pointer shadow-2xs active:scale-95"
         >
           <span>Study Chapter</span>
           <ArrowRight size={11} />
@@ -365,31 +365,31 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
       </div>
 
       {/* Context-Aware Dynamic Starters */}
-      <div className="w-full max-w-md sm:max-w-xl mb-1 sm:mb-4">
-        <div className="flex items-center gap-1.5 mb-2 px-1">
+      <div className="w-full max-w-md sm:max-w-xl mb-0.5 sm:mb-4">
+        <div className="flex items-center gap-1.5 mb-1.5 sm:mb-2 px-1">
           <Sparkles size={11} className="text-accent" />
-          <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-muted">
+          <span className="text-[9.5px] sm:text-[11px] font-semibold uppercase tracking-wider text-muted">
             Suggested Questions
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2">
           {visibleQuestions.map((item, idx) => (
             <button
               key={`${item.prompt}-${idx}`}
               type="button"
               onClick={() => onSelectPrompt(item.prompt)}
-              className={`${idx >= 2 ? 'hidden sm:flex' : 'flex'} group text-left p-2.5 sm:p-3 rounded-xl bg-surface/60 hover:bg-surface border border-border-soft/60 hover:border-accent/50 transition-all cursor-pointer shadow-2xs hover:shadow-xs items-center justify-between gap-2 active:scale-[0.99]`}
+              className={`${idx >= 2 ? 'hidden sm:flex' : 'flex'} group text-left p-2 sm:p-3 rounded-xl bg-surface/60 hover:bg-surface border border-border-soft/60 hover:border-accent/50 transition-all cursor-pointer shadow-2xs hover:shadow-xs items-center justify-between gap-1.5 sm:gap-2 active:scale-[0.99]`}
             >
               <div className="min-w-0 flex-1">
-                <span className="inline-block text-[9px] font-semibold tracking-wide uppercase text-accent bg-accent/10 px-1.5 py-0.5 rounded mb-1">
+                <span className="inline-block text-[8.5px] sm:text-[9px] font-semibold tracking-wide uppercase text-accent bg-accent/10 px-1.5 py-0.2 rounded mb-0.5">
                   {item.subtitle}
                 </span>
-                <p className="text-[12px] text-fg font-medium line-clamp-2 leading-snug">
+                <p className="text-[11px] sm:text-[12px] text-fg font-medium line-clamp-1 sm:line-clamp-2 leading-snug">
                   &ldquo;{item.prompt}&rdquo;
                 </p>
               </div>
-              <ArrowRight size={13} className="text-muted group-hover:text-accent group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
+              <ArrowRight size={12} className="text-muted group-hover:text-accent group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
             </button>
           ))}
         </div>
