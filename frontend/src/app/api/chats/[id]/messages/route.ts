@@ -7,6 +7,7 @@ import { findCanonicalBook } from '@/lib/bibleCanon';
 import { BIBLE_VERSE_REGEX } from '@/lib/bibleReferences';
 import { isValidDbId, getMemoryMessages, addMemoryMessage, MemoryMessage } from '@/lib/memoryChatStore';
 import { ChatIdentity, ownsChat, resolveChatIdentity } from '@/lib/chatIdentity';
+import { extractVerifiedSources } from '@/lib/chatSources';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
@@ -574,6 +575,14 @@ Do NOT inject original Hebrew/Greek characters, Strong's concordance numbers, or
   // Permanently tag the theological lens in the message
   if (!aiResponseText.includes('__LENS__')) {
     aiResponseText = `${aiResponseText.trim()}\n\n__LENS__${theologicalLens}__END_LENS__`;
+  }
+
+  // Permanently tag verified external research and study sources in the message
+  if (!aiResponseText.includes('__SOURCES__')) {
+    const verifiedSources = extractVerifiedSources(aiResponseText, theologicalLens, resolvedGroundTruth);
+    if (verifiedSources.length > 0) {
+      aiResponseText = `${aiResponseText.trim()}\n\n__SOURCES__${JSON.stringify(verifiedSources)}__END_SOURCES__`;
+    }
   }
 
   const aiMessage = await saveOrMockMessage({

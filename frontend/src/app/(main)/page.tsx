@@ -21,6 +21,8 @@ import { TheologicalLensSelector, TheologicalLensType, THEOLOGICAL_LENS_OPTIONS 
 import { ChatEmptyState } from '@/components/chat/ChatEmptyState';
 import { ChatSlashCommands, SLASH_COMMANDS, SlashCommand } from '@/components/chat/ChatSlashCommands';
 import { ChatFollowUps } from '@/components/chat/ChatFollowUps';
+import { ChatSourceTracker } from '@/components/chat/ChatSourceTracker';
+import { ChatSourceItem } from '@/lib/chatSources';
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from 'react-resizable-panels';
 import type { PanelImperativeHandle } from 'react-resizable-panels';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -159,19 +161,34 @@ const userMarkdownComponents = {
 // Typewriter configuration
 const seenMessages = new Set<string>();
 
-// Parse AI message content — handles __GENERATED_IMAGE__, __LENS__, and __SUGGESTED_FOLLOW_UPS__ markers
+// Parse AI message content — handles __GENERATED_IMAGE__, __LENS__, __SOURCES__, and __SUGGESTED_FOLLOW_UPS__ markers
 function parseAiMessage(content: string): { 
   imageBase64: string | null; 
   textContent: string;
   theologicalLens: TheologicalLensType | null;
   suggestedFollowUps: string[];
   thoughtContent: string | null;
+  sources: ChatSourceItem[];
 } {
   let text = content || '';
   let imageBase64: string | null = null;
   let theologicalLens: TheologicalLensType | null = null;
   let suggestedFollowUps: string[] = [];
   let thoughtContent: string | null = null;
+  let sources: ChatSourceItem[] = [];
+
+  const sourcesMatch = text.match(/__SOURCES__([\s\S]*?)__END_SOURCES__/);
+  if (sourcesMatch) {
+    try {
+      const parsed = JSON.parse(sourcesMatch[1].trim());
+      if (Array.isArray(parsed)) {
+        sources = parsed;
+      }
+    } catch {
+      // ignore parsing error
+    }
+    text = text.replace(/__SOURCES__[\s\S]*?__END_SOURCES__/, '').trim();
+  }
 
   const thoughtMatch = text.match(/__THOUGHT__([\s\S]*?)__END_THOUGHT__/) || text.match(/<thought>([\s\S]*?)<\/thought>/);
   if (thoughtMatch) {
@@ -204,7 +221,7 @@ function parseAiMessage(content: string): {
     text = text.replace(/__SUGGESTED_FOLLOW_UPS__[\s\S]*?__END_SUGGESTED_FOLLOW_UPS__/, '').trim();
   }
 
-  return { imageBase64, textContent: text, theologicalLens, suggestedFollowUps, thoughtContent };
+  return { imageBase64, textContent: text, theologicalLens, suggestedFollowUps, thoughtContent, sources };
 }
 
 const seenTitles = new Set<string>();
@@ -673,7 +690,7 @@ const AiChatMessageView = ({
   }
 
   // Theologica AI message
-  const { imageBase64, textContent, theologicalLens: msgLens, suggestedFollowUps, thoughtContent } = parseAiMessage(message.content);
+  const { imageBase64, textContent, theologicalLens: msgLens, suggestedFollowUps, thoughtContent, sources } = parseAiMessage(message.content);
   const effectiveLens = msgLens || activeLens;
   const lensMeta = THEOLOGICAL_LENS_OPTIONS.find(l => l.id === effectiveLens) || THEOLOGICAL_LENS_OPTIONS[0];
 
@@ -724,6 +741,14 @@ const AiChatMessageView = ({
       {thoughtContent && (
         <AiThinkingAccordion thought={thoughtContent} />
       )}
+
+      {/* ChatGPT-Style Source Tracker */}
+      <ChatSourceTracker
+        sources={sources}
+        content={textContent}
+        lens={effectiveLens}
+        isCompact={!isFullView}
+      />
 
       <div className={`w-full ${isFullView ? 'text-[15px] leading-[1.75]' : 'text-[14px] leading-relaxed'} text-fg overflow-x-hidden break-words markdown-body`}>
         {isLast ? (
