@@ -6998,20 +6998,24 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => {
-                          handleToggleLeftSidebar(true);
-                          setTimeout(() => {
-                            const searchInput = document.querySelector('input[placeholder*="Search books"]') as HTMLInputElement;
-                            searchInput?.focus();
-                          }, 80);
+                          const nextState = !showLeftSidebar;
+                          handleToggleLeftSidebar(nextState);
+                          if (nextState) {
+                            setTimeout(() => {
+                              const searchInput = document.querySelector('input[placeholder*="Search books"]') as HTMLInputElement;
+                              searchInput?.focus();
+                            }, 80);
+                          }
                         }}
                         className="flex items-center gap-1.5 px-2 py-1 -ml-2 rounded-lg hover:bg-surface border border-transparent hover:border-border text-fg transition-all cursor-pointer group text-left active:scale-[0.98]"
-                        title="Browse Books & Chapters (or press Cmd+K)"
+                        title={showLeftSidebar ? "Collapse Book & Chapter Selector" : "Browse Books & Chapters (or press Cmd+K)"}
                         aria-label={`Select Book & Chapter. Current: ${activeBook.name} ${activeChapter}`}
+                        aria-expanded={showLeftSidebar}
                       >
                         <span className="font-display text-[16px] sm:text-[18px] lg:text-[20px] font-semibold whitespace-nowrap">
                           {activeBook.name} {activeChapter}
                         </span>
-                        <ChevronDown size={15} className="text-muted group-hover:text-fg opacity-60 transition-transform group-hover:translate-y-0.5 shrink-0" />
+                        <ChevronDown size={15} className={`text-muted group-hover:text-fg opacity-60 transition-transform duration-200 shrink-0 ${showLeftSidebar ? 'rotate-180' : 'group-hover:translate-y-0.5'}`} />
                       </button>
                     </div>
 
