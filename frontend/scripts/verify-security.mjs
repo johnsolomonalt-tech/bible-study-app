@@ -183,3 +183,18 @@ test('Database Performance: Prisma schema includes composite indexes for query p
   assert.ok(schema.includes('@@index([chatId, createdAt(sort: Asc)])'), 'Message model must have composite chatId+createdAt index');
   assert.ok(schema.includes('@@index([userId, book, chapter])'), 'Highlight model must have composite userId+book+chapter index');
 });
+
+test('Content-Security-Policy & Security Headers: strict headers and devotionals route alias', () => {
+  const nextConfig = fs.readFileSync(path.resolve('next.config.ts'), 'utf8');
+  assert.ok(nextConfig.includes('Content-Security-Policy'), 'next.config.ts must configure Content-Security-Policy');
+  assert.ok(nextConfig.includes("frame-ancestors 'self'"), 'CSP must restrict frame-ancestors to self');
+  assert.ok(nextConfig.includes("object-src 'none'"), 'CSP must restrict object-src to none');
+  assert.ok(nextConfig.includes("Strict-Transport-Security"), 'next.config.ts must configure HSTS');
+  assert.ok(nextConfig.includes('/api/devotional'), 'next.config.ts must provide /api/devotional rewrite alias');
+
+  const notesRoute = fs.readFileSync(path.resolve('src/app/api/notes/route.ts'), 'utf8');
+  assert.ok(notesRoute.includes('status: 401'), 'POST /api/notes must return 401 for unauthenticated requests');
+
+  const canvasRoute = fs.readFileSync(path.resolve('src/app/api/canvas/route.ts'), 'utf8');
+  assert.ok(canvasRoute.includes('status: 401'), 'POST /api/canvas must return 401 for unauthenticated requests');
+});

@@ -38,6 +38,10 @@ export async function POST(req: Request) {
     userId = authResult?.userId || null;
   } catch {}
 
+  if (!userId) {
+    return NextResponse.json({ error: 'Unauthorized. Sign in required to save notes to cloud.' }, { status: 401 });
+  }
+
   let title = 'Untitled Note';
   let content = '';
 
@@ -47,7 +51,7 @@ export async function POST(req: Request) {
     if (body?.content) content = body.content;
   } catch {}
 
-  if (userId && process.env.DATABASE_URL) {
+  if (process.env.DATABASE_URL) {
     try {
       const note = await prisma.note.create({
         data: {
@@ -64,16 +68,14 @@ export async function POST(req: Request) {
 
   const clientNote = {
     id: Date.now(),
-    userId: userId || 'guest',
+    userId,
     title,
     content,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
 
-  if (userId) {
-    addMemoryNote(userId, clientNote);
-  }
+  addMemoryNote(userId, clientNote);
 
   return NextResponse.json(clientNote, { status: 201 });
 }

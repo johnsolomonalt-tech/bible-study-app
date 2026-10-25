@@ -76,7 +76,6 @@ export async function POST(req: Request) {
     }
 
     // 2. Clone into recipient account
-    const targetUserId = userId || 'anonymous_user';
     const newBoardId = `board-${Date.now()}`;
     const newTitle = sourceBoard.title || 'Imported Canvas';
     const nodes = (sourceBoard.nodes as any) || [];
@@ -84,19 +83,21 @@ export async function POST(req: Request) {
     const viewport = (sourceBoard.viewport as any) || undefined;
 
     let savedBoard: any = null;
-    try {
-      savedBoard = await prisma.canvas.create({
-        data: {
-          userId: targetUserId,
-          boardId: newBoardId,
-          title: newTitle,
-          nodes,
-          edges,
-          viewport,
-        },
-      });
-    } catch (saveErr) {
-      console.warn('Canvas Import: DB insert failed, returning cloned payload for local storage:', saveErr);
+    if (userId) {
+      try {
+        savedBoard = await prisma.canvas.create({
+          data: {
+            userId,
+            boardId: newBoardId,
+            title: newTitle,
+            nodes,
+            edges,
+            viewport,
+          },
+        });
+      } catch (saveErr) {
+        console.warn('Canvas Import: DB insert failed, returning cloned payload for local storage:', saveErr);
+      }
     }
 
     const nowIso = new Date().toISOString();

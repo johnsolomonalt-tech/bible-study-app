@@ -20,8 +20,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const { title, content } = await req.json();
 
     if (!userId) {
-      // Unauthenticated guests maintain notes in local browser storage
-      return NextResponse.json({ id: numId, title, content, updatedAt: new Date().toISOString() });
+      return NextResponse.json({ error: 'Unauthorized. Sign in required to update notes.' }, { status: 401 });
     }
 
     if (process.env.DATABASE_URL && numId <= 2147483647) {
@@ -66,7 +65,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 
   try {
     if (!userId) {
-      return NextResponse.json({ success: true });
+      return NextResponse.json({ error: 'Unauthorized. Sign in required to delete notes.' }, { status: 401 });
     }
 
     if (process.env.DATABASE_URL && numId <= 2147483647) {

@@ -11,9 +11,10 @@ export async function GET(req: Request) {
   const diff = (now.getTime() - start.getTime()) + ((start.getTimezoneOffset() - now.getTimezoneOffset()) * 60 * 1000);
   const defaultDay = Math.floor(diff / (1000 * 60 * 60 * 24));
   
-  const day = rawDay ? parseInt(rawDay, 10) : defaultDay;
+  const parsed = rawDay ? parseInt(rawDay, 10) : defaultDay;
+  const day = !isNaN(parsed) && parsed > 0 ? parsed : defaultDay;
   const entries = devotionalsData as any[];
-  const match = entries.find(d => d.dayOfYear === day) || entries[(Math.max(1, day) - 1) % entries.length] || entries[0];
+  const match = entries.find(d => d.dayOfYear === day) || entries[(Math.max(1, day) - 1) % (entries.length || 1)] || entries[0] || {};
 
   return NextResponse.json(match, {
     headers: {

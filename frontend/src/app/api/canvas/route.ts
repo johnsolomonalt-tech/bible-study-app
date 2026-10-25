@@ -58,37 +58,38 @@ export async function GET(req: Request) {
 
     // 1. Fetch Board List
     if (isList) {
-      if (userId) {
-        try {
-          const dbRecords = await prisma.canvas.findMany({
-            where: {
-              userId,
-            },
-            select: {
-              boardId: true,
-              title: true,
-              updatedAt: true,
-              nodes: true,
-            },
-            orderBy: { updatedAt: 'desc' },
-          });
-
-          const list: CanvasBoardMetadata[] = dbRecords.map((r) => ({
-            id: r.boardId,
-            title: r.title,
-            updatedAt: r.updatedAt.toISOString(),
-            nodeCount: Array.isArray(r.nodes) ? r.nodes.length : 0,
-          }));
-
-          memoryIndexCache[userId] = list;
-          return NextResponse.json(list);
-        } catch (dbErr) {
-          console.warn('Canvas: PostgreSQL list query failed, falling back to memory:', dbErr);
-        }
+      if (!userId) {
+        return NextResponse.json([]);
       }
 
-      // Anonymous / memory fallback
-      const fallbackList = memoryIndexCache[activeUserId] || [];
+      try {
+        const dbRecords = await prisma.canvas.findMany({
+          where: {
+            userId,
+          },
+          select: {
+            boardId: true,
+            title: true,
+            updatedAt: true,
+            nodes: true,
+          },
+          orderBy: { updatedAt: 'desc' },
+        });
+
+        const list: CanvasBoardMetadata[] = dbRecords.map((r) => ({
+          id: r.boardId,
+          title: r.title,
+          updatedAt: r.updatedAt.toISOString(),
+          nodeCount: Array.isArray(r.nodes) ? r.nodes.length : 0,
+        }));
+
+        memoryIndexCache[userId] = list;
+        return NextResponse.json(list);
+      } catch (dbErr) {
+        console.warn('Canvas: PostgreSQL list query failed, falling back to memory:', dbErr);
+      }
+
+      const fallbackList = memoryIndexCache[userId] || [];
       return NextResponse.json(fallbackList);
     }
 
@@ -180,12 +181,14 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const userId = await getSafeUserId(req);
-    const activeUserId = userId || 'anonymous_user';
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized. Sign in required to save canvas boards.' }, { status: 401 });
+    }
 
     const body = await req.json();
     const { id = 'default', title = 'Untitled Canvas', nodes = [], edges = [], viewport, isPublic } = body;
 
-    const cacheKey = `${activeUserId}_${id}`;
+    const cacheKey = `${userId}_${id}`;
     const nowIso = new Date().toISOString();
 
     const cleanNodes = Array.isArray(nodes) ? nodes : [];
@@ -199,7 +202,7 @@ export async function POST(req: Request) {
     };
 
     // Update in-memory index
-    const index = memoryIndexCache[activeUserId] || [];
+    const index = memoryIndexCache[userId] || [];
     const metaItem: CanvasBoardMetadata = {
       id,
       title,
@@ -212,45 +215,43 @@ export async function POST(req: Request) {
     } else {
       index.unshift(metaItem);
     }
-    memoryIndexCache[activeUserId] = index;
+    memoryIndexCache[userId] = index;
 
-    // Persist directly to PostgreSQL database only for authenticated users
-    if (userId) {
-      try {
-        const saved = await prisma.canvas.upsert({
-          where: {
-            userId_boardId: {
-              userId,
-              boardId: id,
-            },
-          },
-          update: {
-            title,
-            nodes: cleanNodes,
-            edges: cleanEdges,
-            viewport: viewport || undefined,
-            ...(typeof isPublic === 'boolean' ? { isPublic } : {}),
-          },
-          create: {
+    // Persist directly to PostgreSQL database
+    try {
+      const saved = await prisma.canvas.upsert({
+        where: {
+          userId_boardId: {
             userId,
             boardId: id,
-            title,
-            nodes: cleanNodes,
-            edges: cleanEdges,
-            viewport: viewport || undefined,
-            isPublic: Boolean(isPublic),
           },
-        });
+        },
+        update: {
+          title,
+          nodes: cleanNodes,
+          edges: cleanEdges,
+          viewport: viewport || undefined,
+          ...(typeof isPublic === 'boolean' ? { isPublic } : {}),
+        },
+        create: {
+          userId,
+          boardId: id,
+          title,
+          nodes: cleanNodes,
+          edges: cleanEdges,
+          viewport: viewport || undefined,
+          isPublic: Boolean(isPublic),
+        },
+      });
 
-        return NextResponse.json({
-          success: true,
-          id: saved.boardId,
-          title: saved.title,
-          updatedAt: saved.updatedAt.toISOString(),
-        });
-      } catch (dbErr) {
-        console.error('Canvas: PostgreSQL upsert error (in-memory cached):', dbErr);
-      }
+      return NextResponse.json({
+        success: true,
+        id: saved.boardId,
+        title: saved.title,
+        updatedAt: saved.updatedAt.toISOString(),
+      });
+    } catch (dbErr) {
+      console.error('Canvas: PostgreSQL upsert error (in-memory cached):', dbErr);
     }
 
     return NextResponse.json({ success: true, id, title, updatedAt: nowIso });
