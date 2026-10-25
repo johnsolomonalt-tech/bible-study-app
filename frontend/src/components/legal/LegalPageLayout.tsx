@@ -14,9 +14,9 @@ interface LegalPageLayoutProps {
 
 export function LegalPageLayout({ document, currentSlug }: LegalPageLayoutProps) {
   return (
-    <div className="min-h-screen bg-bg text-fg flex flex-col font-sans selection:bg-accent/20 selection:text-fg">
+    <div className="fixed inset-0 w-full h-[100dvh] max-h-[100dvh] overflow-y-auto overflow-x-hidden bg-bg text-fg flex flex-col font-sans selection:bg-accent/20 selection:text-fg custom-scroll overscroll-y-contain z-10">
       {/* Top Navigation Bar */}
-      <header className="sticky top-0 z-30 w-full border-b border-border/80 bg-bg/90 backdrop-blur-md px-4 sm:px-8 py-3.5 flex items-center justify-between">
+      <header className="sticky top-0 z-30 w-full border-b border-border/80 bg-bg/95 backdrop-blur-md px-4 sm:px-8 py-3.5 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <Link
             href="/"
@@ -49,7 +49,7 @@ export function LegalPageLayout({ document, currentSlug }: LegalPageLayoutProps)
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-8 py-8 sm:py-14">
+      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-8 py-8 sm:py-14 shrink-0">
         {/* Document Navigation Tabs */}
         <nav 
           aria-label="Legal Documents Navigation"
@@ -163,7 +163,7 @@ export function LegalPageLayout({ document, currentSlug }: LegalPageLayoutProps)
       </main>
 
       {/* Footer */}
-      <footer className="w-full border-t border-border/80 bg-surface/20 px-4 sm:px-8 py-8 mt-16">
+      <footer className="w-full border-t border-border/80 bg-surface/20 px-4 sm:px-8 py-8 mt-16 shrink-0">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted">
           <div className="flex items-center gap-2">
             <span>Theologica Study Workspace</span>

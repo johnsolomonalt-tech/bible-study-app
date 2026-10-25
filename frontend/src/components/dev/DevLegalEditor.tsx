@@ -228,14 +228,14 @@ export function DevLegalEditor() {
                   value={editedContent}
                   onChange={(e) => setEditedContent(e.target.value)}
                   placeholder="Enter markdown legal text here..."
-                  className="w-full flex-1 min-h-[460px] p-3 rounded-2xl bg-[var(--bg)] border border-[var(--border)] text-xs sm:text-sm font-mono text-[var(--fg)] focus:outline-none focus:border-accent resize-y leading-relaxed"
+                  className="w-full flex-1 min-h-[460px] p-3 rounded-2xl bg-[var(--bg)] border border-[var(--border)] text-xs sm:text-sm font-mono text-[var(--fg)] focus:outline-none focus:border-accent resize-y leading-relaxed overflow-y-auto custom-scroll"
                 />
               </div>
             )}
 
             {/* Live Preview Pane */}
             {(viewMode === 'preview' || viewMode === 'split') && (
-              <div className={`p-5 flex flex-col bg-[var(--bg)]/40 overflow-y-auto max-h-[600px] custom-scroll ${viewMode === 'preview' ? 'col-span-full' : ''}`}>
+              <div className={`p-5 flex flex-col bg-[var(--bg)]/40 overflow-y-auto max-h-[70vh] custom-scroll overscroll-contain ${viewMode === 'preview' ? 'col-span-full' : ''}`}>
                 <div className="flex items-center justify-between pb-2 mb-3 border-b border-[var(--border)]">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted)]">
                     Live Markdown Preview

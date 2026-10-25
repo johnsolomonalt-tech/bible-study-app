@@ -262,7 +262,7 @@ export function SettingsModal(props: SettingsModalProps) {
         </header>
 
         {/* Modal Body: Sidebar Tabs + Content Area */}
-        <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
           {/* Navigation Tabs (Top strip on mobile, Left rail on tablet/desktop) */}
           <nav 
             className="flex md:flex-col overflow-x-auto md:overflow-y-auto shrink-0 p-2 md:p-3 border-b md:border-b-0 md:border-r border-border md:w-48 bg-surface/20 gap-1 custom-scroll"
@@ -288,7 +288,7 @@ export function SettingsModal(props: SettingsModalProps) {
           </nav>
 
           {/* Tab Content Panel */}
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scroll space-y-6">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scroll space-y-6 min-h-0">
             
             {/* 1. APPEARANCE TAB */}
             {activeTab === 'appearance' && (
