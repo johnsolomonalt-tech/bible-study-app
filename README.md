@@ -60,6 +60,39 @@ npm run build
 
 `npm run build` generates the Prisma client before running the Next.js production build. Database migrations must be deployed before serving code that depends on a newly added table.
 
+## How to add a new Bible version
+
+Adding a new Bible translation to Theologica is a centralized, single-file process:
+
+1. **Add the translation definition to the central registry:**
+   Open `frontend/src/lib/bibleTranslations.ts` and add an entry to `BIBLE_TRANSLATION_REGISTRY`:
+   ```ts
+   {
+     id: 'nasb',
+     name: 'New American Standard Bible',
+     abbreviation: 'NASB',
+     year: '2020',
+     publisher: 'The Lockman Foundation',
+     description: 'Highly acclaimed for precision and word-for-word fidelity.',
+     category: 'literal',
+     license: 'copyrighted', // 'public-domain' | 'open-license' | 'copyrighted'
+     licenseText: 'Full required legal copyright text...',
+     copyrightNotice: 'Short copyright notice for chapter headers...',
+     source: { type: 'local', dir: 'nasb' }, // or { type: 'bolls', key: '...' }, { type: 'api.bible', bibleId: '...' }
+     hasInterlinear: false,
+     isPublicDomain: false,
+     readingPlanSupported: true,
+   }
+   ```
+
+2. **Supply the Bible text data:**
+   - **Local static version (`type: 'local'`):** Add the chapter JSON files in `frontend/public/bibles/{dir}/{BOOK_CODE}.json`.
+   - **Bolls Life API fallback (`type: 'bolls'`):** Specify the Bolls translation code (e.g., `key: 'ASV'`).
+   - **API.Bible copyrighted integration (`type: 'api.bible'`):** Specify the API.Bible UUID in `bibleId` (activates when `BIBLE_API_KEY` is provided).
+
+3. **Automatic discovery:**
+   The entire application — Study reader, version switcher dropdown, parallel split view, search, Tracker reading plans, Notes scripture linking, Canvas cards, and the public Legal & Licensing page (`/legal`) — will automatically discover, render, and attribute the new translation with zero extra configuration.
+
 ## Deployment
 
 The linked Vercel project builds the `frontend/` directory when changes are pushed to the connected GitHub branch. The Vercel build command baselines an existing app database when needed, applies committed Prisma migrations, then builds the app. Configure the production environment variables in Vercel and ensure PostgreSQL is reachable. Vercel preview deployments should use a separate database or a safely isolated schema because preview builds also apply pending migrations.

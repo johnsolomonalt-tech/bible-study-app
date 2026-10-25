@@ -198,3 +198,25 @@ test('Content-Security-Policy & Security Headers: strict headers and devotionals
   const canvasRoute = fs.readFileSync(path.resolve('src/app/api/canvas/route.ts'), 'utf8');
   assert.ok(canvasRoute.includes('status: 401'), 'POST /api/canvas must return 401 for unauthenticated requests');
 });
+
+test('Multi-Translation Registry & Legal Infrastructure', () => {
+  const translationsPath = path.resolve('src/lib/bibleTranslations.ts');
+  assert.ok(fs.existsSync(translationsPath), 'bibleTranslations.ts must exist');
+  const translationsCode = fs.readFileSync(translationsPath, 'utf8');
+  assert.ok(translationsCode.includes('BIBLE_TRANSLATION_REGISTRY'), 'Must export BIBLE_TRANSLATION_REGISTRY');
+  assert.ok(translationsCode.includes('getTranslationAttributions'), 'Must provide getTranslationAttributions helper');
+
+  // Verify Legal Pages exist
+  assert.ok(fs.existsSync(path.resolve('src/app/privacy/page.tsx')), '/privacy page must exist');
+  assert.ok(fs.existsSync(path.resolve('src/app/terms/page.tsx')), '/terms page must exist');
+  assert.ok(fs.existsSync(path.resolve('src/app/legal/page.tsx')), '/legal page must exist');
+
+  // Verify Legal PUT route enforces auth
+  const legalRoute = fs.readFileSync(path.resolve('src/app/api/legal/[slug]/route.ts'), 'utf8');
+  assert.ok(legalRoute.includes('!userId') && legalRoute.includes('status: 401'), 'PUT /api/legal/[slug] must require authentication');
+
+  // Verify Notes Markdown enabled label removed
+  const notesWorkspace = fs.readFileSync(path.resolve('src/components/notes/NotesWorkspace.tsx'), 'utf8');
+  assert.ok(!notesWorkspace.includes('<span>Markdown enabled</span>'), 'NotesWorkspace must not say "Markdown enabled"');
+  assert.ok(fs.existsSync(path.resolve('src/components/notes/NotesTutorialModal.tsx')), 'NotesTutorialModal must exist');
+});

@@ -5,31 +5,9 @@ import { findCanonicalBook } from '@/lib/bibleCanon';
 import {
   BibleChapter,
   BibleVerse,
-  OPEN_TRANSLATIONS,
-  COPYRIGHTED_TRANSLATIONS,
 } from '@/types/bible';
+import { getTranslation } from '@/lib/bibleTranslations';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
-
-const ALL_TRANSLATION_META = [...OPEN_TRANSLATIONS, ...COPYRIGHTED_TRANSLATIONS];
-
-// Mapping of translation IDs to API.Bible Bible IDs (if user sets BIBLE_API_KEY)
-const API_BIBLE_MAP: Record<string, string> = {
-  esv: '06125adad2d5898a-01', // ESV
-  niv: '716077271e422315-01', // NIV
-  nasb: 'bba9f40183526463-01', // NASB
-  nlt: 'd5151f43501a117b-01', // NLT
-};
-
-// Known open translations supported directly via Bolls Life
-const BOLLS_OPEN_VERSIONS: Record<string, string> = {
-  asv: 'ASV',
-  ylt: 'YLT',
-  bbe: 'BBE',
-  darby: 'DARBY',
-  kjv: 'KJV',
-  web: 'WEB',
-  bsb: 'BSB',
-};
 
 function cleanVerseText(raw: string): string {
   if (!raw) return '';
@@ -80,14 +58,18 @@ export async function GET(
       );
     }
 
-    // 1. Check if it's one of our local packaged translations (BSB, WEB, KJV)
-    if (['bsb', 'web', 'kjv'].includes(versionKey)) {
+    const transDef = getTranslation(versionKey);
+    const defaultCopyright = transDef?.copyrightNotice || '';
+
+    // 1. Local packaged translation source
+    if (transDef?.source.type === 'local' || ['bsb', 'web', 'kjv'].includes(versionKey)) {
       try {
+        const localDir = transDef?.source.type === 'local' ? transDef.source.dir : versionKey;
         const localPath = path.join(
           process.cwd(),
           'public',
           'bibles',
-          versionKey,
+          localDir,
           `${bookMeta.code}.json`
         );
         if (fs.existsSync(localPath)) {
@@ -95,14 +77,11 @@ export async function GET(
           const data = JSON.parse(raw);
           const verses: BibleVerse[] = data.chapters[String(chapterNum)] || [];
 
-          const transMeta = ALL_TRANSLATION_META.find((t) => t.id.toLowerCase() === versionKey);
-          const defaultCopyright = transMeta?.copyrightNotice || '';
-
           const responsePayload: BibleChapter = {
             book: bookMeta.code,
             bookName: bookMeta.name,
             chapter: chapterNum,
-            translation: versionKey.toUpperCase(),
+            translation: (transDef?.abbreviation || versionKey).toUpperCase(),
             verses,
             copyright: defaultCopyright,
           };
@@ -119,9 +98,9 @@ export async function GET(
     }
 
     // 2. Dynamic Fallback: Open Translations via Bolls Life
-    if (BOLLS_OPEN_VERSIONS[versionKey]) {
-      const bollsTranslation = BOLLS_OPEN_VERSIONS[versionKey];
-      const bollsUrl = `https://bolls.life/get-chapter/${bollsTranslation}/${bookMeta.number}/${chapterNum}/`;
+    const bollsKey = transDef?.source.type === 'bolls' ? transDef.source.key : (versionKey === 'asv' ? 'ASV' : versionKey === 'ylt' ? 'YLT' : null);
+    if (bollsKey) {
+      const bollsUrl = `https://bolls.life/get-chapter/${bollsKey}/${bookMeta.number}/${chapterNum}/`;
 
       const res = await fetch(bollsUrl, {
         headers: { Accept: 'application/json' },
@@ -142,14 +121,11 @@ export async function GET(
         text: cleanVerseText(v.text),
       }));
 
-      const transMeta = ALL_TRANSLATION_META.find((t) => t.id.toLowerCase() === versionKey);
-      const defaultCopyright = transMeta?.copyrightNotice || '';
-
       const responsePayload: BibleChapter = {
         book: bookMeta.code,
         bookName: bookMeta.name,
         chapter: chapterNum,
-        translation: versionKey.toUpperCase(),
+        translation: (transDef?.abbreviation || versionKey).toUpperCase(),
         verses,
         copyright: defaultCopyright,
       };
@@ -163,15 +139,15 @@ export async function GET(
 
     // 3. Dynamic Fallback: Copyrighted translations via API.Bible
     const bibleApiKey = process.env.BIBLE_API_KEY || process.env.API_BIBLE_KEY;
-    const bibleId = API_BIBLE_MAP[versionKey];
+    const bibleId = transDef?.source.type === 'api.bible' ? transDef.source.bibleId : null;
 
     if (bibleId) {
       if (!bibleApiKey) {
         return NextResponse.json(
           {
             error: 'BIBLE_API_KEY_REQUIRED',
-            message: `Translation '${versionKey.toUpperCase()}' is copyrighted and requires a valid BIBLE_API_KEY environment variable.`,
-            translation: versionKey.toUpperCase(),
+            message: `Translation '${(transDef?.abbreviation || versionKey).toUpperCase()}' is copyrighted and requires a valid BIBLE_API_KEY environment variable.`,
+            translation: (transDef?.abbreviation || versionKey).toUpperCase(),
           },
           { status: 403 }
         );
@@ -224,8 +200,7 @@ export async function GET(
         }
       }
 
-      const transMeta = ALL_TRANSLATION_META.find((t) => t.id.toLowerCase() === versionKey);
-      const defaultCopyright = transMeta?.copyrightNotice || '';
+      const defaultCopyright = transDef?.copyrightNotice || '';
 
       walkAst(contentList);
       if (currentVerse > 0 && currentText.trim()) {

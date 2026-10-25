@@ -103,6 +103,14 @@ const nextConfig: NextConfig = {
         destination: '/api/devotionals',
       },
       {
+        source: '/licenses',
+        destination: '/legal',
+      },
+      {
+        source: '/license',
+        destination: '/legal',
+      },
+      {
         source: '/canvas',
         destination: '/?tab=canvas',
       },

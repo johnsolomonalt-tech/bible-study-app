@@ -55,8 +55,10 @@ import {
   Square,
   Filter,
   ChevronRight,
+  FileText,
 } from 'lucide-react';
 import { DEV_API_BASE, DEV_PORTAL_PATH } from '@/lib/devConfig';
+import { DevLegalEditor } from '@/components/dev/DevLegalEditor';
 
 interface SystemHealth {
   database: {
@@ -237,7 +239,7 @@ export default function DevDashboardPage() {
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [isAutoRefresh, setIsAutoRefresh] = useState(true);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date>(new Date());
-  const [activeTab, setActiveTab] = useState<'overview' | 'streaks' | 'users' | 'features' | 'activity' | 'health' | 'security'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'streaks' | 'users' | 'features' | 'activity' | 'health' | 'security' | 'legal'>('overview');
   const [feedFilter, setFeedFilter] = useState<string>('all');
 
   // Registered Users Directory State
@@ -1047,6 +1049,17 @@ export default function DevDashboardPage() {
           >
             <Shield size={16} />
             <span>Access & Security</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('legal')}
+            className={`pb-3 border-b-2 flex items-center gap-2 cursor-pointer transition-colors ${
+              activeTab === 'legal'
+                ? 'border-accent text-accent font-semibold'
+                : 'border-transparent text-[var(--muted)] hover:text-[var(--fg)]'
+            }`}
+          >
+            <FileText size={16} />
+            <span>Legal & Disclosures</span>
           </button>
         </div>
 
@@ -3938,6 +3951,15 @@ export default function DevDashboardPage() {
                 <p className="text-xs text-emerald-400 font-medium">{resetStatusMsg}</p>
               )}
             </div>
+          </div>
+        )}
+
+        {/* ============================================================== */}
+        {/* TAB 8: LEGAL, PRIVACY & TERMS CONTENT MANAGER                  */}
+        {/* ============================================================== */}
+        {activeTab === 'legal' && (
+          <div className="space-y-6">
+            <DevLegalEditor />
           </div>
         )}
       </main>

@@ -142,20 +142,20 @@ export function CanvasSidebar({
       <aside 
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
-        className="fixed lg:relative inset-y-0 left-0 z-40 lg:z-20 w-72 lg:w-80 h-full shrink-0 flex flex-col border-r border-border bg-surface text-fg shadow-2xl lg:shadow-none transition-transform duration-300 ease-out animate-in slide-in-from-left"
+        className="fixed lg:relative inset-y-0 left-0 z-40 lg:z-20 w-72 lg:w-[320px] h-full shrink-0 flex flex-col border-r lg:border-r border-border/80 bg-surface lg:bg-surface/20 lg:backdrop-blur-sm text-fg shadow-2xl lg:shadow-none transition-transform duration-300 ease-out animate-in slide-in-from-left"
       >
       {/* Sidebar Header */}
-      <div className="flex items-center justify-between px-4 py-3.5 border-b border-border shrink-0">
+      <div className="min-h-[48px] lg:min-h-[56px] flex items-center justify-between px-3.5 sm:px-4 border-b border-border/70 bg-surface/30 backdrop-blur-sm shrink-0">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-accent/15 text-accent flex items-center justify-center">
-            <Workflow size={16} />
+          <div className="w-7 h-7 rounded-lg bg-accent/15 text-accent border border-accent/20 flex items-center justify-center shadow-2xs">
+            <Workflow size={15} />
           </div>
-          <span className="text-sm font-bold tracking-tight text-fg">Your Canvases</span>
+          <span className="text-xs sm:text-sm font-bold tracking-tight text-fg">Your Canvases</span>
         </div>
         <button
           type="button"
           onClick={onToggle}
-          className="p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface-hover transition-colors cursor-pointer"
+          className="p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface/60 transition-colors cursor-pointer"
           title="Close Sidebar"
         >
           <PanelLeftClose size={16} />
@@ -163,7 +163,7 @@ export function CanvasSidebar({
       </div>
 
       {/* Action Bar: New Board, Import & Search */}
-      <div className="p-3 space-y-2 shrink-0">
+      <div className="p-3 space-y-2 shrink-0 bg-surface/10">
         <div className="flex items-center gap-1.5 relative" ref={newBoardMenuRef}>
           <button
             type="button"
@@ -387,9 +387,9 @@ export function CanvasSidebar({
       </div>
 
       {/* Footer info */}
-      <div className="p-3 border-t border-border text-[11px] text-muted flex items-center justify-between shrink-0">
-        <span>Saved offline & cloud</span>
-        <span className="font-mono text-[10px]">{boards.length} Total</span>
+      <div className="p-3 border-t border-border/70 bg-surface/25 text-[11px] text-muted flex items-center justify-between shrink-0">
+        <span>Canvas Workspace</span>
+        <span className="font-mono text-[10px] text-meta">{boards.length} {boards.length === 1 ? 'Board' : 'Boards'}</span>
       </div>
     </aside>
 

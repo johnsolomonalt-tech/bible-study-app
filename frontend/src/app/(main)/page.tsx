@@ -61,6 +61,7 @@ import { TrackerStreakHero } from '@/components/bible/TrackerStreakHero';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { PromptModal } from '@/components/ui/PromptModal';
 import { ExpandableSyncBanner } from '@/components/chat/ExpandableSyncBanner';
+import { ReadingPlansSection } from '@/components/bible/ReadingPlansSection';
 
 // Dynamically imported heavy modules to keep the primary bundle featherweight
 const CanvasBoard = dynamic(
@@ -6163,19 +6164,6 @@ export default function App() {
             </div>
           )}
 
-          {/* Offline & Cloud Sync Status Pill */}
-          <div 
-            className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${
-              isOnline 
-                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' 
-                : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
-            }`}
-            title={isOnline ? (userId ? "All notes, highlights, and tracker data synced to cloud & offline cache" : "Saved to local offline cache. Sign in to sync across devices.") : "Offline mode active. Your notes and tracker progress are safely saved locally."}
-          >
-            <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
-            <span>{isOnline ? (userId ? 'Synced & Offline' : 'Saved Offline') : 'Working Offline'}</span>
-          </div>
-
           <StreakPopover 
             onNavigateToTab={setActiveTab} 
           />
@@ -9553,22 +9541,6 @@ export default function App() {
                                     <Sparkles size={14} className="text-accent" />
                                   </button>
 
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setDailyVerseModal({
-                                        isOpen: true,
-                                        verseRef: citation,
-                                        excerpt: quote,
-                                      });
-                                    }}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface/70 hover:bg-surface text-fg-2 hover:text-fg text-xs font-medium border border-border-soft/50 transition-all cursor-pointer active:scale-95"
-                                    title="Read full verse text and context"
-                                  >
-                                    <BookOpen size={13} className="text-accent" />
-                                    <span>Full Verse</span>
-                                  </button>
-
                                   {parsedVerse && (
                                     <button
                                       type="button"
@@ -10141,122 +10113,13 @@ export default function App() {
                 </div>
 
                 {/* Guided Reading Plans Section */}
-                <section className="mb-8 sm:mb-14">
-                  <div className="flex items-center justify-between mb-3 px-1">
-                    <div>
-                      <h2 className="text-sm sm:text-base font-bold text-fg tracking-wide uppercase">Reading Plans</h2>
-                      <p className="text-xs text-muted">Curated paths that advance your tracker and daily goals</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
-                    {[
-                      {
-                        id: 'gospels',
-                        title: 'The Four Gospels',
-                        tagline: 'Life & Teachings of Jesus Christ',
-                        books: ['Matthew', 'Mark', 'Luke', 'John'],
-                      },
-                      {
-                        id: 'nt',
-                        title: 'The New Testament',
-                        tagline: 'Complete Apostolic Witness & Early Church',
-                        books: NT_BOOKS.map(b => b.name),
-                      },
-                      {
-                        id: 'psalms-proverbs',
-                        title: 'Psalms & Proverbs',
-                        tagline: 'Daily Prayer, Worship & Practical Wisdom',
-                        books: ['Psalms', 'Proverbs'],
-                      },
-                      {
-                        id: 'epistles',
-                        title: 'Paul’s Epistles',
-                        tagline: 'Doctrines of Grace, Salvation & Faith',
-                        books: [
-                          'Romans', '1 Corinthians', '2 Corinthians', 'Galatians',
-                          'Ephesians', 'Philippians', 'Colossians', '1 Thessalonians',
-                          '2 Thessalonians', '1 Timothy', '2 Timothy', 'Titus', 'Philemon'
-                        ],
-                      },
-                    ].map((plan) => {
-                      const allPlanChapters = plan.books.flatMap(bookName => {
-                        const bookInfo = [...OT_BOOKS, ...NT_BOOKS].find(b => b.name === bookName);
-                        if (!bookInfo) return [];
-                        return Array.from({ length: bookInfo.chapters }, (_, i) => ({
-                          book: bookName,
-                          chapter: i + 1,
-                          id: `${bookName}-${i + 1}`
-                        }));
-                      });
-                      const completedInPlan = allPlanChapters.filter(c => completedChapters.includes(c.id)).length;
-                      const planPercent = Math.round((completedInPlan / allPlanChapters.length) * 100) || 0;
-                      const nextChapter = allPlanChapters.find(c => !completedChapters.includes(c.id));
-
-                      return (
-                        <div 
-                          key={plan.id}
-                          className="p-4 sm:p-5 rounded-2xl border border-border/80 bg-surface/60 hover:bg-surface ring-shadow transition-all space-y-3"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <h3 className="text-sm sm:text-[15px] font-bold text-fg">{plan.title}</h3>
-                              <p className="text-[11.5px] text-muted">{plan.tagline}</p>
-                            </div>
-                            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20 shrink-0">
-                              {planPercent}%
-                            </span>
-                          </div>
-
-                          <div className="space-y-1.5">
-                            <div className="flex justify-between text-[11px] text-meta">
-                              <span>Progress</span>
-                              <span>{completedInPlan} / {allPlanChapters.length} Chapters</span>
-                            </div>
-                            <div className="h-2 w-full bg-bg rounded-full overflow-hidden inset-shadow">
-                              <div className="h-full bg-accent transition-all duration-500 ease-out" style={{ width: `${planPercent}%` }} />
-                            </div>
-                          </div>
-
-                          <div className="pt-1 flex items-center justify-between gap-2">
-                            <span className="text-xs text-muted truncate">
-                              {nextChapter ? (
-                                <>Next: <span className="font-semibold text-fg">{nextChapter.book} {nextChapter.chapter}</span></>
-                              ) : (
-                                <span className="text-emerald-500 font-semibold">✓ Plan Completed</span>
-                              )}
-                            </span>
-
-                            {nextChapter ? (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  navigateToVerse(nextChapter.book, nextChapter.chapter, 1);
-                                  setActiveTab('study');
-                                }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent text-accent-on text-xs font-semibold hover:opacity-95 active:scale-95 transition-all shadow-xs cursor-pointer shrink-0"
-                              >
-                                <span>Read Chapter</span>
-                                <ChevronRight size={13} />
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  navigateToVerse(allPlanChapters[0].book, allPlanChapters[0].chapter, 1);
-                                  setActiveTab('study');
-                                }}
-                                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface border border-border text-xs text-muted hover:text-fg transition-all cursor-pointer shrink-0"
-                              >
-                                <span>Review</span>
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
+                <ReadingPlansSection
+                  completedChapters={completedChapters}
+                  onNavigateToChapter={(book, chapter) => {
+                    navigateToVerse(book, chapter, 1);
+                    setActiveTab('study');
+                  }}
+                />
 
                 {/* Old Testament Accordion */}
                 <div className="mb-6">

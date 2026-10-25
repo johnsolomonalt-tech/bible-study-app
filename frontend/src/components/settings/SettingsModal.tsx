@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import { 
   X, Palette, BookOpen, Volume2, Sparkles, Target, Database,
-  Check, RotateCcw, Download, Upload, Play, Square, Info, Eye, ShieldCheck, Columns2
+  Check, RotateCcw, Download, Upload, Play, Square, Info, Eye, ShieldCheck, Columns2,
+  ArrowUpRight, FileText, Scale
 } from 'lucide-react';
 import { 
   ReaderFontFamily, 
@@ -965,6 +967,52 @@ export function SettingsModal(props: SettingsModalProps) {
                     </p>
                   </div>
                 </div>
+
+                {/* Official Legal Documents Links */}
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <FileText className="text-accent" size={18} />
+                    <h3 className="text-sm font-semibold uppercase tracking-wider text-fg">Official Policies &amp; Licensing Pages</h3>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <Link
+                      href="/privacy"
+                      onClick={onClose}
+                      className="p-3 rounded-xl bg-surface hover:bg-surface-hover border border-border/70 hover:border-accent/40 transition-all flex flex-col justify-between group shadow-2xs"
+                    >
+                      <div className="flex items-center justify-between text-accent mb-1.5">
+                        <ShieldCheck size={16} />
+                        <ArrowUpRight size={14} className="opacity-60 group-hover:opacity-100 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                      </div>
+                      <span className="text-xs font-semibold text-fg group-hover:text-accent transition-colors">Privacy Policy</span>
+                      <span className="text-[10px] text-muted mt-0.5">Data rights &amp; security</span>
+                    </Link>
+                    <Link
+                      href="/terms"
+                      onClick={onClose}
+                      className="p-3 rounded-xl bg-surface hover:bg-surface-hover border border-border/70 hover:border-accent/40 transition-all flex flex-col justify-between group shadow-2xs"
+                    >
+                      <div className="flex items-center justify-between text-accent mb-1.5">
+                        <Scale size={16} />
+                        <ArrowUpRight size={14} className="opacity-60 group-hover:opacity-100 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                      </div>
+                      <span className="text-xs font-semibold text-fg group-hover:text-accent transition-colors">Terms of Service</span>
+                      <span className="text-[10px] text-muted mt-0.5">Use conditions &amp; AI</span>
+                    </Link>
+                    <Link
+                      href="/legal"
+                      onClick={onClose}
+                      className="p-3 rounded-xl bg-surface hover:bg-surface-hover border border-border/70 hover:border-accent/40 transition-all flex flex-col justify-between group shadow-2xs"
+                    >
+                      <div className="flex items-center justify-between text-accent mb-1.5">
+                        <BookOpen size={16} />
+                        <ArrowUpRight size={14} className="opacity-60 group-hover:opacity-100 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                      </div>
+                      <span className="text-xs font-semibold text-fg group-hover:text-accent transition-colors">Translations &amp; Legal</span>
+                      <span className="text-[10px] text-muted mt-0.5">All Bible licenses</span>
+                    </Link>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -973,16 +1021,32 @@ export function SettingsModal(props: SettingsModalProps) {
 
         {/* Footer */}
         <footer className="px-5 sm:px-6 py-3 border-t border-border flex items-center justify-between shrink-0 bg-surface/30">
-          <div className="flex items-center gap-2 text-[11px] text-muted">
-            <span>Theologica Study Workspace</span>
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted">
+            <span>Theologica</span>
             <span>&bull;</span>
-            <button 
-              type="button" 
-              onClick={() => setActiveTab('about')}
-              className="text-muted hover:text-accent underline transition-colors cursor-pointer"
+            <Link 
+              href="/privacy" 
+              onClick={onClose}
+              className="text-muted hover:text-accent transition-colors cursor-pointer"
             >
-              Privacy &amp; Disclosures
-            </button>
+              Privacy
+            </Link>
+            <span>&bull;</span>
+            <Link 
+              href="/terms" 
+              onClick={onClose}
+              className="text-muted hover:text-accent transition-colors cursor-pointer"
+            >
+              Terms
+            </Link>
+            <span>&bull;</span>
+            <Link 
+              href="/legal" 
+              onClick={onClose}
+              className="text-muted hover:text-accent transition-colors cursor-pointer"
+            >
+              Licenses
+            </Link>
           </div>
           <button
             onClick={onClose}

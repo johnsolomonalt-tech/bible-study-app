@@ -22,7 +22,8 @@ import {
   FilePlus,
   X,
   Clock,
-  Highlighter
+  Highlighter,
+  Lightbulb
 } from 'lucide-react';
 import { NoteFormattingToolbar, NoteViewMode } from './NoteFormattingToolbar';
 import { NoteMarkdownRenderer } from './NoteMarkdownRenderer';
@@ -30,6 +31,7 @@ import { NoteTemplatesModal } from './NoteTemplatesModal';
 import { InsertVerseModal } from './InsertVerseModal';
 import { VersePreviewPopup } from './VersePreviewPopup';
 import { NoteAiAssistantModal } from './NoteAiAssistantModal';
+import { NotesTutorialModal } from './NotesTutorialModal';
 import { NoteTemplate, NOTE_TEMPLATES } from './noteTemplates';
 import { BIBLE_VERSE_REGEX, CANONICAL_BOOKS } from '@/lib/bibleReferences';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
@@ -267,6 +269,7 @@ export function NotesWorkspace({
   const [isAiAssistantOpen, setIsAiAssistantOpen] = useState(false);
   const [previewVerse, setPreviewVerse] = useState<{ book: string; chapter: number; verse: number; raw?: string } | null>(null);
   const [noteToDelete, setNoteToDelete] = useState<NoteItem | null>(null);
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
 
   // Tab Bar scroll, button refs, and cutoff states
   const tabsScrollRef = useRef<HTMLDivElement | null>(null);
@@ -1132,6 +1135,17 @@ export function NotesWorkspace({
                   <span>{noteStats.readingTime}</span>
                 </div>
 
+                {/* Notes Guide & Tutorial Lightbulb button */}
+                <button
+                  type="button"
+                  onClick={() => setIsTutorialOpen(true)}
+                  className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-xl text-amber-500 hover:text-amber-400 hover:bg-amber-500/10 transition-colors cursor-pointer"
+                  title="How to Use Notes (Guide & Tips)"
+                  aria-label="Notes Guide & Tutorial"
+                >
+                  <Lightbulb size={17} />
+                </button>
+
                 {/* Pin button */}
                 <button
                   type="button"
@@ -1422,7 +1436,15 @@ export function NotesWorkspace({
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <span>Markdown enabled</span>
+                <button
+                  type="button"
+                  onClick={() => setIsTutorialOpen(true)}
+                  className="flex items-center gap-1.5 text-muted hover:text-amber-500 transition-colors cursor-pointer text-[11px]"
+                  title="How to Use Notes Guide"
+                >
+                  <Lightbulb size={12} className="text-amber-500" />
+                  <span>Notes Guide</span>
+                </button>
               </div>
             </footer>
           </>
@@ -1438,7 +1460,7 @@ export function NotesWorkspace({
               Select an existing entry from the sidebar to continue studying, or start a new note using our structured frameworks.
             </p>
 
-            <div className="flex items-center gap-3 mb-8">
+            <div className="flex flex-wrap items-center justify-center gap-3 mb-6">
               <button
                 onClick={() => setIsTemplatesOpen(true)}
                 className="flex items-center gap-2 px-5 py-2.5 bg-accent text-white font-semibold text-[13px] rounded-xl hover:opacity-95 shadow-md hover:shadow-lg transition-all cursor-pointer"
@@ -1454,6 +1476,15 @@ export function NotesWorkspace({
                 <span>New Blank Note</span>
               </button>
             </div>
+
+            <button
+              type="button"
+              onClick={() => setIsTutorialOpen(true)}
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 hover:bg-amber-500/15 text-amber-500 border border-amber-500/25 text-xs font-semibold transition-all cursor-pointer shadow-2xs mb-8 group"
+            >
+              <Lightbulb size={14} className="group-hover:scale-110 transition-transform" />
+              <span>How to Use Notes • Interactive Tutorial</span>
+            </button>
 
             {/* Quick Starters */}
             <div className="w-full text-left">
@@ -1543,6 +1574,12 @@ export function NotesWorkspace({
           }
         }}
         onCancel={() => setNoteToDelete(null)}
+      />
+
+      {/* 6. Notes Interactive Tutorial Modal */}
+      <NotesTutorialModal
+        isOpen={isTutorialOpen}
+        onClose={() => setIsTutorialOpen(false)}
       />
     </div>
   );
