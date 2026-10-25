@@ -294,8 +294,12 @@ function InnerCanvasBoard({
   const [paneAddSubmenuOpen, setPaneAddSubmenuOpen] = useState(false);
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
   const contextMenuRef = useRef<HTMLDivElement>(null);
+  const rightClickStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const isDraggingCanvasRef = useRef(false);
 
   useEffect(() => {
+    if (!paneContextMenu) return;
+
     const handleOutside = (e: MouseEvent) => {
       if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as HTMLElement)) {
         setPaneContextMenu(null);
@@ -306,15 +310,37 @@ function InnerCanvasBoard({
         setPaneContextMenu(null);
       }
     };
-    if (paneContextMenu) {
-      document.addEventListener('mousedown', handleOutside);
-      document.addEventListener('keydown', handleKeyDown);
-    }
+    const handleDismissOnScroll = () => {
+      setPaneContextMenu(null);
+    };
+
+    document.addEventListener('mousedown', handleOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('wheel', handleDismissOnScroll, { passive: true });
     return () => {
       document.removeEventListener('mousedown', handleOutside);
       document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('wheel', handleDismissOnScroll);
     };
   }, [paneContextMenu]);
+
+  const triggerPaneContextMenu = (clientX: number, clientY: number) => {
+    // If the user was dragging or moved the mouse during right-click, do not show context menu
+    if (isDraggingCanvasRef.current) {
+      setPaneContextMenu(null);
+      return;
+    }
+    if (rightClickStartPosRef.current) {
+      const dx = Math.abs(clientX - rightClickStartPosRef.current.x);
+      const dy = Math.abs(clientY - rightClickStartPosRef.current.y);
+      if (dx > 4 || dy > 4) {
+        setPaneContextMenu(null);
+        return;
+      }
+    }
+    setPaneContextMenu({ x: clientX, y: clientY });
+    setPaneAddSubmenuOpen(false);
+  };
 
   // Persistence storage key constants
   const STORAGE_KEY_ACTIVE_BOARD = 'theologica_active_canvas_board_id';
@@ -2460,6 +2486,36 @@ function InnerCanvasBoard({
         onTouchStart={handleTouchStartWrapper}
         onTouchMove={handleTouchMoveWrapper}
         onTouchEnd={handleTouchEndWrapper}
+        onMouseDown={(e) => {
+          if (e.button === 2) {
+            rightClickStartPosRef.current = { x: e.clientX, y: e.clientY };
+            isDraggingCanvasRef.current = false;
+          } else if (e.button === 0) {
+            if (paneContextMenu && contextMenuRef.current && !contextMenuRef.current.contains(e.target as HTMLElement)) {
+              setPaneContextMenu(null);
+            }
+          }
+        }}
+        onMouseMove={(e) => {
+          if (rightClickStartPosRef.current) {
+            const dx = Math.abs(e.clientX - rightClickStartPosRef.current.x);
+            const dy = Math.abs(e.clientY - rightClickStartPosRef.current.y);
+            if (dx > 4 || dy > 4) {
+              isDraggingCanvasRef.current = true;
+              if (paneContextMenu) {
+                setPaneContextMenu(null);
+              }
+            }
+          }
+        }}
+        onMouseUp={(e) => {
+          if (e.button === 2) {
+            rightClickStartPosRef.current = null;
+            setTimeout(() => {
+              isDraggingCanvasRef.current = false;
+            }, 100);
+          }
+        }}
         onContextMenu={(e) => {
           e.preventDefault();
           const target = e.target as HTMLElement;
@@ -2470,8 +2526,7 @@ function InnerCanvasBoard({
             !target.closest('.react-flow__controls') &&
             !target.closest('.react-flow__minimap')
           ) {
-            setPaneContextMenu({ x: e.clientX, y: e.clientY });
-            setPaneAddSubmenuOpen(false);
+            triggerPaneContextMenu(e.clientX, e.clientY);
           }
         }}
         className="flex-1 h-full relative overflow-hidden flex flex-col min-w-0"
@@ -2563,15 +2618,21 @@ function InnerCanvasBoard({
         onNodeDragStop={onNodeDragStop}
         onNodesDelete={onNodesDelete}
         onEdgesDelete={onEdgesDelete}
+        onMoveStart={() => {
+          isDraggingCanvasRef.current = true;
+          if (paneContextMenu) setPaneContextMenu(null);
+        }}
+        onMove={() => {
+          isDraggingCanvasRef.current = true;
+          if (paneContextMenu) setPaneContextMenu(null);
+        }}
         onPaneContextMenu={(event) => {
           event.preventDefault();
-          setPaneContextMenu({ x: event.clientX, y: event.clientY });
-          setPaneAddSubmenuOpen(false);
+          triggerPaneContextMenu(event.clientX, event.clientY);
         }}
         onSelectionContextMenu={(event) => {
           event.preventDefault();
-          setPaneContextMenu({ x: event.clientX, y: event.clientY });
-          setPaneAddSubmenuOpen(false);
+          triggerPaneContextMenu(event.clientX, event.clientY);
         }}
         onPaneClick={() => {
           if (paneContextMenu) setPaneContextMenu(null);
@@ -2580,6 +2641,9 @@ function InnerCanvasBoard({
           if (viewport && typeof viewport.zoom === 'number' && viewport.zoom >= 0.2) {
             currentViewportRef.current = viewport;
           }
+          setTimeout(() => {
+            isDraggingCanvasRef.current = false;
+          }, 100);
         }}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}

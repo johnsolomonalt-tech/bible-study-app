@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Flame, 
   Award, 
@@ -46,7 +46,25 @@ export function TrackerStreakHero({
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isDailyVerseOpen, setIsDailyVerseOpen] = useState(false);
   const [isQuoteExpanded, setIsQuoteExpanded] = useState(false);
+  const [isQuoteOverflowing, setIsQuoteOverflowing] = useState(false);
+  const quoteTextRef = useRef<HTMLParagraphElement>(null);
   const [quote] = useState(getTodayStreakQuote());
+
+  useEffect(() => {
+    const checkQuoteOverflow = () => {
+      if (quoteTextRef.current) {
+        // Only consider overflowing if on small mobile screen and text is actually truncated
+        const isMobileScreen = typeof window !== 'undefined' && window.innerWidth < 640;
+        const hasOverflow = isMobileScreen && (quoteTextRef.current.scrollWidth > quoteTextRef.current.clientWidth + 2);
+        setIsQuoteOverflowing(hasOverflow);
+      }
+    };
+    checkQuoteOverflow();
+    window.addEventListener('resize', checkQuoteOverflow);
+    return () => window.removeEventListener('resize', checkQuoteOverflow);
+  }, [quote.text]);
+
+  const canExpandQuote = isQuoteOverflowing || isQuoteExpanded;
 
   useEffect(() => {
     const handleUpdate = () => setStreakData(getStreakData());
@@ -315,11 +333,16 @@ export function TrackerStreakHero({
           </div>
           <div className="min-w-0 flex-1">
             <p 
+              ref={quoteTextRef}
               onClick={(e) => {
-                e.stopPropagation();
-                setIsQuoteExpanded(prev => !prev);
+                if (canExpandQuote) {
+                  e.stopPropagation();
+                  setIsQuoteExpanded(prev => !prev);
+                }
               }}
-              className={`italic text-fg font-serif text-xs leading-relaxed cursor-pointer ${isQuoteExpanded ? 'whitespace-normal' : 'truncate sm:whitespace-normal'}`}
+              className={`italic text-fg font-serif text-xs leading-relaxed ${
+                canExpandQuote ? 'cursor-pointer hover:opacity-80' : 'cursor-default'
+              } ${isQuoteExpanded ? 'whitespace-normal' : 'truncate sm:whitespace-normal'}`}
             >
               &ldquo;{quote.text}&rdquo;
             </p>
