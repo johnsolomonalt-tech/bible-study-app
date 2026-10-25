@@ -511,21 +511,21 @@ const AiThinkingAccordion = ({ thought }: { thought: string }) => {
   if (!thought) return null;
 
   return (
-    <div className="w-full mb-2.5">
+    <div className="w-full mb-1">
       <button
         type="button"
         onClick={() => setIsOpen(prev => !prev)}
-        className="inline-flex items-center gap-1.5 text-left cursor-pointer group select-none transition-colors text-muted/65 hover:text-fg py-0.5 text-[11.5px]"
+        className="inline-flex items-center gap-1.5 text-left cursor-pointer group select-none transition-colors text-muted/70 hover:text-fg py-0.5 text-[11px]"
       >
-        <BrainCircuit size={12} className="text-accent/70 shrink-0" />
+        <BrainCircuit size={11} className="text-accent/80 shrink-0" />
         <span className="font-medium">
-          {isOpen ? 'Hide thinking' : 'Show thinking'}
+          {isOpen ? 'Hide reasoning' : 'Thought process'}
         </span>
-        <ChevronDown size={11} className={`transition-transform duration-200 text-muted/40 group-hover:text-muted/70 ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown size={10} className={`transition-transform duration-200 text-muted/40 group-hover:text-muted/70 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {isOpen && (
-        <div className="mt-1.5 pl-3 border-l-2 border-border-soft text-[11.5px] leading-relaxed text-muted/75 max-h-72 overflow-y-auto custom-scroll whitespace-pre-wrap font-mono selection:bg-accent/20 animate-in fade-in duration-150">
+        <div className="mt-1 pl-2.5 border-l border-border/60 text-[11px] leading-relaxed text-muted/80 max-h-64 overflow-y-auto custom-scroll whitespace-pre-wrap font-mono selection:bg-accent/20 animate-in fade-in duration-150">
           {thought}
         </div>
       )}
@@ -657,8 +657,8 @@ const AiChatMessageView = ({
   if (isUser) {
     return (
       <div className={`flex flex-col items-end w-full shrink-0 ${isFullView ? 'max-w-3xl mx-auto' : ''} py-1.5`}>
-        <div className="flex items-center gap-1.5 mb-1.5 select-none pr-1">
-          <span className="text-[11px] font-semibold tracking-wider uppercase text-muted">You</span>
+        <div className="flex items-center gap-1.5 mb-1 select-none pr-1">
+          <span className="text-[11px] font-medium text-muted">You</span>
         </div>
         <div className={`${
           isFullView 
@@ -700,40 +700,26 @@ const AiChatMessageView = ({
 
   return (
     <div className={`flex flex-col items-start w-full shrink-0 ${isFullView ? 'max-w-3xl mx-auto' : ''} py-2.5`}>
-      {/* Header with Lens & Language Badges */}
-      <div className="flex items-center gap-2 mb-2 select-none flex-wrap">
-        <div className="w-5 h-5 rounded-full bg-accent/10 border border-accent/30 flex items-center justify-center text-accent shrink-0">
-          <Sparkles size={11} />
-        </div>
-        <span className="text-[11px] font-semibold tracking-wider uppercase text-muted">Theologica AI</span>
-
-        {/* Theological Lens Badge */}
-        <span 
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border shadow-2xs"
-          style={{ 
-            backgroundColor: lensMeta.bgLight, 
-            borderColor: lensMeta.borderLight, 
-            color: lensMeta.accentColor 
-          }}
-        >
+      {/* Minimalist AI Header */}
+      <div className="flex items-center gap-1.5 mb-1.5 select-none flex-wrap text-[11px] text-muted">
+        <Sparkles size={11} className="text-accent shrink-0" />
+        <span className="font-medium text-fg">Theologica AI</span>
+        <span className="text-muted/40">·</span>
+        <span className="flex items-center gap-1 text-fg-2">
           {lensMeta.icon}
-          <span>{lensMeta.name} Lens</span>
+          <span>{lensMeta.name}</span>
         </span>
-
-        {/* Original Language Badge */}
         {hasOriginalLanguages && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-            <span>א / Ω</span>
-            <span>Original Roots</span>
-          </span>
+          <>
+            <span className="text-muted/40">·</span>
+            <span className="text-muted">Original Roots</span>
+          </>
         )}
-
-        {/* Scripture Citation Count */}
         {verseCount > 0 && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
-            <BookOpen size={10} />
-            <span>{verseCount} {verseCount === 1 ? 'Reference' : 'References'}</span>
-          </span>
+          <>
+            <span className="text-muted/40">·</span>
+            <span className="text-muted">{verseCount} {verseCount === 1 ? 'ref' : 'refs'}</span>
+          </>
         )}
       </div>
 

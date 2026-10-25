@@ -338,7 +338,7 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
       </div>
 
       {/* Active Scripture & Study Chapter Action Bar */}
-      <div className="w-full max-w-md sm:max-w-xl mb-2 sm:mb-4 p-2 sm:p-2.5 rounded-xl bg-surface/70 border border-border-soft/70 shadow-2xs flex items-center justify-between gap-1.5">
+      <div className="w-full max-w-md sm:max-w-xl mb-2 sm:mb-4 p-2 sm:p-2.5 rounded-xl bg-surface/50 border border-border/50 flex items-center justify-between gap-1.5">
         <div className="flex items-center gap-1.5 min-w-0">
           <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: currentLensMeta.accentColor }} />
           <div className="min-w-0 flex items-center gap-1 sm:gap-1.5 flex-wrap">
@@ -379,7 +379,7 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
               key={`${item.prompt}-${idx}`}
               type="button"
               onClick={() => onSelectPrompt(item.prompt)}
-              className={`${idx >= 2 ? 'hidden sm:flex' : 'flex'} group text-left p-2 sm:p-3 rounded-xl bg-surface/60 hover:bg-surface border border-border-soft/60 hover:border-accent/50 transition-all cursor-pointer shadow-2xs hover:shadow-xs items-center justify-between gap-1.5 sm:gap-2 active:scale-[0.99]`}
+              className={`${idx >= 2 ? 'hidden sm:flex' : 'flex'} group text-left p-2 sm:p-2.5 rounded-xl bg-surface/35 hover:bg-surface border border-border/40 hover:border-accent/40 transition-all cursor-pointer items-center justify-between gap-1.5 sm:gap-2 active:scale-[0.99]`}
             >
               <div className="min-w-0 flex-1">
                 <span className="inline-block text-[8.5px] sm:text-[9px] font-semibold tracking-wide uppercase text-accent bg-accent/10 px-1.5 py-0.2 rounded mb-0.5">
@@ -389,7 +389,7 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
                   &ldquo;{item.prompt}&rdquo;
                 </p>
               </div>
-              <ArrowRight size={12} className="text-muted group-hover:text-accent group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
+              <ArrowRight size={12} className="text-muted/50 group-hover:text-accent group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
             </button>
           ))}
         </div>
@@ -411,7 +411,7 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
                 key={idx}
                 type="button"
                 onClick={() => onSelectPrompt(card.prompt)}
-                className="group text-left p-2.5 rounded-xl bg-surface/40 hover:bg-surface border border-border-soft/50 hover:border-accent/40 transition-all cursor-pointer shadow-xs flex flex-col justify-between"
+                className="group text-left p-2.5 rounded-xl bg-surface/30 hover:bg-surface border border-border/40 hover:border-accent/40 transition-all cursor-pointer flex flex-col justify-between"
               >
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
