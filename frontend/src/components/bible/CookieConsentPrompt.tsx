@@ -18,43 +18,66 @@ export function CookieConsentPrompt({
   const isDark = theme === 'dark';
 
   useEffect(() => {
-    // Check if the user has already acknowledged
-    const consent = getPreference(PREF_KEYS.COOKIE_CONSENT);
-    if (!consent) {
-      // Delay display slightly to avoid layout shifts on initial paint
-      const timer = setTimeout(() => {
-        setIsVisible(true);
-      }, 700);
-      return () => clearTimeout(timer);
+    // Check if the user has already acknowledged or dismissed on this device
+    try {
+      const stored = localStorage.getItem('theologica_cookie_consent') || 
+                     localStorage.getItem('cookie_consent') || 
+                     localStorage.getItem('theologica_cookie_dismissed') ||
+                     getPreference(PREF_KEYS.COOKIE_CONSENT);
+      if (stored) {
+        return;
+      }
+    } catch {
+      // If storage is restricted, check preference fallback
+      const consent = getPreference(PREF_KEYS.COOKIE_CONSENT);
+      if (consent) return;
     }
+
+    // Delay display slightly to avoid layout shifts on initial paint
+    const timer = setTimeout(() => {
+      setIsVisible(true);
+    }, 700);
+    return () => clearTimeout(timer);
   }, []);
 
-  const handleAccept = () => {
-    setPreference(PREF_KEYS.COOKIE_CONSENT, 'accepted');
+  const markPermanentlyDismissed = (status: 'accepted' | 'dismissed') => {
     setIsVisible(false);
+    try {
+      localStorage.setItem('theologica_cookie_consent', status);
+      localStorage.setItem('cookie_consent', status);
+      localStorage.setItem('theologica_cookie_dismissed', 'true');
+      setPreference(PREF_KEYS.COOKIE_CONSENT, status);
+      document.cookie = `theologica_cookie_consent=${status}; path=/; max-age=31536000; SameSite=Lax`;
+    } catch {
+      setPreference(PREF_KEYS.COOKIE_CONSENT, status);
+    }
+  };
+
+  const handleAccept = () => {
+    markPermanentlyDismissed('accepted');
   };
 
   const handleDismiss = () => {
-    setPreference(PREF_KEYS.COOKIE_CONSENT, 'dismissed');
-    setIsVisible(false);
+    markPermanentlyDismissed('dismissed');
   };
 
   if (!isVisible) return null;
 
   return (
-    <aside
-      aria-label="Cookie and storage notice"
-      role="region"
-      className="fixed z-[99] bottom-[calc(52px+max(4px,calc(env(safe-area-inset-bottom,0px)-28px)))] left-3 right-3 md:bottom-6 md:left-6 md:right-auto md:max-w-[390px] rounded-2xl p-3.5 md:p-4 border shadow-2xl transition-all duration-200 animate-in slide-in-from-bottom-4 fade-in"
-      style={{
-        backgroundColor: isDark ? '#1e1e22' : '#ffffff',
-        borderColor: isDark ? '#323238' : '#e4e4e7',
-        color: isDark ? '#f4f4f5' : '#18181b',
-        boxShadow: isDark
-          ? '0 20px 40px -10px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.06)'
-          : '0 20px 35px -10px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04)',
-      }}
-    >
+    <div className="fixed inset-x-0 bottom-0 z-[99] pointer-events-none flex justify-center md:justify-start px-3 md:px-6 pb-[calc(58px+max(6px,calc(env(safe-area-inset-bottom,0px)-24px)))] md:pb-6">
+      <aside
+        aria-label="Cookie and storage notice"
+        role="region"
+        className="pointer-events-auto max-w-sm w-full rounded-2xl p-3.5 md:p-4 border shadow-2xl transition-all duration-200 animate-in slide-in-from-bottom-3 fade-in"
+        style={{
+          backgroundColor: isDark ? '#1e1e22' : '#ffffff',
+          borderColor: isDark ? '#323238' : '#e4e4e7',
+          color: isDark ? '#f4f4f5' : '#18181b',
+          boxShadow: isDark
+            ? '0 20px 40px -10px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.06)'
+            : '0 20px 35px -10px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04)',
+        }}
+      >
       <div className="flex items-start gap-2.5">
         <div
           className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
@@ -173,5 +196,6 @@ export function CookieConsentPrompt({
         </button>
       </div>
     </aside>
-  );
+  </div>
+);
 }

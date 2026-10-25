@@ -228,30 +228,39 @@ export function CanvasStartPage({
               className="w-full rounded-2xl border border-border bg-surface text-fg focus-within:border-accent/80 focus-within:ring-2 focus-within:ring-accent/15 shadow-xl p-3.5 sm:p-4 space-y-3 transition-all duration-200"
             >
               {/* Architecture Mode Selector Pills */}
-              <div className="flex items-center gap-1.5 pb-2 border-b border-border-soft/60 overflow-x-auto no-scrollbar">
-                {[
-                  { id: 'generate', label: 'Mind-Map', icon: Network },
-                  { id: 'discourse', label: 'Logic Flowchart', icon: Workflow },
-                  { id: 'synthesize', label: 'Topic Synthesis', icon: FileText },
-                ].map((m) => {
-                  const Icon = m.icon;
-                  const isSelected = mode === m.id;
-                  return (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => setMode(m.id as CanvasMode)}
-                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap ${
-                        isSelected
-                          ? 'bg-accent/15 text-accent font-semibold border border-accent/30'
-                          : 'text-fg-2 hover:text-fg hover:bg-surface-hover'
-                      }`}
-                    >
-                      <Icon size={13} />
-                      <span>{m.label}</span>
-                    </button>
-                  );
-                })}
+              <div className="space-y-2 pb-2.5 border-b border-border-soft/60">
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                  {[
+                    { id: 'generate', label: 'Mind-Map', icon: Network },
+                    { id: 'discourse', label: 'Logic Flowchart', icon: Workflow },
+                    { id: 'synthesize', label: 'Topic Synthesis', icon: FileText },
+                  ].map((m) => {
+                    const Icon = m.icon;
+                    const isSelected = mode === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setMode(m.id as CanvasMode)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer whitespace-nowrap ${
+                          isSelected
+                            ? 'bg-accent text-accent-on font-semibold shadow-xs'
+                            : 'text-fg-2 hover:text-fg hover:bg-surface-hover bg-surface/40 border border-border/40'
+                        }`}
+                      >
+                        <Icon size={13} />
+                        <span>{m.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Clear 1-sentence mode explainer */}
+                <p className="text-[11.5px] text-muted leading-relaxed px-0.5">
+                  {mode === 'generate' && 'Mind-Map: Explores central passages, theological connections, and practical study applications.'}
+                  {mode === 'discourse' && 'Logic Flowchart: Traces the step-by-step biblical arguments, conditional logic, and doctrinal progressions.'}
+                  {mode === 'synthesize' && 'Topic Synthesis: Gathers multiple biblical passages to synthesize key doctrines, historic context, and takeaways.'}
+                </p>
               </div>
 
               {/* Study Prompt Textarea */}
@@ -302,9 +311,9 @@ export function CanvasStartPage({
                     type="button"
                     onClick={() => handleStartSubmit()}
                     disabled={!prompt.trim()}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent text-accent-on text-xs font-semibold hover:opacity-90 disabled:opacity-40 disabled:hover:opacity-40 active:scale-95 transition-all shadow-xs cursor-pointer"
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-accent text-accent-on text-xs font-bold hover:opacity-95 disabled:opacity-40 disabled:hover:opacity-40 active:scale-95 transition-all shadow-md cursor-pointer"
                   >
-                    <Sparkles size={14} />
+                    <Sparkles size={15} />
                     <span>Create Board</span>
                   </button>
                 </div>

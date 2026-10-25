@@ -80,12 +80,7 @@ const NotesWorkspace = dynamic(
   () => import('@/components/notes/NotesWorkspace').then((m) => m.NotesWorkspace),
   {
     ssr: false,
-    loading: () => (
-      <div className="w-full h-full flex flex-col items-center justify-center p-8 bg-bg text-fg">
-        <div className="w-8 h-8 rounded-full border-2 border-accent border-t-transparent animate-spin mb-3" />
-        <span className="text-sm font-medium text-meta">Loading Notes workspace...</span>
-      </div>
-    ),
+    loading: () => null,
   }
 );
 
@@ -961,7 +956,18 @@ export default function App() {
   const [isVersesLoading, setIsVersesLoading] = useState(false);
   const [bibleVerses, setBibleVerses] = useState<{verse: number, text: string}[]>([]);
   const [chapterCopyright, setChapterCopyright] = useState<string>('');
-  const [completedChapters, setCompletedChapters] = useState<string[]>([]);
+  const [completedChapters, setCompletedChapters] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('theologica_completed_chapters');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) return parsed;
+        }
+      } catch {}
+    }
+    return [];
+  });
 
   // Split Screen / Parallel Reader State (Desktop & Tablets)
   const [isSplitView, setIsSplitView] = useState<boolean>(() => {
@@ -3849,9 +3855,18 @@ export default function App() {
             }).catch(() => {});
         });
       }
+
+      // 3. Sync local completed chapters to /api/tracker
+      if (completedChapters.length > 0) {
+        fetchWithAuth(`${API_URL}/api/tracker`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chapterIds: completedChapters, action: 'mark' })
+        }).catch(() => null);
+      }
     }
     prevUserIdRef.current = userId || null;
-  }, [userId, getLocalNotes, saveLocalNotes, fetchWithAuth]);
+  }, [userId, getLocalNotes, saveLocalNotes, fetchWithAuth, completedChapters]);
 
   const saveHighlight = async (color: string) => {
     const rawText = selectedText || selectionRange?.toString().trim() || '';
@@ -4205,6 +4220,72 @@ export default function App() {
     setSelectedText('');
     window.getSelection()?.removeAllRanges();
     setActiveTab('canvas');
+  };
+
+  const handleCreateNote = async (initialData?: { title: string; content: string }): Promise<NoteItem | null> => {
+    const tempNote: NoteItem = {
+      id: Math.floor(Math.random() * 2000000000) + 1,
+      title: initialData?.title || 'New Note',
+      content: initialData?.content || '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setNotes(prev => {
+      const next = [tempNote, ...prev];
+      saveLocalNotes(next);
+      return next;
+    });
+    try {
+      const res = await fetchWithAuth(`${API_URL}/api/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          title: tempNote.title, 
+          content: tempNote.content 
+        })
+      });
+      if (res && res.ok) {
+        const newNote = await res.json();
+        setNotes(prev => {
+          const next = prev.map(n => n.id === tempNote.id ? newNote : n);
+          saveLocalNotes(next);
+          return next;
+        });
+        return newNote;
+      }
+    } catch {}
+    return tempNote;
+  };
+
+  const addHighlightToNotes = async () => {
+    const rawText = selectedText || selectionRange?.toString().trim() || '';
+    if (!rawText || !selectionVerse) return;
+    
+    const startVerse = Math.min(selectionVerse, endVerseNumber || selectionVerse);
+    const endVerse = Math.max(selectionVerse, endVerseNumber || selectionVerse);
+    const refVerses = startVerse === endVerse 
+      ? `${startVerse}` 
+      : `${startVerse}-${endVerse}`;
+
+    const cleanText = cleanVerseText(rawText, startVerse, endVerse);
+    const reference = `${activeBook.name} ${activeChapter}:${refVerses}`;
+    
+    const noteContent = `> "${cleanText}"\n\n— **${reference}** (${translation.toUpperCase()})\n\n### Study Notes\n- `;
+    const created = await handleCreateNote({
+      title: `Study: ${reference}`,
+      content: noteContent,
+    });
+    
+    setToolbarPosition(null);
+    setSelectionVerse(null);
+    setEndVerseNumber(null);
+    setSelectedText('');
+    window.getSelection()?.removeAllRanges();
+
+    if (created) {
+      setActiveNoteId(created.id);
+    }
+    setActiveTab('notes');
   };
 
   const sendChatMessageToCanvas = (content: string, title?: string, sourceChatId?: string | number) => {
@@ -5654,9 +5735,11 @@ export default function App() {
   const isCompleted = completedChapters.includes(currentChapterId);
   const toggleCompleted = async () => {
     const prevStatus = isCompleted;
-    setCompletedChapters(prev => 
-      prevStatus ? prev.filter(id => id !== currentChapterId) : [...prev, currentChapterId]
-    );
+    setCompletedChapters(prev => {
+      const next = prevStatus ? prev.filter(id => id !== currentChapterId) : [...prev, currentChapterId];
+      try { localStorage.setItem('theologica_completed_chapters', JSON.stringify(next)); } catch {}
+      return next;
+    });
     if (!prevStatus) {
       recordHabitActivity('scripture', { chapterId: currentChapterId });
     } else {
@@ -5685,7 +5768,11 @@ export default function App() {
     }
 
     const checked = completedChapters.includes(id);
-    setCompletedChapters(prev => checked ? prev.filter(c => c !== id) : [...prev, id]);
+    setCompletedChapters(prev => {
+      const next = checked ? prev.filter(c => c !== id) : [...prev, id];
+      try { localStorage.setItem('theologica_completed_chapters', JSON.stringify(next)); } catch {}
+      return next;
+    });
     if (!checked) {
       recordHabitActivity('scripture', { chapterId: id });
     } else {
@@ -5707,7 +5794,11 @@ export default function App() {
 
     if (isAllCompleted) {
       // Unmark all chapters of this book
-      setCompletedChapters(prev => prev.filter(id => !id.startsWith(`${book.name}-`)));
+      setCompletedChapters(prev => {
+        const next = prev.filter(id => !id.startsWith(`${book.name}-`));
+        try { localStorage.setItem('theologica_completed_chapters', JSON.stringify(next)); } catch {}
+        return next;
+      });
       unmarkChapterActivity(completedInBook.length);
       await fetchWithAuth(`${API_URL}/api/tracker`, {
         method: 'POST',
@@ -5717,7 +5808,11 @@ export default function App() {
     } else {
       // Mark all chapters of this book as completed
       const newChapters = allIds.filter(id => !completedChapters.includes(id));
-      setCompletedChapters(prev => Array.from(new Set([...prev, ...allIds])));
+      setCompletedChapters(prev => {
+        const next = Array.from(new Set([...prev, ...allIds]));
+        try { localStorage.setItem('theologica_completed_chapters', JSON.stringify(next)); } catch {}
+        return next;
+      });
       newChapters.forEach(id => recordHabitActivity('scripture', { chapterId: id }));
       await fetchWithAuth(`${API_URL}/api/tracker`, {
         method: 'POST',
@@ -5779,6 +5874,34 @@ export default function App() {
       toggleAnyChapter(closestId);
     }
   };
+
+  // Active reading dwell timer: soft-counts chapter reading toward daily habit & streak after 45s of active study
+  const dwellTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const dwellCreditedChaptersRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (activeTab !== 'study' || !activeBook?.name || !activeChapter) {
+      if (dwellTimerRef.current) clearTimeout(dwellTimerRef.current);
+      return;
+    }
+    const chapterKey = `${activeBook.name}-${activeChapter}`;
+    if (dwellCreditedChaptersRef.current.has(chapterKey)) {
+      return;
+    }
+    if (dwellTimerRef.current) clearTimeout(dwellTimerRef.current);
+
+    dwellTimerRef.current = setTimeout(() => {
+      if (activeTab === 'study') {
+        dwellCreditedChaptersRef.current.add(chapterKey);
+        recordHabitActivity('scripture', { chapterId: chapterKey });
+        queueStreakPush(fetchWithAuth, dailyChapterGoalRef.current, 100);
+      }
+    }, 45000); // 45 seconds of active reading in this chapter
+
+    return () => {
+      if (dwellTimerRef.current) clearTimeout(dwellTimerRef.current);
+    };
+  }, [activeTab, activeBook?.name, activeChapter, fetchWithAuth, recordHabitActivity]);
 
   if (!isLoaded && !authTimeout) {
     return (
@@ -6039,6 +6162,19 @@ export default function App() {
               </button>
             </div>
           )}
+
+          {/* Offline & Cloud Sync Status Pill */}
+          <div 
+            className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${
+              isOnline 
+                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' 
+                : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+            }`}
+            title={isOnline ? (userId ? "All notes, highlights, and tracker data synced to cloud & offline cache" : "Saved to local offline cache. Sign in to sync across devices.") : "Offline mode active. Your notes and tracker progress are safely saved locally."}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
+            <span>{isOnline ? (userId ? 'Synced & Offline' : 'Saved Offline') : 'Working Offline'}</span>
+          </div>
 
           <StreakPopover 
             onNavigateToTab={setActiveTab} 
@@ -6463,24 +6599,6 @@ export default function App() {
                       <Languages size={17} />
                     </button>
 
-                    {/* Study AI Button */}
-                    <button 
-                      onClick={() => {
-                        setMobileStudyView('ai');
-                        scrollToBottomOnChatOpenRef.current = true;
-                        scrollChatToBottom();
-                      }} 
-                      className="min-w-[38px] min-h-[38px] flex items-center justify-center rounded-full bg-accent/10 border border-accent/25 text-accent hover:bg-accent/20 active:scale-95 transition-all cursor-pointer shrink-0 relative" 
-                      title="Study AI Assistant"
-                    >
-                      <Sparkles size={15} />
-                      {chatQuotes.length > 0 && (
-                        <span className="absolute -top-1 -right-1 min-w-[15px] h-3.5 px-0.5 bg-accent text-accent-on text-[9px] font-bold rounded-full flex items-center justify-center shadow-xs">
-                          {chatQuotes.length}
-                        </span>
-                      )}
-                    </button>
-
                     {/* Settings Button */}
                     <button 
                       onClick={() => setIsSettingsOpen(true)}
@@ -6505,6 +6623,25 @@ export default function App() {
                       </Link>
                     )}
                   </div>
+
+                  {/* Study AI Button (Always visible on mobile & desktop reader header) */}
+                  <button 
+                    onClick={() => {
+                      setMobileStudyView('ai');
+                      scrollToBottomOnChatOpenRef.current = true;
+                      scrollChatToBottom();
+                    }} 
+                    className="w-8.5 h-8.5 min-w-[34px] min-h-[34px] flex items-center justify-center rounded-full bg-accent/10 border border-accent/25 text-accent hover:bg-accent/20 active:scale-95 transition-all cursor-pointer shrink-0 relative" 
+                    title="Study AI Assistant"
+                    aria-label="Study AI Assistant"
+                  >
+                    <Sparkles size={15} />
+                    {chatQuotes.length > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-[15px] h-3.5 px-0.5 bg-accent text-accent-on text-[9px] font-bold rounded-full flex items-center justify-center shadow-xs">
+                        {chatQuotes.length}
+                      </span>
+                    )}
+                  </button>
 
                   {/* 3 Dots More Menu Button (Toggles smooth sliding Study Tools drawer) */}
                   <button
@@ -7176,6 +7313,32 @@ export default function App() {
                       <ChevronRight size={16} className="text-muted/60 shrink-0 ml-2" />
                     </button>
 
+                    {/* New Note for this Chapter */}
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setMobileStudyView('reader');
+                        const created = await handleCreateNote({
+                          title: `${activeBook.name} ${activeChapter} Study Notes`,
+                          content: `## ${activeBook.name} ${activeChapter} (${translation.toUpperCase()})\n\n### Observations\n- \n\n### Application\n- `,
+                        });
+                        if (created) setActiveNoteId(created.id);
+                        setActiveTab('notes');
+                      }}
+                      className="w-full min-h-[48px] flex items-center justify-between px-3.5 py-2.5 hover:bg-fg/5 active:bg-fg/10 text-fg text-sm font-medium cursor-pointer transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-fg/5 text-fg-2 flex items-center justify-center shrink-0">
+                          <FileText size={16} className="text-accent" />
+                        </div>
+                        <div className="text-left min-w-0">
+                          <div className="text-[13.5px] font-semibold text-fg truncate">New Note for this Chapter</div>
+                          <div className="text-[11px] text-muted font-normal truncate">Open directly in Notes workspace</div>
+                        </div>
+                      </div>
+                      <ChevronRight size={16} className="text-muted/60 shrink-0 ml-2" />
+                    </button>
+
                     {/* Reverse Interlinear */}
                     <button
                       type="button"
@@ -7360,6 +7523,46 @@ export default function App() {
                 </div>
               </div>
             </aside>
+
+            {/* Mobile Study Floating Quick Actions (Ask AI & Quick Note) */}
+            {mobileStudyView === 'reader' && (
+              <aside 
+                aria-label="Study quick actions"
+                className="fixed bottom-[calc(56px+max(6px,calc(env(safe-area-inset-bottom,0px)-24px)))] right-3.5 z-30 flex md:hidden items-center gap-1.5 p-1 rounded-full bg-surface/90 backdrop-blur-xl border border-border shadow-xl pointer-events-auto"
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileStudyView('ai');
+                    scrollToBottomOnChatOpenRef.current = true;
+                    scrollChatToBottom();
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent text-accent-on text-xs font-semibold shadow-xs hover:opacity-95 active:scale-95 transition-all cursor-pointer"
+                  title="Ask Study AI"
+                  aria-label="Ask Study AI"
+                >
+                  <Sparkles size={13} />
+                  <span>Ask AI</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const created = await handleCreateNote({
+                      title: `${activeBook.name} ${activeChapter} Study Notes`,
+                      content: `## ${activeBook.name} ${activeChapter} (${translation.toUpperCase()})\n\n### Observations\n- \n\n### Application\n- `,
+                    });
+                    if (created) setActiveNoteId(created.id);
+                    setActiveTab('notes');
+                  }}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-surface text-fg hover:bg-surface-hover text-xs font-medium border border-border-soft active:scale-95 transition-all cursor-pointer"
+                  title="Create Study Note for this Chapter"
+                  aria-label="Create Note"
+                >
+                  <FileText size={13} className="text-accent" />
+                  <span>Note</span>
+                </button>
+              </aside>
+            )}
           </div>
         )}
 
@@ -8519,8 +8722,8 @@ export default function App() {
             {showRightSidebar && (
               <Panel 
                 panelRef={rightPanelRef} 
-                defaultSize="25" 
-                minSize="20" 
+                defaultSize="22" 
+                minSize="18" 
                 className={`relative w-full lg:w-auto border-l border-border bg-bg flex-col ${mobileStudyView === 'ai' ? 'flex' : 'hidden lg:flex'}`}
                 onDragEnter={handleChatDragEnter}
                 onDragOver={handleChatDragOver}
@@ -8545,13 +8748,24 @@ export default function App() {
                   <Sparkles size={16} className="hidden lg:block text-accent shrink-0" />
                   <span className="truncate">Study AI</span>
                 </div>
-                <TheologicalLensSelector 
-                  currentLens={theologicalLens} 
-                  onSelectLens={setTheologicalLens} 
-                  includeOriginalRoots={includeOriginalRoots} 
-                  onToggleOriginalRoots={handleToggleOriginalRoots} 
-                  compact 
-                />
+                <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+                  <TheologicalLensSelector 
+                    currentLens={theologicalLens} 
+                    onSelectLens={setTheologicalLens} 
+                    includeOriginalRoots={includeOriginalRoots} 
+                    onToggleOriginalRoots={handleToggleOriginalRoots} 
+                    compact 
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleToggleRightSidebar(false)}
+                    className="hidden lg:flex p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface-hover transition-colors cursor-pointer"
+                    title="Collapse Study AI Panel"
+                    aria-label="Collapse Study AI Panel"
+                  >
+                    <PanelRightClose size={16} />
+                  </button>
+                </div>
               </header>
               <div
                 ref={desktopStudyChatScrollRef}
@@ -8882,17 +9096,31 @@ export default function App() {
                   type="button"
                   onClick={addHighlightToCanvas}
                   className="min-h-[44px] flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-surface-warm border border-border text-fg hover:bg-border-soft text-xs font-semibold shadow-xs cursor-pointer active:scale-98 transition-all col-span-1"
+                  title="Send to Canvas"
+                  aria-label="Send to Canvas"
                 >
                   <Workflow size={15} />
                   <span>Canvas</span>
                 </button>
                 <button
                   type="button"
+                  onClick={addHighlightToNotes}
+                  className="min-h-[44px] flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-surface-warm border border-border text-fg hover:bg-border-soft text-xs font-semibold shadow-xs cursor-pointer active:scale-98 transition-all col-span-1"
+                  title="Send to Notes"
+                  aria-label="Send to Notes"
+                >
+                  <FileText size={15} />
+                  <span>Note</span>
+                </button>
+                <button
+                  type="button"
                   onClick={handleSelectionWordStudy}
-                  className="min-h-[44px] flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-surface-warm border border-border text-fg hover:bg-border-soft text-xs font-semibold shadow-xs cursor-pointer active:scale-98 transition-all col-span-2"
+                  className="min-h-[44px] flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-surface-warm border border-border text-fg hover:bg-border-soft text-xs font-semibold shadow-xs cursor-pointer active:scale-98 transition-all col-span-1"
+                  title="Word Study"
+                  aria-label="Word Study"
                 >
                   <Languages size={15} className="text-accent" />
-                  <span>Word Study</span>
+                  <span>Words</span>
                 </button>
               </div>
             </div>
@@ -9125,6 +9353,28 @@ export default function App() {
                 e.stopPropagation(); 
                 if (toolbarTouchStartRef.current?.hasMoved) return;
                 lastTouchEndRef.current = Date.now();
+                addHighlightToNotes(); 
+              }}
+              onClick={(e) => { 
+                e.preventDefault(); 
+                e.stopPropagation(); 
+                if (Date.now() - lastTouchEndRef.current < 450) return;
+                if (toolbarTouchStartRef.current?.hasMoved) return;
+                addHighlightToNotes(); 
+              }} 
+              className="flex items-center justify-center h-7 sm:h-8 w-7 sm:w-auto px-0 sm:px-2.5 rounded-lg bg-surface border border-border-soft text-fg hover:bg-border-soft active:scale-95 transition-all text-xs font-semibold shadow-xs gap-1.5 cursor-pointer shrink-0" 
+              title="Send to Notes"
+            >
+              <FileText size={14} />
+              <span className="hidden sm:inline">Notes</span>
+            </button>
+            <button 
+              type="button"
+              onMouseDown={(e) => e.preventDefault()} 
+              onTouchEnd={(e) => { 
+                e.stopPropagation(); 
+                if (toolbarTouchStartRef.current?.hasMoved) return;
+                lastTouchEndRef.current = Date.now();
                 handleSelectionWordStudy(); 
               }}
               onClick={(e) => { 
@@ -9318,6 +9568,23 @@ export default function App() {
                                     <BookOpen size={13} className="text-accent" />
                                     <span>Full Verse</span>
                                   </button>
+
+                                  {parsedVerse && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setChatQuotes([{ id: String(Date.now()), text: quote, reference: citation || currentVerse }]);
+                                        navigateToVerse(parsedVerse.book, parsedVerse.chapter, parsedVerse.verse);
+                                        setActiveTab('study');
+                                      }}
+                                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-accent text-accent-on text-xs font-semibold hover:opacity-95 transition-all cursor-pointer active:scale-95 shadow-xs"
+                                      title="Open passage in Study with AI context preloaded"
+                                      aria-label="Open in Study"
+                                    >
+                                      <Sparkles size={13} />
+                                      <span>Open in Study</span>
+                                    </button>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -9344,6 +9611,30 @@ export default function App() {
                           >
                             <Workflow size={15} className="text-accent" />
                             <span className="hidden sm:inline">Canvas</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const currentVerse = devotionalTime === 'morning' ? devotionalEntry.morningVerse : devotionalEntry.eveningVerse;
+                              const splitMatch = currentVerse.match(/^(".*?")\s*[-—–]\s*(.+)$/);
+                              const quote = splitMatch ? splitMatch[1] : currentVerse;
+                              const citation = splitMatch ? splitMatch[2] : currentVerse;
+                              const rawT = devotionalTime === 'morning' ? devotionalEntry.morningText : devotionalEntry.eveningText;
+                              const t = getDevotionalBody(rawT);
+                              const created = await handleCreateNote({
+                                title: `Devotional: ${citation}`,
+                                content: `## ${citation}\n\n> "${quote}"\n\n### Reflection\n${t}\n\n*${devotionalEntry.citation}*\n\n### Study Notes & Reflection\n- `,
+                              });
+                              if (created) setActiveNoteId(created.id);
+                              setActiveTab('notes');
+                            }}
+                            className="min-h-[44px] flex items-center gap-1.5 px-3.5 py-2 bg-surface hover:bg-surface-hover text-fg text-xs font-semibold rounded-xl border border-border transition-colors cursor-pointer"
+                            title="Send Devotional to Notes"
+                            aria-label="Send to Notes"
+                          >
+                            <FileText size={15} className="text-accent" />
+                            <span className="hidden sm:inline">Send to Notes</span>
                           </button>
 
                           <button 
@@ -9849,6 +10140,124 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* Guided Reading Plans Section */}
+                <section className="mb-8 sm:mb-14">
+                  <div className="flex items-center justify-between mb-3 px-1">
+                    <div>
+                      <h2 className="text-sm sm:text-base font-bold text-fg tracking-wide uppercase">Reading Plans</h2>
+                      <p className="text-xs text-muted">Curated paths that advance your tracker and daily goals</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
+                    {[
+                      {
+                        id: 'gospels',
+                        title: 'The Four Gospels',
+                        tagline: 'Life & Teachings of Jesus Christ',
+                        books: ['Matthew', 'Mark', 'Luke', 'John'],
+                      },
+                      {
+                        id: 'nt',
+                        title: 'The New Testament',
+                        tagline: 'Complete Apostolic Witness & Early Church',
+                        books: NT_BOOKS.map(b => b.name),
+                      },
+                      {
+                        id: 'psalms-proverbs',
+                        title: 'Psalms & Proverbs',
+                        tagline: 'Daily Prayer, Worship & Practical Wisdom',
+                        books: ['Psalms', 'Proverbs'],
+                      },
+                      {
+                        id: 'epistles',
+                        title: 'Paul’s Epistles',
+                        tagline: 'Doctrines of Grace, Salvation & Faith',
+                        books: [
+                          'Romans', '1 Corinthians', '2 Corinthians', 'Galatians',
+                          'Ephesians', 'Philippians', 'Colossians', '1 Thessalonians',
+                          '2 Thessalonians', '1 Timothy', '2 Timothy', 'Titus', 'Philemon'
+                        ],
+                      },
+                    ].map((plan) => {
+                      const allPlanChapters = plan.books.flatMap(bookName => {
+                        const bookInfo = [...OT_BOOKS, ...NT_BOOKS].find(b => b.name === bookName);
+                        if (!bookInfo) return [];
+                        return Array.from({ length: bookInfo.chapters }, (_, i) => ({
+                          book: bookName,
+                          chapter: i + 1,
+                          id: `${bookName}-${i + 1}`
+                        }));
+                      });
+                      const completedInPlan = allPlanChapters.filter(c => completedChapters.includes(c.id)).length;
+                      const planPercent = Math.round((completedInPlan / allPlanChapters.length) * 100) || 0;
+                      const nextChapter = allPlanChapters.find(c => !completedChapters.includes(c.id));
+
+                      return (
+                        <div 
+                          key={plan.id}
+                          className="p-4 sm:p-5 rounded-2xl border border-border/80 bg-surface/60 hover:bg-surface ring-shadow transition-all space-y-3"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <h3 className="text-sm sm:text-[15px] font-bold text-fg">{plan.title}</h3>
+                              <p className="text-[11.5px] text-muted">{plan.tagline}</p>
+                            </div>
+                            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20 shrink-0">
+                              {planPercent}%
+                            </span>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <div className="flex justify-between text-[11px] text-meta">
+                              <span>Progress</span>
+                              <span>{completedInPlan} / {allPlanChapters.length} Chapters</span>
+                            </div>
+                            <div className="h-2 w-full bg-bg rounded-full overflow-hidden inset-shadow">
+                              <div className="h-full bg-accent transition-all duration-500 ease-out" style={{ width: `${planPercent}%` }} />
+                            </div>
+                          </div>
+
+                          <div className="pt-1 flex items-center justify-between gap-2">
+                            <span className="text-xs text-muted truncate">
+                              {nextChapter ? (
+                                <>Next: <span className="font-semibold text-fg">{nextChapter.book} {nextChapter.chapter}</span></>
+                              ) : (
+                                <span className="text-emerald-500 font-semibold">✓ Plan Completed</span>
+                              )}
+                            </span>
+
+                            {nextChapter ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigateToVerse(nextChapter.book, nextChapter.chapter, 1);
+                                  setActiveTab('study');
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent text-accent-on text-xs font-semibold hover:opacity-95 active:scale-95 transition-all shadow-xs cursor-pointer shrink-0"
+                              >
+                                <span>Read Chapter</span>
+                                <ChevronRight size={13} />
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigateToVerse(allPlanChapters[0].book, allPlanChapters[0].chapter, 1);
+                                  setActiveTab('study');
+                                }}
+                                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface border border-border text-xs text-muted hover:text-fg transition-all cursor-pointer shrink-0"
+                              >
+                                <span>Review</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+
                 {/* Old Testament Accordion */}
                 <div className="mb-6">
                   <button 
@@ -10074,42 +10483,19 @@ export default function App() {
         {activeTab === 'notes' && (
           <NotesWorkspace
             notes={notes}
+            highlights={highlights}
+            onSendHighlightToCanvas={(hl) => {
+              const reference = `${hl.book} ${hl.chapter}:${hl.verse}`;
+              setCanvasIncomingNode({
+                title: reference,
+                content: `> "${hl.text}"\n\n*${reference}*`,
+                category: 'scripture',
+              });
+              setActiveTab('canvas');
+            }}
             activeNoteId={activeNoteId}
             onSelectNote={setActiveNoteId}
-            onCreateNote={async (initialData) => {
-              const tempNote: NoteItem = {
-                id: Math.floor(Math.random() * 2000000000) + 1,
-                title: initialData?.title || 'New Note',
-                content: initialData?.content || '',
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-              };
-              setNotes(prev => {
-                const next = [tempNote, ...prev];
-                saveLocalNotes(next);
-                return next;
-              });
-              try {
-                const res = await fetchWithAuth(`${API_URL}/api/notes`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ 
-                    title: tempNote.title, 
-                    content: tempNote.content 
-                  })
-                });
-                if (res && res.ok) {
-                  const newNote = await res.json();
-                  setNotes(prev => {
-                    const next = prev.map(n => n.id === tempNote.id ? newNote : n);
-                    saveLocalNotes(next);
-                    return next;
-                  });
-                  return newNote;
-                }
-              } catch {}
-              return tempNote;
-            }}
+            onCreateNote={handleCreateNote}
             onUpdateNote={updateNote}
             onDeleteNote={handleDeleteNote}
             onNavigateToVerse={navigateToVerse}

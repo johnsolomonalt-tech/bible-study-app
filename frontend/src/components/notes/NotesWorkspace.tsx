@@ -21,7 +21,8 @@ import {
   ArrowUpDown, 
   FilePlus,
   X,
-  Clock
+  Clock,
+  Highlighter
 } from 'lucide-react';
 import { NoteFormattingToolbar, NoteViewMode } from './NoteFormattingToolbar';
 import { NoteMarkdownRenderer } from './NoteMarkdownRenderer';
@@ -75,6 +76,15 @@ export const DIVERSE_SUGGESTED_TAGS: { category: string; tags: string[] }[] = [
   }
 ];
 
+export interface HighlightItem {
+  id: number;
+  book: string;
+  chapter: number;
+  verse: number;
+  text: string;
+  color: string;
+}
+
 interface NotesWorkspaceProps {
   notes: NoteItem[];
   activeNoteId: number | null;
@@ -86,6 +96,8 @@ interface NotesWorkspaceProps {
   theologicalLens?: string;
   currentTranslation?: string;
   theme?: 'dark' | 'light';
+  highlights?: HighlightItem[];
+  onSendHighlightToCanvas?: (hl: { book: string; chapter: number; verse: number; text: string }) => void;
 }
 
 const PINNED_STORAGE_KEY = 'theologica_pinned_notes';
@@ -217,10 +229,13 @@ export function NotesWorkspace({
   onNavigateToVerse,
   theologicalLens = 'standard',
   currentTranslation = 'bsb',
+  highlights = [],
+  onSendHighlightToCanvas,
 }: NotesWorkspaceProps) {
   // Sidebar UI state
-  const [sidebarTab, setSidebarTab] = useState<'notes' | 'backlinks' | 'templates'>('notes');
+  const [sidebarTab, setSidebarTab] = useState<'notes' | 'highlights' | 'backlinks' | 'templates'>('notes');
   const [searchQuery, setSearchQuery] = useState('');
+  const [highlightsSearchQuery, setHighlightsSearchQuery] = useState('');
   const [backlinksSearchQuery, setBacklinksSearchQuery] = useState('');
   const [templatesSearchQuery, setTemplatesSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
@@ -256,6 +271,7 @@ export function NotesWorkspace({
   // Tab Bar scroll, button refs, and cutoff states
   const tabsScrollRef = useRef<HTMLDivElement | null>(null);
   const notesTabBtnRef = useRef<HTMLButtonElement | null>(null);
+  const highlightsTabBtnRef = useRef<HTMLButtonElement | null>(null);
   const backlinksTabBtnRef = useRef<HTMLButtonElement | null>(null);
   const templatesTabBtnRef = useRef<HTMLButtonElement | null>(null);
   const [tabsCanScrollLeft, setTabsCanScrollLeft] = useState(false);
@@ -596,6 +612,18 @@ export function NotesWorkspace({
     return allBacklinksGroups.filter(g => activeKeys.has(g.reference));
   }, [activeNote, draftTitle, draftContent, allBacklinksGroups]);
 
+  // Filtered highlights based on search query
+  const filteredHighlights = useMemo(() => {
+    if (!highlights || highlights.length === 0) return [];
+    if (!highlightsSearchQuery.trim()) return highlights;
+    const q = highlightsSearchQuery.toLowerCase().trim();
+    return highlights.filter(h =>
+      h.book.toLowerCase().includes(q) ||
+      `${h.book} ${h.chapter}:${h.verse}`.toLowerCase().includes(q) ||
+      h.text.toLowerCase().includes(q)
+    );
+  }, [highlights, highlightsSearchQuery]);
+
   // Unique template category badges
   const allTemplateBadges = useMemo(() => {
     return Array.from(new Set(NOTE_TEMPLATES.map(t => t.badge)));
@@ -702,6 +730,7 @@ export function NotesWorkspace({
   useEffect(() => {
     let targetBtn: HTMLButtonElement | null = null;
     if (sidebarTab === 'notes') targetBtn = notesTabBtnRef.current;
+    else if (sidebarTab === 'highlights') targetBtn = highlightsTabBtnRef.current;
     else if (sidebarTab === 'backlinks') targetBtn = backlinksTabBtnRef.current;
     else if (sidebarTab === 'templates') targetBtn = templatesTabBtnRef.current;
 
@@ -817,9 +846,66 @@ export function NotesWorkspace({
     updateNoteImmediately(draftTitle, updated);
   };
 
-  const handleExport = (format: 'md' | 'txt') => {
+  const handleExport = (format: 'md' | 'txt' | 'pdf') => {
     if (!activeNote) return;
     const title = draftTitle || 'Untitled Note';
+    if (format === 'pdf') {
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        const escapedContent = (draftContent || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+        printWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="utf-8" />
+              <title>${title}</title>
+              <style>
+                body {
+                  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                  margin: 0;
+                  padding: 48px;
+                  color: #18181b;
+                  line-height: 1.7;
+                  max-width: 800px;
+                  margin: 0 auto;
+                }
+                h1 {
+                  font-size: 26px;
+                  font-weight: 700;
+                  color: #c96442;
+                  border-bottom: 2px solid #e4e4e7;
+                  padding-bottom: 12px;
+                  margin-top: 0;
+                  margin-bottom: 24px;
+                }
+                .content {
+                  font-size: 15px;
+                  white-space: pre-wrap;
+                  word-wrap: break-word;
+                }
+                @media print {
+                  body { padding: 20px; }
+                }
+              </style>
+            </head>
+            <body>
+              <h1>${title}</h1>
+              <div class="content">${escapedContent}</div>
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+          printWindow.print();
+        }, 300);
+      }
+      setIsActionsMenuOpen(false);
+      return;
+    }
     const filename = `${title.replace(/[^a-zA-Z0-9_\-]/g, '_')}.${format}`;
     const blob = new Blob([draftContent], { type: format === 'md' ? 'text/markdown' : 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -898,6 +984,25 @@ export function NotesWorkspace({
                 </span>
               </button>
               <button
+                ref={highlightsTabBtnRef}
+                type="button"
+                onClick={() => setSidebarTab('highlights')}
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11.5px] font-semibold transition-all cursor-pointer shrink-0 whitespace-nowrap ${
+                  sidebarTab === 'highlights'
+                    ? 'bg-bg text-accent shadow-2xs ring-1 ring-border/80'
+                    : 'text-muted hover:text-fg hover:bg-surface/50'
+                }`}
+                title="Saved Highlights"
+              >
+                <Highlighter size={12.5} className={sidebarTab === 'highlights' ? 'text-accent' : ''} />
+                <span>Highlights</span>
+                {highlights.length > 0 && (
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-accent/15 text-accent font-medium">
+                    {highlights.length}
+                  </span>
+                )}
+              </button>
+              <button
                 ref={backlinksTabBtnRef}
                 type="button"
                 onClick={() => setSidebarTab('backlinks')}
@@ -961,6 +1066,7 @@ export function NotesWorkspace({
         <div className="flex-1 min-h-0 flex flex-col p-2 overflow-hidden">
           <div className="flex-1 flex flex-col min-h-0 rounded-2xl border border-border/70 bg-surface/20 overflow-hidden shadow-2xs">
             {sidebarTab === 'notes' && renderNotesPanelContent()}
+            {sidebarTab === 'highlights' && renderHighlightsPanelContent()}
             {sidebarTab === 'backlinks' && renderBacklinksPanelContent()}
             {sidebarTab === 'templates' && renderTemplatesPanelContent()}
           </div>
@@ -1082,6 +1188,13 @@ export function NotesWorkspace({
                       >
                         <Download size={15} />
                         <span>Export Plain Text (.txt)</span>
+                      </button>
+                      <button
+                        onClick={() => handleExport('pdf')}
+                        className="w-full text-left px-3 py-2.5 text-[13px] rounded-xl hover:bg-surface flex items-center gap-2.5 text-fg cursor-pointer min-h-[40px]"
+                      >
+                        <Download size={15} />
+                        <span>Export as PDF (.pdf)</span>
                       </button>
                       <div className="w-full h-px bg-border my-1" />
                       <button
@@ -1676,7 +1789,124 @@ export function NotesWorkspace({
     );
   }
 
-  // 2. Render Backlinks Panel Content
+  // 2. Render Highlights Panel Content
+  function renderHighlightsPanelContent() {
+    return (
+      <div className="flex-1 flex flex-col min-h-0">
+        {/* Highlights Search Bar */}
+        <div className="p-2.5 rounded-xl border border-border/70 bg-surface/40 space-y-2 shrink-0">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={14} />
+            <input
+              type="text"
+              value={highlightsSearchQuery}
+              onChange={(e) => setHighlightsSearchQuery(e.target.value)}
+              placeholder="Search highlighted verses..."
+              className="w-full bg-surface border border-border/80 pl-9 pr-8 py-1.5 rounded-lg text-[13px] text-fg placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+            {highlightsSearchQuery && (
+              <button
+                onClick={() => setHighlightsSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-fg cursor-pointer"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-meta">
+            <span>{filteredHighlights.length} {filteredHighlights.length === 1 ? 'highlight' : 'highlights'}</span>
+            <span>{highlights.length} total saved</span>
+          </div>
+        </div>
+
+        {/* Highlights List */}
+        <div 
+          className="notes-panel-scroll flex-1 min-h-0 overflow-y-auto custom-scroll p-2.5 space-y-2.5 pb-16 lg:pb-4 touch-pan-y"
+          style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}
+        >
+          {filteredHighlights.length === 0 ? (
+            <div className="py-8 px-4 text-center text-meta">
+              <Highlighter size={22} className="mx-auto mb-2 text-muted" />
+              <p className="text-[12.5px] font-medium text-fg">No highlights found</p>
+              <p className="text-[11px] mt-1 leading-relaxed">
+                {highlightsSearchQuery 
+                  ? 'No highlighted verses match your search.' 
+                  : 'Highlight verses in Study to see them here, insert them into notes, or send them to Canvas.'}
+              </p>
+            </div>
+          ) : (
+            filteredHighlights.map((hl) => {
+              const ref = `${hl.book} ${hl.chapter}:${hl.verse}`;
+              return (
+                <div 
+                  key={hl.id}
+                  className="p-3 rounded-xl border border-border/70 bg-surface/50 hover:bg-surface hover:border-border transition-all space-y-2 group"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span 
+                        className="w-2.5 h-2.5 rounded-full shrink-0 border border-black/10" 
+                        style={{ backgroundColor: hl.color || '#c96442' }} 
+                      />
+                      <span className="text-xs font-semibold text-fg truncate">{ref}</span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const quoteSnippet = `> "${hl.text}"\n\n— **${ref}**\n\n`;
+                          if (activeNote) {
+                            handleContentChange(`${draftContent ? draftContent + '\n\n' : ''}${quoteSnippet}`);
+                          } else {
+                            onCreateNote({
+                              title: `Study: ${ref}`,
+                              content: `${quoteSnippet}### Study Notes\n- `,
+                            });
+                          }
+                        }}
+                        className="px-2 py-0.5 rounded-md text-[10.5px] font-medium bg-surface-hover hover:bg-border text-fg-2 hover:text-fg border border-border/60 transition-colors cursor-pointer"
+                        title="Insert quote into active note"
+                      >
+                        Insert
+                      </button>
+                      {onSendHighlightToCanvas && (
+                        <button
+                          type="button"
+                          onClick={() => onSendHighlightToCanvas({
+                            book: hl.book,
+                            chapter: hl.chapter,
+                            verse: hl.verse,
+                            text: hl.text,
+                          })}
+                          className="px-2 py-0.5 rounded-md text-[10.5px] font-medium bg-accent/10 hover:bg-accent/20 text-accent transition-colors cursor-pointer"
+                          title="Drop onto Canvas"
+                        >
+                          Canvas
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => onNavigateToVerse(hl.book, hl.chapter, hl.verse)}
+                        className="p-1 rounded-md text-muted hover:text-fg hover:bg-surface-hover transition-colors cursor-pointer"
+                        title="Open in Study"
+                      >
+                        <ExternalLink size={12} />
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-[12px] text-fg-2 line-clamp-3 leading-relaxed italic border-l-2 pl-2" style={{ borderColor: hl.color || '#c96442' }}>
+                    "{hl.text}"
+                  </p>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // 3. Render Backlinks Panel Content
   function renderBacklinksPanelContent() {
     return (
       <div className="flex-1 flex flex-col min-h-0">
