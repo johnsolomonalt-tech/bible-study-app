@@ -269,7 +269,8 @@ export function getAvailableTranslations(): TranslationDefinition[] {
 }
 
 /**
- * Returns structured attribution records for legal pages and in-app footers
+ * Returns structured attribution records for legal pages and in-app footers.
+ * Strictly reflects only translations that are actually present/available in the app.
  */
 export function getTranslationAttributions(): Array<{
   id: string;
@@ -282,7 +283,7 @@ export function getTranslationAttributions(): Array<{
   copyrightNotice: string;
   isPublicDomain: boolean;
 }> {
-  return BIBLE_TRANSLATION_REGISTRY.map((t) => ({
+  return getAvailableTranslations().map((t) => ({
     id: t.id,
     name: t.name,
     abbreviation: t.abbreviation,

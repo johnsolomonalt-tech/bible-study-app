@@ -102,7 +102,7 @@ Theologica is an advanced digital workspace designed for personal devotional rea
 
 ### 4. Scripture Copyrights & Fair Use
 
-Theologica provides access to public domain and open-licensed Bible translations for unrestricted study. When quoting copyrighted modern Bible translations (such as the ESV, NIV, or NASB), users are responsible for honoring the fair-use policies and copyright guidelines of the respective publishers.
+Theologica provides access to public domain and open-licensed Bible translations for unrestricted study. When quoting or referencing external Bible translations in personal notes or study materials, users are responsible for honoring the applicable fair-use policies and copyright guidelines of the respective copyright holders.
 
 ---
 

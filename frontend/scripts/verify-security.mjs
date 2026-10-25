@@ -111,7 +111,11 @@ test('Production Build Script: safe migration scripts configured', () => {
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
 
   assert.ok(!pkg.scripts.build.includes('--accept-data-loss'), 'build script must not contain --accept-data-loss');
-  assert.strictEqual(pkg.scripts['db:migrate'], 'prisma migrate deploy', 'package.json must provide db:migrate script');
+  assert.ok(
+    pkg.scripts['db:migrate'] === 'prisma migrate deploy' ||
+    pkg.scripts['db:migrate'].includes('scripts/run-migrations.mjs'),
+    'package.json must provide safe db:migrate script'
+  );
 });
 
 test('Database Migrations: migration baseline exists', () => {

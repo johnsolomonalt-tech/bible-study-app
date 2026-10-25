@@ -10,7 +10,7 @@
     "lint": "eslint",
     "db:push": "prisma db push",
     "db:baseline": "node scripts/baseline-database.mjs",
-    "db:migrate": "prisma migrate deploy",
+    "db:migrate": "node scripts/run-migrations.mjs",
     "postinstall": "prisma generate"
   },
   "dependencies": {
