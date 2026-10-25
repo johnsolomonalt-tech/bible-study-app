@@ -5,7 +5,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } fr
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useAuth, UserButton, SignIn, SignInButton } from '@clerk/nextjs';
-import { Send, Plus, Layout, Edit, Sparkles, Target, Check, CheckCheck, Copy, ChevronRight, ChevronLeft, ChevronDown, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquare, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow, ShieldCheck, Heart, Layers, Languages, MoreVertical, MoreHorizontal, Search, BookMarked, Quote, Compass, ArrowRight, Square, BrainCircuit, FileText, UploadCloud, Menu, SlidersHorizontal } from 'lucide-react';
+import { Send, Plus, Layout, Edit, Sparkles, Target, Check, CheckCheck, Copy, ChevronRight, ChevronLeft, ChevronDown, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquare, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow, ShieldCheck, Heart, Layers, Languages, MoreVertical, MoreHorizontal, Search, BookMarked, Bookmark, ArrowLeftRight, Columns2, Quote, Compass, ArrowRight, Square, BrainCircuit, FileText, UploadCloud, Menu, SlidersHorizontal } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import TextareaAutosize from 'react-textarea-autosize';
 import { getDevotionalForDay, fetchDevotionalForDay, DevotionalEntry, getDevotionalBody } from '../../lib/devotionals';
@@ -963,6 +963,126 @@ export default function App() {
   const [chapterCopyright, setChapterCopyright] = useState<string>('');
   const [completedChapters, setCompletedChapters] = useState<string[]>([]);
 
+  // Split Screen / Parallel Reader State (Desktop & Tablets)
+  const [isSplitView, setIsSplitView] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') return getBooleanPreference(PREF_KEYS.IS_SPLIT_VIEW, false);
+    return false;
+  });
+  const [splitBook, setSplitBook] = useState<typeof OT_BOOKS[0]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = getPreference(PREF_KEYS.SPLIT_LAST_BOOK);
+      if (saved) {
+        const found = ALL_BOOKS.find(b => b.name.toLowerCase() === saved.toLowerCase());
+        if (found) return found;
+      }
+    }
+    return ALL_BOOKS.find(b => b.name === 'Matthew') || NT_BOOKS[0] || OT_BOOKS[0];
+  });
+  const [splitChapter, setSplitChapter] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = Number(getPreference(PREF_KEYS.SPLIT_LAST_CHAPTER));
+      if (saved && !isNaN(saved) && saved >= 1) return saved;
+    }
+    return 1;
+  });
+  const [splitTranslation, setSplitTranslation] = useState<string>(() => {
+    if (typeof window !== 'undefined') return getPreference(PREF_KEYS.SPLIT_BIBLE_VERSION) || 'bsb';
+    return 'bsb';
+  });
+  const [splitBibleVerses, setSplitBibleVerses] = useState<{verse: number, text: string}[]>([]);
+  const [isSplitVersesLoading, setIsSplitVersesLoading] = useState(false);
+  const [splitChapterCopyright, setSplitChapterCopyright] = useState<string>('');
+  const [isSplitBookSelectorOpen, setIsSplitBookSelectorOpen] = useState(false);
+  const [splitBookSearchQuery, setSplitBookSearchQuery] = useState('');
+  const [splitExpandedBook, setSplitExpandedBook] = useState<string | null>(null);
+  const splitBookSelectorRef = useRef<HTMLDivElement>(null);
+
+  // Mobile Chapter Bookmark & Quick-Swap State
+  const [bookmarkedChapter, setBookmarkedChapter] = useState<{ book: string; chapter: number } | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem(PREF_KEYS.BOOKMARKED_CHAPTER);
+        if (saved) return JSON.parse(saved);
+      } catch {}
+    }
+    return null;
+  });
+
+  const splitFilteredOtBooks = useMemo(() => {
+    if (!splitBookSearchQuery.trim()) return OT_BOOKS;
+    const q = splitBookSearchQuery.toLowerCase().trim();
+    return OT_BOOKS.filter(b => b.name.toLowerCase().includes(q));
+  }, [splitBookSearchQuery]);
+
+  const splitFilteredNtBooks = useMemo(() => {
+    if (!splitBookSearchQuery.trim()) return NT_BOOKS;
+    const q = splitBookSearchQuery.toLowerCase().trim();
+    return NT_BOOKS.filter(b => b.name.toLowerCase().includes(q));
+  }, [splitBookSearchQuery]);
+
+  const splitPrevChapterInfo = useMemo(() => {
+    if (splitChapter > 1) {
+      return { book: splitBook.name, chapter: splitChapter - 1 };
+    }
+    const curIdx = ALL_BOOKS.findIndex(b => b.name.toLowerCase() === splitBook.name.toLowerCase());
+    if (curIdx > 0) {
+      const prevBook = ALL_BOOKS[curIdx - 1];
+      return { book: prevBook.name, chapter: prevBook.chapters };
+    }
+    return null;
+  }, [splitBook.name, splitChapter]);
+
+  const splitNextChapterInfo = useMemo(() => {
+    if (splitChapter < splitBook.chapters) {
+      return { book: splitBook.name, chapter: splitChapter + 1 };
+    }
+    const curIdx = ALL_BOOKS.findIndex(b => b.name.toLowerCase() === splitBook.name.toLowerCase());
+    if (curIdx !== -1 && curIdx < ALL_BOOKS.length - 1) {
+      const nextBook = ALL_BOOKS[curIdx + 1];
+      return { book: nextBook.name, chapter: 1 };
+    }
+    return null;
+  }, [splitBook.name, splitChapter]);
+
+  const handleToggleSplitView = useCallback((enabled: boolean) => {
+    setIsSplitView(enabled);
+    setPreference(PREF_KEYS.IS_SPLIT_VIEW, String(enabled));
+    if (enabled) {
+      trackClientEvent('split_view_enabled');
+    }
+  }, []);
+
+  const handleSelectSplitTranslation = useCallback((newTranslation: string) => {
+    setSplitTranslation(newTranslation);
+    setPreference(PREF_KEYS.SPLIT_BIBLE_VERSION, newTranslation);
+  }, []);
+
+  const navigateToSplitPassage = useCallback((bookName: string, chapter: number) => {
+    const found = ALL_BOOKS.find(b => b.name.toLowerCase() === bookName.toLowerCase());
+    if (found) {
+      setSplitBook(found);
+      const clamped = Math.min(Math.max(1, chapter), found.chapters);
+      setSplitChapter(clamped);
+      setPreference(PREF_KEYS.SPLIT_LAST_BOOK, found.name);
+      setPreference(PREF_KEYS.SPLIT_LAST_CHAPTER, String(clamped));
+    }
+  }, []);
+
+  const handleBookmarkCurrentChapter = useCallback(() => {
+    const bookmark = { book: activeBook.name, chapter: activeChapter };
+    setBookmarkedChapter(bookmark);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(PREF_KEYS.BOOKMARKED_CHAPTER, JSON.stringify(bookmark));
+    }
+  }, [activeBook.name, activeChapter]);
+
+  const handleRemoveBookmark = useCallback(() => {
+    setBookmarkedChapter(null);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(PREF_KEYS.BOOKMARKED_CHAPTER);
+    }
+  }, []);
+
   // Reset reader scroll position to top whenever switching books or chapters
   useEffect(() => {
     document.querySelectorAll('.bible-reader-content').forEach(el => {
@@ -1215,6 +1335,24 @@ export default function App() {
       setActiveChapter(chapter);
     }
   }, [activeBook.name, activeChapter, bibleVerses.length, scrollToAndHighlightVerse]);
+
+  const handleQuickSwapChapter = useCallback(() => {
+    if (!bookmarkedChapter) return;
+    const curBook = activeBook.name;
+    const curChapter = activeChapter;
+    const targetBook = bookmarkedChapter.book;
+    const targetChapter = bookmarkedChapter.chapter;
+
+    // Navigate to held/bookmarked chapter
+    navigateToVerse(targetBook, targetChapter, 1);
+
+    // Save previous chapter as the new bookmark so user can swap back and forth easily
+    const newBookmark = { book: curBook, chapter: curChapter };
+    setBookmarkedChapter(newBookmark);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(PREF_KEYS.BOOKMARKED_CHAPTER, JSON.stringify(newBookmark));
+    }
+  }, [bookmarkedChapter, activeBook.name, activeChapter, navigateToVerse]);
 
   useEffect(() => {
     if (pendingVerseRef.current && bibleVerses.length > 0) {
@@ -1987,6 +2125,7 @@ export default function App() {
     setShowLeftSidebar(getBooleanPreference(PREF_KEYS.SHOW_LEFT_SIDEBAR, false));
     setShowRightSidebar(getBooleanPreference(PREF_KEYS.SHOW_RIGHT_SIDEBAR, true));
     setShowBottomNotes(getBooleanPreference(PREF_KEYS.SHOW_BOTTOM_NOTES, false));
+    setIsSplitView(getBooleanPreference(PREF_KEYS.IS_SPLIT_VIEW, false));
 
     // 5. Mobile Study View
     const mobileViewPref = getPreference(PREF_KEYS.MOBILE_STUDY_VIEW);
@@ -2094,6 +2233,7 @@ export default function App() {
     setShowLeftSidebar(getBooleanPreference(PREF_KEYS.SHOW_LEFT_SIDEBAR, false));
     setShowRightSidebar(getBooleanPreference(PREF_KEYS.SHOW_RIGHT_SIDEBAR, true));
     setShowBottomNotes(getBooleanPreference(PREF_KEYS.SHOW_BOTTOM_NOTES, false));
+    setIsSplitView(getBooleanPreference(PREF_KEYS.IS_SPLIT_VIEW, false));
   }, []);
 
   // Record clicked book's screen Y coordinate before collapsing/expanding another book
@@ -2219,6 +2359,7 @@ export default function App() {
         [PREF_KEYS.SHOW_LEFT_SIDEBAR]: String(showLeftSidebar),
         [PREF_KEYS.SHOW_RIGHT_SIDEBAR]: String(showRightSidebar),
         [PREF_KEYS.SHOW_BOTTOM_NOTES]: String(showBottomNotes),
+        [PREF_KEYS.IS_SPLIT_VIEW]: String(isSplitView),
         [PREF_KEYS.MOBILE_STUDY_VIEW]: mobileStudyView,
         [PREF_KEYS.DEVOTIONAL_TIME]: devotionalTime,
         [PREF_KEYS.THEME]: theme,
@@ -2403,6 +2544,29 @@ export default function App() {
       document.removeEventListener('touchstart', handleOutsideClick);
     };
   }, [isDesktopMoreMenuOpen]);
+
+  // Outside click handler for split view book/chapter selector
+  useEffect(() => {
+    if (!isSplitBookSelectorOpen) return;
+    const handleOutsideClick = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node | null;
+      if (!target) return;
+      if (splitBookSelectorRef.current && !splitBookSelectorRef.current.contains(target)) {
+        setIsSplitBookSelectorOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsSplitBookSelectorOpen(false);
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('touchstart', handleOutsideClick);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('touchstart', handleOutsideClick);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isSplitBookSelectorOpen]);
 
   // Unified Settings Handlers
   const handleToggleLeftSidebar = useCallback((val: boolean) => {
@@ -4192,8 +4356,8 @@ export default function App() {
     }
   };
 
-  const renderTextWithInterlinear = (rawStr: string, verseNum: number) => {
-    if (!isInterlinearMode) {
+  const renderTextWithInterlinear = (rawStr: string, verseNum: number, bookName = activeBook.name, chapterNum = activeChapter) => {
+    if (!isInterlinearMode || bookName !== activeBook.name || chapterNum !== activeChapter) {
       return rawStr.replace(/\[\s*[HG]\d+\s*\]/g, '').replace(/<\/?em>/gi, '');
     }
     const verseRef = `${activeBook.name} ${activeChapter}:${verseNum}`;
@@ -4425,18 +4589,18 @@ export default function App() {
     return null;
   };
 
-  const renderVerseContent = (verse: number, text: string) => {
+  const renderVerseContent = (verse: number, text: string, bookName = activeBook.name, chapterNum = activeChapter) => {
     const { mainText, footnote } = parseVerseFootnote(text);
     const verseHighlights = highlights.filter(h => 
-      isSameBook(h.book, activeBook.name) && 
-      Number(h.chapter) === Number(activeChapter) && 
+      isSameBook(h.book, bookName) && 
+      Number(h.chapter) === Number(chapterNum) && 
       Number(h.verse) === Number(verse)
     );
     if (verseHighlights.length === 0) {
-      if (!footnote || !showFootnotes) return <>{renderTextWithInterlinear(mainText, verse)}</>;
+      if (!footnote || !showFootnotes) return <>{renderTextWithInterlinear(mainText, verse, bookName, chapterNum)}</>;
       return (
         <>
-          {renderTextWithInterlinear(mainText, verse)}
+          {renderTextWithInterlinear(mainText, verse, bookName, chapterNum)}
           {showFootnotes && (
             <span className="text-gray-500 text-sm italic ml-2 select-none break-words inline" data-footnote="true">
               {footnote}
@@ -4585,10 +4749,10 @@ export default function App() {
               }`}
               title="Click to change color or remove highlight"
             >
-              {renderTextWithInterlinear(seg.text, verse)}
+              {renderTextWithInterlinear(seg.text, verse, bookName, chapterNum)}
             </mark>
           ) : (
-            <span key={i}>{renderTextWithInterlinear(seg.text, verse)}</span>
+            <span key={i}>{renderTextWithInterlinear(seg.text, verse, bookName, chapterNum)}</span>
           )
         )}
         {showFootnotes && footnote && (
@@ -4805,6 +4969,44 @@ export default function App() {
     }
     return () => { isMounted = false; };
   }, [activeBook, activeChapter, translation]);
+
+  // Fetch Split Verses when Split View is active and chapter/translation changes
+  useEffect(() => {
+    if (!isSplitView) return;
+    let isMounted = true;
+    setIsSplitVersesLoading(true);
+
+    getPassage(splitTranslation, splitBook.name, splitChapter)
+      .then(({ chapter }) => {
+        if (isMounted) {
+          if (chapter.verses && chapter.verses.length > 0) {
+            setSplitBibleVerses(chapter.verses);
+          } else {
+            setSplitBibleVerses([{ verse: 1, text: "Chapter not found in this translation." }]);
+          }
+
+          if (chapter.copyright) {
+            setSplitChapterCopyright(chapter.copyright);
+          } else {
+            const tr = AVAILABLE_TRANSLATIONS.find(t => t.id.toLowerCase() === splitTranslation.toLowerCase());
+            setSplitChapterCopyright(tr?.copyrightNotice || '');
+          }
+
+          setIsSplitVersesLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          setSplitBibleVerses([{ verse: 1, text: err?.message || "Error loading scripture text." }]);
+          setSplitChapterCopyright('');
+          setIsSplitVersesLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isSplitView, splitTranslation, splitBook.name, splitChapter]);
 
   // Audio Reader Toggle
   const toggleSpeech = () => {
@@ -5815,6 +6017,26 @@ export default function App() {
                 <BookOpen size={13} className={isFocusMode ? "text-accent" : "opacity-70"} />
                 <span>{isFocusMode ? 'Focus' : 'Workspace'}</span>
               </button>
+              <div className="w-[1px] h-3.5 bg-border/60 mx-0.5" />
+              {/* Parallel Split View Toggle (Desktop & Tablet) */}
+              <button
+                type="button"
+                onClick={() => handleToggleSplitView(!isSplitView)}
+                className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                  isSplitView
+                    ? 'bg-accent/15 text-accent font-bold hover:bg-accent/25'
+                    : 'text-muted hover:text-fg hover:bg-border-soft'
+                }`}
+                title={
+                  isSplitView
+                    ? 'Close Parallel Split View'
+                    : 'Parallel Split View: Read two chapters side by side'
+                }
+                aria-label="Toggle Parallel Split View"
+              >
+                <Columns2 size={13} className={isSplitView ? "text-accent" : "opacity-70"} />
+                <span>Split View</span>
+              </button>
             </div>
           )}
 
@@ -6192,6 +6414,21 @@ export default function App() {
                       <ChevronDown size={11} className="text-muted shrink-0 opacity-60 ml-auto" />
                     </button>
                   </div>
+
+                  {/* Quick-Swap to Bookmarked Chapter */}
+                  {bookmarkedChapter && (
+                    <button
+                      type="button"
+                      onClick={handleQuickSwapChapter}
+                      className="h-8.5 min-h-[34px] px-2 py-1 rounded-full bg-accent/15 hover:bg-accent/25 border border-accent/30 text-accent flex items-center gap-1 text-[11px] font-semibold transition-all shrink-0 active:scale-95 shadow-2xs cursor-pointer"
+                      title={`Quick-swap to ${bookmarkedChapter.book} ${bookmarkedChapter.chapter}`}
+                    >
+                      <ArrowLeftRight size={11} className="shrink-0 text-accent" />
+                      <span className="truncate max-w-[65px] xs:max-w-[80px]">
+                        {bookmarkedChapter.book} {bookmarkedChapter.chapter}
+                      </span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Right: Actions */}
@@ -6825,6 +7062,92 @@ export default function App() {
               </header>
 
               <div className="flex-1 overflow-y-auto custom-scroll p-3.5 sm:p-4 space-y-3.5 pb-24">
+                {/* Mobile Chapter Bookmark & Quick-Swap */}
+                <div>
+                  <div className="text-[10.5px] font-bold uppercase tracking-wider text-muted px-1.5 mb-1.5 flex items-center justify-between">
+                    <span>Chapter Bookmark</span>
+                    {bookmarkedChapter && (
+                      <span className="text-[10px] text-accent font-semibold lowercase">Active Bookmark</span>
+                    )}
+                  </div>
+                  <div className="rounded-2xl border border-border/60 bg-surface/50 backdrop-blur-md overflow-hidden divide-y divide-border/30 shadow-2xs">
+                    {bookmarkedChapter ? (
+                      <>
+                        <div className="p-3 flex items-center justify-between">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-lg bg-accent/15 text-accent flex items-center justify-center shrink-0">
+                              <Bookmark size={16} className="fill-accent/30" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-[11px] text-muted font-normal">Held Chapter</div>
+                              <div className="text-[13.5px] font-semibold text-fg truncate">
+                                {bookmarkedChapter.book} {bookmarkedChapter.chapter}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleQuickSwapChapter();
+                                setMobileStudyView('reader');
+                              }}
+                              className="px-2.5 py-1.5 rounded-lg bg-accent text-accent-on text-xs font-semibold flex items-center gap-1 hover:opacity-95 active:scale-95 transition-all cursor-pointer shadow-xs"
+                              title={`Swap to ${bookmarkedChapter.book} ${bookmarkedChapter.chapter}`}
+                            >
+                              <ArrowLeftRight size={13} />
+                              <span>Swap</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleRemoveBookmark}
+                              className="p-1.5 rounded-lg text-muted hover:text-rose-500 hover:bg-rose-500/10 active:scale-95 transition-colors cursor-pointer"
+                              title="Remove Bookmark"
+                              aria-label="Remove Bookmark"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </div>
+                        {(activeBook.name !== bookmarkedChapter.book || activeChapter !== bookmarkedChapter.chapter) && (
+                          <button
+                            type="button"
+                            onClick={handleBookmarkCurrentChapter}
+                            className="w-full min-h-[40px] flex items-center justify-between px-3.5 py-2 hover:bg-fg/5 text-fg text-xs font-medium cursor-pointer transition-colors"
+                          >
+                            <div className="flex items-center gap-2 text-muted">
+                              <Bookmark size={13} />
+                              <span>Bookmark current chapter ({activeBook.name} {activeChapter})</span>
+                            </div>
+                            <Check size={14} className="text-muted/60" />
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleBookmarkCurrentChapter}
+                        className="w-full min-h-[48px] flex items-center justify-between px-3.5 py-2.5 hover:bg-fg/5 active:bg-fg/10 text-fg text-sm font-medium cursor-pointer transition-colors"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-8 h-8 rounded-lg bg-fg/5 text-fg-2 flex items-center justify-center shrink-0">
+                            <Bookmark size={16} />
+                          </div>
+                          <div className="text-left min-w-0">
+                            <div className="text-[13.5px] font-semibold text-fg truncate">
+                              Bookmark {activeBook.name} {activeChapter}
+                            </div>
+                            <div className="text-[11px] text-muted font-normal truncate">
+                              Hold chapter to swap back and forth easily
+                            </div>
+                          </div>
+                        </div>
+                        <Plus size={16} className="text-accent shrink-0 ml-2" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
                 {/* Study & Exegesis Group */}
                 <div>
                   <div className="text-[10.5px] font-bold uppercase tracking-wider text-muted px-1.5 mb-1.5">
@@ -7285,6 +7608,444 @@ export default function App() {
                 <PanelGroup orientation="vertical" id="theologica-layout-vertical-v2" className="flex-1 min-h-0">
                 <Panel defaultSize="75" minSize="30" className="flex flex-col relative min-w-0">
                   <div className="w-full h-full flex flex-col min-h-0 min-w-0 overflow-hidden relative">
+                    {isSplitView ? (
+                      <PanelGroup orientation="horizontal" id="theologica-split-reader" className="flex-1 min-h-0 w-full flex">
+                        {/* Primary Reader Pane (Pane 1) */}
+                        <Panel defaultSize="50" minSize="30" className="flex flex-col h-full min-w-0 relative">
+                          <div className="w-full h-full flex flex-col min-h-0 min-w-0 overflow-hidden relative">
+                            {/* Pane 1 Header */}
+                            <header className="w-full max-w-full min-w-0 h-[56px] border-b border-border flex items-center justify-between px-3 sm:px-4 lg:px-5 bg-bg shrink-0 gap-2 relative z-20">
+                              <div className="flex items-center gap-1.5 shrink-0 z-1 select-none">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const nextState = !showLeftSidebar;
+                                    handleToggleLeftSidebar(nextState);
+                                  }}
+                                  className="flex items-center gap-1.5 px-2 py-1 -ml-1.5 rounded-lg hover:bg-surface border border-transparent hover:border-border text-fg transition-all cursor-pointer group text-left active:scale-[0.98]"
+                                  title={showLeftSidebar ? "Collapse Book Selector" : "Browse Books & Chapters"}
+                                >
+                                  <span className="font-display text-[15px] sm:text-[17px] font-semibold whitespace-nowrap">
+                                    {activeBook.name} {activeChapter}
+                                  </span>
+                                  <ChevronDown size={14} className={`text-muted group-hover:text-fg opacity-60 transition-transform ${showLeftSidebar ? 'rotate-180' : ''}`} />
+                                </button>
+                                <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-surface border border-border/60 text-muted">
+                                  Primary
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+                                {prevChapterInfo && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigateToVerse(prevChapterInfo.book, prevChapterInfo.chapter, 1);
+                                      document.querySelectorAll('.bible-reader-content').forEach(el => el.scrollTo({ top: 0, behavior: 'smooth' }));
+                                    }}
+                                    className="p-1.5 rounded-lg text-fg-2 hover:text-fg hover:bg-surface transition-colors cursor-pointer"
+                                    title={`Previous: ${prevChapterInfo.book} ${prevChapterInfo.chapter}`}
+                                    aria-label="Previous Chapter"
+                                  >
+                                    <ChevronLeft size={16} />
+                                  </button>
+                                )}
+                                {nextChapterInfo && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigateToVerse(nextChapterInfo.book, nextChapterInfo.chapter, 1);
+                                      document.querySelectorAll('.bible-reader-content').forEach(el => el.scrollTo({ top: 0, behavior: 'smooth' }));
+                                    }}
+                                    className="p-1.5 rounded-lg text-fg-2 hover:text-fg hover:bg-surface transition-colors cursor-pointer"
+                                    title={`Next: ${nextChapterInfo.book} ${nextChapterInfo.chapter}`}
+                                    aria-label="Next Chapter"
+                                  >
+                                    <ChevronRight size={16} />
+                                  </button>
+                                )}
+                                <div className="h-4 w-px bg-border/60 mx-0.5" />
+                                <TranslationSelector 
+                                  currentTranslation={translation} 
+                                  onSelectTranslation={setTranslation}
+                                  theme={theme as 'dark' | 'light'}
+                                  align="right"
+                                />
+                              </div>
+                            </header>
+
+                            {/* Pane 1 Content */}
+                            <div className="bible-reader-content select-text flex-1 overflow-y-auto custom-scroll p-6 lg:p-10" onMouseUp={handleSelection} onTouchEnd={handleSelection} onContextMenu={handleReaderContextMenu}>
+                              <article className="max-w-2xl mx-auto w-full break-words select-text">
+                                {isVersesLoading ? (
+                                  <div className="space-y-4 py-4 animate-pulse">
+                                    <div className="h-4 bg-fg/10 rounded w-full"></div>
+                                    <div className="h-4 bg-fg/10 rounded w-11/12"></div>
+                                    <div className="h-4 bg-fg/10 rounded w-4/5"></div>
+                                    <div className="h-4 bg-fg/10 rounded w-full"></div>
+                                  </div>
+                                ) : bibleVerses.length > 0 ? (
+                                  <div className={`${getReaderFontClass()} ${getReaderSizeClass(false)} ${getReaderLeadingClass()} text-fg w-full break-words`}>
+                                    {readerLayout === 'paragraph' ? (
+                                      <div className="break-words">
+                                        {bibleVerses.map((v, index) => (
+                                          <span 
+                                            key={v.verse} 
+                                            data-verse={v.verse} 
+                                            className={`inline rounded-sm px-0.5 transition-colors duration-200 ${
+                                              currentSpeakingVerseIndex === index ? 'text-accent bg-accent/10' : ''
+                                            }`}
+                                          >
+                                            {showVerseNumbers && (
+                                              <sup className="text-[11px] font-bold text-accent select-none mr-1.5 cursor-pointer hover:underline" onClick={() => scrollToAndHighlightVerse(v.verse)}>
+                                                {v.verse}
+                                              </sup>
+                                            )}
+                                            {renderVerseContent(v.verse, v.text, activeBook.name, activeChapter)}
+                                            {' '}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <div className="space-y-3">
+                                        {bibleVerses.map((v, index) => (
+                                          <p 
+                                            key={v.verse} 
+                                            data-verse={v.verse} 
+                                            className={`flex items-start gap-2 rounded-sm p-1 transition-colors duration-200 ${
+                                              currentSpeakingVerseIndex === index ? 'text-accent bg-accent/10' : ''
+                                            }`}
+                                          >
+                                            {showVerseNumbers && (
+                                              <span className="text-xs font-bold text-accent select-none min-w-[24px] text-right pt-0.5 cursor-pointer hover:underline" onClick={() => scrollToAndHighlightVerse(v.verse)}>
+                                                {v.verse}
+                                              </span>
+                                            )}
+                                            <span className="flex-1">
+                                              {renderVerseContent(v.verse, v.text, activeBook.name, activeChapter)}
+                                            </span>
+                                          </p>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-meta">Loading...</span>
+                                )}
+
+                                {bibleVerses.length > 0 && !isVersesLoading && (
+                                  <nav aria-label="Pane 1 Chapter Navigation" className="mt-8 pt-4 border-t border-border flex items-center justify-between gap-3 text-xs select-none">
+                                    {prevChapterInfo ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          navigateToVerse(prevChapterInfo.book, prevChapterInfo.chapter, 1);
+                                          document.querySelectorAll('.bible-reader-content').forEach(el => el.scrollTo({ top: 0, behavior: 'smooth' }));
+                                        }}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface hover:bg-surface-hover border border-border text-fg text-xs font-medium cursor-pointer"
+                                      >
+                                        <ChevronLeft size={14} />
+                                        <span>{prevChapterInfo.book} {prevChapterInfo.chapter}</span>
+                                      </button>
+                                    ) : <div />}
+                                    {nextChapterInfo ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          navigateToVerse(nextChapterInfo.book, nextChapterInfo.chapter, 1);
+                                          document.querySelectorAll('.bible-reader-content').forEach(el => el.scrollTo({ top: 0, behavior: 'smooth' }));
+                                        }}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-accent-on text-xs font-medium cursor-pointer"
+                                      >
+                                        <span>{nextChapterInfo.book} {nextChapterInfo.chapter}</span>
+                                        <ChevronRight size={14} />
+                                      </button>
+                                    ) : <div />}
+                                  </nav>
+                                )}
+                              </article>
+                            </div>
+                          </div>
+                        </Panel>
+
+                        {/* Resizable Divider */}
+                        <PanelResizeHandle className="w-1.5 bg-border/60 hover:bg-accent active:bg-accent transition-colors cursor-col-resize shrink-0 z-10 relative flex items-center justify-center">
+                          <div className="w-0.5 h-7 bg-muted/40 rounded-full" />
+                        </PanelResizeHandle>
+
+                        {/* Parallel Reader Pane (Pane 2) */}
+                        <Panel defaultSize="50" minSize="30" className="flex flex-col h-full min-w-0 relative bg-surface/15">
+                          <div className="w-full h-full flex flex-col min-h-0 min-w-0 overflow-hidden relative">
+                            {/* Pane 2 Header */}
+                            <header className="w-full max-w-full min-w-0 h-[56px] border-b border-border flex items-center justify-between px-3 sm:px-4 lg:px-5 bg-bg shrink-0 gap-2 relative z-20">
+                              {/* Left: Book Picker & Chapter Selector */}
+                              <div ref={splitBookSelectorRef} className="relative z-30 flex items-center gap-1.5 select-none">
+                                <button
+                                  type="button"
+                                  onClick={() => setIsSplitBookSelectorOpen(prev => !prev)}
+                                  className="flex items-center gap-1.5 px-2 py-1 -ml-1.5 rounded-lg hover:bg-surface border border-transparent hover:border-border text-fg transition-all cursor-pointer group text-left active:scale-[0.98]"
+                                  title="Choose Book & Chapter for Split Reader"
+                                  aria-expanded={isSplitBookSelectorOpen}
+                                >
+                                  <span className="font-display text-[15px] sm:text-[17px] font-semibold whitespace-nowrap">
+                                    {splitBook.name} {splitChapter}
+                                  </span>
+                                  <ChevronDown size={14} className={`text-muted group-hover:text-fg opacity-60 transition-transform ${isSplitBookSelectorOpen ? 'rotate-180' : ''}`} />
+                                </button>
+                                <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-accent/15 text-accent border border-accent/25">
+                                  Parallel
+                                </span>
+
+                                {/* Popover Book/Chapter Picker for Pane 2 */}
+                                {isSplitBookSelectorOpen && (
+                                  <div className="absolute left-0 top-full mt-2 w-72 sm:w-80 max-h-[460px] rounded-2xl bg-surface border border-border shadow-2xl p-2.5 z-50 animate-in fade-in zoom-in-95 backdrop-blur-xl flex flex-col space-y-2 select-none">
+                                    <div className="relative">
+                                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+                                      <input
+                                        type="text"
+                                        value={splitBookSearchQuery}
+                                        onChange={(e) => setSplitBookSearchQuery(e.target.value)}
+                                        placeholder="Search books..."
+                                        className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-bg border border-border text-xs text-fg placeholder:text-muted focus:outline-none focus:border-accent"
+                                        autoFocus
+                                      />
+                                    </div>
+
+                                    <div className="flex-1 overflow-y-auto custom-scroll space-y-1 max-h-[360px] pr-1">
+                                      {splitFilteredOtBooks.length > 0 && (
+                                        <div>
+                                          <div className="text-[10px] font-bold uppercase tracking-wider text-muted px-2 py-1">
+                                            Old Testament
+                                          </div>
+                                          {splitFilteredOtBooks.map(b => (
+                                            <div key={b.name} className="rounded-lg overflow-hidden">
+                                              <button
+                                                type="button"
+                                                onClick={() => setSplitExpandedBook(splitExpandedBook === b.name ? null : b.name)}
+                                                className={`w-full flex items-center justify-between px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors cursor-pointer ${
+                                                  splitBook.name === b.name ? 'bg-accent/15 text-accent font-semibold' : 'hover:bg-fg/5 text-fg'
+                                                }`}
+                                              >
+                                                <span>{b.name}</span>
+                                                <div className="flex items-center gap-1 text-[11px] text-muted">
+                                                  <span>{b.chapters} ch</span>
+                                                  <ChevronDown size={12} className={`transition-transform ${splitExpandedBook === b.name ? 'rotate-180' : ''}`} />
+                                                </div>
+                                              </button>
+                                              {splitExpandedBook === b.name && (
+                                                <div className="p-2 grid grid-cols-5 gap-1.5 bg-bg/50 rounded-lg my-1 border border-border/50">
+                                                  {Array.from({ length: b.chapters }, (_, i) => i + 1).map(ch => (
+                                                    <button
+                                                      key={ch}
+                                                      type="button"
+                                                      onClick={() => {
+                                                        navigateToSplitPassage(b.name, ch);
+                                                        setIsSplitBookSelectorOpen(false);
+                                                        setSplitBookSearchQuery('');
+                                                      }}
+                                                      className={`h-7 rounded-md text-[11px] font-semibold transition-all cursor-pointer flex items-center justify-center ${
+                                                        splitBook.name === b.name && splitChapter === ch
+                                                          ? 'bg-accent text-accent-on font-bold shadow-xs'
+                                                          : 'bg-surface hover:bg-surface-hover text-fg border border-border/50'
+                                                      }`}
+                                                    >
+                                                      {ch}
+                                                    </button>
+                                                  ))}
+                                                </div>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+
+                                      {splitFilteredNtBooks.length > 0 && (
+                                        <div className="pt-1.5">
+                                          <div className="text-[10px] font-bold uppercase tracking-wider text-muted px-2 py-1">
+                                            New Testament
+                                          </div>
+                                          {splitFilteredNtBooks.map(b => (
+                                            <div key={b.name} className="rounded-lg overflow-hidden">
+                                              <button
+                                                type="button"
+                                                onClick={() => setSplitExpandedBook(splitExpandedBook === b.name ? null : b.name)}
+                                                className={`w-full flex items-center justify-between px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors cursor-pointer ${
+                                                  splitBook.name === b.name ? 'bg-accent/15 text-accent font-semibold' : 'hover:bg-fg/5 text-fg'
+                                                }`}
+                                              >
+                                                <span>{b.name}</span>
+                                                <div className="flex items-center gap-1 text-[11px] text-muted">
+                                                  <span>{b.chapters} ch</span>
+                                                  <ChevronDown size={12} className={`transition-transform ${splitExpandedBook === b.name ? 'rotate-180' : ''}`} />
+                                                </div>
+                                              </button>
+                                              {splitExpandedBook === b.name && (
+                                                <div className="p-2 grid grid-cols-5 gap-1.5 bg-bg/50 rounded-lg my-1 border border-border/50">
+                                                  {Array.from({ length: b.chapters }, (_, i) => i + 1).map(ch => (
+                                                    <button
+                                                      key={ch}
+                                                      type="button"
+                                                      onClick={() => {
+                                                        navigateToSplitPassage(b.name, ch);
+                                                        setIsSplitBookSelectorOpen(false);
+                                                        setSplitBookSearchQuery('');
+                                                      }}
+                                                      className={`h-7 rounded-md text-[11px] font-semibold transition-all cursor-pointer flex items-center justify-center ${
+                                                        splitBook.name === b.name && splitChapter === ch
+                                                          ? 'bg-accent text-accent-on font-bold shadow-xs'
+                                                          : 'bg-surface hover:bg-surface-hover text-fg border border-border/50'
+                                                      }`}
+                                                    >
+                                                      {ch}
+                                                    </button>
+                                                  ))}
+                                                </div>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Right: Prev/Next, Translation Selector, Close Split View */}
+                              <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+                                {splitPrevChapterInfo && (
+                                  <button
+                                    type="button"
+                                    onClick={() => navigateToSplitPassage(splitPrevChapterInfo.book, splitPrevChapterInfo.chapter)}
+                                    className="p-1.5 rounded-lg text-fg-2 hover:text-fg hover:bg-surface transition-colors cursor-pointer"
+                                    title={`Previous: ${splitPrevChapterInfo.book} ${splitPrevChapterInfo.chapter}`}
+                                    aria-label="Previous Chapter"
+                                  >
+                                    <ChevronLeft size={16} />
+                                  </button>
+                                )}
+                                {splitNextChapterInfo && (
+                                  <button
+                                    type="button"
+                                    onClick={() => navigateToSplitPassage(splitNextChapterInfo.book, splitNextChapterInfo.chapter)}
+                                    className="p-1.5 rounded-lg text-fg-2 hover:text-fg hover:bg-surface transition-colors cursor-pointer"
+                                    title={`Next: ${splitNextChapterInfo.book} ${splitNextChapterInfo.chapter}`}
+                                    aria-label="Next Chapter"
+                                  >
+                                    <ChevronRight size={16} />
+                                  </button>
+                                )}
+                                <div className="h-4 w-px bg-border/60 mx-0.5" />
+                                <TranslationSelector 
+                                  currentTranslation={splitTranslation} 
+                                  onSelectTranslation={handleSelectSplitTranslation}
+                                  theme={theme as 'dark' | 'light'}
+                                  align="right"
+                                />
+                                <div className="h-4 w-px bg-border/60 mx-0.5" />
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleSplitView(false)}
+                                  className="p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface transition-colors cursor-pointer"
+                                  title="Close Split View (Single Reader)"
+                                  aria-label="Close Split View"
+                                >
+                                  <X size={16} />
+                                </button>
+                              </div>
+                            </header>
+
+                            {/* Pane 2 Content */}
+                            <div className="bible-reader-content select-text flex-1 overflow-y-auto custom-scroll p-6 lg:p-10" onMouseUp={handleSelection} onTouchEnd={handleSelection} onContextMenu={handleReaderContextMenu}>
+                              <article className="max-w-2xl mx-auto w-full break-words select-text">
+                                {isSplitVersesLoading ? (
+                                  <div className="space-y-4 py-4 animate-pulse">
+                                    <div className="h-4 bg-fg/10 rounded w-full"></div>
+                                    <div className="h-4 bg-fg/10 rounded w-11/12"></div>
+                                    <div className="h-4 bg-fg/10 rounded w-4/5"></div>
+                                    <div className="h-4 bg-fg/10 rounded w-full"></div>
+                                  </div>
+                                ) : splitBibleVerses.length > 0 ? (
+                                  <div className={`${getReaderFontClass()} ${getReaderSizeClass(false)} ${getReaderLeadingClass()} text-fg w-full break-words`}>
+                                    {readerLayout === 'paragraph' ? (
+                                      <div className="break-words">
+                                        {splitBibleVerses.map(v => (
+                                          <span 
+                                            key={v.verse} 
+                                            data-verse={v.verse} 
+                                            className="inline rounded-sm px-0.5 transition-colors duration-200"
+                                          >
+                                            {showVerseNumbers && (
+                                              <sup className="text-[11px] font-bold text-accent select-none mr-1.5">
+                                                {v.verse}
+                                              </sup>
+                                            )}
+                                            {renderVerseContent(v.verse, v.text, splitBook.name, splitChapter)}
+                                            {' '}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <div className="space-y-3">
+                                        {splitBibleVerses.map(v => (
+                                          <p 
+                                            key={v.verse} 
+                                            data-verse={v.verse} 
+                                            className="flex items-start gap-2 rounded-sm p-1 transition-colors duration-200"
+                                          >
+                                            {showVerseNumbers && (
+                                              <span className="text-xs font-bold text-accent select-none min-w-[24px] text-right pt-0.5">
+                                                {v.verse}
+                                              </span>
+                                            )}
+                                            <span className="flex-1">
+                                              {renderVerseContent(v.verse, v.text, splitBook.name, splitChapter)}
+                                            </span>
+                                          </p>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-meta">Loading...</span>
+                                )}
+
+                                {splitBibleVerses.length > 0 && !isSplitVersesLoading && (
+                                  <nav aria-label="Pane 2 Chapter Navigation" className="mt-8 pt-4 border-t border-border flex items-center justify-between gap-3 text-xs select-none">
+                                    {splitPrevChapterInfo ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => navigateToSplitPassage(splitPrevChapterInfo.book, splitPrevChapterInfo.chapter)}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface hover:bg-surface-hover border border-border text-fg text-xs font-medium cursor-pointer"
+                                      >
+                                        <ChevronLeft size={14} />
+                                        <span>{splitPrevChapterInfo.book} {splitPrevChapterInfo.chapter}</span>
+                                      </button>
+                                    ) : <div />}
+                                    {splitNextChapterInfo ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => navigateToSplitPassage(splitNextChapterInfo.book, splitNextChapterInfo.chapter)}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-accent-on text-xs font-medium cursor-pointer"
+                                      >
+                                        <span>{splitNextChapterInfo.book} {splitNextChapterInfo.chapter}</span>
+                                        <ChevronRight size={14} />
+                                      </button>
+                                    ) : <div />}
+                                  </nav>
+                                )}
+
+                                {splitChapterCopyright && (
+                                  <p className="mt-6 text-[10px] text-muted text-center italic select-none">
+                                    {splitChapterCopyright}
+                                  </p>
+                                )}
+                              </article>
+                            </div>
+                          </div>
+                        </Panel>
+                      </PanelGroup>
+                    ) : (
+                      <>
                   <header 
                     ref={readerHeaderRef}
                     className="w-full max-w-full min-w-0 h-[60px] border-b border-border flex items-center justify-between px-3 sm:px-4 lg:px-6 bg-bg shrink-0 gap-2 relative z-20"
@@ -7716,6 +8477,8 @@ export default function App() {
                   )}
                 </article>
               </div>
+                      </>
+                    )}
                   </div>
                 </Panel>
                 
@@ -9447,6 +10210,8 @@ export default function App() {
           onToggleRightSidebar={handleToggleRightSidebar}
           showBottomNotes={showBottomNotes}
           onToggleBottomNotes={handleToggleBottomNotes}
+          isSplitView={isSplitView}
+          onToggleSplitView={handleToggleSplitView}
           readerFontFamily={readerFontFamily}
           onReaderFontFamilyChange={handleReaderFontFamilyChange}
           readerFontSize={readerFontSize}

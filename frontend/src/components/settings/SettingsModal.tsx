@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, Palette, BookOpen, Volume2, Sparkles, Target, Database,
-  Check, RotateCcw, Download, Upload, Play, Square, Info, Eye, ShieldCheck
+  Check, RotateCcw, Download, Upload, Play, Square, Info, Eye, ShieldCheck, Columns2
 } from 'lucide-react';
 import { 
   ReaderFontFamily, 
@@ -43,6 +43,8 @@ export interface SettingsModalProps {
   onToggleRightSidebar: (show: boolean) => void;
   showBottomNotes: boolean;
   onToggleBottomNotes: (show: boolean) => void;
+  isSplitView?: boolean;
+  onToggleSplitView?: (show: boolean) => void;
 
   // Reading & Typography
   readerFontFamily: ReaderFontFamily;
@@ -105,6 +107,8 @@ export function SettingsModal(props: SettingsModalProps) {
     onToggleRightSidebar,
     showBottomNotes,
     onToggleBottomNotes,
+    isSplitView = false,
+    onToggleSplitView,
     readerFontFamily,
     onReaderFontFamilyChange,
     readerFontSize,
@@ -414,6 +418,22 @@ export function SettingsModal(props: SettingsModalProps) {
                         type="checkbox"
                         checked={showBottomNotes}
                         onChange={(e) => onToggleBottomNotes(e.target.checked)}
+                        className="tracker-checkbox cursor-pointer"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between p-3.5 bg-surface rounded-2xl border border-border">
+                      <div>
+                        <div className="text-sm font-medium text-fg flex items-center gap-1.5">
+                          <Columns2 size={16} className="text-accent" />
+                          <span>Parallel Split View</span>
+                        </div>
+                        <div className="text-xs text-muted">Read two chapters or translations side by side on desktop and tablets</div>
+                      </div>
+                      <input 
+                        type="checkbox"
+                        checked={Boolean(isSplitView)}
+                        onChange={(e) => onToggleSplitView?.(e.target.checked)}
                         className="tracker-checkbox cursor-pointer"
                       />
                     </div>

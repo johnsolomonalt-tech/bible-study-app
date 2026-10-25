@@ -42,6 +42,11 @@ export const PREF_KEYS = {
   USER_DEFAULT_LENS: 'theologica_user_default_lens',
   INCLUDE_ORIGINAL_ROOTS: 'theologica_include_original_roots',
   DAILY_CHAPTER_GOAL: 'theologica_daily_chapter_goal',
+  IS_SPLIT_VIEW: 'theologica_split_view',
+  SPLIT_LAST_BOOK: 'theologica_split_last_book',
+  SPLIT_LAST_CHAPTER: 'theologica_split_last_chapter',
+  SPLIT_BIBLE_VERSION: 'theologica_split_bible_version',
+  BOOKMARKED_CHAPTER: 'theologica_bookmarked_chapter',
 } as const;
 
 export type ReaderFontFamily = 'serif' | 'sans' | 'mono';
