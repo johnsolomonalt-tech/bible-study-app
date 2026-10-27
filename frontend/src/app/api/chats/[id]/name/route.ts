@@ -39,10 +39,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const identity = await resolveChatIdentity(req);
   const userId = identity?.userId || null;
-  let chatId = Number(id);
-  if (!isValidDbId(chatId) && typeof chatId === 'number' && chatId > 0) {
-    chatId = (chatId % 2000000000) + 1;
-  }
+  const chatId = Number(id);
   if (!isValidDbId(chatId) || !(await ownsChat(identity, chatId))) {
     return NextResponse.json({ error: 'Chat not found.' }, { status: 404 });
   }

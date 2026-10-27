@@ -1,0 +1,25 @@
+{
+  "stats": {
+    "web": {
+      "books": 66,
+      "chapters": 1190,
+      "verses": 31105
+    },
+    "bsb": {
+      "books": 66,
+      "chapters": 1189,
+      "verses": 31086
+    },
+    "kjv_strongs": {
+      "books": 66,
+      "chapters": 1189,
+      "verses": 31102
+    },
+    "kjv": {
+      "books": 66,
+      "chapters": 1195,
+      "verses": 31207
+    }
+  },
+  "structuralIssues": []
+}

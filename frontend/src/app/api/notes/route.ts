@@ -42,14 +42,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unauthorized. Sign in required to save notes to cloud.' }, { status: 401 });
   }
 
-  let title = 'Untitled Note';
-  let content = '';
-
+  let body;
   try {
-    const body = await req.json();
-    if (body?.title) title = body.title;
-    if (body?.content) content = body.content;
-  } catch {}
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON request body.' }, { status: 400 });
+  }
+  if (!body || typeof body !== 'object' || Array.isArray(body) ||
+      (body.title !== undefined && typeof body.title !== 'string') ||
+      (body.content !== undefined && typeof body.content !== 'string')) {
+    return NextResponse.json({ error: 'Title and content must be strings.' }, { status: 400 });
+  }
+  const title = body.title || 'Untitled Note';
+  const content = body.content || '';
 
   if (process.env.DATABASE_URL) {
     try {

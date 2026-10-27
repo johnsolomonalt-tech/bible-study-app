@@ -852,6 +852,7 @@ export function NotesWorkspace({
   const handleExport = (format: 'md' | 'txt' | 'pdf') => {
     if (!activeNote) return;
     const title = draftTitle || 'Untitled Note';
+    const escapedTitle = title.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     if (format === 'pdf') {
       const printWindow = window.open('', '_blank');
       if (printWindow) {
@@ -864,7 +865,7 @@ export function NotesWorkspace({
           <html>
             <head>
               <meta charset="utf-8" />
-              <title>${title}</title>
+              <title>${escapedTitle}</title>
               <style>
                 body {
                   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -895,7 +896,7 @@ export function NotesWorkspace({
               </style>
             </head>
             <body>
-              <h1>${title}</h1>
+              <h1>${escapedTitle}</h1>
               <div class="content">${escapedContent}</div>
             </body>
           </html>

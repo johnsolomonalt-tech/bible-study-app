@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
-    "test": "node scripts/verify-security.mjs",
+    "test": "node scripts/verify-security.mjs && node --test scripts/verify-service-worker.mjs && node scripts/verify-bugfixes.mjs",
     "lint": "eslint",
     "db:push": "prisma db push",
     "db:baseline": "node scripts/baseline-database.mjs",

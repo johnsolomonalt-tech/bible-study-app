@@ -1,0 +1,76 @@
+
+> bible-study-app@0.1.0 build
+> prisma generate && next build
+
+Prisma schema loaded from prisma/schema.prisma
+
+✔ Generated Prisma Client (v5.22.0) to ./node_modules/@prisma/client in 69ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Tip: Want to turn off tips and other hints? https://pris.ly/tip-4-nohints
+
+▲ Next.js 16.2.10 (Turbopack)
+- Environments: .env.local
+
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+  Creating an optimized production build ...
+✓ Compiled successfully in 4.7s
+  Running TypeScript ...
+  Finished TypeScript in 10.7s ...
+  Collecting page data using 15 workers ...
+  Generating static pages using 15 workers (0/27) ...
+  Generating static pages using 15 workers (6/27) 
+  Generating static pages using 15 workers (13/27) 
+  Generating static pages using 15 workers (20/27) 
+✓ Generating static pages using 15 workers (27/27) in 341ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /~offline
+├ ƒ /api/analytics/track
+├ ƒ /api/bible/[version]/[book]/[chapter]
+├ ƒ /api/bible/lexicon
+├ ƒ /api/canvas
+├ ƒ /api/canvas/ai
+├ ƒ /api/canvas/export-guide
+├ ƒ /api/canvas/import
+├ ƒ /api/chats
+├ ƒ /api/chats/[id]
+├ ƒ /api/chats/[id]/messages
+├ ƒ /api/chats/[id]/name
+├ ƒ /api/console-7d8f9e6b4a3c21d0/auth/change-password
+├ ƒ /api/console-7d8f9e6b4a3c21d0/auth/logout
+├ ƒ /api/console-7d8f9e6b4a3c21d0/auth/verify
+├ ƒ /api/console-7d8f9e6b4a3c21d0/events
+├ ƒ /api/console-7d8f9e6b4a3c21d0/health
+├ ƒ /api/console-7d8f9e6b4a3c21d0/settings
+├ ƒ /api/console-7d8f9e6b4a3c21d0/stats
+├ ƒ /api/console-7d8f9e6b4a3c21d0/users
+├ ƒ /api/devotionals
+├ ƒ /api/highlights
+├ ƒ /api/highlights/[id]
+├ ƒ /api/legal/[slug]
+├ ƒ /api/notes
+├ ƒ /api/notes/[id]
+├ ƒ /api/notes/ai
+├ ƒ /api/streak
+├ ƒ /api/tracker
+├ ƒ /console-7d8f9e6b4a3c21d0
+├ ƒ /legal
+├ ƒ /privacy
+├ ○ /robots.txt
+├ ƒ /share/canvas/[id]
+├ ƒ /sign-in/[[...sign-in]]
+├ ƒ /sign-up/[[...sign-up]]
+├ ○ /sitemap.xml
+└ ƒ /terms
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

@@ -1,10 +1,9 @@
 // Theologica PWA Service Worker
-const CACHE_VERSION = 'theologica-pwa-v1';
+const CACHE_VERSION = 'theologica-pwa-v2';
 const PASSAGE_CACHE = 'theologica-bible-passages-v1';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 
 const PRECACHE_ASSETS = [
-  '/',
   '/~offline',
   '/manifest.json',
   '/apple-touch-icon.png',
@@ -30,7 +29,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) => {
       return Promise.all(
         keys.map((key) => {
-          if (key !== STATIC_CACHE && key !== PASSAGE_CACHE) {
+          if ((key.startsWith('theologica-') || key === 'internal-api-cache' || key === 'clerk-api-cache') && key !== STATIC_CACHE && key !== PASSAGE_CACHE) {
             console.log('[Theologica SW] Pruning old cache:', key);
             return caches.delete(key);
           }
@@ -50,26 +49,36 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Account and authentication responses cannot be served from a previous session's cache.
+  if ((url.origin === self.location.origin && url.pathname.startsWith('/api/') && !url.pathname.startsWith('/api/bible/')) ||
+      /(^|\.)clerk\.(com|accounts\.dev|accounts\.com)$/.test(url.hostname)) {
+    return;
+  }
+
   // 1. Bible passages (Stale While Revalidate)
-  const isBibleApi = url.pathname.startsWith('/api/bible/') || url.hostname === 'bible-api.com';
+  const isBibleApi = (url.origin === self.location.origin && url.pathname.startsWith('/api/bible/')) || url.hostname === 'bible-api.com';
   if (isBibleApi) {
     event.respondWith(
       caches.open(PASSAGE_CACHE).then(async (cache) => {
         const cachedResponse = await cache.match(request);
         const networkFetch = fetch(request)
-          .then((networkResponse) => {
+          .then(async (networkResponse) => {
             if (networkResponse && networkResponse.status === 200) {
-              cache.put(request, networkResponse.clone());
+              await cache.put(request, networkResponse.clone());
             }
             return networkResponse;
           })
-          .catch(() => cachedResponse);
+          .catch(() => cachedResponse || new Response('Passage unavailable offline', { status: 503 }));
 
+        event.waitUntil(networkFetch.then(() => undefined));
         return cachedResponse || networkFetch;
       })
     );
     return;
   }
+
+  // Never cache or replay private account APIs or third-party authentication.
+  if (url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;
 
   // 2. Next.js immutable static assets & icons (Cache First)
   const isStaticAsset = 
@@ -89,7 +98,7 @@ self.addEventListener('fetch', (event) => {
         try {
           const networkResponse = await fetch(request);
           if (networkResponse && networkResponse.status === 200) {
-            cache.put(request, networkResponse.clone());
+            await cache.put(request, networkResponse.clone());
           }
           return networkResponse;
         } catch {
@@ -118,13 +127,9 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Default: Network fetch with cache fallback if available
-  event.respondWith(
-    fetch(request).catch(async () => {
-      const cached = await caches.match(request);
-      return cached || new Response('Network error', { status: 503 });
-    })
-  );
+  // Default: Network only; never replay a prior account's response.
+  return;
+
 });
 
 // Support skip waiting message from app

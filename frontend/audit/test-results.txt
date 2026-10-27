@@ -1,0 +1,70 @@
+
+> bible-study-app@0.1.0 test
+> node scripts/verify-security.mjs && node --test scripts/verify-service-worker.mjs && node scripts/verify-bugfixes.mjs
+
+✔ Rate Limiter: uses shared atomic counters and trusted proxy addresses (1.931436ms)
+✔ Dev Auth Security: fail-closed in production (0.164053ms)
+✔ Developer Console Security: middleware and layout auth gates (0.251403ms)
+✔ JWT Security: reject forged unsigned token payloads (0.208763ms)
+✔ Canvas Security: unguessable IDs and isPublic authorization (0.42242ms)
+✔ Analytics Security: track route has rate limiting (0.178535ms)
+✔ Accessibility: layout viewport allows user scaling (0.194723ms)
+✔ Highlight Routes: use singleton prisma and verify ownership (0.239896ms)
+✔ Production Build Script: safe migration scripts configured (0.233949ms)
+✔ Database Migrations: migration baseline exists (0.213239ms)
+✔ Error Boundaries: custom not-found and error pages exist (0.143361ms)
+✔ SEO & Metadata: robots.ts, sitemap.ts, and metadataBase configured (0.238186ms)
+✔ Guest Data Isolation: notes and chats do not pool guest records in server memory (0.176354ms)
+✔ Chat API: requires owner access and scopes memory messages by owner (0.937425ms)
+✔ Rate Limiting Coverage: AI & search endpoints enforce shared rate limits (0.279151ms)
+✔ Database Performance: Prisma schema includes composite indexes for query patterns (0.261985ms)
+✔ Content-Security-Policy & Security Headers: strict headers and devotionals route alias (0.360541ms)
+✔ Multi-Translation Registry & Legal Infrastructure (0.58117ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 13.733796
+✔ private APIs and third-party auth bypass all offline caches (22.869844ms)
+✔ uncached offline passages return a valid failure response (2.510621ms)
+✔ mutations are never intercepted (0.60974ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 117.806133
+✔ Chat authorization denies foreign/missing IDs without creating records (90.362855ms)
+✔ Guests on the same IP receive distinct signed cookies and cannot share chats (50.956917ms)
+✔ Guest chat fails closed when signing secrets are not configured (20.788953ms)
+✔ Public canvas access is revoked for guest and signed-in non-owner (32.695198ms)
+✔ Canvas sharing rejects truthy strings instead of publishing a private board (12.106707ms)
+✔ Legal edits require the developer guard, even for signed-in users (5.929038ms)
+✔ Legal editor source does not accumulate generated attribution sections (16.455953ms)
+✔ Failed legal persistence throws and does not mutate the published cache (29.152825ms)
+✔ Missing memory notes return 404 and partial numeric IDs are rejected (11.310934ms)
+✔ Bible provider validates bounds and discovers local sources from registry (29.530326ms)
+✔ Bible API keeps legitimate three-digit scripture numbers (25.318237ms)
+✔ Editing two notes retains both pending cloud saves (5.119349ms)
+✔ Guest quick notes remain valid local drafts without a cloud request (8.624254ms)
+✔ Private API requests bypass the service-worker cache and uncached offline Bible yields 503 (1.441223ms)
+✔ Chat message endpoints reject malformed payloads and never remap oversized IDs (36.220876ms)
+✔ Failed signed-in quick note creation preserves the original local draft (3.752588ms)
+✔ PDF export escapes note titles rather than injecting HTML (3.745064ms)
+✔ Devotional navigation skips the leap-day dataset entry in ordinary years (4.582289ms)
+✔ Tab synchronization leaves the original deep link intact until restoration (1.830521ms)
+✔ Streak sync reports account read and write failures instead of false success (25.40615ms)
+✔ Malformed note creates do not persist blank or non-string records (8.240631ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 439.574642

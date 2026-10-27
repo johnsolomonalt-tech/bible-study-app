@@ -186,12 +186,12 @@ function loadPersistedDocs(): Record<LegalDocSlug, LegalDocument> {
   return defaults;
 }
 
-export function getLegalDocument(slug: LegalDocSlug): LegalDocument {
+export function getLegalDocument(slug: LegalDocSlug, includeAttributions = true): LegalDocument {
   const docs = loadPersistedDocs();
   const doc = docs[slug] || docs.privacy;
 
   // For the legal page: automatically append dynamic translation attributions from the central registry!
-  if (slug === 'legal') {
+  if (slug === 'legal' && includeAttributions) {
     const attributions = getTranslationAttributions();
     const attributionsMarkdown = attributions
       .map((t) => {
@@ -221,14 +221,9 @@ export function saveLegalDocument(slug: LegalDocSlug, content: string, title?: s
     content,
   };
 
-  docs[slug] = updatedDoc;
-  legalDocsMemoryCache = docs;
-
-  try {
-    fs.writeFileSync(STORAGE_FILE_PATH, JSON.stringify(docs, null, 2), 'utf-8');
-  } catch (err) {
-    console.warn('Failed to persist legal documents to file; memory updated:', err);
-  }
-
+  const updatedDocs = { ...docs, [slug]: updatedDoc };
+  // A failed filesystem write must not be presented as a successful publication.
+  fs.writeFileSync(STORAGE_FILE_PATH, JSON.stringify(updatedDocs, null, 2), 'utf-8');
+  legalDocsMemoryCache = updatedDocs;
   return updatedDoc;
 }

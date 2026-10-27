@@ -1,80 +1,5 @@
 import type { NextConfig } from "next";
-import withPWAInit from "@ducanh2912/next-pwa";
-
-const withPWA = withPWAInit({
-  dest: "public",
-  disable: process.env.NODE_ENV === "development",
-  register: true,
-  cacheStartUrl: true,
-  dynamicStartUrl: false,
-  extendDefaultRuntimeCaching: true,
-  fallbacks: {
-    document: "/~offline",
-  },
-  workboxOptions: {
-    runtimeCaching: [
-      {
-        urlPattern: /\/api\/bible\/.*/i,
-        handler: "StaleWhileRevalidate",
-        options: {
-          cacheName: "theologica-bible-passages",
-          expiration: {
-            maxEntries: 1500,
-            maxAgeSeconds: 60 * 60 * 24 * 365,
-          },
-          cacheableResponse: {
-            statuses: [0, 200],
-          },
-        },
-      },
-      {
-        urlPattern: /^https:\/\/bible-api\.com\/.*/i,
-        handler: "CacheFirst",
-        options: {
-          cacheName: "bible-api-cache",
-          expiration: {
-            maxEntries: 1200,
-            maxAgeSeconds: 60 * 60 * 24 * 365,
-          },
-          cacheableResponse: {
-            statuses: [0, 200],
-          },
-        },
-      },
-      {
-        urlPattern: /\/api\/(highlights|tracker|notes)/i,
-        handler: "NetworkFirst",
-        options: {
-          cacheName: "internal-api-cache",
-          expiration: {
-            maxEntries: 100,
-            maxAgeSeconds: 60 * 60 * 24 * 30,
-          },
-          networkTimeoutSeconds: 3,
-          cacheableResponse: {
-            statuses: [0, 200],
-          },
-        },
-      },
-      {
-        urlPattern: /^https:\/\/.*(clerk\.accounts\.dev|clerk\.accounts\.com|\.clerk\.).*/i,
-        handler: "NetworkFirst",
-        options: {
-          cacheName: "clerk-api-cache",
-          expiration: {
-            maxEntries: 50,
-            maxAgeSeconds: 60 * 60 * 24 * 30,
-          },
-          networkTimeoutSeconds: 3,
-          cacheableResponse: {
-            statuses: [0, 200],
-          },
-        },
-      }
-    ],
-  },
-});
-
+// public/sw.js is the single service worker for both build modes.
 import path from "path";
 
 const cspHeader = [
@@ -152,6 +77,7 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     return [
+      { source: '/sw.js', headers: [{ key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' }] },
       {
         source: '/:path*',
         headers: [
@@ -185,4 +111,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withPWA(nextConfig);
+export default nextConfig;

@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useId, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Edit2, X } from 'lucide-react';
+import { useModalFocus } from './useModalFocus';
 
 export interface PromptModalProps {
   isOpen: boolean;
@@ -29,6 +30,9 @@ export function PromptModal({
 }: PromptModalProps) {
   const [prevInitialValue, setPrevInitialValue] = useState(initialValue);
   const [value, setValue] = useState(initialValue);
+  const titleId = useId();
+  const messageId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   if (prevInitialValue !== initialValue) {
@@ -36,27 +40,7 @@ export function PromptModal({
     setValue(initialValue);
   }
 
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const timer = setTimeout(() => {
-      inputRef.current?.focus();
-      inputRef.current?.select();
-    }, 50);
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onCancel();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isOpen, onCancel]);
+  useModalFocus(isOpen, dialogRef, inputRef, onCancel);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,11 +53,15 @@ export function PromptModal({
       {isOpen && (
         <div 
           className="fixed inset-0 z-50 flex items-center justify-center modal-safe-overlay bg-black/60 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
           onClick={onCancel}
         >
           <motion.div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            aria-describedby={message ? messageId : undefined}
+            tabIndex={-1}
             initial={{ opacity: 0, scale: 0.94, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.94, y: 8 }}
@@ -96,11 +84,11 @@ export function PromptModal({
                   <Edit2 size={18} />
                 </div>
                 <div>
-                  <h3 className="text-base sm:text-lg font-bold text-fg tracking-tight">
+                  <h3 id={titleId} className="text-base sm:text-lg font-bold text-fg tracking-tight">
                     {title}
                   </h3>
                   {message && (
-                    <p className="text-xs text-muted mt-0.5">{message}</p>
+                    <p id={messageId} className="text-xs text-muted mt-0.5">{message}</p>
                   )}
                 </div>
               </div>
@@ -109,6 +97,7 @@ export function PromptModal({
                 <input
                   ref={inputRef}
                   type="text"
+                  aria-labelledby={titleId}
                   value={value}
                   onChange={(e) => setValue(e.target.value)}
                   placeholder={placeholder}

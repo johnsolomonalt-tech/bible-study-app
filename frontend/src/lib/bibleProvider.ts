@@ -1,4 +1,5 @@
 import { findCanonicalBook } from './bibleCanon';
+import { getTranslation } from './bibleTranslations';
 import { BibleChapter, BibleVerse, BibleBookData } from '@/types/bible';
 
 // Tier 1: Fast In-Memory Cache
@@ -75,7 +76,13 @@ export async function getPassage(
     throw new Error(`Invalid Bible book reference: "${book}"`);
   }
 
+  if (!Number.isInteger(chapter) || chapter < 1 || chapter > bookMeta.chapters) {
+    throw new Error(`Invalid chapter for ${bookMeta.name}: ${chapter}`);
+  }
+
   const bookCode = bookMeta.code;
+  const translation = getTranslation(versionKey);
+  const copyright = translation?.copyrightNotice;
   const cacheKey = `${versionKey}:${bookCode}:${chapter}`;
 
   // 1. Tier 1: Check Memory Cache (0ms)
@@ -94,14 +101,15 @@ export async function getPassage(
   }
 
   // 3. Local Translations (BSB, WEB, KJV, KJV_STRONGS)
-  const isLocal = ['bsb', 'web', 'kjv', 'kjv_strongs'].includes(versionKey);
+  const localDir = translation?.source.type === 'local' ? translation.source.dir : versionKey === 'kjv_strongs' ? 'kjv_strongs' : null;
+  const isLocal = Boolean(localDir);
   if (isLocal) {
     const bookCacheKey = `${versionKey}:${bookCode}`;
     let bookData: BibleBookData | undefined = BOOK_MEMORY_CACHE.get(bookCacheKey);
 
     if (!bookData) {
       // Fetch the full book JSON (~30-60KB). This loads all chapters in this book in a single request!
-      const res = await fetch(`/bibles/${versionKey}/${bookCode}.json`);
+      const res = await fetch(`/bibles/${localDir}/${bookCode}.json`);
       if (!res.ok) {
         throw new Error(`Failed to load local scripture data for ${versionKey.toUpperCase()} ${bookMeta.name}`);
       }
@@ -116,6 +124,7 @@ export async function getPassage(
           chapter: Number(chNum),
           translation: versionKey.toUpperCase(),
           verses: chVerses,
+          copyright,
         };
         const itemKey = `${versionKey}:${bookCode}:${chNum}`;
         MEMORY_CACHE.set(itemKey, chPayload);
@@ -129,6 +138,7 @@ export async function getPassage(
       chapter,
       translation: versionKey.toUpperCase(),
       verses: chapterVerses,
+      copyright,
     };
 
     MEMORY_CACHE.set(cacheKey, chapterPayload);

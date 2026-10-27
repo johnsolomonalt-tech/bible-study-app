@@ -227,10 +227,7 @@ async function saveOrMockMessage(data: { content: string; role: string; chatId: 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const identity = await resolveChatIdentity(req);
-  let chatId = Number(id);
-  if (!isValidDbId(chatId) && typeof chatId === 'number' && chatId > 0) {
-    chatId = (chatId % 2000000000) + 1;
-  }
+  const chatId = Number(id);
   if (!isValidDbId(chatId) || !(await ownsChat(identity, chatId))) {
     return NextResponse.json({ error: 'Chat not found.' }, { status: 404 });
   }
@@ -627,10 +624,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const identity = await resolveChatIdentity(req);
   const userId = identity?.userId || null;
-  let chatId = Number(id);
-  if (!isValidDbId(chatId) && typeof chatId === 'number' && chatId > 0) {
-    chatId = (chatId % 2000000000) + 1;
-  }
+  const chatId = Number(id);
   if (!isValidDbId(chatId) || !(await ownsChat(identity, chatId))) {
     return NextResponse.json({ error: 'Chat not found.' }, { status: 404 });
   }
@@ -648,8 +642,28 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     );
   }
 
-  const body = await req.json();
-  const { content, image, scriptureContext, translation, theologicalLens, includeOriginalRoots } = body;
+  let body;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON request body.' }, { status: 400 });
+  }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return NextResponse.json({ error: 'Invalid message.' }, { status: 400 });
+  }
+  const { content = '', image, scriptureContext, translation, theologicalLens, includeOriginalRoots } = body;
+  if (typeof content !== 'string' || content.length > 100_000 || (!content.trim() && !image) ||
+      (translation !== undefined && typeof translation !== 'string') ||
+      (theologicalLens !== undefined && (typeof theologicalLens !== 'string' || !Object.hasOwn(THEOLOGICAL_LENSES, theologicalLens))) ||
+      (image && (typeof image.base64 !== 'string' || image.base64.length > 20_000_000 ||
+        !['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'application/pdf'].includes(image.mimeType))) ||
+      (scriptureContext && (typeof scriptureContext.reference !== 'string' || typeof scriptureContext.text !== 'string' ||
+        scriptureContext.text.length > 100_000 || typeof scriptureContext.translation !== 'string'))) {
+    return NextResponse.json({ error: 'Invalid message content or attachment.' }, { status: 400 });
+  }
+  if (!process.env.GEMINI_API_KEY) {
+    return NextResponse.json({ error: 'AI service is currently not configured.' }, { status: 503 });
+  }
 
   if (image) {
     recordAnalyticsEvent('chat_file_upload', userId || ip, { feature: 'chat' }).catch(() => {});

@@ -1,0 +1,19 @@
+{
+  "errors": 1,
+  "warnings": 437,
+  "rules": {
+    "@typescript-eslint/no-unused-vars": 145,
+    "@next/next/no-assign-module-variable": 1,
+    "@typescript-eslint/no-explicit-any": 168,
+    "react-hooks/set-state-in-effect": 47,
+    "@next/next/no-img-element": 10,
+    "react-hooks/exhaustive-deps": 12,
+    "react-hooks/immutability": 12,
+    "react-hooks/refs": 17,
+    "react-hooks/purity": 6,
+    "react-hooks/preserve-manual-memoization": 11,
+    "prefer-const": 3,
+    "null": 1,
+    "@next/next/no-html-link-for-pages": 5
+  }
+}

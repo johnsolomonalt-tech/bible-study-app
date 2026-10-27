@@ -8,7 +8,7 @@ import { useAuth, UserButton, SignIn, SignInButton } from '@clerk/nextjs';
 import { Send, Plus, Layout, Edit, Sparkles, Target, Check, CheckCheck, Copy, ChevronRight, ChevronLeft, ChevronDown, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquare, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow, ShieldCheck, Heart, Layers, Languages, MoreVertical, MoreHorizontal, Search, BookMarked, Bookmark, ArrowLeftRight, Columns2, Quote, Compass, ArrowRight, Square, BrainCircuit, FileText, UploadCloud, Menu, SlidersHorizontal } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import TextareaAutosize from 'react-textarea-autosize';
-import { getDevotionalForDay, fetchDevotionalForDay, DevotionalEntry, getDevotionalBody } from '../../lib/devotionals';
+import { getDevotionalForDay, fetchDevotionalForDay, toDevotionalDatasetDay, DevotionalEntry, getDevotionalBody } from '../../lib/devotionals';
 import PWAInstallPrompt from '../PWAInstallPrompt';
 import { CookieConsentPrompt } from '@/components/bible/CookieConsentPrompt';
 import { NodeCategory } from '@/types/canvas';
@@ -82,7 +82,7 @@ const NotesWorkspace = dynamic(
   () => import('@/components/notes/NotesWorkspace').then((m) => m.NotesWorkspace),
   {
     ssr: false,
-    loading: () => null,
+    loading: () => <div role="status" className="flex h-full items-center justify-center p-8 text-meta">Loading your notes…</div>,
   }
 );
 
@@ -831,6 +831,7 @@ export default function App() {
       headers
     });
   }, [getToken, userId]);
+  const [hasRestoredPreferences, setHasRestoredPreferences] = useState(false);
   const [activeTab, setActiveTab] = useState('study'); // study, notes, chats, tracker, devotional, canvas
   const [canvasFocusTrigger, setCanvasFocusTrigger] = useState(0);
   const [canvasIncomingNode, setCanvasIncomingNode] = useState<{
@@ -855,8 +856,9 @@ export default function App() {
     excerpt: '',
   });
 
-  // Synchronize activeTab to URL query params & cookies/storage for reliable refresh & bookmarking
+  // Synchronize activeTab only after the original URL and saved preference have been restored.
   useEffect(() => {
+    if (!hasRestoredPreferences) return;
     if (typeof window !== 'undefined') {
       setPreference(PREF_KEYS.ACTIVE_TAB, activeTab);
       const url = new URL(window.location.href);
@@ -870,7 +872,7 @@ export default function App() {
         window.history.replaceState(null, '', newPath);
       }
     }
-  }, [activeTab]);
+  }, [activeTab, hasRestoredPreferences]);
 
   // Require staying on the Devotional tab for at least 5 active seconds to count toward daily streak
   useEffect(() => {
@@ -910,7 +912,7 @@ export default function App() {
     if (nextDay < 1) nextDay = totalDays;
     if (nextDay > totalDays) nextDay = 1;
     setDisplayDay(nextDay);
-    fetchDevotionalForDay(nextDay).then(entry => {
+    fetchDevotionalForDay(toDevotionalDatasetDay(nextDay, Number(new Intl.DateTimeFormat('en-US', { year: 'numeric', timeZone: 'America/Chicago' }).format(new Date())))).then(entry => {
       if (entry) setDevotionalEntry(entry);
     });
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -1554,8 +1556,7 @@ export default function App() {
 
   const [notes, setNotes] = useState<NoteItem[]>([]);
   const [activeNoteId, setActiveNoteId] = useState<number | null>(null);
-  const tempNoteIdRef = useRef<number | null>(null);
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const noteSaveTimersRef = useRef(new Map<number, ReturnType<typeof setTimeout>>());
 
   const isOldTestament = useMemo(() => {
     return OT_BOOKS.some((b) => b.name.toLowerCase() === activeBook.name.toLowerCase());
@@ -2126,6 +2127,7 @@ export default function App() {
   useEffect(() => {
     if (preferencesRestoredRef.current || typeof window === 'undefined') return;
     preferencesRestoredRef.current = true;
+    setHasRestoredPreferences(true);
 
     // 1. Active Tab
     const params = new URLSearchParams(window.location.search);
@@ -3118,6 +3120,7 @@ export default function App() {
     }
   }, [processSelectedFile]);
   const [isAiTyping, setIsAiTyping] = useState(false);
+  const chatRequestInFlightRef = useRef(false);
   const [aiActivityStatus, setAiActivityStatus] = useState('Ready');
   const [aiThinkingText, setAiThinkingText] = useState('');
   const [aiActivityType, setAiActivityType] = useState<'study' | 'image'>('study');
@@ -5355,8 +5358,10 @@ export default function App() {
       saveLocalNotes(next);
       return next;
     });
-    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    debounceTimerRef.current = setTimeout(async () => {
+    const pendingSave = noteSaveTimersRef.current.get(id);
+    if (pendingSave) clearTimeout(pendingSave);
+    noteSaveTimersRef.current.set(id, setTimeout(async () => {
+      noteSaveTimersRef.current.delete(id);
       try {
         await fetchWithAuth(`${API_URL}/api/notes/${id}`, {
           method: 'PUT',
@@ -5366,7 +5371,7 @@ export default function App() {
       } catch (err) {
         console.error('Failed to update note', err);
       }
-    }, 1000);
+    }, 1000));
   };
 
   const handleNewChat = () => {
@@ -5407,8 +5412,10 @@ export default function App() {
   };
 
   const handleDeleteNote = async (id: number) => {
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
+    const pendingSave = noteSaveTimersRef.current.get(id);
+    if (pendingSave) {
+      clearTimeout(pendingSave);
+      noteSaveTimersRef.current.delete(id);
     }
     setNotes(prev => {
       const next = prev.filter(n => n.id !== id);
@@ -5451,6 +5458,7 @@ export default function App() {
     explicitScripture?: { reference: string; text: string; translation: string }
   ) => {
     if (e) e.preventDefault();
+    if (chatRequestInFlightRef.current) return;
     
     let textToSend = overrideText || chatInput;
     if (chatQuotes.length > 0 && !overrideText) {
@@ -5461,6 +5469,7 @@ export default function App() {
     const currentChat = activeChatId ? chats.find(c => c.id === activeChatId) : null;
     const isFirstMessage = !activeChatId || (currentChat && currentChat.messages.length === 0);
     if (!textToSend.trim() && !chatImage && !attachedFile) return;
+    chatRequestInFlightRef.current = true;
     
     setChatQuotes([]);
     setAttachedScripture(null);
@@ -5654,7 +5663,8 @@ export default function App() {
               }
               return c;
             }));
-          } else if (streamError) {
+          } else {
+            streamError ||= 'The response was interrupted before it completed';
             const errorMsg = { 
               id: Math.floor(Math.random() * 2000000000) + 1, 
               chatId: targetChatId, 
@@ -5695,28 +5705,6 @@ export default function App() {
         const errorData = await res.json().catch(() => null);
         const errMsgText = String(errorData?.details || errorData?.error || '');
 
-        // Auto-recover seamlessly if chat session ID was rejected or out-of-sync
-        if (res.status === 404 || errMsgText.toLowerCase().includes('chat not found')) {
-          try {
-            console.warn('Chat ID out-of-sync, creating fresh conversation and auto-retrying message...');
-            const newChatRes = await fetchWithAuth(`${API_URL}/api/chats`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ title: 'New Conversation' })
-            });
-            if (newChatRes.ok) {
-              const freshChat = await newChatRes.json();
-              if (freshChat?.id) {
-                setActiveChatId(freshChat.id);
-                setChats(prev => prev.map(c => c.id === targetChatId ? { ...c, id: freshChat.id } : c));
-                return handleSendMessage(undefined, currentInput);
-              }
-            }
-          } catch (recoveryErr) {
-            console.error('Chat auto-recovery failed:', recoveryErr);
-          }
-        }
-
         const errorMsg = { 
           id: Math.floor(Math.random() * 2000000000) + 1, 
           chatId: targetChatId, 
@@ -5745,6 +5733,7 @@ export default function App() {
         return c;
       }));
     } finally {
+      chatRequestInFlightRef.current = false;
       setIsAiTyping(false);
     }
   };
@@ -5755,46 +5744,48 @@ export default function App() {
 
   const handleQuickNoteChange = async (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newContent = e.target.value;
-    
     if (chapterNote) {
-      if (chapterNote.id < 0) {
-        setNotes(prev => prev.map(n => n.id === chapterNote.id ? { ...n, content: newContent } : n));
-      } else {
-        updateNote(chapterNote.id, chapterNote.title, newContent);
-      }
-    } else if (tempNoteIdRef.current !== null) {
-      const tempId = tempNoteIdRef.current;
-      setNotes(prev => prev.map(n => n.id === tempId ? { ...n, content: newContent } : n));
-    } else {
-      // eslint-disable-next-line react-hooks/purity
-      tempNoteIdRef.current = -Math.floor(Math.random() * 100000);
-      const tempId = tempNoteIdRef.current;
-      const optimisticNote = { id: tempId, title: chapterTitle, content: newContent };
-      setNotes(prev => [optimisticNote, ...prev]);
-      
-      try {
-        const res = await fetchWithAuth(`${API_URL}/api/notes`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title: chapterTitle, content: newContent })
-        });
-        const newNote = await res.json();
-        trackClientEvent('note_created');
-        
-        setNotes(prev => {
-          const latestTemp = prev.find(n => n.id === tempId);
-          const finalContent = latestTemp ? latestTemp.content : newContent;
-          
-          if (finalContent !== newContent) {
-            updateNote(newNote.id, chapterTitle, finalContent);
-          }
-          return prev.map(n => n.id === tempId ? { ...newNote, content: finalContent } : n);
-        });
-      } catch (err) {
-        console.error('Failed to create note', err);
-      } finally {
-        tempNoteIdRef.current = null;
-      }
+      updateNote(chapterNote.id, chapterNote.title, newContent);
+      return;
+    }
+    const tempId = Date.now();
+    const localNote: NoteItem = {
+      id: tempId,
+      title: chapterTitle,
+      content: newContent,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setNotes(prev => {
+      const next = [localNote, ...prev];
+      saveLocalNotes(next);
+      return next;
+    });
+    if (!userId) return;
+    try {
+      const res = await fetchWithAuth(`${API_URL}/api/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: chapterTitle, content: newContent }),
+      });
+      if (!res.ok) return; // Preserve the local draft on HTTP errors as well as network failures.
+      const newNote = await res.json();
+      if (!newNote?.id) return;
+      const pendingSave = noteSaveTimersRef.current.get(tempId);
+      if (pendingSave) clearTimeout(pendingSave);
+      noteSaveTimersRef.current.delete(tempId);
+      const latest = getLocalNotes().find(n => n.id === tempId);
+      setNotes(prev => {
+        const current = prev.find(n => n.id === tempId);
+        if (!current) return prev; // Do not resurrect a draft deleted while its create was pending.
+        const next = prev.map(n => n.id === tempId ? { ...newNote, content: current.content } : n);
+        saveLocalNotes(next);
+        return next;
+      });
+      if (latest && latest.content !== newContent) updateNote(newNote.id, latest.title, latest.content);
+      trackClientEvent('note_created');
+    } catch (err) {
+      console.warn('Quick note kept locally:', err);
     }
   };
 
@@ -6322,7 +6313,8 @@ export default function App() {
       )}
       
       {/* Main Viewport */}
-      <main className="flex-1 overflow-hidden min-h-0 flex relative">
+      <a href="#study-workspace" className="skip-link">Skip to study workspace</a>
+      <main id="study-workspace" tabIndex={-1} aria-label="Study workspace" className="flex-1 overflow-hidden min-h-0 flex relative">
         
         
         {/* MOBILE STUDY TAB (Finger-tracking smooth drawers & gestures for phones < 768px) */}

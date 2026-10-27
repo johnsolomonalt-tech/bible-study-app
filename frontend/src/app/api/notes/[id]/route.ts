@@ -12,12 +12,21 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   } catch {}
 
   const numId = parseInt(id, 10);
-  if (isNaN(numId)) {
+  if (!/^\d+$/.test(id) || !Number.isSafeInteger(numId) || numId < 1) {
     return NextResponse.json({ error: 'Invalid note ID' }, { status: 400 });
   }
 
   try {
-    const { title, content } = await req.json();
+    let body;
+    try { body = await req.json(); } catch {
+      return NextResponse.json({ error: 'Invalid JSON request body.' }, { status: 400 });
+    }
+    if (!body || typeof body !== 'object' || Array.isArray(body) ||
+        (body.title !== undefined && typeof body.title !== 'string') ||
+        (body.content !== undefined && typeof body.content !== 'string')) {
+      return NextResponse.json({ error: 'Title and content must be strings.' }, { status: 400 });
+    }
+    const { title, content } = body;
 
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized. Sign in required to update notes.' }, { status: 401 });
@@ -43,7 +52,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (updated) {
       return NextResponse.json(updated);
     }
-    return NextResponse.json({ id: numId, title, content, updatedAt: new Date().toISOString() });
+    return NextResponse.json({ error: 'Note not found or unauthorized' }, { status: 404 });
   } catch (error) {
     console.error('Failed to update note:', error);
     return NextResponse.json({ error: 'Failed to update note' }, { status: 500 });
@@ -59,7 +68,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   } catch {}
 
   const numId = parseInt(id, 10);
-  if (isNaN(numId)) {
+  if (!/^\d+$/.test(id) || !Number.isSafeInteger(numId) || numId < 1) {
     return NextResponse.json({ error: 'Invalid note ID' }, { status: 400 });
   }
 

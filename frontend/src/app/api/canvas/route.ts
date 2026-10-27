@@ -102,6 +102,7 @@ export async function GET(req: Request) {
     const cacheKey = `${activeUserId}_${boardId}`;
 
     let dbRecord: any = null;
+    let ownerLookupFailed = false;
     if (userId) {
       try {
         dbRecord = await prisma.canvas.findUnique({
@@ -113,6 +114,7 @@ export async function GET(req: Request) {
           },
         });
       } catch (dbErr) {
+        ownerLookupFailed = true;
         console.warn('Canvas: PostgreSQL query failed, falling back to memory cache:', dbErr);
       }
     }
@@ -138,11 +140,14 @@ export async function GET(req: Request) {
         viewport: (dbRecord.viewport as any) || undefined,
       };
 
-      memoryCache[cacheKey] = {
-        title: dbRecord.title,
-        updatedAt: dbRecord.updatedAt.toISOString(),
-        payload,
-      };
+      // Public readers must re-check sharing on every request; never cache their access.
+      if (userId && dbRecord.userId === userId) {
+        memoryCache[cacheKey] = {
+          title: dbRecord.title,
+          updatedAt: dbRecord.updatedAt.toISOString(),
+          payload,
+        };
+      }
 
       return NextResponse.json({
         id: dbRecord.boardId,
@@ -153,7 +158,7 @@ export async function GET(req: Request) {
     }
 
     // Check memory cache strictly for active user
-    const cachedEntry = memoryCache[cacheKey];
+    const cachedEntry = userId && ownerLookupFailed ? memoryCache[cacheKey] : undefined;
 
     if (cachedEntry) {
       return NextResponse.json({
@@ -321,7 +326,9 @@ export async function PATCH(req: Request) {
 
     const body = await req.json();
     const { id, isPublic } = body;
-    if (!id) return NextResponse.json({ error: 'Board ID is required.' }, { status: 400 });
+    if (typeof id !== 'string' || !id.trim() || typeof isPublic !== 'boolean') {
+      return NextResponse.json({ error: 'Board ID and boolean isPublic are required.' }, { status: 400 });
+    }
 
     const updated = await prisma.canvas.updateMany({
       where: { userId, boardId: id },

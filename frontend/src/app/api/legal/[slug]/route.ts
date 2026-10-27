@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { checkDevAuthorization } from '@/lib/devGuard';
 import { auth } from '@clerk/nextjs/server';
 import { getLegalDocument, saveLegalDocument, LegalDocSlug } from '@/lib/legalContentStore';
 
@@ -14,7 +15,7 @@ export async function GET(
     return NextResponse.json({ error: 'Legal document not found' }, { status: 404 });
   }
 
-  const doc = getLegalDocument(slug as LegalDocSlug);
+  const doc = getLegalDocument(slug as LegalDocSlug, new URL(req.url).searchParams.get('raw') !== 'true');
   return NextResponse.json(doc, {
     headers: {
       'Cache-Control': 'public, max-age=60, s-maxage=300, stale-while-revalidate=600',
@@ -30,6 +31,9 @@ export async function PUT(
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized. Admin credentials required to modify legal terms.' }, { status: 401 });
   }
+
+  const guard = await checkDevAuthorization();
+  if (!guard.authorized) return guard.response;
 
   const { slug } = await params;
   const validSlugs: LegalDocSlug[] = ['privacy', 'terms', 'legal'];

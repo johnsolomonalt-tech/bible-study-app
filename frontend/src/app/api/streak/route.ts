@@ -95,6 +95,7 @@ export async function GET() {
       accountPrayers = (user.unsafeMetadata?.theologica_prayers as any) || [];
     } catch (clerkErr) {
       console.warn('Clerk user lookup in GET /api/streak:', clerkErr);
+      return NextResponse.json({ error: 'Account service unavailable. Local progress is preserved.' }, { status: 503 });
     }
 
     const trackerDates = await getTrackerDates(userId);
@@ -164,6 +165,7 @@ export async function POST(req: Request) {
       accountPrayers = (user.unsafeMetadata?.theologica_prayers as any) || [];
     } catch (clerkErr) {
       console.warn('Clerk user lookup in POST /api/streak:', clerkErr);
+      return NextResponse.json({ error: 'Account service unavailable. Please retry syncing.' }, { status: 503 });
     }
 
     const trackerDates = await getTrackerDates(userId);
@@ -249,6 +251,7 @@ export async function POST(req: Request) {
         });
       } catch (saveErr) {
         console.warn('Clerk user metadata update warning:', saveErr);
+        return NextResponse.json({ error: 'Account sync failed. Please retry.' }, { status: 503 });
       }
     }
 

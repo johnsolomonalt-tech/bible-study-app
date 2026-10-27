@@ -73,3 +73,9 @@ export function getDevotionalBody(rawText: string): string {
   if (!rawText) return '';
   return rawText.replace(/^("[^"]+"|\S[^\n]+?)\s*[-—–]\s*[^\n]+\s*\n+/, '').trimStart();
 }
+
+/** The source has 366 dated entries, including February 29 in every dataset year. */
+export function toDevotionalDatasetDay(calendarDay: number, year: number): number {
+  const isLeapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  return !isLeapYear && calendarDay >= 60 ? calendarDay + 1 : calendarDay;
+}

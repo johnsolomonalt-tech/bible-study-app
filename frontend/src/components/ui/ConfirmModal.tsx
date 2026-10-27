@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useEffect, useRef } from 'react';
+import React, { useId, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, Trash2, X } from 'lucide-react';
+import { useModalFocus } from './useModalFocus';
 
 export interface ConfirmModalProps {
   isOpen: boolean;
@@ -29,42 +30,30 @@ export function ConfirmModal({
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
-  const confirmButtonRef = useRef<HTMLButtonElement>(null);
-
-  // Focus confirm button on open & handle Escape key
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const timer = setTimeout(() => {
-      confirmButtonRef.current?.focus();
-    }, 50);
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onCancel();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isOpen, onCancel]);
+  const titleId = useId();
+  const messageId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const handleCancel = () => {
+    if (!isLoading) onCancel();
+  };
+  useModalFocus(isOpen, dialogRef, cancelButtonRef, handleCancel);
 
   return (
     <AnimatePresence>
       {isOpen && (
         <div 
           className="fixed inset-0 z-50 flex items-center justify-center modal-safe-overlay bg-black/60 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="confirm-modal-title"
-          aria-describedby="confirm-modal-desc"
-          onClick={onCancel}
+          onClick={handleCancel}
         >
           <motion.div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            aria-describedby={messageId}
+            aria-busy={isLoading}
+            tabIndex={-1}
             initial={{ opacity: 0, scale: 0.94, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.94, y: 8 }}
@@ -74,9 +63,10 @@ export function ConfirmModal({
           >
             {/* Close button */}
             <button
-              onClick={onCancel}
+              onClick={handleCancel}
               className="absolute top-4 right-4 text-muted hover:text-fg p-1.5 rounded-xl hover:bg-fg/5 transition-colors cursor-pointer"
               aria-label="Close dialog"
+              disabled={isLoading}
             >
               <X size={18} />
             </button>
@@ -95,10 +85,10 @@ export function ConfirmModal({
 
               {/* Text content */}
               <div className="space-y-1.5 flex-1 pr-4">
-                <h3 id="confirm-modal-title" className="text-base sm:text-lg font-bold text-fg tracking-tight">
+                <h3 id={titleId} className="text-base sm:text-lg font-bold text-fg tracking-tight">
                   {title}
                 </h3>
-                <p id="confirm-modal-desc" className="text-xs sm:text-sm text-fg-2 leading-relaxed">
+                <p id={messageId} className="text-xs sm:text-sm text-fg-2 leading-relaxed">
                   {message}
                 </p>
               </div>
@@ -108,7 +98,8 @@ export function ConfirmModal({
             <div className="mt-6 flex items-center justify-end gap-2.5 pt-4 border-t border-border/60">
               <button
                 type="button"
-                onClick={onCancel}
+                ref={cancelButtonRef}
+                onClick={handleCancel}
                 disabled={isLoading}
                 className="min-h-[44px] px-4 py-2.5 text-sm font-semibold rounded-xl border border-border bg-surface hover:bg-surface-hover text-fg transition-all cursor-pointer disabled:opacity-50"
               >
@@ -116,7 +107,6 @@ export function ConfirmModal({
               </button>
               <button
                 type="button"
-                ref={confirmButtonRef}
                 onClick={onConfirm}
                 disabled={isLoading}
                 className={`min-h-[44px] px-4 py-2.5 text-sm font-semibold rounded-xl text-white shadow-sm transition-all cursor-pointer disabled:opacity-50 active:scale-95 ${

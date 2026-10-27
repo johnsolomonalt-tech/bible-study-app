@@ -37,7 +37,8 @@ async function getSafeUserId(req?: Request): Promise<string | null> {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const rawCode = (body.code || body.sourceBoardId || '').trim();
+    const code = body?.code || body?.sourceBoardId;
+    const rawCode = typeof code === 'string' ? code.trim() : '';
 
     if (!rawCode) {
       return NextResponse.json({ error: 'Share link or board code is required.' }, { status: 400 });
@@ -76,7 +77,7 @@ export async function POST(req: Request) {
     }
 
     // 2. Clone into recipient account
-    const newBoardId = `board-${Date.now()}`;
+    const newBoardId = `board-${crypto.randomUUID()}`;
     const newTitle = sourceBoard.title || 'Imported Canvas';
     const nodes = (sourceBoard.nodes as any) || [];
     const edges = (sourceBoard.edges as any) || [];

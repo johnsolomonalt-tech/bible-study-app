@@ -16,7 +16,6 @@ function cleanVerseText(raw: string): string {
     .replace(/<[^>]*>/g, '')
     .replace(/\[\d+\]/g, '')
     .replace(/([a-zA-Z,.;:!?’'"]+)\d+/g, '$1')
-    .replace(/\b\d{3,5}\b/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -42,7 +41,7 @@ export async function GET(
     const versionKey = (version || 'bsb').toLowerCase().trim();
     const chapterNum = parseInt(chapter, 10);
 
-    if (isNaN(chapterNum) || chapterNum < 1) {
+    if (!/^\d+$/.test(chapter) || !Number.isSafeInteger(chapterNum) || chapterNum < 1) {
       return NextResponse.json({ error: 'Invalid chapter number' }, { status: 400 });
     }
 

@@ -29,7 +29,7 @@ export function DevLegalEditor() {
     setIsLoading(true);
     setSaveStatus('idle');
 
-    fetch(`/api/legal/${activeDoc}`)
+    fetch(`/api/legal/${activeDoc}?raw=true`, { cache: 'no-store' })
       .then((res) => res.json())
       .then((data: DocData) => {
         if (!isMounted) return;
