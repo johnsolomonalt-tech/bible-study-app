@@ -47,7 +47,10 @@ export const PREF_KEYS = {
   SPLIT_LAST_CHAPTER: 'theologica_split_last_chapter',
   SPLIT_BIBLE_VERSION: 'theologica_split_bible_version',
   BOOKMARKED_CHAPTER: 'theologica_bookmarked_chapter',
+  STUDY_LAYOUT_MODE: 'theologica_study_layout_mode',
 } as const;
+
+export type StudyLayoutMode = 'focus' | 'tablet' | 'workspace';
 
 export type ReaderFontFamily = 'serif' | 'sans' | 'mono';
 export type ReaderFontSize = 'sm' | 'md' | 'lg' | 'xl';
@@ -108,14 +111,14 @@ export function deleteCookie(name: string): void {
 /**
  * Read preference checking cookies first, then localStorage, with legacy key fallbacks.
  */
-export function getPreference(key: string, defaultValue: string = ''): string {
-  if (typeof window === 'undefined') return defaultValue;
+export function getPreference<T extends string = string>(key: string, defaultValue: string = ''): T {
+  if (typeof window === 'undefined') return defaultValue as T;
 
   try {
     // 1. Check primary cookie
     const cookieVal = getCookie(key);
     if (cookieVal !== null && cookieVal !== undefined && cookieVal !== '') {
-      return cookieVal;
+      return cookieVal as T;
     }
 
     // 2. Check primary localStorage
@@ -123,7 +126,7 @@ export function getPreference(key: string, defaultValue: string = ''): string {
     if (localVal !== null && localVal !== undefined && localVal !== '') {
       // Sync back to cookie
       setCookie(key, localVal);
-      return localVal;
+      return localVal as T;
     }
 
     // 3. Fallback for legacy keys if applicable
@@ -131,26 +134,26 @@ export function getPreference(key: string, defaultValue: string = ''): string {
       const legacyBook = localStorage.getItem('lastBook');
       if (legacyBook) {
         setPreference(key, legacyBook);
-        return legacyBook;
+        return legacyBook as T;
       }
     } else if (key === PREF_KEYS.LAST_CHAPTER) {
       const legacyChap = localStorage.getItem('lastChapter');
       if (legacyChap) {
         setPreference(key, legacyChap);
-        return legacyChap;
+        return legacyChap as T;
       }
     } else if (key === PREF_KEYS.BIBLE_VERSION) {
       const legacyTrans = localStorage.getItem('lastTranslation');
       if (legacyTrans) {
         setPreference(key, legacyTrans);
-        return legacyTrans;
+        return legacyTrans as T;
       }
     }
   } catch {
     // Fallback on restricted storage error
   }
 
-  return defaultValue;
+  return (defaultValue || '') as T;
 }
 
 /**

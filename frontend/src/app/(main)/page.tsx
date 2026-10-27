@@ -5,7 +5,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } fr
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useAuth, UserButton, SignIn, SignInButton } from '@clerk/nextjs';
-import { Send, Plus, Layout, Edit, Sparkles, Target, Check, CheckCheck, Copy, ChevronRight, ChevronLeft, ChevronDown, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquare, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow, ShieldCheck, Heart, Layers, Languages, MoreVertical, MoreHorizontal, Search, BookMarked, Bookmark, ArrowLeftRight, Columns2, Quote, Compass, ArrowRight, Square, BrainCircuit, FileText, UploadCloud, Menu, SlidersHorizontal } from 'lucide-react';
+import { Send, Plus, Layout, Edit, Sparkles, Target, Check, CheckCheck, Copy, ChevronRight, ChevronLeft, ChevronDown, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquare, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow, ShieldCheck, Heart, Layers, Languages, MoreVertical, MoreHorizontal, Search, BookMarked, Bookmark, ArrowLeftRight, Columns2, Quote, Compass, ArrowRight, Square, BrainCircuit, FileText, UploadCloud, Menu, SlidersHorizontal, Tablet } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import TextareaAutosize from 'react-textarea-autosize';
 import { getDevotionalForDay, fetchDevotionalForDay, DevotionalEntry, getDevotionalBody } from '../../lib/devotionals';
@@ -52,7 +52,8 @@ import {
   ReaderFontFamily,
   ReaderFontSize,
   ReaderLineHeight,
-  ReaderLayout
+  ReaderLayout,
+  StudyLayoutMode
 } from '@/lib/appPreferences';
 import { initSessionTracking, trackClientEvent } from '@/lib/analyticsClient';
 import type { NoteItem } from '@/components/notes/NotesWorkspace';
@@ -1459,19 +1460,51 @@ export default function App() {
 
   const [mobileStudyView, setMobileStudyView] = useState<'reader' | 'chapters' | 'ai' | 'tools'>('reader');
   
-  // Layout State — read saved panel defaults synchronously before first render (falling back to calm 2-panel layout: Reader + Study AI)
-  const [showLeftSidebar, setShowLeftSidebar] = useState<boolean>(() =>
-    getBooleanPreference(PREF_KEYS.SHOW_LEFT_SIDEBAR, false)
-  );
-  const [showRightSidebar, setShowRightSidebar] = useState<boolean>(() =>
-    getBooleanPreference(PREF_KEYS.SHOW_RIGHT_SIDEBAR, true)
-  );
+  // Layout Mode & State — Supports 'focus' (clean reading), 'tablet' (compressed balanced study workspace), and 'workspace' (full desktop)
+  const [studyLayoutMode, setStudyLayoutMode] = useState<StudyLayoutMode>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = getPreference<StudyLayoutMode>(PREF_KEYS.STUDY_LAYOUT_MODE);
+      if (saved && (saved === 'focus' || saved === 'tablet' || saved === 'workspace')) {
+        return saved;
+      }
+      // Tablet auto-detection: viewport width between 768px and 1180px, or touch tablet
+      const isTabletViewport = window.innerWidth >= 768 && window.innerWidth <= 1180;
+      const isTouchTablet = 'ontouchstart' in window && window.innerWidth >= 768;
+      if (isTabletViewport || isTouchTablet) {
+        return 'tablet';
+      }
+    }
+    return 'workspace';
+  });
+
+  const isTabletMode = studyLayoutMode === 'tablet';
+
+  const [showLeftSidebar, setShowLeftSidebar] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const savedMode = getPreference<StudyLayoutMode>(PREF_KEYS.STUDY_LAYOUT_MODE);
+      if (savedMode === 'tablet' || (!savedMode && window.innerWidth >= 768 && window.innerWidth <= 1180)) {
+        return false;
+      }
+    }
+    return getBooleanPreference(PREF_KEYS.SHOW_LEFT_SIDEBAR, false);
+  });
+  const [showRightSidebar, setShowRightSidebar] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const savedMode = getPreference<StudyLayoutMode>(PREF_KEYS.STUDY_LAYOUT_MODE);
+      if (savedMode === 'focus') return false;
+    }
+    return getBooleanPreference(PREF_KEYS.SHOW_RIGHT_SIDEBAR, true);
+  });
   const leftPanelRef = useRef<PanelImperativeHandle>(null);
   const rightPanelRef = useRef<PanelImperativeHandle>(null);
   const bottomPanelRef = useRef<PanelImperativeHandle>(null);
-  const [showBottomNotes, setShowBottomNotes] = useState<boolean>(() =>
-    getBooleanPreference(PREF_KEYS.SHOW_BOTTOM_NOTES, false)
-  );
+  const [showBottomNotes, setShowBottomNotes] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const savedMode = getPreference<StudyLayoutMode>(PREF_KEYS.STUDY_LAYOUT_MODE);
+      if (savedMode === 'tablet' || savedMode === 'focus') return false;
+    }
+    return getBooleanPreference(PREF_KEYS.SHOW_BOTTOM_NOTES, false);
+  });
   const mobileBookListScrollRef = useRef<HTMLDivElement>(null);
   const desktopBookListScrollRef = useRef<HTMLDivElement>(null);
   const pendingBookScrollAnchorRef = useRef<{
@@ -2526,10 +2559,11 @@ export default function App() {
   // Lectio (~82px) has highest priority to remain visible next to the chapter control whenever space allows:
   // - Lectio only: ~145 + 82 = ~227px
   // Desktop collapsible study tools visibility based on available tools container width:
-  const showBacklinksInBar = availableToolsWidth >= 565;
-  const showInterlinearInBar = availableToolsWidth >= 475;
-  const showMarkCompleteInBar = availableToolsWidth >= 365;
-  const showLectioInBar = availableToolsWidth >= 225;
+  // In Tablet Mode, buttons use compressed styling so thresholds are lower to keep tools visible without crowding!
+  const showBacklinksInBar = isTabletMode ? availableToolsWidth >= 400 : availableToolsWidth >= 565;
+  const showInterlinearInBar = isTabletMode ? availableToolsWidth >= 320 : availableToolsWidth >= 475;
+  const showMarkCompleteInBar = isTabletMode ? availableToolsWidth >= 240 : availableToolsWidth >= 365;
+  const showLectioInBar = isTabletMode ? availableToolsWidth >= 150 : availableToolsWidth >= 225;
   const hasCollapsedStudyTools = !showBacklinksInBar || !showLectioInBar || !showInterlinearInBar || !showMarkCompleteInBar;
 
   // Outside click handler for desktop 3-dots study options menu
@@ -2610,19 +2644,54 @@ export default function App() {
     setPreference(PREF_KEYS.READER_FONT_FAMILY, val);
   };
 
-  // Layout preset toggle (Focus Mode vs. Scholar Workspace)
+  // Layout preset toggle (Focus Mode vs. Tablet Mode vs. Scholar Workspace)
   const isFocusMode = !showLeftSidebar && !showBottomNotes && !showRightSidebar;
-  const handleToggleWorkspacePreset = useCallback(() => {
-    if (!showLeftSidebar && !showBottomNotes && !showRightSidebar) {
-      handleToggleLeftSidebar(true);
-      handleToggleBottomNotes(true);
-      handleToggleRightSidebar(true);
-    } else {
+
+  const applyStudyLayoutMode = useCallback((mode: StudyLayoutMode) => {
+    setStudyLayoutMode(mode);
+    setPreference(PREF_KEYS.STUDY_LAYOUT_MODE, mode);
+
+    if (mode === 'focus') {
+      // Focus: distraction-free full reading space
       handleToggleLeftSidebar(false);
       handleToggleBottomNotes(false);
       handleToggleRightSidebar(false);
+    } else if (mode === 'tablet') {
+      // Tablet Mode: compressed layout with balanced reading & AI workspace
+      // Books and notes collapsed by default, AI open with compressed width
+      handleToggleLeftSidebar(false);
+      handleToggleBottomNotes(false);
+      handleToggleRightSidebar(true);
+      setTimeout(() => {
+        try {
+          rightPanelRef.current?.resize(26);
+        } catch (_) {}
+      }, 50);
+    } else if (mode === 'workspace') {
+      // Full Scholar Workspace: expand all sidebars
+      handleToggleLeftSidebar(true);
+      handleToggleBottomNotes(true);
+      handleToggleRightSidebar(true);
+      setTimeout(() => {
+        try {
+          leftPanelRef.current?.resize(16);
+          rightPanelRef.current?.resize(24);
+          bottomPanelRef.current?.resize(25);
+        } catch (_) {}
+      }, 50);
     }
-  }, [showLeftSidebar, showBottomNotes, showRightSidebar, handleToggleLeftSidebar, handleToggleBottomNotes, handleToggleRightSidebar]);
+  }, [handleToggleLeftSidebar, handleToggleBottomNotes, handleToggleRightSidebar]);
+
+  const handleToggleWorkspacePreset = useCallback(() => {
+    // Cycle between Focus -> Tablet -> Workspace -> Focus
+    if (studyLayoutMode === 'focus') {
+      applyStudyLayoutMode('tablet');
+    } else if (studyLayoutMode === 'tablet') {
+      applyStudyLayoutMode('workspace');
+    } else {
+      applyStudyLayoutMode('focus');
+    }
+  }, [studyLayoutMode, applyStudyLayoutMode]);
 
   const handleReaderFontSizeChange = (val: ReaderFontSize) => {
     setReaderFontSize(val);
@@ -6019,13 +6088,13 @@ export default function App() {
   return (
     <>
       <div className="fixed inset-0 w-full h-full flex flex-col bg-bg text-fg overflow-hidden select-none">
-        {/* Top Navbar (Desktop only - Mobile has dedicated clean native app bars per view) */}
-        <header className="hidden lg:flex sticky top-0 z-40 min-h-14 h-[calc(3.5rem+env(safe-area-inset-top,0px))] border-b border-border items-center justify-between px-4 sm:px-6 bg-bg shrink-0" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+        {/* Top Navbar (Desktop & Tablet) */}
+        <header className="hidden md:flex sticky top-0 z-40 min-h-14 h-[calc(3.5rem+env(safe-area-inset-top,0px))] border-b border-border items-center justify-between px-3 sm:px-4 lg:px-6 bg-bg shrink-0" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         
         {/* Left: Logo */}
-        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-          <div className="font-display text-[18px] sm:text-[20px] tracking-tight flex items-center gap-2 sm:gap-2.5 select-none shrink-0">
-            <div className="relative w-7 h-7 sm:w-8 sm:h-8 rounded-xl overflow-hidden shadow-xs shrink-0 flex items-center justify-center">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <div className="font-display text-[17px] sm:text-[19px] lg:text-[20px] tracking-tight flex items-center gap-1.5 sm:gap-2 select-none shrink-0">
+            <div className="relative w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 rounded-xl overflow-hidden shadow-xs shrink-0 flex items-center justify-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img 
                 src={(theme === 'light' || theme === 'sepia') ? '/logo-light.png' : '/logo-dark.png'} 
@@ -6033,19 +6102,20 @@ export default function App() {
                 className="w-full h-full object-contain filter contrast-105" 
               />
             </div>
-            <span className="font-serif text-[18px] sm:text-[22px] font-bold tracking-tight text-[#c96442] inline shrink-0">
+            <span className="font-serif text-[17px] sm:text-[19px] lg:text-[22px] font-bold tracking-tight text-[#c96442] inline shrink-0">
               Theologica
             </span>
           </div>
         </div>
 
-        {/* Center: Tabs (Desktop) */}
+        {/* Center: Tabs (Desktop & Tablet) */}
         <nav 
           aria-label="Navigation Tabs"
-          className="hidden lg:flex items-center gap-1 p-1 bg-surface border border-border-soft/60 rounded-xl shadow-xs select-none mx-auto shrink-0"
+          className="hidden md:flex items-center gap-0.5 sm:gap-1 p-0.5 sm:p-1 bg-surface border border-border-soft/60 rounded-xl shadow-xs select-none mx-auto shrink-0"
         >
           {['study', 'canvas', 'devotional', 'notes', 'chats', 'tracker'].map(tab => {
             const label = tab === 'chats' ? 'AI Chats' : tab.charAt(0).toUpperCase() + tab.slice(1);
+            const shortLabel = tab === 'devotional' ? 'Devo' : tab === 'chats' ? 'AI' : tab.charAt(0).toUpperCase() + tab.slice(1);
             return (
               <button 
                 key={tab} 
@@ -6065,29 +6135,30 @@ export default function App() {
                   }
                 }}
                 title={label}
-                className={`px-2.5 xl:px-3 py-1 rounded-lg text-xs xl:text-[13px] font-medium transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                className={`px-2 sm:px-2.5 xl:px-3 py-1 rounded-lg text-xs xl:text-[13px] font-medium transition-all flex items-center gap-1 sm:gap-1.5 cursor-pointer whitespace-nowrap ${
                   activeTab === tab 
                     ? 'bg-bg text-fg shadow-xs border border-border-soft/60 font-semibold' 
                     : 'text-fg-2 hover:text-fg hover:bg-surface-hover/60 border border-transparent'
                 }`}
               >
-                {tab === 'study' && <Layout size={14} className={activeTab === tab ? 'text-accent' : ''} />}
-                {tab === 'canvas' && <Workflow size={14} className={activeTab === tab ? 'text-accent' : ''} />}
-                {tab === 'devotional' && <BookOpen size={14} className={activeTab === tab ? 'text-accent' : ''} />}
-                {tab === 'notes' && <Edit size={14} className={activeTab === tab ? 'text-accent' : ''} />}
-                {tab === 'chats' && <Sparkles size={14} className={activeTab === tab ? 'text-accent' : ''} />}
-                {tab === 'tracker' && <Target size={14} className={activeTab === tab ? 'text-accent' : ''} />}
-                <span className="capitalize">{tab === 'chats' ? 'AI Chats' : tab}</span>
+                {tab === 'study' && <Layout size={13} className={activeTab === tab ? 'text-accent' : ''} />}
+                {tab === 'canvas' && <Workflow size={13} className={activeTab === tab ? 'text-accent' : ''} />}
+                {tab === 'devotional' && <BookOpen size={13} className={activeTab === tab ? 'text-accent' : ''} />}
+                {tab === 'notes' && <Edit size={13} className={activeTab === tab ? 'text-accent' : ''} />}
+                {tab === 'chats' && <Sparkles size={13} className={activeTab === tab ? 'text-accent' : ''} />}
+                {tab === 'tracker' && <Target size={13} className={activeTab === tab ? 'text-accent' : ''} />}
+                <span className="capitalize hidden lg:inline">{label}</span>
+                <span className="capitalize lg:hidden">{shortLabel}</span>
               </button>
             );
           })}
         </nav>
         
         {/* Right: Panel Toggles, Streak, Settings & Clerk UserButton */}
-        <div className="flex justify-end items-center gap-1.5 sm:gap-2.5 shrink-0">
-          {/* Collapsible Panel Toggles - Book Selector, Quick Note, Study AI & Preset */}
+        <div className="flex justify-end items-center gap-1 sm:gap-1.5 lg:gap-2 shrink-0">
+          {/* Collapsible Panel Toggles & Mode Preset */}
           {activeTab === 'study' && (
-            <div className="hidden lg:flex items-center bg-surface border border-border-soft/60 rounded-lg p-0.5 shrink-0 gap-0.5">
+            <div className="flex items-center bg-surface border border-border-soft/60 rounded-lg p-0.5 shrink-0 gap-0.5">
               <button
                 type="button"
                 onClick={() => handleToggleLeftSidebar(!showLeftSidebar)}
@@ -6097,7 +6168,7 @@ export default function App() {
                 title={showLeftSidebar ? 'Collapse Book Selector' : 'Expand Book Selector'}
                 aria-label="Toggle Book Selector"
               >
-                {showLeftSidebar ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
+                {showLeftSidebar ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
               </button>
               <button
                 type="button"
@@ -6108,7 +6179,7 @@ export default function App() {
                 title={showBottomNotes ? 'Collapse Notes' : 'Expand Notes'}
                 aria-label="Toggle Notes"
               >
-                {showBottomNotes ? <PanelBottomClose size={18} /> : <PanelBottomOpen size={18} />}
+                {showBottomNotes ? <PanelBottomClose size={16} /> : <PanelBottomOpen size={16} />}
               </button>
               <button
                 type="button"
@@ -6119,34 +6190,66 @@ export default function App() {
                 title={showRightSidebar ? 'Collapse Study AI' : 'Expand Study AI'}
                 aria-label="Toggle Study AI"
               >
-                {showRightSidebar ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
+                {showRightSidebar ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
               </button>
+
               <div className="w-[1px] h-3.5 bg-border/60 mx-0.5" />
-              {/* 1-Click Preset Toggle: Focus Mode vs Scholar Workspace */}
-              <button
-                type="button"
-                onClick={handleToggleWorkspacePreset}
-                className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1 ${
-                  isFocusMode
-                    ? 'bg-accent/15 text-accent font-bold hover:bg-accent/25'
-                    : 'text-muted hover:text-fg hover:bg-border-soft'
-                }`}
-                title={
-                  isFocusMode
-                    ? 'Scholar Workspace: Expand all sidebars for deep study'
-                    : 'Reader Focus: Collapse sidebars for distraction-free reading'
-                }
-                aria-label="Toggle Workspace Layout Preset"
-              >
-                <BookOpen size={13} className={isFocusMode ? "text-accent" : "opacity-70"} />
-                <span>{isFocusMode ? 'Focus' : 'Workspace'}</span>
-              </button>
+
+              {/* 3-Way Mode Preset Toggle: Focus | Tablet | Workspace */}
+              <div className="flex items-center bg-bg/60 border border-border-soft/80 rounded-md p-0.5 gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => applyStudyLayoutMode('focus')}
+                  className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[10.5px] sm:text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                    studyLayoutMode === 'focus'
+                      ? 'bg-accent/20 text-accent font-bold shadow-xs'
+                      : 'text-muted hover:text-fg hover:bg-surface-hover'
+                  }`}
+                  title="Focus Mode: Full-width reader without sidebars"
+                  aria-label="Focus Mode"
+                >
+                  <BookOpen size={12} className={studyLayoutMode === 'focus' ? "text-accent" : "opacity-70"} />
+                  <span className="hidden sm:inline">Focus</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => applyStudyLayoutMode('tablet')}
+                  className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[10.5px] sm:text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                    studyLayoutMode === 'tablet'
+                      ? 'bg-accent/20 text-accent font-bold shadow-xs'
+                      : 'text-muted hover:text-fg hover:bg-surface-hover'
+                  }`}
+                  title="Tablet Mode: Compressed study workspace optimized for tablets & smaller screens"
+                  aria-label="Tablet Mode"
+                >
+                  <Tablet size={12} className={studyLayoutMode === 'tablet' ? "text-accent" : "opacity-70"} />
+                  <span>Tablet</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => applyStudyLayoutMode('workspace')}
+                  className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[10.5px] sm:text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                    studyLayoutMode === 'workspace'
+                      ? 'bg-accent/20 text-accent font-bold shadow-xs'
+                      : 'text-muted hover:text-fg hover:bg-surface-hover'
+                  }`}
+                  title="Scholar Workspace: Full expanded multi-panel desktop layout"
+                  aria-label="Scholar Workspace"
+                >
+                  <Layout size={12} className={studyLayoutMode === 'workspace' ? "text-accent" : "opacity-70"} />
+                  <span className="hidden sm:inline">Workspace</span>
+                </button>
+              </div>
+
               <div className="w-[1px] h-3.5 bg-border/60 mx-0.5" />
+
               {/* Parallel Split View Toggle (Desktop & Tablet) */}
               <button
                 type="button"
                 onClick={() => handleToggleSplitView(!isSplitView)}
-                className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md text-[10.5px] sm:text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1 ${
                   isSplitView
                     ? 'bg-accent/15 text-accent font-bold hover:bg-accent/25'
                     : 'text-muted hover:text-fg hover:bg-border-soft'
@@ -6158,8 +6261,8 @@ export default function App() {
                 }
                 aria-label="Toggle Parallel Split View"
               >
-                <Columns2 size={13} className={isSplitView ? "text-accent" : "opacity-70"} />
-                <span>Split View</span>
+                <Columns2 size={12} className={isSplitView ? "text-accent" : "opacity-70"} />
+                <span className="hidden sm:inline">Split</span>
               </button>
             </div>
           )}
@@ -6169,14 +6272,14 @@ export default function App() {
           />
           <button 
             onClick={() => setIsSettingsOpen(true)} 
-            className="text-muted hover:text-fg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-xl hover:bg-surface cursor-pointer" 
+            className="text-muted hover:text-fg transition-colors min-w-[38px] sm:min-w-[44px] min-h-[38px] sm:min-h-[44px] flex items-center justify-center p-1.5 sm:p-2 rounded-xl hover:bg-surface cursor-pointer" 
             title="Settings"
             aria-label="Settings"
           >
             <Settings size={18} />
           </button>
           {userId ? (
-            <div className="min-w-[44px] min-h-[44px] flex items-center justify-center">
+            <div className="min-w-[38px] sm:min-w-[44px] min-h-[38px] sm:min-h-[44px] flex items-center justify-center">
               <UserButton />
             </div>
           ) : (
@@ -6191,10 +6294,10 @@ export default function App() {
         </div>
       </header>
 
-      {/* Subtle Global Mobile Top Bar across non-study tabs */}
+      {/* Subtle Global Mobile Top Bar across non-study tabs (Mobile Phones) */}
       {activeTab !== 'study' && (
         <header 
-          className="lg:hidden border-b border-border/40 flex items-center justify-between px-3.5 sm:px-4 bg-bg/95 backdrop-blur-xs shrink-0 z-30 pb-1.5"
+          className="md:hidden border-b border-border/40 flex items-center justify-between px-3.5 sm:px-4 bg-bg/95 backdrop-blur-xs shrink-0 z-30 pb-1.5"
           style={{ paddingTop: mobileTopPadding }}
         >
           <div className="flex items-center gap-1.5 min-w-0">
@@ -6240,9 +6343,9 @@ export default function App() {
       <main className="flex-1 overflow-hidden min-h-0 flex relative">
         
         
-        {/* MOBILE STUDY TAB (Finger-tracking smooth drawers & gestures) */}
+        {/* MOBILE STUDY TAB (Finger-tracking smooth drawers & gestures for phones < 768px) */}
         {activeTab === 'study' && (
-          <div className="lg:hidden relative w-full h-full overflow-hidden bg-bg">
+          <div className="md:hidden relative w-full h-full overflow-hidden bg-bg">
             {/* Mobile Left Sidebar: Navigation (Book & Chapter Selector) */}
             <aside 
               onTouchStart={handleBookSelectorTouchStart}
@@ -7555,7 +7658,7 @@ export default function App() {
         )}
 
         {activeTab === 'study' && (
-          <div className="hidden lg:flex w-full h-full min-h-0 overflow-hidden">
+          <div className="hidden md:flex w-full h-full min-h-0 overflow-hidden">
             <PanelGroup 
               orientation="horizontal" 
               id="theologica-layout-v2" 
@@ -7565,9 +7668,9 @@ export default function App() {
             >
             {/* Left Sidebar: Navigation */}
             {showLeftSidebar && (
-              <Panel panelRef={leftPanelRef} defaultSize="15" minSize="15" className={`w-full lg:w-auto border-r border-border bg-bg flex-col ${mobileStudyView === 'chapters' ? 'flex' : 'hidden lg:flex'}`}>
+              <Panel panelRef={leftPanelRef} defaultSize={isTabletMode ? "16" : "15"} minSize={isTabletMode ? "14" : "15"} className={`w-full md:w-auto border-r border-border bg-bg flex-col ${mobileStudyView === 'chapters' ? 'flex' : 'hidden md:flex'}`}>
               <div className="w-full h-full flex flex-col min-h-0 overflow-hidden">
-              <header className="lg:hidden h-[60px] border-b border-border flex items-center px-4 shrink-0">
+              <header className="md:hidden h-[60px] border-b border-border flex items-center px-4 shrink-0">
                 <button onClick={() => setMobileStudyView('reader')} className="p-2 mr-2 text-fg-2 hover:text-fg">
                   <ChevronLeft size={20} />
                 </button>
@@ -7790,11 +7893,11 @@ export default function App() {
             )}
 
             {showLeftSidebar && (
-              <PanelResizeHandle className="hidden lg:flex w-1 bg-transparent hover:bg-accent active:bg-accent transition-colors cursor-col-resize shrink-0 z-10 relative" />
+              <PanelResizeHandle className="hidden md:flex w-1 bg-transparent hover:bg-accent active:bg-accent transition-colors cursor-col-resize shrink-0 z-10 relative" />
             )}
 
             {/* Center: Bible Reader */}
-            <Panel defaultSize="60" minSize="30" className={`w-full lg:w-auto flex-col h-full bg-bg min-w-0 ${mobileStudyView === 'reader' ? 'flex' : 'hidden lg:flex'}`}>
+            <Panel defaultSize={isTabletMode ? "74" : "60"} minSize="30" className={`w-full md:w-auto flex-col h-full bg-bg min-w-0 ${mobileStudyView === 'reader' ? 'flex' : 'hidden md:flex'}`}>
               <div ref={readerContainerRef} className="w-full h-full flex flex-col min-h-0 min-w-0 overflow-hidden relative">
                 <PanelGroup orientation="vertical" id="theologica-layout-vertical-v2" className="flex-1 min-h-0">
                 <Panel defaultSize="75" minSize="30" className="flex flex-col relative min-w-0">
@@ -7805,7 +7908,7 @@ export default function App() {
                         <Panel defaultSize="50" minSize="30" className="flex flex-col h-full min-w-0 relative">
                           <div className="w-full h-full flex flex-col min-h-0 min-w-0 overflow-hidden relative">
                             {/* Pane 1 Header */}
-                            <header className="w-full max-w-full min-w-0 h-[56px] border-b border-border flex items-center justify-between px-3 sm:px-4 lg:px-5 bg-bg shrink-0 gap-2 relative z-20">
+                            <header className={`w-full max-w-full min-w-0 ${isTabletMode ? 'h-[48px] px-2.5 sm:px-3' : 'h-[56px] px-3 sm:px-4 lg:px-5'} border-b border-border flex items-center justify-between bg-bg shrink-0 gap-1.5 sm:gap-2 relative z-20`}>
                               <div className="flex items-center gap-1.5 shrink-0 z-1 select-none">
                                 <button
                                   type="button"
@@ -7816,7 +7919,7 @@ export default function App() {
                                   className="flex items-center gap-1.5 px-2 py-1 -ml-1.5 rounded-lg hover:bg-surface border border-transparent hover:border-border text-fg transition-all cursor-pointer group text-left active:scale-[0.98]"
                                   title={showLeftSidebar ? "Collapse Book Selector" : "Browse Books & Chapters"}
                                 >
-                                  <span className="font-display text-[15px] sm:text-[17px] font-semibold whitespace-nowrap">
+                                  <span className={`font-display ${isTabletMode ? 'text-[14px] sm:text-[15px]' : 'text-[15px] sm:text-[17px]'} font-semibold whitespace-nowrap`}>
                                     {activeBook.name} {activeChapter}
                                   </span>
                                   <ChevronDown size={14} className={`text-muted group-hover:text-fg opacity-60 transition-transform ${showLeftSidebar ? 'rotate-180' : ''}`} />
@@ -7866,7 +7969,7 @@ export default function App() {
                             </header>
 
                             {/* Pane 1 Content */}
-                            <div className="bible-reader-content select-text flex-1 overflow-y-auto custom-scroll p-6 lg:p-10" onMouseUp={handleSelection} onTouchEnd={handleSelection} onContextMenu={handleReaderContextMenu}>
+                            <div className={`bible-reader-content select-text flex-1 overflow-y-auto custom-scroll ${isTabletMode ? 'p-3 sm:p-4 lg:p-6' : 'p-6 lg:p-10'}`} onMouseUp={handleSelection} onTouchEnd={handleSelection} onContextMenu={handleReaderContextMenu}>
                               <article className="max-w-2xl mx-auto w-full break-words select-text">
                                 {isVersesLoading ? (
                                   <div className="space-y-4 py-4 animate-pulse">
@@ -7968,7 +8071,7 @@ export default function App() {
                         <Panel defaultSize="50" minSize="30" className="flex flex-col h-full min-w-0 relative bg-surface/15">
                           <div className="w-full h-full flex flex-col min-h-0 min-w-0 overflow-hidden relative">
                             {/* Pane 2 Header */}
-                            <header className="w-full max-w-full min-w-0 h-[56px] border-b border-border flex items-center justify-between px-3 sm:px-4 lg:px-5 bg-bg shrink-0 gap-2 relative z-20">
+                            <header className={`w-full max-w-full min-w-0 ${isTabletMode ? 'h-[48px] px-2.5 sm:px-3' : 'h-[56px] px-3 sm:px-4 lg:px-5'} border-b border-border flex items-center justify-between bg-bg shrink-0 gap-1.5 sm:gap-2 relative z-20`}>
                               {/* Left: Book Picker & Chapter Selector */}
                               <div ref={splitBookSelectorRef} className="relative z-30 flex items-center gap-1.5 select-none">
                                 <button
@@ -7978,7 +8081,7 @@ export default function App() {
                                   title="Choose Book & Chapter for Split Reader"
                                   aria-expanded={isSplitBookSelectorOpen}
                                 >
-                                  <span className="font-display text-[15px] sm:text-[17px] font-semibold whitespace-nowrap">
+                                  <span className={`font-display ${isTabletMode ? 'text-[14px] sm:text-[15px]' : 'text-[15px] sm:text-[17px]'} font-semibold whitespace-nowrap`}>
                                     {splitBook.name} {splitChapter}
                                   </span>
                                   <ChevronDown size={14} className={`text-muted group-hover:text-fg opacity-60 transition-transform ${isSplitBookSelectorOpen ? 'rotate-180' : ''}`} />
@@ -8146,7 +8249,7 @@ export default function App() {
                             </header>
 
                             {/* Pane 2 Content */}
-                            <div className="bible-reader-content select-text flex-1 overflow-y-auto custom-scroll p-6 lg:p-10" onMouseUp={handleSelection} onTouchEnd={handleSelection} onContextMenu={handleReaderContextMenu}>
+                            <div className={`bible-reader-content select-text flex-1 overflow-y-auto custom-scroll ${isTabletMode ? 'p-3 sm:p-4 lg:p-6' : 'p-6 lg:p-10'}`} onMouseUp={handleSelection} onTouchEnd={handleSelection} onContextMenu={handleReaderContextMenu}>
                               <article className="max-w-2xl mx-auto w-full break-words select-text">
                                 {isSplitVersesLoading ? (
                                   <div className="space-y-4 py-4 animate-pulse">
@@ -8260,7 +8363,7 @@ export default function App() {
                         aria-label={`Select Book & Chapter. Current: ${activeBook.name} ${activeChapter}`}
                         aria-expanded={showLeftSidebar}
                       >
-                        <span className="font-display text-[16px] sm:text-[18px] lg:text-[20px] font-semibold whitespace-nowrap">
+                        <span className={`font-display ${isTabletMode ? 'text-[15px] sm:text-[17px]' : 'text-[16px] sm:text-[18px] lg:text-[20px]'} font-semibold whitespace-nowrap`}>
                           {activeBook.name} {activeChapter}
                         </span>
                         <ChevronDown size={15} className={`text-muted group-hover:text-fg opacity-60 transition-transform duration-200 shrink-0 ${showLeftSidebar ? 'rotate-180' : 'group-hover:translate-y-0.5'}`} />
@@ -8281,14 +8384,16 @@ export default function App() {
                                 backlinks: totalChapterBacklinks,
                               });
                             }}
-                            className={`flex items-center gap-1.5 text-[13px] font-medium px-3 py-2 rounded-lg border ring-shadow transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                            className={`flex items-center gap-1 sm:gap-1.5 font-medium rounded-lg border ring-shadow transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                              isTabletMode ? 'px-2 py-1.5 text-xs' : 'px-3 py-2 text-[13px]'
+                            } ${
                               totalChapterBacklinks.totalCount > 0
                                 ? 'border-accent/40 bg-accent/10 text-accent hover:bg-accent/15'
                                 : 'border-border bg-surface text-fg hover:bg-border-soft'
                             }`}
                             title="Scripture Backlinks (Notes, Canvas Boards & Highlights)"
                           >
-                            <Layers size={15} />
+                            <Layers size={isTabletMode ? 14 : 15} />
                             <span>Backlinks</span>
                             {totalChapterBacklinks.totalCount > 0 && (
                               <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-accent text-accent-on ml-0.5">
@@ -8302,10 +8407,12 @@ export default function App() {
                         {showLectioInBar && (
                           <button
                             onClick={() => setIsLectioModalOpen(true)}
-                            className="flex items-center gap-1.5 text-[13px] font-medium px-3 py-2 rounded-lg bg-surface text-fg hover:bg-border-soft hover:text-accent border border-border ring-shadow transition-all cursor-pointer whitespace-nowrap shrink-0"
+                            className={`flex items-center gap-1 sm:gap-1.5 font-medium rounded-lg bg-surface text-fg hover:bg-border-soft hover:text-accent border border-border ring-shadow transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                              isTabletMode ? 'px-2 py-1.5 text-xs' : 'px-3 py-2 text-[13px]'
+                            }`}
                             title="Lectio Divina Guided Meditation"
                           >
-                            <Heart size={15} className="text-accent" />
+                            <Heart size={isTabletMode ? 14 : 15} className="text-accent" />
                             <span>Lectio</span>
                           </button>
                         )}
@@ -8314,14 +8421,16 @@ export default function App() {
                         {showInterlinearInBar && (
                           <button
                             onClick={() => handleToggleInterlinearMode()}
-                            className={`flex items-center gap-1.5 text-[13px] font-medium px-3 py-2 rounded-lg border ring-shadow transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                            className={`flex items-center gap-1 sm:gap-1.5 font-medium rounded-lg border ring-shadow transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                              isTabletMode ? 'px-2 py-1.5 text-xs' : 'px-3 py-2 text-[13px]'
+                            } ${
                               isInterlinearMode
                                 ? 'border-accent bg-accent text-accent-on shadow-accent/20'
                                 : 'border-border bg-surface text-fg hover:bg-border-soft'
                             }`}
                             title={isInterlinearMode ? "Disable Reverse Interlinear" : "Enable Reverse Interlinear (Original Hebrew/Greek Word Study)"}
                           >
-                            <Languages size={15} />
+                            <Languages size={isTabletMode ? 14 : 15} />
                             <span>Interlinear</span>
                           </button>
                         )}
@@ -8330,10 +8439,12 @@ export default function App() {
                         {showMarkCompleteInBar && (
                           <button 
                             onClick={toggleCompleted} 
-                            className="flex items-center gap-2 text-[13px] font-medium px-3.5 py-2 rounded-lg bg-surface text-fg hover:bg-border-soft ring-shadow ring-shadow-hover transition-all cursor-pointer whitespace-nowrap shrink-0"
+                            className={`flex items-center gap-1.5 font-medium rounded-lg bg-surface text-fg hover:bg-border-soft ring-shadow ring-shadow-hover transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                              isTabletMode ? 'px-2.5 py-1.5 text-xs' : 'px-3.5 py-2 text-[13px]'
+                            }`}
                           >
-                            <Check size={16} className={isCompleted ? "text-accent" : "text-meta"} /> 
-                            <span>{isCompleted ? "Completed" : "Mark Complete"}</span>
+                            <Check size={isTabletMode ? 15 : 16} className={isCompleted ? "text-accent" : "text-meta"} /> 
+                            <span>{isCompleted ? (isTabletMode ? "Done" : "Completed") : (isTabletMode ? "Complete" : "Mark Complete")}</span>
                           </button>
                         )}
                       </div>
@@ -8448,17 +8559,62 @@ export default function App() {
                                     )}
                                   </button>
                                 )}
+
+                                {/* Mode Switcher inside More Menu */}
+                                <div className="pt-1.5 pb-0.5 border-t border-border/40 mt-1">
+                                  <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-muted">
+                                    Study Mode
+                                  </div>
+                                  <div className="grid grid-cols-3 gap-1 px-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        applyStudyLayoutMode('focus');
+                                        setIsDesktopMoreMenuOpen(false);
+                                      }}
+                                      className={`px-1.5 py-1 rounded-md text-[11px] font-semibold transition-colors cursor-pointer text-center ${
+                                        studyLayoutMode === 'focus' ? 'bg-accent/20 text-accent font-bold' : 'text-fg hover:bg-fg/5'
+                                      }`}
+                                    >
+                                      Focus
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        applyStudyLayoutMode('tablet');
+                                        setIsDesktopMoreMenuOpen(false);
+                                      }}
+                                      className={`px-1.5 py-1 rounded-md text-[11px] font-semibold transition-colors cursor-pointer text-center ${
+                                        studyLayoutMode === 'tablet' ? 'bg-accent/20 text-accent font-bold' : 'text-fg hover:bg-fg/5'
+                                      }`}
+                                    >
+                                      Tablet
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        applyStudyLayoutMode('workspace');
+                                        setIsDesktopMoreMenuOpen(false);
+                                      }}
+                                      className={`px-1.5 py-1 rounded-md text-[11px] font-semibold transition-colors cursor-pointer text-center ${
+                                        studyLayoutMode === 'workspace' ? 'bg-accent/20 text-accent font-bold' : 'text-fg hover:bg-fg/5'
+                                      }`}
+                                    >
+                                      Workspace
+                                    </button>
+                                  </div>
+                                </div>
                               </div>
                             )}
                           </div>
                         )}
 
                         {/* Always Visible Audio Button */}
-                        <button onClick={toggleSpeech} className="flex items-center justify-center p-2 min-w-[38px] min-h-[38px] rounded-lg text-fg-2 hover:text-fg hover:bg-surface transition-colors cursor-pointer touch-manipulation shrink-0" title="Read chapter aloud">
+                        <button onClick={toggleSpeech} className="flex items-center justify-center p-2 min-w-[36px] sm:min-w-[38px] min-h-[36px] sm:min-h-[38px] rounded-lg text-fg-2 hover:text-fg hover:bg-surface transition-colors cursor-pointer touch-manipulation shrink-0" title="Read chapter aloud">
                           {isSpeaking ? <VolumeX size={18} className="text-accent" /> : <Volume2 size={18} />}
                         </button>
 
-                        <div className="hidden lg:block h-5 w-px bg-border/60 shrink-0"></div>
+                        <div className="hidden md:block h-5 w-px bg-border/60 shrink-0"></div>
                         
                         <div className="shrink-0">
                           <TranslationSelector 
@@ -8471,7 +8627,7 @@ export default function App() {
                       </div>
                     </div>
                   </header>
-              <div className="bible-reader-content select-text flex-1 overflow-y-auto custom-scroll p-10 lg:p-16" onMouseUp={handleSelection} onTouchEnd={handleSelection} onContextMenu={handleReaderContextMenu}>
+              <div className={`bible-reader-content select-text flex-1 overflow-y-auto custom-scroll ${isTabletMode ? 'p-4 sm:p-6 lg:p-8' : 'p-6 lg:p-14'}`} onMouseUp={handleSelection} onTouchEnd={handleSelection} onContextMenu={handleReaderContextMenu}>
                 <article className={`${!showLeftSidebar && !showRightSidebar ? 'max-w-[68ch]' : 'max-w-3xl'} mx-auto w-full break-words select-text`}>
                   {isInterlinearMode && (
                     <InterlinearModeRibbon
@@ -8679,9 +8835,9 @@ export default function App() {
 
               {/* Quick Note Split */}
                 {showBottomNotes && (
-                <Panel panelRef={bottomPanelRef} defaultSize="25" minSize="20" className="hidden lg:flex border-t border-border bg-bg flex-col shrink-0">
+                <Panel panelRef={bottomPanelRef} defaultSize={isTabletMode ? "20" : "25"} minSize={isTabletMode ? "15" : "20"} className="hidden md:flex border-t border-border bg-bg flex-col shrink-0">
                 <div className="w-full h-full flex flex-col min-h-0 overflow-hidden">
-                  <div className="h-10 border-b border-border flex items-center justify-between px-6 text-[11px] font-bold text-muted uppercase tracking-widest shrink-0">
+                  <div className={`${isTabletMode ? 'h-8 px-4 text-[10px]' : 'h-10 px-6 text-[11px]'} border-b border-border flex items-center justify-between font-bold text-muted uppercase tracking-widest shrink-0`}>
                     <span>Quick Note — {chapterTitle}</span>
                     {hasGuestData && !isSyncBannerDismissed && (
                       <span className="text-[10px] lowercase font-normal text-accent flex items-center gap-1">
@@ -8690,7 +8846,7 @@ export default function App() {
                     )}
                   </div>
                   <textarea 
-                    className="flex-1 min-h-0 bg-transparent p-6 focus:outline-none resize-none text-[15px] leading-relaxed text-fg custom-scroll" 
+                    className={`flex-1 min-h-0 bg-transparent ${isTabletMode ? 'p-3 text-[14px]' : 'p-6 text-[15px]'} focus:outline-none resize-none leading-relaxed text-fg custom-scroll`} 
                     placeholder={`Take notes for ${chapterTitle}...`}
                     value={chapterNote ? chapterNote.content : ''}
                     onChange={handleQuickNoteChange}
@@ -8703,16 +8859,16 @@ export default function App() {
             </Panel>
 
             {showRightSidebar && (
-              <PanelResizeHandle className="hidden lg:flex w-1 bg-transparent hover:bg-accent active:bg-accent transition-colors cursor-col-resize shrink-0 z-10 relative" />
+              <PanelResizeHandle className="hidden md:flex w-1 bg-transparent hover:bg-accent active:bg-accent transition-colors cursor-col-resize shrink-0 z-10 relative" />
             )}
 
             {/* Right Sidebar: Study AI */}
             {showRightSidebar && (
               <Panel 
                 panelRef={rightPanelRef} 
-                defaultSize="22" 
-                minSize="18" 
-                className={`relative w-full lg:w-auto border-l border-border bg-bg flex-col ${mobileStudyView === 'ai' ? 'flex' : 'hidden lg:flex'}`}
+                defaultSize={isTabletMode ? "26" : "22"} 
+                minSize={isTabletMode ? "20" : "18"} 
+                className={`relative w-full md:w-auto border-l border-border bg-bg flex-col ${mobileStudyView === 'ai' ? 'flex' : 'hidden md:flex'}`}
                 onDragEnter={handleChatDragEnter}
                 onDragOver={handleChatDragOver}
                 onDragLeave={handleChatDragLeave}
@@ -8728,12 +8884,12 @@ export default function App() {
                   <div className="text-[12px] text-muted mt-1 max-w-xs">Supports images, study PDFs, and notes</div>
                 </div>
               )}
-              <header className="h-[60px] border-b border-border flex items-center justify-between px-2.5 sm:px-3 lg:px-4 text-[15px] font-medium text-fg shrink-0 gap-1.5">
+              <header className={`${isTabletMode ? 'h-[48px]' : 'h-[60px]'} border-b border-border flex items-center justify-between px-2.5 sm:px-3 lg:px-4 text-[14px] sm:text-[15px] font-medium text-fg shrink-0 gap-1.5`}>
                 <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                  <button onClick={() => setMobileStudyView('reader')} className="lg:hidden p-1.5 -ml-1 text-fg-2 hover:text-fg shrink-0 cursor-pointer" title="Back to reader">
+                  <button onClick={() => setMobileStudyView('reader')} className="md:hidden p-1.5 -ml-1 text-fg-2 hover:text-fg shrink-0 cursor-pointer" title="Back to reader">
                     <ChevronLeft size={20} />
                   </button>
-                  <Sparkles size={16} className="hidden lg:block text-accent shrink-0" />
+                  <Sparkles size={16} className="hidden md:block text-accent shrink-0" />
                   <span className="truncate">Study AI</span>
                 </div>
                 <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
@@ -8747,7 +8903,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => handleToggleRightSidebar(false)}
-                    className="hidden lg:flex p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface-hover transition-colors cursor-pointer"
+                    className="hidden md:flex p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface-hover transition-colors cursor-pointer"
                     title="Collapse Study AI Panel"
                     aria-label="Collapse Study AI Panel"
                   >
@@ -8762,7 +8918,7 @@ export default function App() {
                   isHomeTypingLocked
                     ? 'overflow-hidden overscroll-none touch-none select-none'
                     : 'overflow-y-auto custom-scroll'
-                } ${activeChat.messages.length === 0 && !isAiTyping ? 'flex flex-col' : 'space-y-6'} p-4`}
+                } ${activeChat.messages.length === 0 && !isAiTyping ? 'flex flex-col' : isTabletMode ? 'space-y-4' : 'space-y-6'} ${isTabletMode ? 'p-3' : 'p-4'}`}
               >
                 {activeChat.messages.length === 0 ? (
                   <ChatEmptyState
@@ -10381,10 +10537,10 @@ export default function App() {
           />
         </div>
       </main>
-        {/* Mobile Bottom Navigation — Sleek, modern app tab bar safely anchored above iOS home indicator */}
+        {/* Mobile Bottom Navigation — Sleek, modern app tab bar safely anchored above iOS home indicator for phones < 768px */}
         <nav 
           aria-label="Mobile Navigation"
-          className={`lg:hidden shrink-0 bg-bg/90 backdrop-blur-2xl border-t border-border/40 flex items-center justify-around px-1 z-40 w-full select-none ${
+          className={`md:hidden shrink-0 bg-bg/90 backdrop-blur-2xl border-t border-border/40 flex items-center justify-around px-1 z-40 w-full select-none ${
             (isMobileTyping && activeTab !== 'canvas') ? 'hidden pointer-events-none' : 'flex'
           }`}
           style={{ 

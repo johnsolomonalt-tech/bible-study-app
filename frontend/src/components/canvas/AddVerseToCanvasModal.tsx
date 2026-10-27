@@ -22,7 +22,7 @@ export function AddVerseToCanvasModal({
   theme = 'dark',
 }: AddVerseToCanvasModalProps) {
   const [query, setQuery] = useState('');
-  const [translation, setTranslation] = useState(() => {
+  const [translation, setTranslation] = useState<string>(() => {
     return getPreference(PREF_KEYS.BIBLE_VERSION, 'bsb');
   });
   const [isLoading, setIsLoading] = useState(false);
