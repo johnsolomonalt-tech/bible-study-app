@@ -6085,10 +6085,13 @@ export default function App() {
     <>
       <div className="fixed inset-0 w-full h-full flex flex-col bg-bg text-fg overflow-hidden select-none">
         {/* Top Navbar (Desktop & Tablet) */}
-        <header className={`hidden md:flex sticky top-0 z-40 ${isTabletMode ? 'h-12 min-h-12 px-2.5 sm:px-3' : 'min-h-14 h-[calc(3.5rem+env(safe-area-inset-top,0px))] px-3 sm:px-4 lg:px-6'} border-b border-border items-center justify-between bg-bg shrink-0`} style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+        <header 
+          className="hidden md:flex sticky top-0 z-40 min-h-14 h-[calc(3.5rem+env(safe-area-inset-top,0px))] border-b border-border items-center justify-between px-3 sm:px-4 lg:px-6 bg-bg shrink-0 relative" 
+          style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+        >
         
         {/* Left: Logo */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 z-10">
           <div className="font-display text-[17px] sm:text-[19px] lg:text-[20px] tracking-tight flex items-center gap-1.5 sm:gap-2 select-none shrink-0">
             <div className="relative w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 rounded-xl overflow-hidden shadow-xs shrink-0 flex items-center justify-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -6104,10 +6107,10 @@ export default function App() {
           </div>
         </div>
 
-        {/* Center: Tabs (Desktop & Tablet) */}
+        {/* Center: Tabs (Desktop & Tablet) — Centered in the middle at all times */}
         <nav 
           aria-label="Navigation Tabs"
-          className="hidden md:flex items-center gap-0.5 sm:gap-1 p-0.5 sm:p-1 bg-surface border border-border-soft/60 rounded-xl shadow-xs select-none mx-auto shrink-0"
+          className="hidden md:flex items-center gap-0.5 sm:gap-1 p-0.5 sm:p-1 bg-surface border border-border-soft/60 rounded-xl shadow-xs select-none absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 shrink-0 z-10 pointer-events-auto"
         >
           {['study', 'canvas', 'devotional', 'notes', 'chats', 'tracker'].map(tab => {
             const label = tab === 'chats' ? 'AI Chats' : tab.charAt(0).toUpperCase() + tab.slice(1);
@@ -6143,15 +6146,15 @@ export default function App() {
                 {tab === 'notes' && <Edit size={13} className={activeTab === tab ? 'text-accent' : ''} />}
                 {tab === 'chats' && <Sparkles size={13} className={activeTab === tab ? 'text-accent' : ''} />}
                 {tab === 'tracker' && <Target size={13} className={activeTab === tab ? 'text-accent' : ''} />}
-                <span className={`capitalize ${isTabletMode ? (activeTab === tab ? 'inline text-xs' : 'hidden') : 'hidden lg:inline'}`}>{label}</span>
-                <span className={`capitalize ${isTabletMode ? 'hidden' : 'lg:hidden'}`}>{shortLabel}</span>
+                <span className="capitalize hidden lg:inline">{label}</span>
+                <span className="capitalize lg:hidden">{shortLabel}</span>
               </button>
             );
           })}
         </nav>
         
         {/* Right: Panel Toggles, Streak, Settings & Clerk UserButton */}
-        <div className="flex justify-end items-center gap-1 sm:gap-1.5 lg:gap-2 shrink-0">
+        <div className="flex justify-end items-center gap-1 sm:gap-1.5 lg:gap-2 shrink-0 z-10 ml-auto">
           {/* Collapsible Panel Toggles & Mode Preset */}
           {activeTab === 'study' && (
             <div className="flex items-center bg-surface border border-border-soft/60 rounded-lg p-0.5 shrink-0 gap-0.5">
@@ -6212,7 +6215,7 @@ export default function App() {
                 ) : (
                   <Layout size={14} className="text-fg shrink-0 opacity-80 group-hover:opacity-100" />
                 )}
-                <span className={isTabletMode ? "hidden" : "hidden xl:inline"}>
+                <span className="hidden xl:inline">
                   {isFocusMode ? 'Focus' : 'Workspace'}
                 </span>
               </button>
@@ -6236,7 +6239,7 @@ export default function App() {
                 aria-label="Toggle Parallel Split View"
               >
                 <Columns2 size={13} className={isSplitView ? "text-accent" : "opacity-70"} />
-                <span className={isTabletMode ? "hidden" : "hidden xl:inline"}>Split</span>
+                <span className="hidden xl:inline">Split</span>
               </button>
             </div>
           )}
@@ -6246,14 +6249,14 @@ export default function App() {
           />
           <button 
             onClick={() => setIsSettingsOpen(true)} 
-            className={`text-muted hover:text-fg transition-colors ${isTabletMode ? 'min-w-[34px] min-h-[34px] p-1.5' : 'min-w-[38px] sm:min-w-[44px] min-h-[38px] sm:min-h-[44px] p-1.5 sm:p-2'} flex items-center justify-center rounded-xl hover:bg-surface cursor-pointer`} 
+            className="text-muted hover:text-fg transition-colors min-w-[38px] sm:min-w-[44px] min-h-[38px] sm:min-h-[44px] flex items-center justify-center p-1.5 sm:p-2 rounded-xl hover:bg-surface cursor-pointer" 
             title="Settings"
             aria-label="Settings"
           >
-            <Settings size={isTabletMode ? 16 : 18} />
+            <Settings size={18} />
           </button>
           {userId ? (
-            <div className={`${isTabletMode ? 'min-w-[34px] min-h-[34px]' : 'min-w-[38px] sm:min-w-[44px] min-h-[38px] sm:min-h-[44px]'} flex items-center justify-center`}>
+            <div className="min-w-[38px] sm:min-w-[44px] min-h-[38px] sm:min-h-[44px] flex items-center justify-center">
               <UserButton />
             </div>
           ) : (
