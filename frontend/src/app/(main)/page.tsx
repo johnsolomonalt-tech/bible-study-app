@@ -5,7 +5,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } fr
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useAuth, UserButton, SignIn, SignInButton } from '@clerk/nextjs';
-import { Send, Plus, Layout, Edit, Sparkles, Target, Check, CheckCheck, Copy, ChevronRight, ChevronLeft, ChevronDown, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquare, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow, ShieldCheck, Heart, Layers, Languages, MoreVertical, MoreHorizontal, Search, BookMarked, Bookmark, ArrowLeftRight, Columns2, Quote, Compass, ArrowRight, Square, BrainCircuit, FileText, UploadCloud, Menu, SlidersHorizontal, Tablet } from 'lucide-react';
+import { Send, Plus, Layout, Edit, Sparkles, Target, Check, CheckCheck, Copy, ChevronRight, ChevronLeft, ChevronDown, Trash2, Volume2, VolumeX, Sun, Moon, BookOpen, GripVertical, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PanelBottomClose, PanelBottomOpen, MessageSquare, MessageSquarePlus, X, Paperclip, Image as ImageIcon , Settings, Workflow, ShieldCheck, Heart, Layers, Languages, MoreVertical, MoreHorizontal, Search, BookMarked, Bookmark, ArrowLeftRight, Columns2, Quote, Compass, ArrowRight, Square, BrainCircuit, FileText, UploadCloud, Menu, SlidersHorizontal } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import TextareaAutosize from 'react-textarea-autosize';
 import { getDevotionalForDay, fetchDevotionalForDay, DevotionalEntry, getDevotionalBody } from '../../lib/devotionals';
@@ -1460,51 +1460,55 @@ export default function App() {
 
   const [mobileStudyView, setMobileStudyView] = useState<'reader' | 'chapters' | 'ai' | 'tools'>('reader');
   
-  // Layout Mode & State — Supports 'focus' (clean reading), 'tablet' (compressed balanced study workspace), and 'workspace' (full desktop)
+  // Device auto-recognition: automatically recognizes tablet viewports (768px-1180px or touch tablets up to 1366px)
+  const [isTablet, setIsTablet] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const w = window.innerWidth;
+    const isWidth = w >= 768 && w <= 1180;
+    const isTouch = ('ontouchstart' in window || (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0));
+    const isTouchTablet = isTouch && w >= 600 && w <= 1366;
+    return isWidth || isTouchTablet;
+  });
+
+  useEffect(() => {
+    const checkTablet = () => {
+      const w = window.innerWidth;
+      const isWidth = w >= 768 && w <= 1180;
+      const isTouch = ('ontouchstart' in window || (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0));
+      const isTouchTablet = isTouch && w >= 600 && w <= 1366;
+      setIsTablet(isWidth || isTouchTablet);
+    };
+    checkTablet();
+    window.addEventListener('resize', checkTablet);
+    return () => window.removeEventListener('resize', checkTablet);
+  }, []);
+
+  // When a tablet is recognized, compressed layout automatically applies everywhere
+  const isTabletMode = isTablet;
+
+  // Layout Mode & State — Supports 'focus' (clean reading) and 'workspace' (scholar multi-panel workspace)
   const [studyLayoutMode, setStudyLayoutMode] = useState<StudyLayoutMode>(() => {
     if (typeof window !== 'undefined') {
       const saved = getPreference<StudyLayoutMode>(PREF_KEYS.STUDY_LAYOUT_MODE);
-      if (saved && (saved === 'focus' || saved === 'tablet' || saved === 'workspace')) {
+      if (saved === 'focus' || saved === 'workspace') {
         return saved;
-      }
-      // Tablet auto-detection: viewport width between 768px and 1180px, or touch tablet
-      const isTabletViewport = window.innerWidth >= 768 && window.innerWidth <= 1180;
-      const isTouchTablet = 'ontouchstart' in window && window.innerWidth >= 768;
-      if (isTabletViewport || isTouchTablet) {
-        return 'tablet';
       }
     }
     return 'workspace';
   });
 
-  const isTabletMode = studyLayoutMode === 'tablet';
-
-  const [showLeftSidebar, setShowLeftSidebar] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const savedMode = getPreference<StudyLayoutMode>(PREF_KEYS.STUDY_LAYOUT_MODE);
-      if (savedMode === 'tablet' || (!savedMode && window.innerWidth >= 768 && window.innerWidth <= 1180)) {
-        return false;
-      }
-    }
-    return getBooleanPreference(PREF_KEYS.SHOW_LEFT_SIDEBAR, false);
-  });
-  const [showRightSidebar, setShowRightSidebar] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const savedMode = getPreference<StudyLayoutMode>(PREF_KEYS.STUDY_LAYOUT_MODE);
-      if (savedMode === 'focus') return false;
-    }
-    return getBooleanPreference(PREF_KEYS.SHOW_RIGHT_SIDEBAR, true);
-  });
+  const [showLeftSidebar, setShowLeftSidebar] = useState<boolean>(() =>
+    getBooleanPreference(PREF_KEYS.SHOW_LEFT_SIDEBAR, false)
+  );
+  const [showRightSidebar, setShowRightSidebar] = useState<boolean>(() =>
+    getBooleanPreference(PREF_KEYS.SHOW_RIGHT_SIDEBAR, true)
+  );
   const leftPanelRef = useRef<PanelImperativeHandle>(null);
   const rightPanelRef = useRef<PanelImperativeHandle>(null);
   const bottomPanelRef = useRef<PanelImperativeHandle>(null);
-  const [showBottomNotes, setShowBottomNotes] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const savedMode = getPreference<StudyLayoutMode>(PREF_KEYS.STUDY_LAYOUT_MODE);
-      if (savedMode === 'tablet' || savedMode === 'focus') return false;
-    }
-    return getBooleanPreference(PREF_KEYS.SHOW_BOTTOM_NOTES, false);
-  });
+  const [showBottomNotes, setShowBottomNotes] = useState<boolean>(() =>
+    getBooleanPreference(PREF_KEYS.SHOW_BOTTOM_NOTES, false)
+  );
   const mobileBookListScrollRef = useRef<HTMLDivElement>(null);
   const desktopBookListScrollRef = useRef<HTMLDivElement>(null);
   const pendingBookScrollAnchorRef = useRef<{
@@ -2644,7 +2648,7 @@ export default function App() {
     setPreference(PREF_KEYS.READER_FONT_FAMILY, val);
   };
 
-  // Layout preset toggle (Focus Mode vs. Tablet Mode vs. Scholar Workspace)
+  // Layout preset toggle (Focus Mode vs. Scholar Workspace)
   const isFocusMode = !showLeftSidebar && !showBottomNotes && !showRightSidebar;
 
   const applyStudyLayoutMode = useCallback((mode: StudyLayoutMode) => {
@@ -2656,42 +2660,34 @@ export default function App() {
       handleToggleLeftSidebar(false);
       handleToggleBottomNotes(false);
       handleToggleRightSidebar(false);
-    } else if (mode === 'tablet') {
-      // Tablet Mode: compressed layout with balanced reading & AI workspace
-      // Books and notes collapsed by default, AI open with compressed width
-      handleToggleLeftSidebar(false);
-      handleToggleBottomNotes(false);
-      handleToggleRightSidebar(true);
-      setTimeout(() => {
-        try {
-          rightPanelRef.current?.resize(26);
-        } catch (_) {}
-      }, 50);
     } else if (mode === 'workspace') {
-      // Full Scholar Workspace: expand all sidebars
+      // Full Scholar Workspace: expand all sidebars (with compressed proportions when on tablet)
       handleToggleLeftSidebar(true);
       handleToggleBottomNotes(true);
       handleToggleRightSidebar(true);
       setTimeout(() => {
         try {
-          leftPanelRef.current?.resize(16);
-          rightPanelRef.current?.resize(24);
-          bottomPanelRef.current?.resize(25);
+          if (isTablet) {
+            leftPanelRef.current?.resize(15);
+            rightPanelRef.current?.resize(24);
+            bottomPanelRef.current?.resize(20);
+          } else {
+            leftPanelRef.current?.resize(16);
+            rightPanelRef.current?.resize(24);
+            bottomPanelRef.current?.resize(25);
+          }
         } catch (_) {}
       }, 50);
     }
-  }, [handleToggleLeftSidebar, handleToggleBottomNotes, handleToggleRightSidebar]);
+  }, [handleToggleLeftSidebar, handleToggleBottomNotes, handleToggleRightSidebar, isTablet]);
 
   const handleToggleWorkspacePreset = useCallback(() => {
-    // Cycle between Focus -> Tablet -> Workspace -> Focus
-    if (studyLayoutMode === 'focus') {
-      applyStudyLayoutMode('tablet');
-    } else if (studyLayoutMode === 'tablet') {
+    if (isFocusMode) {
       applyStudyLayoutMode('workspace');
     } else {
       applyStudyLayoutMode('focus');
     }
-  }, [studyLayoutMode, applyStudyLayoutMode]);
+  }, [isFocusMode, applyStudyLayoutMode]);
 
   const handleReaderFontSizeChange = (val: ReaderFontSize) => {
     setReaderFontSize(val);
@@ -6089,7 +6085,7 @@ export default function App() {
     <>
       <div className="fixed inset-0 w-full h-full flex flex-col bg-bg text-fg overflow-hidden select-none">
         {/* Top Navbar (Desktop & Tablet) */}
-        <header className="hidden md:flex sticky top-0 z-40 min-h-14 h-[calc(3.5rem+env(safe-area-inset-top,0px))] border-b border-border items-center justify-between px-3 sm:px-4 lg:px-6 bg-bg shrink-0" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+        <header className={`hidden md:flex sticky top-0 z-40 ${isTabletMode ? 'h-12 min-h-12 px-2.5 sm:px-3' : 'min-h-14 h-[calc(3.5rem+env(safe-area-inset-top,0px))] px-3 sm:px-4 lg:px-6'} border-b border-border items-center justify-between bg-bg shrink-0`} style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         
         {/* Left: Logo */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
@@ -6195,53 +6191,25 @@ export default function App() {
 
               <div className="w-[1px] h-3.5 bg-border/60 mx-0.5" />
 
-              {/* 3-Way Mode Preset Toggle: Focus | Tablet | Workspace */}
-              <div className="flex items-center bg-bg/60 border border-border-soft/80 rounded-md p-0.5 gap-0.5">
-                <button
-                  type="button"
-                  onClick={() => applyStudyLayoutMode('focus')}
-                  className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[10.5px] sm:text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1 ${
-                    studyLayoutMode === 'focus'
-                      ? 'bg-accent/20 text-accent font-bold shadow-xs'
-                      : 'text-muted hover:text-fg hover:bg-surface-hover'
-                  }`}
-                  title="Focus Mode: Full-width reader without sidebars"
-                  aria-label="Focus Mode"
-                >
-                  <BookOpen size={12} className={studyLayoutMode === 'focus' ? "text-accent" : "opacity-70"} />
-                  <span className="hidden sm:inline">Focus</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => applyStudyLayoutMode('tablet')}
-                  className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[10.5px] sm:text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1 ${
-                    studyLayoutMode === 'tablet'
-                      ? 'bg-accent/20 text-accent font-bold shadow-xs'
-                      : 'text-muted hover:text-fg hover:bg-surface-hover'
-                  }`}
-                  title="Tablet Mode: Compressed study workspace optimized for tablets & smaller screens"
-                  aria-label="Tablet Mode"
-                >
-                  <Tablet size={12} className={studyLayoutMode === 'tablet' ? "text-accent" : "opacity-70"} />
-                  <span>Tablet</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => applyStudyLayoutMode('workspace')}
-                  className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[10.5px] sm:text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1 ${
-                    studyLayoutMode === 'workspace'
-                      ? 'bg-accent/20 text-accent font-bold shadow-xs'
-                      : 'text-muted hover:text-fg hover:bg-surface-hover'
-                  }`}
-                  title="Scholar Workspace: Full expanded multi-panel desktop layout"
-                  aria-label="Scholar Workspace"
-                >
-                  <Layout size={12} className={studyLayoutMode === 'workspace' ? "text-accent" : "opacity-70"} />
-                  <span className="hidden sm:inline">Workspace</span>
-                </button>
-              </div>
+              {/* 1-Click Preset Toggle: Focus Mode vs Scholar Workspace */}
+              <button
+                type="button"
+                onClick={handleToggleWorkspacePreset}
+                className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                  isFocusMode
+                    ? 'bg-accent/15 text-accent font-bold hover:bg-accent/25'
+                    : 'text-muted hover:text-fg hover:bg-border-soft'
+                }`}
+                title={
+                  isFocusMode
+                    ? 'Scholar Workspace: Expand all sidebars for deep study'
+                    : 'Reader Focus: Collapse sidebars for distraction-free reading'
+                }
+                aria-label="Toggle Workspace Layout Preset"
+              >
+                <BookOpen size={13} className={isFocusMode ? "text-accent" : "opacity-70"} />
+                <span>{isFocusMode ? 'Focus' : 'Workspace'}</span>
+              </button>
 
               <div className="w-[1px] h-3.5 bg-border/60 mx-0.5" />
 
@@ -6272,14 +6240,14 @@ export default function App() {
           />
           <button 
             onClick={() => setIsSettingsOpen(true)} 
-            className="text-muted hover:text-fg transition-colors min-w-[38px] sm:min-w-[44px] min-h-[38px] sm:min-h-[44px] flex items-center justify-center p-1.5 sm:p-2 rounded-xl hover:bg-surface cursor-pointer" 
+            className={`text-muted hover:text-fg transition-colors ${isTabletMode ? 'min-w-[34px] min-h-[34px] p-1.5' : 'min-w-[38px] sm:min-w-[44px] min-h-[38px] sm:min-h-[44px] p-1.5 sm:p-2'} flex items-center justify-center rounded-xl hover:bg-surface cursor-pointer`} 
             title="Settings"
             aria-label="Settings"
           >
-            <Settings size={18} />
+            <Settings size={isTabletMode ? 16 : 18} />
           </button>
           {userId ? (
-            <div className="min-w-[38px] sm:min-w-[44px] min-h-[38px] sm:min-h-[44px] flex items-center justify-center">
+            <div className={`${isTabletMode ? 'min-w-[34px] min-h-[34px]' : 'min-w-[38px] sm:min-w-[44px] min-h-[38px] sm:min-h-[44px]'} flex items-center justify-center`}>
               <UserButton />
             </div>
           ) : (
@@ -7668,7 +7636,7 @@ export default function App() {
             >
             {/* Left Sidebar: Navigation */}
             {showLeftSidebar && (
-              <Panel panelRef={leftPanelRef} defaultSize={isTabletMode ? "16" : "15"} minSize={isTabletMode ? "14" : "15"} className={`w-full md:w-auto border-r border-border bg-bg flex-col ${mobileStudyView === 'chapters' ? 'flex' : 'hidden md:flex'}`}>
+              <Panel panelRef={leftPanelRef} defaultSize={isTabletMode ? "15" : "16"} minSize={isTabletMode ? "12" : "14"} className={`w-full md:w-auto border-r border-border bg-bg flex-col ${mobileStudyView === 'chapters' ? 'flex' : 'hidden md:flex'}`}>
               <div className="w-full h-full flex flex-col min-h-0 overflow-hidden">
               <header className="md:hidden h-[60px] border-b border-border flex items-center px-4 shrink-0">
                 <button onClick={() => setMobileStudyView('reader')} className="p-2 mr-2 text-fg-2 hover:text-fg">
@@ -7897,10 +7865,10 @@ export default function App() {
             )}
 
             {/* Center: Bible Reader */}
-            <Panel defaultSize={isTabletMode ? "74" : "60"} minSize="30" className={`w-full md:w-auto flex-col h-full bg-bg min-w-0 ${mobileStudyView === 'reader' ? 'flex' : 'hidden md:flex'}`}>
+            <Panel defaultSize={isTabletMode ? "61" : "60"} minSize="30" className={`w-full md:w-auto flex-col h-full bg-bg min-w-0 ${mobileStudyView === 'reader' ? 'flex' : 'hidden md:flex'}`}>
               <div ref={readerContainerRef} className="w-full h-full flex flex-col min-h-0 min-w-0 overflow-hidden relative">
                 <PanelGroup orientation="vertical" id="theologica-layout-vertical-v2" className="flex-1 min-h-0">
-                <Panel defaultSize="75" minSize="30" className="flex flex-col relative min-w-0">
+                <Panel defaultSize={isTabletMode ? "80" : "75"} minSize="30" className="flex flex-col relative min-w-0">
                   <div className="w-full h-full flex flex-col min-h-0 min-w-0 overflow-hidden relative">
                     {isSplitView ? (
                       <PanelGroup orientation="horizontal" id="theologica-split-reader" className="flex-1 min-h-0 w-full flex">
@@ -8565,7 +8533,7 @@ export default function App() {
                                   <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-muted">
                                     Study Mode
                                   </div>
-                                  <div className="grid grid-cols-3 gap-1 px-1">
+                                  <div className="grid grid-cols-2 gap-1 px-1">
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -8573,22 +8541,10 @@ export default function App() {
                                         setIsDesktopMoreMenuOpen(false);
                                       }}
                                       className={`px-1.5 py-1 rounded-md text-[11px] font-semibold transition-colors cursor-pointer text-center ${
-                                        studyLayoutMode === 'focus' ? 'bg-accent/20 text-accent font-bold' : 'text-fg hover:bg-fg/5'
+                                        isFocusMode ? 'bg-accent/20 text-accent font-bold' : 'text-fg hover:bg-fg/5'
                                       }`}
                                     >
                                       Focus
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        applyStudyLayoutMode('tablet');
-                                        setIsDesktopMoreMenuOpen(false);
-                                      }}
-                                      className={`px-1.5 py-1 rounded-md text-[11px] font-semibold transition-colors cursor-pointer text-center ${
-                                        studyLayoutMode === 'tablet' ? 'bg-accent/20 text-accent font-bold' : 'text-fg hover:bg-fg/5'
-                                      }`}
-                                    >
-                                      Tablet
                                     </button>
                                     <button
                                       type="button"
@@ -8597,7 +8553,7 @@ export default function App() {
                                         setIsDesktopMoreMenuOpen(false);
                                       }}
                                       className={`px-1.5 py-1 rounded-md text-[11px] font-semibold transition-colors cursor-pointer text-center ${
-                                        studyLayoutMode === 'workspace' ? 'bg-accent/20 text-accent font-bold' : 'text-fg hover:bg-fg/5'
+                                        !isFocusMode ? 'bg-accent/20 text-accent font-bold' : 'text-fg hover:bg-fg/5'
                                       }`}
                                     >
                                       Workspace
@@ -8627,7 +8583,7 @@ export default function App() {
                       </div>
                     </div>
                   </header>
-              <div className={`bible-reader-content select-text flex-1 overflow-y-auto custom-scroll ${isTabletMode ? 'p-4 sm:p-6 lg:p-8' : 'p-6 lg:p-14'}`} onMouseUp={handleSelection} onTouchEnd={handleSelection} onContextMenu={handleReaderContextMenu}>
+              <div className={`bible-reader-content select-text flex-1 overflow-y-auto custom-scroll ${isTabletMode ? (isFocusMode ? 'p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto' : 'p-3 sm:p-4 lg:p-6') : 'p-6 lg:p-14'}`} onMouseUp={handleSelection} onTouchEnd={handleSelection} onContextMenu={handleReaderContextMenu}>
                 <article className={`${!showLeftSidebar && !showRightSidebar ? 'max-w-[68ch]' : 'max-w-3xl'} mx-auto w-full break-words select-text`}>
                   {isInterlinearMode && (
                     <InterlinearModeRibbon
@@ -8866,8 +8822,8 @@ export default function App() {
             {showRightSidebar && (
               <Panel 
                 panelRef={rightPanelRef} 
-                defaultSize={isTabletMode ? "26" : "22"} 
-                minSize={isTabletMode ? "20" : "18"} 
+                defaultSize={isTabletMode ? "24" : "24"} 
+                minSize={isTabletMode ? "18" : "18"} 
                 className={`relative w-full md:w-auto border-l border-border bg-bg flex-col ${mobileStudyView === 'ai' ? 'flex' : 'hidden md:flex'}`}
                 onDragEnter={handleChatDragEnter}
                 onDragOver={handleChatDragOver}

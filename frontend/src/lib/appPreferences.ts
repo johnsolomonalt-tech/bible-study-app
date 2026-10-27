@@ -50,7 +50,7 @@ export const PREF_KEYS = {
   STUDY_LAYOUT_MODE: 'theologica_study_layout_mode',
 } as const;
 
-export type StudyLayoutMode = 'focus' | 'tablet' | 'workspace';
+export type StudyLayoutMode = 'focus' | 'workspace';
 
 export type ReaderFontFamily = 'serif' | 'sans' | 'mono';
 export type ReaderFontSize = 'sm' | 'md' | 'lg' | 'xl';
