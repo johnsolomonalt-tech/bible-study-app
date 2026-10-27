@@ -6107,11 +6107,11 @@ export default function App() {
           </div>
         </div>
 
-        {/* Center: Tabs (Desktop & Tablet) — Anchored strictly in the viewport middle at all times */}
-        <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10 px-3">
+        {/* Tabs share the available header space with the controls on every workspace. */}
+        <div className="flex min-w-0 flex-1 items-center justify-start mx-2 lg:mx-4 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <nav 
             aria-label="Navigation Tabs"
-            className="pointer-events-auto flex items-center gap-0.5 sm:gap-1 p-0.5 sm:p-1 bg-surface border border-border-soft/60 rounded-xl shadow-xs select-none"
+            className="flex w-max shrink-0 items-center gap-0.5 sm:gap-1 p-0.5 sm:p-1 bg-surface border border-border-soft/60 rounded-xl shadow-xs select-none"
           >
             {['study', 'canvas', 'devotional', 'notes', 'chats', 'tracker'].map(tab => {
               const label = tab === 'chats' ? 'AI Chats' : tab.charAt(0).toUpperCase() + tab.slice(1);

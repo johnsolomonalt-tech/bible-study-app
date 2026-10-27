@@ -145,7 +145,7 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
         setNodes((nds) => nds.map((n) => ({ ...n, selected: n.id === id })));
         setIsMenuOpen(true);
       }}
-      className={`relative group rounded-xl transition-shadow duration-150 select-none w-[310px] sm:w-[380px] max-w-[calc(100vw-32px)] ${
+      className={`relative group flex flex-col rounded-xl transition-shadow duration-150 select-none w-[310px] sm:w-[380px] max-w-[calc(100vw-32px)] ${
         isMenuOpen ? '!z-50' : selected ? 'z-30' : 'z-0'
       } bg-surface text-fg border border-border shadow-[0_8px_30px_rgba(0,0,0,0.15)] backdrop-blur-md ${
         selected 
@@ -230,7 +230,7 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
 
       {/* Card Header */}
       <div 
-        className="flex items-start justify-between px-3.5 py-2.5 border-b border-border rounded-t-xl gap-2 bg-surface-warm/40"
+        className="flex shrink-0 items-start justify-between px-3.5 py-2.5 border-b border-border rounded-t-xl gap-2 bg-surface-warm/40"
       >
         {/* Category Badge & Multi-Line Flowing Title */}
         <div className="flex-1 min-w-0 after:content-[''] after:table after:clear-both">
@@ -289,7 +289,7 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
                 (e.target as HTMLElement).blur();
               }
             }}
-            className="nodrag text-[13px] font-semibold leading-snug focus:outline-none focus:ring-1 focus:ring-accent/50 rounded px-1 py-0.5 break-words whitespace-pre-wrap text-fg empty:before:content-[attr(data-placeholder)] empty:before:text-muted empty:before:pointer-events-none cursor-text select-text"
+            className="nodrag max-h-16 overflow-y-auto text-[13px] font-semibold leading-snug focus:outline-none focus:ring-1 focus:ring-accent/50 rounded px-1 py-0.5 break-words whitespace-pre-wrap text-fg empty:before:content-[attr(data-placeholder)] empty:before:text-muted empty:before:pointer-events-none cursor-text select-text"
           />
         </div>
 
@@ -527,7 +527,7 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
 
       {/* Card Body */}
       <div 
-        className="p-3.5 min-h-[120px] text-sm overflow-hidden"
+        className="flex-1 min-h-0 p-3.5 text-sm overflow-y-auto nowheel"
         onDoubleClick={(e) => {
           e.stopPropagation();
           setIsEditing(true);
@@ -543,7 +543,7 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
             </div>
           ) : (
             /* Edit Mode Textarea */
-            <div className="flex flex-col h-full gap-2">
+            <div className="flex flex-col h-full min-h-0 gap-2">
               <textarea
                 ref={textareaRef}
                 value={editContent}
@@ -556,7 +556,7 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
                 }}
                 onBlur={commitChanges}
                 placeholder="Write card content..."
-                className="w-full min-h-[120px] resize-y font-sans text-sm leading-relaxed p-2.5 rounded-lg border border-border bg-bg text-fg placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent transition-all"
+                className="w-full flex-1 min-h-[48px] resize-none font-sans text-sm leading-relaxed p-2.5 rounded-lg border border-border bg-bg text-fg placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent transition-all"
               />
               <div className="flex items-center justify-between text-[11px] text-muted">
                 <span className="hidden sm:inline">Tip: Press <kbd className="px-1 py-0.5 bg-surface-warm rounded text-[10px] font-mono">{mod.symbol}+Enter</kbd> to save</span>
@@ -600,7 +600,7 @@ export const CustomCanvasNode = memo(function CustomCanvasNode(
 
       {/* Card Footer Accent Strip */}
       <div 
-        className="h-1 w-full rounded-b-xl opacity-80"
+        className="h-1 w-full shrink-0 rounded-b-xl opacity-80"
         style={{ backgroundColor: categoryMeta.accent }}
       />
     </div>
