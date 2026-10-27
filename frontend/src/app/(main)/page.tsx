@@ -6086,12 +6086,12 @@ export default function App() {
       <div className="fixed inset-0 w-full h-full flex flex-col bg-bg text-fg overflow-hidden select-none">
         {/* Top Navbar (Desktop & Tablet) */}
         <header 
-          className="hidden md:flex sticky top-0 z-40 min-h-14 h-[calc(3.5rem+env(safe-area-inset-top,0px))] border-b border-border items-center justify-between px-3 sm:px-4 lg:px-6 bg-bg shrink-0 relative" 
+          className="hidden md:flex sticky top-0 z-40 w-full max-w-full min-h-14 h-[calc(3.5rem+env(safe-area-inset-top,0px))] border-b border-border items-center justify-between px-3 sm:px-4 lg:px-6 bg-bg shrink-0 relative overflow-hidden select-none" 
           style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
         >
         
         {/* Left: Logo */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 z-10">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 z-20">
           <div className="font-display text-[17px] sm:text-[19px] lg:text-[20px] tracking-tight flex items-center gap-1.5 sm:gap-2 select-none shrink-0">
             <div className="relative w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 rounded-xl overflow-hidden shadow-xs shrink-0 flex items-center justify-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -6107,98 +6107,103 @@ export default function App() {
           </div>
         </div>
 
-        {/* Center: Tabs (Desktop & Tablet) — Centered in the middle at all times */}
-        <nav 
-          aria-label="Navigation Tabs"
-          className="hidden md:flex items-center gap-0.5 sm:gap-1 p-0.5 sm:p-1 bg-surface border border-border-soft/60 rounded-xl shadow-xs select-none absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 shrink-0 z-10 pointer-events-auto"
-        >
-          {['study', 'canvas', 'devotional', 'notes', 'chats', 'tracker'].map(tab => {
-            const label = tab === 'chats' ? 'AI Chats' : tab.charAt(0).toUpperCase() + tab.slice(1);
-            const shortLabel = tab === 'devotional' ? 'Devo' : tab === 'chats' ? 'AI' : tab.charAt(0).toUpperCase() + tab.slice(1);
-            return (
-              <button 
-                key={tab} 
-                onClick={() => {
-                  setActiveTab(tab);
-                  if (tab === 'notes') {
-                    setActiveNoteId(null);
-                  }
-                  if (tab === 'canvas') {
-                    setIsMobileTyping(false);
-                    setCanvasFocusTrigger(prev => prev + 1);
-                  }
-                  if (tab === 'chats') {
-                    setMobileChatView('chat');
-                    scrollToBottomOnChatOpenRef.current = true;
-                    scrollChatToBottom();
-                  }
-                }}
-                title={label}
-                className={`px-2 sm:px-2.5 xl:px-3 py-1 rounded-lg text-xs xl:text-[13px] font-medium transition-all flex items-center gap-1 sm:gap-1.5 cursor-pointer whitespace-nowrap ${
-                  activeTab === tab 
-                    ? 'bg-bg text-fg shadow-xs border border-border-soft/60 font-semibold' 
-                    : 'text-fg-2 hover:text-fg hover:bg-surface-hover/60 border border-transparent'
-                }`}
-              >
-                {tab === 'study' && <Layout size={13} className={activeTab === tab ? 'text-accent' : ''} />}
-                {tab === 'canvas' && <Workflow size={13} className={activeTab === tab ? 'text-accent' : ''} />}
-                {tab === 'devotional' && <BookOpen size={13} className={activeTab === tab ? 'text-accent' : ''} />}
-                {tab === 'notes' && <Edit size={13} className={activeTab === tab ? 'text-accent' : ''} />}
-                {tab === 'chats' && <Sparkles size={13} className={activeTab === tab ? 'text-accent' : ''} />}
-                {tab === 'tracker' && <Target size={13} className={activeTab === tab ? 'text-accent' : ''} />}
-                <span className="capitalize hidden lg:inline">{label}</span>
-                <span className="capitalize lg:hidden">{shortLabel}</span>
-              </button>
-            );
-          })}
-        </nav>
+        {/* Center: Tabs (Desktop & Tablet) — Anchored strictly in the viewport middle at all times */}
+        <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10 px-3">
+          <nav 
+            aria-label="Navigation Tabs"
+            className="pointer-events-auto flex items-center gap-0.5 sm:gap-1 p-0.5 sm:p-1 bg-surface border border-border-soft/60 rounded-xl shadow-xs select-none"
+          >
+            {['study', 'canvas', 'devotional', 'notes', 'chats', 'tracker'].map(tab => {
+              const label = tab === 'chats' ? 'AI Chats' : tab.charAt(0).toUpperCase() + tab.slice(1);
+              const shortLabel = tab === 'devotional' ? 'Devo' : tab === 'chats' ? 'AI' : tab.charAt(0).toUpperCase() + tab.slice(1);
+              const isActive = activeTab === tab;
+              return (
+                <button 
+                  key={tab} 
+                  onClick={() => {
+                    setActiveTab(tab);
+                    if (tab === 'notes') {
+                      setActiveNoteId(null);
+                    }
+                    if (tab === 'canvas') {
+                      setIsMobileTyping(false);
+                      setCanvasFocusTrigger(prev => prev + 1);
+                    }
+                    if (tab === 'chats') {
+                      setMobileChatView('chat');
+                      scrollToBottomOnChatOpenRef.current = true;
+                      scrollChatToBottom();
+                    }
+                  }}
+                  title={label}
+                  className={`px-2 sm:px-2.5 xl:px-3 py-1 rounded-lg text-xs xl:text-[13px] font-semibold transition-colors duration-150 flex items-center gap-1 sm:gap-1.5 cursor-pointer whitespace-nowrap ${
+                    isActive 
+                      ? 'bg-bg text-fg shadow-xs border border-border-soft/60' 
+                      : 'text-fg-2 hover:text-fg hover:bg-surface-hover/60 border border-transparent'
+                  }`}
+                >
+                  {tab === 'study' && <Layout size={13} className={isActive ? 'text-accent' : ''} />}
+                  {tab === 'canvas' && <Workflow size={13} className={isActive ? 'text-accent' : ''} />}
+                  {tab === 'devotional' && <BookOpen size={13} className={isActive ? 'text-accent' : ''} />}
+                  {tab === 'notes' && <Edit size={13} className={isActive ? 'text-accent' : ''} />}
+                  {tab === 'chats' && <Sparkles size={13} className={isActive ? 'text-accent' : ''} />}
+                  {tab === 'tracker' && <Target size={13} className={isActive ? 'text-accent' : ''} />}
+                  <span className="capitalize hidden lg:inline">{label}</span>
+                  <span className="capitalize lg:hidden">{shortLabel}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </div>
         
         {/* Right: Panel Toggles, Streak, Settings & Clerk UserButton */}
-        <div className="flex justify-end items-center gap-1 sm:gap-1.5 lg:gap-2 shrink-0 z-10 ml-auto">
+        <div className="flex justify-end items-center gap-1 sm:gap-1.5 lg:gap-2 shrink-0 z-20 ml-auto min-w-0">
           {/* Collapsible Panel Toggles & Mode Preset */}
           {activeTab === 'study' && (
             <div className="flex items-center bg-surface border border-border-soft/60 rounded-lg p-0.5 shrink-0 gap-0.5">
-              <button
-                type="button"
-                onClick={() => handleToggleLeftSidebar(!showLeftSidebar)}
-                className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-                  showLeftSidebar ? 'text-fg hover:bg-border-soft' : 'text-muted hover:text-fg'
-                }`}
-                title={showLeftSidebar ? 'Collapse Book Selector' : 'Expand Book Selector'}
-                aria-label="Toggle Book Selector"
-              >
-                {showLeftSidebar ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleToggleBottomNotes(!showBottomNotes)}
-                className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-                  showBottomNotes ? 'text-fg hover:bg-border-soft' : 'text-muted hover:text-fg'
-                }`}
-                title={showBottomNotes ? 'Collapse Notes' : 'Expand Notes'}
-                aria-label="Toggle Notes"
-              >
-                {showBottomNotes ? <PanelBottomClose size={16} /> : <PanelBottomOpen size={16} />}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleToggleRightSidebar(!showRightSidebar)}
-                className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-                  showRightSidebar ? 'text-fg hover:bg-border-soft' : 'text-muted hover:text-fg'
-                }`}
-                title={showRightSidebar ? 'Collapse Study AI' : 'Expand Study AI'}
-                aria-label="Toggle Study AI"
-              >
-                {showRightSidebar ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
-              </button>
-
-              <div className="w-[1px] h-3.5 bg-border/60 mx-0.5" />
+              {/* 3 panel toggles: visible on desktop (lg and up) */}
+              <div className="hidden lg:flex items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => handleToggleLeftSidebar(!showLeftSidebar)}
+                  className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                    showLeftSidebar ? 'text-fg hover:bg-border-soft' : 'text-muted hover:text-fg'
+                  }`}
+                  title={showLeftSidebar ? 'Collapse Book Selector' : 'Expand Book Selector'}
+                  aria-label="Toggle Book Selector"
+                >
+                  {showLeftSidebar ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleToggleBottomNotes(!showBottomNotes)}
+                  className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                    showBottomNotes ? 'text-fg hover:bg-border-soft' : 'text-muted hover:text-fg'
+                  }`}
+                  title={showBottomNotes ? 'Collapse Notes' : 'Expand Notes'}
+                  aria-label="Toggle Notes"
+                >
+                  {showBottomNotes ? <PanelBottomClose size={15} /> : <PanelBottomOpen size={15} />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleToggleRightSidebar(!showRightSidebar)}
+                  className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                    showRightSidebar ? 'text-fg hover:bg-border-soft' : 'text-muted hover:text-fg'
+                  }`}
+                  title={showRightSidebar ? 'Collapse Study AI' : 'Expand Study AI'}
+                  aria-label="Toggle Study AI"
+                >
+                  {showRightSidebar ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
+                </button>
+                <div className="w-[1px] h-3.5 bg-border/60 mx-0.5" />
+              </div>
 
               {/* 1-Click Preset Toggle: Focus Mode vs Scholar Workspace */}
               <button
                 type="button"
                 onClick={handleToggleWorkspacePreset}
-                className={`rounded-md font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 p-1.5 xl:px-2 xl:py-1 xl:text-[11px] ${
+                className={`rounded-md font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1.5 p-1.5 2xl:px-2 2xl:py-1 2xl:text-[11px] ${
                   isFocusMode
                     ? 'bg-accent/15 text-accent font-bold hover:bg-accent/25'
                     : 'text-muted hover:text-fg hover:bg-border-soft'
@@ -6215,7 +6220,7 @@ export default function App() {
                 ) : (
                   <Layout size={14} className="text-fg shrink-0 opacity-80 group-hover:opacity-100" />
                 )}
-                <span className="hidden xl:inline">
+                <span className="hidden 2xl:inline">
                   {isFocusMode ? 'Focus' : 'Workspace'}
                 </span>
               </button>
@@ -6226,7 +6231,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => handleToggleSplitView(!isSplitView)}
-                className={`rounded-md font-semibold transition-all cursor-pointer flex items-center justify-center gap-1 p-1.5 xl:px-2 xl:py-1 xl:text-[11px] ${
+                className={`rounded-md font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1 p-1.5 2xl:px-2 2xl:py-1 2xl:text-[11px] ${
                   isSplitView
                     ? 'bg-accent/15 text-accent font-bold hover:bg-accent/25'
                     : 'text-muted hover:text-fg hover:bg-border-soft'
@@ -6239,7 +6244,7 @@ export default function App() {
                 aria-label="Toggle Parallel Split View"
               >
                 <Columns2 size={13} className={isSplitView ? "text-accent" : "opacity-70"} />
-                <span className="hidden xl:inline">Split</span>
+                <span className="hidden 2xl:inline">Split</span>
               </button>
             </div>
           )}
@@ -6249,20 +6254,20 @@ export default function App() {
           />
           <button 
             onClick={() => setIsSettingsOpen(true)} 
-            className="text-muted hover:text-fg transition-colors min-w-[38px] sm:min-w-[44px] min-h-[38px] sm:min-h-[44px] flex items-center justify-center p-1.5 sm:p-2 rounded-xl hover:bg-surface cursor-pointer" 
+            className="text-muted hover:text-fg transition-colors min-w-[36px] sm:min-w-[40px] min-h-[36px] sm:min-h-[40px] flex items-center justify-center p-1.5 rounded-xl hover:bg-surface cursor-pointer" 
             title="Settings"
             aria-label="Settings"
           >
             <Settings size={18} />
           </button>
           {userId ? (
-            <div className="min-w-[38px] sm:min-w-[44px] min-h-[38px] sm:min-h-[44px] flex items-center justify-center">
+            <div className="min-w-[36px] sm:min-w-[40px] min-h-[36px] sm:min-h-[40px] flex items-center justify-center">
               <UserButton />
             </div>
           ) : (
             <Link 
               href="/sign-in"
-              className="h-8 px-3 text-xs font-semibold rounded-lg bg-accent text-accent-on hover:opacity-90 transition-all cursor-pointer shadow-2xs shrink-0 inline-flex items-center justify-center active:scale-95"
+              className="h-8 px-2.5 sm:px-3 text-xs font-semibold rounded-lg bg-accent text-accent-on hover:opacity-90 transition-all cursor-pointer shadow-2xs shrink-0 inline-flex items-center justify-center active:scale-95 whitespace-nowrap"
               title="Sign in to Theologica"
             >
               Sign In
