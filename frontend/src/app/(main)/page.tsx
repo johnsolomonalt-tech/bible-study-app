@@ -6143,8 +6143,8 @@ export default function App() {
                 {tab === 'notes' && <Edit size={13} className={activeTab === tab ? 'text-accent' : ''} />}
                 {tab === 'chats' && <Sparkles size={13} className={activeTab === tab ? 'text-accent' : ''} />}
                 {tab === 'tracker' && <Target size={13} className={activeTab === tab ? 'text-accent' : ''} />}
-                <span className="capitalize hidden lg:inline">{label}</span>
-                <span className="capitalize lg:hidden">{shortLabel}</span>
+                <span className={`capitalize ${isTabletMode ? (activeTab === tab ? 'inline text-xs' : 'hidden') : 'hidden lg:inline'}`}>{label}</span>
+                <span className={`capitalize ${isTabletMode ? 'hidden' : 'lg:hidden'}`}>{shortLabel}</span>
               </button>
             );
           })}
@@ -6195,20 +6195,26 @@ export default function App() {
               <button
                 type="button"
                 onClick={handleToggleWorkspacePreset}
-                className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                className={`rounded-md font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 p-1.5 xl:px-2 xl:py-1 xl:text-[11px] ${
                   isFocusMode
                     ? 'bg-accent/15 text-accent font-bold hover:bg-accent/25'
                     : 'text-muted hover:text-fg hover:bg-border-soft'
                 }`}
                 title={
                   isFocusMode
-                    ? 'Scholar Workspace: Expand all sidebars for deep study'
-                    : 'Reader Focus: Collapse sidebars for distraction-free reading'
+                    ? 'Reader Focus: Sidebars collapsed for distraction-free reading (Click for Scholar Workspace)'
+                    : 'Scholar Workspace: Multi-panel layout for deep study (Click for Reader Focus)'
                 }
                 aria-label="Toggle Workspace Layout Preset"
               >
-                <BookOpen size={13} className={isFocusMode ? "text-accent" : "opacity-70"} />
-                <span>{isFocusMode ? 'Focus' : 'Workspace'}</span>
+                {isFocusMode ? (
+                  <BookOpen size={14} className="text-accent shrink-0" />
+                ) : (
+                  <Layout size={14} className="text-fg shrink-0 opacity-80 group-hover:opacity-100" />
+                )}
+                <span className={isTabletMode ? "hidden" : "hidden xl:inline"}>
+                  {isFocusMode ? 'Focus' : 'Workspace'}
+                </span>
               </button>
 
               <div className="w-[1px] h-3.5 bg-border/60 mx-0.5" />
@@ -6217,7 +6223,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => handleToggleSplitView(!isSplitView)}
-                className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md text-[10.5px] sm:text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                className={`rounded-md font-semibold transition-all cursor-pointer flex items-center justify-center gap-1 p-1.5 xl:px-2 xl:py-1 xl:text-[11px] ${
                   isSplitView
                     ? 'bg-accent/15 text-accent font-bold hover:bg-accent/25'
                     : 'text-muted hover:text-fg hover:bg-border-soft'
@@ -6229,8 +6235,8 @@ export default function App() {
                 }
                 aria-label="Toggle Parallel Split View"
               >
-                <Columns2 size={12} className={isSplitView ? "text-accent" : "opacity-70"} />
-                <span className="hidden sm:inline">Split</span>
+                <Columns2 size={13} className={isSplitView ? "text-accent" : "opacity-70"} />
+                <span className={isTabletMode ? "hidden" : "hidden xl:inline"}>Split</span>
               </button>
             </div>
           )}
@@ -8540,11 +8546,12 @@ export default function App() {
                                         applyStudyLayoutMode('focus');
                                         setIsDesktopMoreMenuOpen(false);
                                       }}
-                                      className={`px-1.5 py-1 rounded-md text-[11px] font-semibold transition-colors cursor-pointer text-center ${
+                                      className={`px-1.5 py-1 rounded-md text-[11px] font-semibold transition-colors cursor-pointer text-center flex items-center justify-center gap-1.5 ${
                                         isFocusMode ? 'bg-accent/20 text-accent font-bold' : 'text-fg hover:bg-fg/5'
                                       }`}
                                     >
-                                      Focus
+                                      <BookOpen size={13} className={isFocusMode ? "text-accent" : "opacity-60"} />
+                                      <span>Focus</span>
                                     </button>
                                     <button
                                       type="button"
@@ -8552,11 +8559,12 @@ export default function App() {
                                         applyStudyLayoutMode('workspace');
                                         setIsDesktopMoreMenuOpen(false);
                                       }}
-                                      className={`px-1.5 py-1 rounded-md text-[11px] font-semibold transition-colors cursor-pointer text-center ${
+                                      className={`px-1.5 py-1 rounded-md text-[11px] font-semibold transition-colors cursor-pointer text-center flex items-center justify-center gap-1.5 ${
                                         !isFocusMode ? 'bg-accent/20 text-accent font-bold' : 'text-fg hover:bg-fg/5'
                                       }`}
                                     >
-                                      Workspace
+                                      <Layout size={13} className={!isFocusMode ? "text-accent" : "opacity-60"} />
+                                      <span>Workspace</span>
                                     </button>
                                   </div>
                                 </div>
