@@ -243,14 +243,28 @@ function buildDynamicQuestionPool(bookName: string, chapter: number, translation
   return [...specific, ...rotatedGenre];
 }
 
-const shuffleArray = <T,>(array: T[]): T[] => {
-  const arr = [...array];
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
+// Reuse each passage's offset within one page load so multiple mounted chat panels
+// show the same set, including when React repeats an effect in development.
+const questionOffsets = new Map<string, number>();
+const QUESTION_CYCLE_KEY = 'theologica_question_cycle_v1';
+
+function getQuestionOffset(key: string, count: number): number {
+  const current = questionOffsets.get(key);
+  if (current !== undefined) return current % count;
+  let offset = Math.floor(Math.random() * count);
+  try {
+    const stored = JSON.parse(localStorage.getItem(QUESTION_CYCLE_KEY) || '{}');
+    if (typeof stored[key] === 'number' && Number.isFinite(stored[key])) {
+      offset = ((stored[key] % count) + count) % count;
+    }
+    stored[key] = (offset + 2) % count;
+    localStorage.setItem(QUESTION_CYCLE_KEY, JSON.stringify(stored));
+  } catch {
+    // Storage can be unavailable in private browsing; randomize in that case.
   }
-  return arr;
-};
+  questionOffsets.set(key, offset);
+  return offset;
+}
 
 export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
   activeBook = { name: 'Genesis', chapters: 50 },
@@ -267,16 +281,16 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
     [activeBook.name, activeChapter, translation, currentLensMeta.name]
   );
 
-  // Pick 4 questions randomized every time on reload/mount (2 on mobile, 4 on desktop)
-  const [visibleQuestions, setVisibleQuestions] = useState<QuestionItem[]>(() => {
-    return questionPool.slice(0, 4);
-  });
+  const [visibleQuestions, setVisibleQuestions] = useState<QuestionItem[]>(() => questionPool.slice(0, 4));
 
   useEffect(() => {
-    if (!questionPool || questionPool.length === 0) return;
-    const shuffled = shuffleArray(questionPool);
-    setVisibleQuestions(shuffled.slice(0, 4));
-  }, [questionPool]);
+    if (questionPool.length === 0) return;
+    const key = `${activeBook.name}:${activeChapter}:${translation}:${currentLensMeta.id}`;
+    const offset = getQuestionOffset(key, questionPool.length);
+    setVisibleQuestions(Array.from({ length: Math.min(4, questionPool.length) }, (_, index) =>
+      questionPool[(offset + index) % questionPool.length]
+    ));
+  }, [questionPool, activeBook.name, activeChapter, translation, currentLensMeta.id]);
 
   const thematicCards = [
     {

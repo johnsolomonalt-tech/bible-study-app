@@ -2,90 +2,115 @@
 
 import { useEffect, useState } from 'react';
 
-// Desktop browsers provide native title tooltips. Touch browsers generally do not,
-// so show the same text while a finger is held on a truncated button.
+type Tooltip = { text: string; left: number; top?: number; bottom?: number };
+
 export function TruncatedButtonTooltip() {
-  const [tip, setTip] = useState<{ text: string; y: number; below: boolean } | null>(null);
+  const [tip, setTip] = useState<Tooltip | null>(null);
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let active: HTMLElement | null = null;
     let start: { x: number; y: number } | null = null;
-    let heldButton: HTMLButtonElement | null = null;
+    let heldControl: HTMLElement | null = null;
     let suppressClick = false;
-    let titledButton: HTMLButtonElement | null = null;
+    let titleOwner: HTMLElement | null = null;
     let originalTitle: string | null = null;
 
-    const truncatedText = (button: HTMLButtonElement) => {
-      const elements = [button, ...Array.from(button.querySelectorAll<HTMLElement>('*'))];
-      const truncated = elements.find((element) => {
-        const style = getComputedStyle(element);
-        const clamp = style.getPropertyValue('-webkit-line-clamp');
-        const clipped = style.textOverflow === 'ellipsis' || (clamp !== '' && clamp !== 'none');
-        return clipped && (element.scrollWidth > element.clientWidth + 1 || element.scrollHeight > element.clientHeight + 1);
-      });
-      return truncated?.textContent?.trim().replace(/\s+/g, ' ') || '';
+    const isTruncated = (element: HTMLElement) => {
+      if (!element.getClientRects().length) return false;
+      const style = getComputedStyle(element);
+      const clamp = style.getPropertyValue('-webkit-line-clamp');
+      const clipsText = style.textOverflow === 'ellipsis' || (clamp !== '' && clamp !== 'none');
+      return clipsText && (element.scrollWidth > element.clientWidth + 1 || element.scrollHeight > element.clientHeight + 1);
+    };
+    const findTruncated = (target: Element): HTMLElement | null => {
+      let node: Element | null = target;
+      const control = target.closest<HTMLElement>('button, a, [role="button"]');
+      while (node && node !== control?.parentElement) {
+        if (node instanceof HTMLElement && isTruncated(node)) return node;
+        node = node.parentElement;
+      }
+      if (control) return Array.from(control.querySelectorAll<HTMLElement>('*')).find(isTruncated) || null;
+      return null;
     };
     const restoreTitle = () => {
-      if (!titledButton) return;
-      if (originalTitle === null) titledButton.removeAttribute('title');
-      else titledButton.setAttribute('title', originalTitle);
-      titledButton = null;
-    };
-    const hover = (event: PointerEvent) => {
-      if (event.pointerType === 'touch') return;
-      const button = (event.target as Element).closest('button');
-      if (!button || button === titledButton) return;
-      restoreTitle();
-      const text = truncatedText(button);
-      if (!text) return;
-      titledButton = button;
-      originalTitle = button.getAttribute('title');
-      button.title = text;
-    };
-    const leave = (event: PointerEvent) => {
-      if (titledButton && !titledButton.contains(event.relatedTarget as Node | null)) restoreTitle();
+      if (titleOwner && originalTitle !== null) titleOwner.setAttribute('title', originalTitle);
+      titleOwner = null;
+      originalTitle = null;
     };
     const cancel = () => {
       clearTimeout(timer);
+      active = null;
       start = null;
-      heldButton = null;
+      heldControl = null;
       setTip(null);
+      restoreTitle();
+    };
+    const show = (element: HTMLElement) => {
+      const text = element.textContent?.trim().replace(/\s+/g, ' ');
+      if (!text || !element.isConnected) return;
+      const rect = element.getBoundingClientRect();
+      const maxWidth = Math.min(360, window.innerWidth - 24);
+      const left = Math.max(12, Math.min(rect.left, window.innerWidth - maxWidth - 12));
+      const above = rect.bottom > window.innerHeight - 180 && rect.top > 180;
+      setTip({ text, left, ...(above ? { bottom: window.innerHeight - rect.top + 8 } : { top: rect.bottom + 8 }) });
+    };
+    const over = (event: PointerEvent) => {
+      if (event.pointerType === 'touch' || !(event.target instanceof Element)) return;
+      const element = findTruncated(event.target);
+      if (element === active) return;
+      cancel();
+      if (!element) return;
+      active = element;
+      titleOwner = element.closest<HTMLElement>('[title]');
+      if (titleOwner) {
+        originalTitle = titleOwner.getAttribute('title');
+        titleOwner.removeAttribute('title');
+      }
+      timer = setTimeout(() => show(element), 450);
+    };
+    const out = (event: PointerEvent) => {
+      if (!active || event.pointerType === 'touch') return;
+      const next = event.relatedTarget;
+      const control = active.closest('button, a, [role="button"]');
+      if (next instanceof Node && (active.contains(next) || control?.contains(next))) return;
+      cancel();
     };
     const down = (event: PointerEvent) => {
-      if (event.pointerType !== 'touch') return;
+      if (event.pointerType !== 'touch' || !(event.target instanceof Element)) return;
       cancel();
-      const button = (event.target as Element).closest('button');
-      if (!button) return;
-      const text = truncatedText(button);
-      if (!text) return;
+      const element = findTruncated(event.target);
+      if (!element) return;
+      active = element;
       start = { x: event.clientX, y: event.clientY };
-      const rect = button.getBoundingClientRect();
+      const control = element.closest<HTMLElement>('button, a, [role="button"]');
       timer = setTimeout(() => {
-        heldButton = button;
-        setTip({ text, y: rect.top < 120 ? rect.bottom + 8 : rect.top - 8, below: rect.top < 120 });
+        heldControl = control;
+        show(element);
       }, 600);
     };
     const move = (event: PointerEvent) => {
       if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 10) cancel();
     };
-    const up = () => {
-      if (heldButton) {
+    const up = (event: PointerEvent) => {
+      if (event.pointerType !== 'touch') return;
+      if (active && !start) return;
+      if (heldControl) {
         suppressClick = true;
-        // Keep the tooltip readable briefly after release.
         clearTimeout(timer);
         timer = setTimeout(cancel, 1500);
         start = null;
       } else cancel();
     };
     const click = (event: MouseEvent) => {
-      if (suppressClick && heldButton?.contains(event.target as Node)) {
+      if (suppressClick && heldControl?.contains(event.target as Node)) {
         event.preventDefault();
         event.stopPropagation();
       }
       suppressClick = false;
     };
-    document.addEventListener('pointerover', hover);
-    document.addEventListener('pointerout', leave);
+    document.addEventListener('pointerover', over);
+    document.addEventListener('pointerout', out);
     document.addEventListener('pointerdown', down);
     document.addEventListener('pointermove', move);
     document.addEventListener('pointerup', up);
@@ -95,8 +120,8 @@ export function TruncatedButtonTooltip() {
     return () => {
       clearTimeout(timer);
       restoreTitle();
-      document.removeEventListener('pointerover', hover);
-      document.removeEventListener('pointerout', leave);
+      document.removeEventListener('pointerover', over);
+      document.removeEventListener('pointerout', out);
       document.removeEventListener('pointerdown', down);
       document.removeEventListener('pointermove', move);
       document.removeEventListener('pointerup', up);
@@ -108,7 +133,7 @@ export function TruncatedButtonTooltip() {
 
   if (!tip) return null;
   return (
-    <div role="tooltip" className="fixed z-[100] pointer-events-none left-3 right-3 mx-auto w-fit max-w-[calc(100vw-24px)] rounded-lg bg-fg text-bg px-3 py-2 text-sm shadow-lg break-words" style={{ top: tip.y, transform: tip.below ? undefined : 'translateY(-100%)' }}>
+    <div role="tooltip" className="fixed z-[100] pointer-events-none max-w-[min(360px,calc(100vw-24px))] max-h-[min(50vh,320px)] overflow-hidden rounded-lg bg-fg text-bg px-3 py-2 text-sm leading-snug shadow-lg break-words" style={{ left: tip.left, top: tip.top, bottom: tip.bottom }}>
       {tip.text}
     </div>
   );
