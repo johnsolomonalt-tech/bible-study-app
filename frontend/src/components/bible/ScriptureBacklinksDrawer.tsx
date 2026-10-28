@@ -104,7 +104,7 @@ export function ScriptureBacklinksDrawer({
         {/* Header */}
         <div 
           className="flex items-center justify-between px-5 py-4 border-b border-zinc-200 dark:border-zinc-800"
-          style={{ paddingTop: 'max(1rem, calc(env(safe-area-inset-top, 0px) + 12px))' }}
+          style={{ paddingTop: 'max(1rem, calc(var(--app-safe-top) + 12px))' }}
         >
           <div>
             <div className="flex items-center gap-2">

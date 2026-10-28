@@ -21,7 +21,7 @@ export async function fetchDevotionalForDay(dayOfYear: number): Promise<Devotion
 
   // 1. Fetch from fast micro-API
   try {
-    const res = await fetch(`/api/devotionals?day=${dayOfYear}`);
+    const res = await fetch(`/api/devotionals?day=${dayOfYear}&text=2`);
     if (res.ok) {
       const data: DevotionalEntry = await res.json();
       memoryCache.set(dayOfYear, data);

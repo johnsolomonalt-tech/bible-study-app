@@ -62,7 +62,7 @@ export default function PWAInstallPrompt() {
 
   if (isIOS) {
     return (
-      <div className="fixed bottom-[calc(52px+max(calc(env(safe-area-inset-bottom,0px)-28px),4px))] left-3 right-3 sm:left-4 sm:right-4 bg-[#30302e] border border-[#4d4c48] rounded-[20px] p-3.5 sm:p-4 shadow-2xl z-[100] animate-in slide-in-from-bottom-5 fade-in duration-500" style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 12px)' }}>
+      <div className="fixed bottom-[calc(52px+var(--mobile-nav-bottom-padding))] left-3 right-3 sm:left-4 sm:right-4 bg-[#30302e] border border-[#4d4c48] rounded-[20px] p-3.5 sm:p-4 shadow-2xl z-[100] animate-in slide-in-from-bottom-5 fade-in duration-500" style={{ paddingBottom: 'max(var(--app-safe-bottom), 12px)' }}>
         <button onClick={() => setShowPrompt(false)} className="absolute top-3 right-3 text-[#87867f] hover:text-[#faf9f5]">
           <X size={18} />
         </button>
@@ -84,7 +84,7 @@ export default function PWAInstallPrompt() {
 
   // Android/Chrome Banner
   return (
-    <div className="fixed bottom-[calc(52px+max(calc(env(safe-area-inset-bottom,0px)-28px),4px))] left-3 right-3 sm:left-4 sm:right-4 bg-[#30302e] border border-[#4d4c48] rounded-[20px] p-3.5 sm:p-4 shadow-2xl z-[100] animate-in slide-in-from-bottom-5 fade-in duration-500 flex items-center justify-between">
+    <div className="fixed bottom-[calc(52px+var(--mobile-nav-bottom-padding))] left-3 right-3 sm:left-4 sm:right-4 bg-[#30302e] border border-[#4d4c48] rounded-[20px] p-3.5 sm:p-4 shadow-2xl z-[100] animate-in slide-in-from-bottom-5 fade-in duration-500 flex items-center justify-between">
       <div className="flex items-center gap-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={(theme === 'light' || theme === 'sepia') ? '/logo-light.png' : '/logo-dark.png'} className="w-12 h-12 object-contain drop-shadow" alt="Theologica" />

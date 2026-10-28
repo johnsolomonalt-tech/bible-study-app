@@ -259,13 +259,13 @@ html, body {
 
 /* iOS Safe Area Helper Classes */
 .safe-top {
-  padding-top: env(safe-area-inset-top, 0px);
+  padding-top: var(--app-safe-top);
 }
 .safe-bottom {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: var(--app-safe-bottom);
 }
 .safe-area-pb {
-  padding-bottom: max(env(safe-area-inset-bottom, 0px), 16px);
+  padding-bottom: max(var(--app-safe-bottom), 16px);
 }
 
 /* Mobile Sheet & Tap Target Utilities */
@@ -275,7 +275,7 @@ html, body {
     min-width: 44px;
   }
   .mobile-sheet-content {
-    padding-bottom: max(env(safe-area-inset-bottom, 0px), 16px);
+    padding-bottom: max(var(--app-safe-bottom), 16px);
   }
 }
 
@@ -611,10 +611,10 @@ sup.verse-number {
 
 /* Mobile safe area modal backdrop and content sizing for iPhone Dynamic Island, notch, and home bar */
 .modal-safe-overlay {
-  padding-top: calc(env(safe-area-inset-top, 0px) + 14px);
-  padding-bottom: calc(max(env(safe-area-inset-bottom, 0px), 16px) + 14px);
-  padding-left: max(env(safe-area-inset-left, 0px), 12px);
-  padding-right: max(env(safe-area-inset-right, 0px), 12px);
+  padding-top: calc(var(--app-safe-top) + 14px);
+  padding-bottom: calc(max(var(--app-safe-bottom), 16px) + 14px);
+  padding-left: max(var(--app-safe-left), 12px);
+  padding-right: max(var(--app-safe-right), 12px);
 }
 @media (min-width: 640px) {
   .modal-safe-overlay {
@@ -660,4 +660,19 @@ sup.verse-number {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Browser chrome and standalone safe areas are calculated independently. */
+:root { --app-safe-top: 0px; --app-safe-bottom: 0px; --app-safe-left: 0px; --app-safe-right: 0px; --mobile-header-top-padding: 8px; --mobile-nav-bottom-padding: 4px; }
+@media (display-mode: standalone) {
+  :root { --app-safe-top: env(safe-area-inset-top, 0px); --app-safe-bottom: env(safe-area-inset-bottom, 0px); --app-safe-left: env(safe-area-inset-left, 0px); --app-safe-right: env(safe-area-inset-right, 0px); --mobile-header-top-padding: var(--app-safe-top); --mobile-nav-bottom-padding: max(var(--app-safe-bottom), 4px); }
+}
+.bible-reader-content .verse-text, .bible-reader-content .verse-text * {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Keep the fixed chat welcome screen within shorter viewports. */
+@media (max-height: 760px) {
+  .chat-study-lenses { display: none; }
 }

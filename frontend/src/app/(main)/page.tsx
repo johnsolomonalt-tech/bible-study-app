@@ -905,13 +905,20 @@ export default function App() {
   const [isDevoSpeaking, setIsDevoSpeaking] = useState(false);
   const isDevoSpeakingRef = useRef(false);
   const todayDayRef = useRef(1);
+  const [localToday, setLocalToday] = useState('');
+  useEffect(() => {
+    const updateDate = () => setLocalToday(new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).format(new Date()));
+    updateDate();
+    const timer = window.setInterval(updateDate, 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const changeDevotionalDay = (targetDay: number) => {
     let nextDay = targetDay;
     if (nextDay < 1) nextDay = totalDays;
     if (nextDay > totalDays) nextDay = 1;
     setDisplayDay(nextDay);
-    fetchDevotionalForDay(toDevotionalDatasetDay(nextDay, Number(new Intl.DateTimeFormat('en-US', { year: 'numeric', timeZone: 'America/Chicago' }).format(new Date())))).then(entry => {
+    fetchDevotionalForDay(toDevotionalDatasetDay(nextDay, new Date().getFullYear())).then(entry => {
       if (entry) setDevotionalEntry(entry);
     });
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -1726,18 +1733,6 @@ export default function App() {
     chatDrawerDragLockedRef.current = null;
   };
 
-  // Mobile Standalone PWA detection and safe-area top padding
-  const [isStandalone, setIsStandalone] = useState(false);
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setIsStandalone(window.matchMedia('(display-mode: standalone)').matches);
-    }
-  }, []);
-
-  const mobileTopPadding = isStandalone
-    ? 'calc(env(safe-area-inset-top, 0px) + 12px)'
-    : 'calc(env(safe-area-inset-top, 0px) + 8px)';
-
   // Auto-hide mobile top header and bottom nav bar on downward scroll in Scripture reader
   const [mobileChromeHidden, setMobileChromeHidden] = useState(false);
   const mobileLastScrollTopRef = useRef(0);
@@ -2308,6 +2303,8 @@ export default function App() {
     if (Math.abs(delta) > 0.5) {
       anchor.container.scrollTop += delta;
     }
+    // A collapsing long book can clamp scrollTop before the adjustment.
+    anchor.summaryEl.scrollIntoView({ block: "nearest" });
   }, [expandedBook]);
 
   // Persist translation version
@@ -2336,15 +2333,6 @@ export default function App() {
       });
     }
   }, [activeBook.name, activeChapter, translation]);
-
-  // Persist layout sidebars after initial preferences have been restored
-  useEffect(() => {
-    if (typeof window !== 'undefined' && preferencesRestoredRef.current) {
-      setPreference(PREF_KEYS.SHOW_LEFT_SIDEBAR, String(showLeftSidebar));
-      setPreference(PREF_KEYS.SHOW_RIGHT_SIDEBAR, String(showRightSidebar));
-      setPreference(PREF_KEYS.SHOW_BOTTOM_NOTES, String(showBottomNotes));
-    }
-  }, [showLeftSidebar, showRightSidebar, showBottomNotes]);
 
   // Persist mobile study view
   useEffect(() => {
@@ -3796,47 +3784,7 @@ export default function App() {
   const activeChat = (activeChatId ? chats.find(c => c.id === activeChatId) : null) || { id: 0, title: 'New Conversation', messages: [] };
 
   const isChatEmptyHome = activeChat.messages.length === 0;
-  const isHomeTypingLocked = isChatEmptyHome && (isChatInputFocused || isMobileTyping);
   isHomeSuggestionsActiveRef.current = isChatEmptyHome;
-
-  // Prevent scrolling on the AI chat home suggestions screen when focused in the text box
-  useEffect(() => {
-    if (!isHomeTypingLocked) return;
-
-    if (mobileStudyChatScrollRef.current) {
-      mobileStudyChatScrollRef.current.scrollTop = 0;
-    }
-    if (desktopStudyChatScrollRef.current) {
-      desktopStudyChatScrollRef.current.scrollTop = 0;
-    }
-    if (fullChatScrollRef.current) {
-      fullChatScrollRef.current.scrollTop = 0;
-    }
-
-    const preventTouchScroll = (e: TouchEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT')) {
-        return;
-      }
-      e.preventDefault();
-    };
-
-    const preventWheelScroll = (e: WheelEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT')) {
-        return;
-      }
-      e.preventDefault();
-    };
-
-    window.addEventListener('touchmove', preventTouchScroll, { passive: false });
-    window.addEventListener('wheel', preventWheelScroll, { passive: false });
-
-    return () => {
-      window.removeEventListener('touchmove', preventTouchScroll);
-      window.removeEventListener('wheel', preventWheelScroll);
-    };
-  }, [isHomeTypingLocked]);
 
   const LOCAL_HIGHLIGHTS_KEY = 'theologica_local_highlights_v1';
 
@@ -4915,14 +4863,17 @@ export default function App() {
 
   const scrollToBottom = scrollChatToBottom;
 
-  // Only scroll to the bottom when explicitly opening an existing chat.
-  // When chatting or receiving AI responses, the user's scroll position is preserved exactly where they were.
+  // Restore the bottom position when opening a conversation.
   useEffect(() => {
     if (scrollToBottomOnChatOpenRef.current) {
       scrollToBottomOnChatOpenRef.current = false;
       scrollChatToBottom();
     }
   }, [activeChatId, activeTab, mobileChatView, mobileStudyView, scrollChatToBottom]);
+
+  useEffect(() => {
+    if (activeChat.messages.length > 0) scrollChatToBottom();
+  }, [activeChat.messages, scrollChatToBottom]);
 
   // Preload Voices for High-Quality TTS
   useEffect(() => {
@@ -4939,14 +4890,13 @@ export default function App() {
     }
   }, []);
 
-  // Timezone-Aware Day Calculation (America/Chicago)
+  // Keep the selected devotional aligned with the reader’s local calendar day.
   useEffect(() => {
+    if (!localToday) return;
     const now = new Date();
-    const options: Intl.DateTimeFormatOptions = { timeZone: 'America/Chicago', year: 'numeric', month: 'numeric', day: 'numeric' };
-    const parts = new Intl.DateTimeFormat('en-US', options).formatToParts(now);
-    const tzYear = parseInt(parts.find(p => p.type === 'year')!.value);
-    const tzMonth = parseInt(parts.find(p => p.type === 'month')!.value);
-    const tzDay = parseInt(parts.find(p => p.type === 'day')!.value);
+    const tzYear = now.getFullYear();
+    const tzMonth = now.getMonth() + 1;
+    const tzDay = now.getDate();
     
     // 1. Calculate actual day of the year for UI display
     const current = new Date(Date.UTC(tzYear, tzMonth - 1, tzDay));
@@ -4971,7 +4921,7 @@ export default function App() {
     fetchDevotionalForDay(alignedDoy).then(entry => {
       if (entry) setDevotionalEntry(entry);
     });
-  }, []);
+  }, [localToday]);
 
   // Devotional TTS
   useEffect(() => {
@@ -6085,8 +6035,8 @@ export default function App() {
       <div className="fixed inset-0 w-full h-full flex flex-col bg-bg text-fg overflow-hidden select-none">
         {/* Top Navbar (Desktop & Tablet) */}
         <header 
-          className="hidden md:flex sticky top-0 z-40 w-full max-w-full min-h-14 h-[calc(3.5rem+env(safe-area-inset-top,0px))] border-b border-border items-center justify-between px-3 sm:px-4 lg:px-6 bg-bg shrink-0 relative overflow-hidden select-none" 
-          style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+          className="hidden md:flex sticky top-0 z-40 w-full max-w-full min-h-14 h-[calc(3.5rem+var(--app-safe-top))] border-b border-border items-center justify-between px-3 sm:px-4 lg:px-6 bg-bg shrink-0 relative overflow-hidden select-none"
+          style={{ paddingTop: 'var(--app-safe-top)' }}
         >
         
         {/* Left: Logo */}
@@ -6279,7 +6229,7 @@ export default function App() {
       {activeTab !== 'study' && (
         <header 
           className="md:hidden border-b border-border/40 flex items-center justify-between px-3.5 sm:px-4 bg-bg/95 backdrop-blur-xs shrink-0 z-30 pb-1.5"
-          style={{ paddingTop: mobileTopPadding }}
+          style={{ paddingTop: "var(--mobile-header-top-padding)" }}
         >
           <div className="flex items-center gap-1.5 min-w-0">
             {activeTab === 'canvas' && <Workflow size={13} className="text-muted/80 shrink-0" />}
@@ -6343,7 +6293,7 @@ export default function App() {
             >
               <header 
                 className="min-h-[46px] border-b border-border/60 flex items-center justify-between px-4 shrink-0 bg-bg py-1.5"
-                style={{ paddingTop: mobileTopPadding }}
+                style={{ paddingTop: "var(--mobile-header-top-padding)" }}
               >
                 <div className="flex items-center gap-1.5">
                   <button onClick={() => setMobileStudyView('reader')} className="min-w-[40px] min-h-[40px] flex items-center justify-center -ml-2 p-2 text-fg-2 hover:text-fg rounded-xl hover:bg-surface cursor-pointer" title="Back to reader">
@@ -6590,7 +6540,7 @@ export default function App() {
                 ref={mobileReaderHeaderRef}
                 className="min-h-[50px] border-b border-border/50 flex items-center justify-between px-1.5 xs:px-2.5 sm:px-3.5 bg-bg/85 backdrop-blur-xl shrink-0 relative z-30 py-1.5"
                 style={{
-                  paddingTop: mobileTopPadding,
+                  paddingTop: "var(--mobile-header-top-padding)",
                 }}
               >
                 {/* Left: Translation (pinned to top-left corner) + Book & Chapter Selector */}
@@ -6609,11 +6559,11 @@ export default function App() {
                     <button 
                       type="button"
                       onClick={() => setMobileStudyView('chapters')} 
-                      className="h-8.5 min-h-[34px] w-full flex items-center gap-1 py-1 px-2 rounded-full bg-surface/80 hover:bg-surface border border-border-soft/60 shadow-2xs text-fg transition-all cursor-pointer active:scale-95 touch-manipulation min-w-0" 
-                      title="Choose Book & Chapter"
+                      className="h-8.5 min-h-[44px] w-full flex items-center gap-1 py-1 px-2 rounded-full bg-surface/80 hover:bg-surface border border-border-soft/60 shadow-2xs text-fg transition-all cursor-pointer active:scale-95 touch-manipulation min-w-0"
+                      title={`Choose Book & Chapter — ${activeBook.name} ${activeChapter}`}
                     >
                       <BookOpen size={13} className="text-accent shrink-0" />
-                      <span className={`font-display font-semibold whitespace-nowrap min-w-0 ${
+                      <span className={`font-display font-semibold truncate min-w-0 ${
                         (activeBook.name.length + String(activeChapter).length) > 13
                           ? 'text-[12px] xs:text-[13px] sm:text-[14.5px]'
                           : 'text-[13px] xs:text-[14px] sm:text-[15px]'
@@ -6624,41 +6574,18 @@ export default function App() {
                     </button>
                   </div>
 
-                  {/* Quick-Swap to Bookmarked Chapter */}
-                  {bookmarkedChapter && (
-                    <button
-                      type="button"
-                      onClick={handleQuickSwapChapter}
-                      className="h-8.5 min-h-[34px] px-2 py-1 rounded-full bg-accent/15 hover:bg-accent/25 border border-accent/30 text-accent flex items-center gap-1 text-[11px] font-semibold transition-all shrink-0 active:scale-95 shadow-2xs cursor-pointer"
-                      title={`Quick-swap to ${bookmarkedChapter.book} ${bookmarkedChapter.chapter}`}
-                    >
-                      <ArrowLeftRight size={11} className="shrink-0 text-accent" />
-                      <span className="truncate max-w-[65px] xs:max-w-[80px]">
-                        {bookmarkedChapter.book} {bookmarkedChapter.chapter}
-                      </span>
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setIsLectioModalOpen(true)}
+                    className="min-h-[44px] px-2 flex items-center gap-1 text-xs font-medium text-accent shrink-0 rounded-lg hover:bg-surface"
+                    aria-label="Lectio Divina"
+                  >
+                    <Heart size={15} /> <span>Lectio</span>
+                  </button>
                 </div>
 
                 {/* Right: Actions */}
                 <div className="flex items-center gap-0.5 xs:gap-1 shrink-0">
-                  {/* Quick Speech / Listen button */}
-                  <button 
-                    onClick={toggleSpeech} 
-                    className={`w-8.5 h-8.5 min-w-[34px] min-h-[34px] flex items-center justify-center rounded-full transition-all cursor-pointer shrink-0 ${
-                      isSpeaking 
-                        ? 'bg-accent/15 text-accent animate-pulse border border-accent/30' 
-                        : 'text-muted hover:text-fg hover:bg-surface/80 active:scale-95'
-                    }`} 
-                    title={isSpeaking ? "Stop reading chapter" : "Listen to chapter"}
-                    aria-label={isSpeaking ? "Stop reading chapter" : "Listen to chapter"}
-                  >
-                    {isSpeaking ? <VolumeX size={15} /> : <Volume2 size={15} />}
-                  </button>
-
-                  {/* Streak Flame (visible across all screens, matching the other mobile tabs) */}
-                  <StreakPopover onNavigateToTab={setActiveTab} onNavigateToVerse={navigateToVerse} />
-
                   {/* Desktop & Tablet shortcuts (hidden on mobile phone screens for clean, uncluttered layout) */}
                   <div className="hidden md:flex items-center gap-1 sm:gap-1.5">
                     {/* Reverse Interlinear Quick Button */}
@@ -6704,7 +6631,7 @@ export default function App() {
                       scrollToBottomOnChatOpenRef.current = true;
                       scrollChatToBottom();
                     }} 
-                    className="w-8.5 h-8.5 min-w-[34px] min-h-[34px] flex items-center justify-center rounded-full bg-accent/10 border border-accent/25 text-accent hover:bg-accent/20 active:scale-95 transition-all cursor-pointer shrink-0 relative" 
+                    className="w-8.5 h-8.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-accent/10 border border-accent/25 text-accent hover:bg-accent/20 active:scale-95 transition-all cursor-pointer shrink-0 relative"
                     title="Study AI Assistant"
                     aria-label="Study AI Assistant"
                   >
@@ -6720,7 +6647,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => setMobileStudyView(prev => prev === 'tools' ? 'reader' : 'tools')}
-                    className={`w-8.5 h-8.5 min-w-[34px] min-h-[34px] flex items-center justify-center rounded-full bg-surface/70 hover:bg-surface border border-border-soft/50 text-muted hover:text-fg active:scale-95 transition-all cursor-pointer touch-manipulation ${
+                    className={`w-8.5 h-8.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-surface/70 hover:bg-surface border border-border-soft/50 text-muted hover:text-fg active:scale-95 transition-all cursor-pointer touch-manipulation ${
                       mobileStudyView === 'tools' ? 'bg-surface text-fg ring-1 ring-border-soft' : ''
                     }`}
                     title="Study tools & options"
@@ -6780,7 +6707,6 @@ export default function App() {
                               {showVerseNumbers && (
                                 <sup 
                                   onClick={(e) => { e.stopPropagation(); handleVerseNumberClick(e, v.verse); }}
-                                  onTouchEnd={(e) => { e.stopPropagation(); handleVerseNumberClick(e, v.verse); }}
                                   className={`verse-number select-none text-[11px] font-sans font-semibold mr-1 cursor-pointer hover:text-accent hover:scale-110 align-baseline relative -top-0.5 inline-block shrink-0 transition-all ${
                                     currentSpeakingVerseIndex === index ? 'text-accent' : 
                                     selectionVerse === v.verse ? 'text-accent font-bold scale-110' : 'text-muted/80'
@@ -6842,7 +6768,6 @@ export default function App() {
                               {showVerseNumbers && (
                                 <sup 
                                   onClick={(e) => { e.stopPropagation(); handleVerseNumberClick(e, v.verse); }}
-                                  onTouchEnd={(e) => { e.stopPropagation(); handleVerseNumberClick(e, v.verse); }}
                                   className={`verse-number select-none text-[11px] font-sans font-semibold mr-1.5 cursor-pointer hover:text-accent hover:scale-110 align-baseline relative -top-0.5 inline-block shrink-0 transition-all ${
                                     currentSpeakingVerseIndex === index ? 'text-accent' : 
                                     selectionVerse === v.verse ? 'text-accent font-bold scale-110' : 'text-muted/80'
@@ -6982,7 +6907,7 @@ export default function App() {
               )}
               <header 
                 className="min-h-[46px] border-b border-border/60 flex items-center justify-between px-3 sm:px-4 text-[15px] font-medium text-fg shrink-0 gap-2 bg-bg py-1.5"
-                style={{ paddingTop: mobileTopPadding }}
+                style={{ paddingTop: "var(--mobile-header-top-padding)" }}
               >
                 <div className="flex items-center gap-1.5 min-w-0">
                   <button onClick={() => setMobileStudyView('reader')} className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2.5 -ml-1 text-fg-2 hover:text-fg rounded-xl hover:bg-surface shrink-0 cursor-pointer" title="Back to reader">
@@ -7002,12 +6927,7 @@ export default function App() {
               <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                 <div
                   ref={mobileStudyChatScrollRef}
-                  style={isHomeTypingLocked ? { overflow: 'hidden', touchAction: 'none', overscrollBehavior: 'none' } : undefined}
-                  className={`flex-1 min-h-0 ${
-                    isHomeTypingLocked
-                      ? 'overflow-hidden overscroll-none touch-none select-none'
-                      : 'overflow-y-auto custom-scroll'
-                  } ${activeChat.messages.length === 0 && !isAiTyping ? 'flex flex-col' : 'space-y-4'} p-3 sm:p-4`}
+                  className={`flex-1 min-h-0 ${isChatEmptyHome ? 'overflow-hidden' : 'overflow-y-auto custom-scroll'} ${activeChat.messages.length === 0 && !isAiTyping ? 'flex flex-col' : 'space-y-4'} p-3 sm:p-4`}
                 >
                   {activeChat.messages.length === 0 ? (
                     <ChatEmptyState
@@ -7240,7 +7160,7 @@ export default function App() {
             >
               <header 
                 className="min-h-[50px] border-b border-border/50 flex items-center justify-between px-3 sm:px-4 text-[15px] font-medium text-fg shrink-0 gap-2 bg-bg/85 backdrop-blur-xl py-2"
-                style={{ paddingTop: mobileTopPadding }}
+                style={{ paddingTop: "var(--mobile-header-top-padding)" }}
               >
                 <div className="flex items-center gap-1.5 min-w-0">
                   <button 
@@ -7488,27 +7408,6 @@ export default function App() {
                         <ChevronRight size={16} className="text-muted/60 shrink-0 ml-2" />
                       )}
                     </button>
-
-                    {/* Lectio Divina Guided Prayer */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsLectioModalOpen(true);
-                        setMobileStudyView('reader');
-                      }}
-                      className="w-full min-h-[48px] flex items-center justify-between px-3.5 py-2.5 hover:bg-fg/5 active:bg-fg/10 text-fg text-sm font-medium cursor-pointer transition-colors"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0">
-                          <Heart size={16} />
-                        </div>
-                        <div className="text-left min-w-0">
-                          <div className="text-[13.5px] font-semibold text-fg truncate">Lectio Divina</div>
-                          <div className="text-[11px] text-muted font-normal truncate">4-step contemplative meditation</div>
-                        </div>
-                      </div>
-                      <ChevronRight size={16} className="text-muted/60 shrink-0 ml-2" />
-                    </button>
                   </div>
                 </div>
 
@@ -7601,7 +7500,7 @@ export default function App() {
             {mobileStudyView === 'reader' && (
               <aside 
                 aria-label="Study quick actions"
-                className="fixed bottom-[calc(56px+max(6px,calc(env(safe-area-inset-bottom,0px)-24px)))] right-3.5 z-30 flex md:hidden items-center gap-1.5 p-1 rounded-full bg-surface/90 backdrop-blur-xl border border-border shadow-xl pointer-events-auto"
+                className="fixed bottom-[calc(56px+var(--mobile-nav-bottom-padding))] right-3.5 z-30 flex md:hidden items-center gap-1.5 p-1 rounded-full bg-surface/90 backdrop-blur-xl border border-border shadow-xl pointer-events-auto"
               >
                 <button
                   type="button"
@@ -8641,7 +8540,6 @@ export default function App() {
                               {showVerseNumbers && (
                                 <sup 
                                   onClick={(e) => { e.stopPropagation(); handleVerseNumberClick(e, v.verse); }}
-                                  onTouchEnd={(e) => { e.stopPropagation(); handleVerseNumberClick(e, v.verse); }}
                                   className={`verse-number select-none text-[11px] font-sans font-semibold mr-1 cursor-pointer hover:text-accent hover:scale-110 align-baseline relative -top-0.5 inline-block shrink-0 transition-all ${
                                     currentSpeakingVerseIndex === index ? 'text-accent' : 
                                     selectionVerse === v.verse ? 'text-accent font-bold scale-110' : 'text-muted/80'
@@ -8703,7 +8601,6 @@ export default function App() {
                               {showVerseNumbers && (
                                 <sup 
                                   onClick={(e) => { e.stopPropagation(); handleVerseNumberClick(e, v.verse); }}
-                                  onTouchEnd={(e) => { e.stopPropagation(); handleVerseNumberClick(e, v.verse); }}
                                   className={`verse-number select-none text-[11px] font-sans font-semibold mr-1.5 cursor-pointer hover:text-accent hover:scale-110 align-baseline relative -top-0.5 inline-block shrink-0 transition-all ${
                                     currentSpeakingVerseIndex === index ? 'text-accent' : 
                                     selectionVerse === v.verse ? 'text-accent font-bold scale-110' : 'text-muted/80'
@@ -8885,12 +8782,7 @@ export default function App() {
               </header>
               <div
                 ref={desktopStudyChatScrollRef}
-                style={isHomeTypingLocked ? { overflow: 'hidden', touchAction: 'none', overscrollBehavior: 'none' } : undefined}
-                className={`flex-1 min-h-0 ${
-                  isHomeTypingLocked
-                    ? 'overflow-hidden overscroll-none touch-none select-none'
-                    : 'overflow-y-auto custom-scroll'
-                } ${activeChat.messages.length === 0 && !isAiTyping ? 'flex flex-col' : isTabletMode ? 'space-y-4' : 'space-y-6'} ${isTabletMode ? 'p-3' : 'p-4'}`}
+                className={`flex-1 min-h-0 ${isChatEmptyHome ? 'overflow-hidden' : 'overflow-y-auto custom-scroll'} ${activeChat.messages.length === 0 && !isAiTyping ? 'flex flex-col' : isTabletMode ? 'space-y-4' : 'space-y-6'} ${isTabletMode ? 'p-3' : 'p-4'}`}
               >
                 {activeChat.messages.length === 0 ? (
                   <ChatEmptyState
@@ -9120,7 +9012,7 @@ export default function App() {
             {/* Mobile Slide-up Verse Action Bottom Sheet (< 768px) */}
             <div 
               className="md:hidden floating-verse-toolbar fixed inset-x-0 bottom-0 z-50 bg-surface/98 border-t border-border/80 rounded-t-[28px] shadow-2xl p-4 animate-in slide-in-from-bottom duration-200 backdrop-blur-2xl"
-              style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 16px)' }}
+              style={{ paddingBottom: 'max(var(--app-safe-bottom), 16px)' }}
             >
               <div className="w-10 h-1 bg-border-soft rounded-full mx-auto mb-3" />
               {/* Header: Verse reference & close button */}
@@ -9543,7 +9435,7 @@ export default function App() {
             <div className="w-full max-w-4xl xl:max-w-5xl space-y-6">
               {/* Today's local date header */}
               <div className="text-xs sm:text-sm font-medium text-muted tracking-wide">
-                Today is {new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).format(new Date())}
+                {localToday && `Today is ${localToday}`}
               </div>
 
               {/* Day navigation & Time toggle header */}
@@ -9969,12 +9861,7 @@ export default function App() {
               </header>
               <div
                 ref={fullChatScrollRef}
-                style={isHomeTypingLocked ? { overflow: 'hidden', touchAction: 'none', overscrollBehavior: 'none' } : undefined}
-                className={`flex-1 min-h-0 ${
-                  isHomeTypingLocked
-                    ? 'overflow-hidden overscroll-none touch-none select-none'
-                    : 'overflow-y-auto custom-scroll'
-                } ${activeChat.messages.length === 0 && !isAiTyping ? 'flex flex-col' : 'space-y-6 sm:space-y-8'} p-2.5 sm:p-8 lg:p-12`}
+                className={`flex-1 min-h-0 ${isChatEmptyHome ? 'overflow-hidden' : 'overflow-y-auto custom-scroll'} ${activeChat.messages.length === 0 && !isAiTyping ? 'flex flex-col p-3 sm:p-4' : 'space-y-6 sm:space-y-8 p-2.5 sm:p-8 lg:p-12'}`}
               >
                 {activeChat.messages.length === 0 ? (
                   <ChatEmptyState
@@ -10516,8 +10403,8 @@ export default function App() {
             (isMobileTyping && activeTab !== 'canvas') ? 'hidden pointer-events-none' : 'flex'
           }`}
           style={{ 
-            height: 'calc(44px + max(calc(env(safe-area-inset-bottom, 0px) - 28px), 4px))',
-            paddingBottom: 'max(calc(env(safe-area-inset-bottom, 0px) - 28px), 4px)',
+            height: 'calc(46px + var(--mobile-nav-bottom-padding))',
+            paddingBottom: 'var(--mobile-nav-bottom-padding)',
             paddingTop: '2px',
             transition: 'background-color 200ms ease'
           }}
@@ -10550,7 +10437,7 @@ export default function App() {
                     scrollChatToBottom();
                   }
                 }}
-                className="flex-1 flex flex-col items-center justify-center h-[42px] py-0.5 transition-all duration-200 ease-out relative cursor-pointer active:scale-95 touch-manipulation select-none"
+                className="flex-1 flex flex-col items-center justify-center min-h-[44px] py-0.5 transition-all duration-200 ease-out relative cursor-pointer active:scale-95 touch-manipulation select-none"
                 title={tab.label}
                 aria-label={tab.label}
               >

@@ -257,6 +257,8 @@ function InnerCanvasBoard({
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
 
   const handleTouchStartWrapper = (e: React.TouchEvent) => {
+    const target = e.target as HTMLElement;
+    if (!target.closest('.react-flow__pane')) return;
     if (e.touches.length === 1) {
       const touch = e.touches[0];
       touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
@@ -363,6 +365,14 @@ function InnerCanvasBoard({
     }
     return false;
   });
+
+  useEffect(() => {
+    const closeOverlayOnNarrowScreen = () => {
+      if (window.innerWidth < 1024) setIsSidebarOpen(false);
+    };
+    window.addEventListener('resize', closeOverlayOnNarrowScreen);
+    return () => window.removeEventListener('resize', closeOverlayOnNarrowScreen);
+  }, []);
 
   // Theologica AI Modal state
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
@@ -2298,7 +2308,7 @@ function InnerCanvasBoard({
           }
         } catch {}
       }
-      if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+      if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
         setIsSidebarOpen(true);
       }
     }
@@ -2654,7 +2664,7 @@ function InnerCanvasBoard({
         panOnScroll={false}
         selectionOnDrag={false}
         selectionKeyCode="Shift"
-        panOnDrag={true}
+        panOnDrag={[0, 1]}
         zoomOnPinch={true}
         zoomOnScroll={true}
         zoomOnDoubleClick={false}

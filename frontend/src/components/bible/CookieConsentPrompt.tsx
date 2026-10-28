@@ -64,7 +64,7 @@ export function CookieConsentPrompt({
   if (!isVisible) return null;
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-[99] pointer-events-none flex justify-center md:justify-start px-3 md:px-6 pb-[calc(58px+max(6px,calc(env(safe-area-inset-bottom,0px)-24px)))] md:pb-6">
+    <div className="fixed inset-x-0 bottom-0 z-[99] pointer-events-none flex justify-center md:justify-start px-3 md:px-6 pb-[calc(58px+var(--mobile-nav-bottom-padding))] md:pb-6">
       <aside
         aria-label="Cookie and storage notice"
         role="region"

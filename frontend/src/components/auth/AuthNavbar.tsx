@@ -25,8 +25,8 @@ export function AuthNavbar() {
 
   return (
     <header 
-      className="sticky top-0 z-40 min-h-14 h-[calc(3.5rem+env(safe-area-inset-top,0px))] border-b border-border flex items-center justify-between px-4 sm:px-8 bg-bg shrink-0 select-none" 
-      style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+      className="sticky top-0 z-40 min-h-14 h-[calc(3.5rem+var(--app-safe-top))] border-b border-border flex items-center justify-between px-4 sm:px-8 bg-bg shrink-0 select-none"
+      style={{ paddingTop: 'var(--app-safe-top)' }}
     >
       {/* Left: Brand Identity */}
       <Link 

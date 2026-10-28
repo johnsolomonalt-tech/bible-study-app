@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Merriweather } from "next/font/google";
 import "./globals.css";
+import { TruncatedButtonTooltip } from "@/components/ui/TruncatedButtonTooltip";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -68,7 +69,6 @@ import type { Viewport } from 'next';
 import { ClerkProvider } from '@clerk/nextjs';
 
 import { theologicaClerkAppearance } from '@/lib/clerkTheme';
-import { DisableBrowserContextMenu } from '@/components/DisableBrowserContextMenu';
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -150,8 +150,8 @@ export default function RootLayout({
         />
       </head>
       <body className={`${inter.variable} ${merriweather.variable} antialiased`}>
-        <DisableBrowserContextMenu />
         {children}
+        <TruncatedButtonTooltip />
       </body>
     </html>
     </ClerkProvider>

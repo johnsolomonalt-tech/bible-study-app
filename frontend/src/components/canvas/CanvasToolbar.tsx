@@ -254,7 +254,7 @@ export function CanvasToolbar({
                 type="button"
                 onClick={() => setIsEditingTitle(true)}
                 className="text-xs sm:text-sm font-bold tracking-tight hover:text-accent transition-colors truncate max-w-[90px] xs:max-w-[130px] sm:max-w-[200px] text-left cursor-pointer"
-                title="Click to rename canvas"
+                title={`${boardTitle || 'Untitled Canvas'} — click to rename`}
               >
                 <span className="truncate">{boardTitle || 'Untitled Canvas'}</span>
               </button>

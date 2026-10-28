@@ -379,6 +379,7 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
               key={`${item.prompt}-${idx}`}
               type="button"
               onClick={() => onSelectPrompt(item.prompt)}
+              title={item.prompt}
               className={`${idx >= 2 ? 'hidden sm:flex' : 'flex'} group text-left p-2 sm:p-2.5 rounded-xl bg-surface/35 hover:bg-surface border border-border/40 hover:border-accent/40 transition-all cursor-pointer items-center justify-between gap-1.5 sm:gap-2 active:scale-[0.99]`}
             >
               <div className="min-w-0 flex-1">
@@ -397,7 +398,7 @@ export const ChatEmptyState: React.FC<ChatEmptyStateProps> = ({
 
       {/* Study Topics (Desktop only when full view) */}
       {!isCompact && (
-        <div className="hidden lg:block w-full max-w-xl">
+        <div className="chat-study-lenses hidden lg:block w-full max-w-xl">
           <div className="flex items-center gap-2 mb-2 px-1">
             <Compass size={12} className="text-muted" />
             <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">
