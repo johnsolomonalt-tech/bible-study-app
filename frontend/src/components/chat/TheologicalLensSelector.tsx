@@ -201,11 +201,13 @@ export function TheologicalLensSelector({
           color: selected.accentColor,
         }}
         title={`Theological Perspective: ${selected.id === 'standard' ? 'General' : selected.name} (${includeOriginalRoots ? 'Roots On' : 'Roots Off'})`}
+        aria-label={`Theological Perspective: ${selected.id === 'standard' ? 'General' : selected.name} (${includeOriginalRoots ? 'Roots On' : 'Roots Off'})`}
       >
-        <span className="shrink-0">{selected.icon}</span>
-        <span className="font-semibold tracking-tight truncate max-w-[85px] xs:max-w-[110px] sm:max-w-none">
+        <span className="lens-trigger-icon shrink-0">{selected.icon}</span>
+        <span className="lens-trigger-label font-semibold tracking-tight truncate max-w-[85px] xs:max-w-[110px] sm:max-w-none">
           {selected.id === 'standard' ? 'Perspective' : selected.name}
         </span>
+        <span className="lens-trigger-short-label" aria-hidden="true">Lens</span>
         {includeOriginalRoots && (
           <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-accent/20 text-accent hidden xs:inline" title="Original roots enabled">
             Roots

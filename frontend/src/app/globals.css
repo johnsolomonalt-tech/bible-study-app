@@ -676,3 +676,17 @@ sup.verse-number {
 @media (max-height: 760px) {
   .chat-study-lenses { display: none; }
 }
+
+/* Adapt the AI header to the resizable panel, not the browser width. */
+.study-ai-panel { container-type: inline-size; }
+.lens-trigger-short-label { display: none; }
+@container (max-width: 360px) {
+  .study-ai-panel .study-ai-heading-icon,
+  .study-ai-panel .lens-trigger-icon,
+  .study-ai-panel .lens-trigger-label { display: none; }
+  .study-ai-panel .lens-trigger-short-label { display: inline; font-weight: 600; }
+}
+@container (max-width: 220px) {
+  .study-ai-panel .lens-trigger-short-label { display: none; }
+  .study-ai-panel .lens-trigger-icon { display: inline-flex; }
+}

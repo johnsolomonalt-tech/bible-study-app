@@ -8743,7 +8743,7 @@ export default function App() {
                 onDragLeave={handleChatDragLeave}
                 onDrop={handleChatDrop}
               >
-              <div className="w-full h-full flex flex-col min-h-0 min-w-0 overflow-hidden relative">
+              <div className="study-ai-panel w-full h-full flex flex-col min-h-0 min-w-0 overflow-hidden relative">
               {isDraggingOverChat && (
                 <div className="absolute inset-0 z-50 bg-bg/85 backdrop-blur-sm border-2 border-dashed border-accent rounded-2xl flex flex-col items-center justify-center p-6 text-center pointer-events-none transition-all animate-in fade-in zoom-in-95 duration-150 m-2 shadow-2xl">
                   <div className="w-14 h-14 rounded-2xl bg-accent/15 text-accent flex items-center justify-center mb-3 shadow-inner">
@@ -8758,8 +8758,8 @@ export default function App() {
                   <button onClick={() => setMobileStudyView('reader')} className="md:hidden p-1.5 -ml-1 text-fg-2 hover:text-fg shrink-0 cursor-pointer" title="Back to reader">
                     <ChevronLeft size={20} />
                   </button>
-                  <Sparkles size={16} className="hidden md:block text-accent shrink-0" />
-                  <span className="truncate">Study AI</span>
+                  <Sparkles size={16} className="study-ai-heading-icon hidden md:block text-accent shrink-0" />
+                  <span className="whitespace-nowrap">Study AI</span>
                 </div>
                 <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
                   <TheologicalLensSelector 
