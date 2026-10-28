@@ -690,3 +690,15 @@ sup.verse-number {
   .study-ai-panel .lens-trigger-short-label { display: none; }
   .study-ai-panel .lens-trigger-icon { display: inline-flex; }
 }
+
+/* The tab bar adapts to its available space, including when study controls are visible. */
+.workspace-tabs-container { container: workspace-tabs / inline-size; }
+.workspace-tab-short { display: none; }
+@container workspace-tabs (max-width: 620px) {
+  .workspace-tab-full { display: none; }
+  .workspace-tab-short { display: inline; }
+}
+@container workspace-tabs (max-width: 535px) {
+  .workspace-tab-short { display: none; }
+  .workspace-tab { min-width: 32px; justify-content: center; padding-inline: 8px; }
+}

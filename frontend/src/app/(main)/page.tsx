@@ -6057,7 +6057,7 @@ export default function App() {
         </div>
 
         {/* Center the tabs when they fit; auto margins collapse as space gets tight. */}
-        <div className="flex min-w-0 flex-1 items-center justify-start mx-2 lg:mx-4 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="workspace-tabs-container flex min-w-0 flex-1 items-center justify-start mx-2 lg:mx-4 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <nav 
             aria-label="Navigation Tabs"
             className="mx-auto flex w-max shrink-0 items-center gap-0.5 sm:gap-1 p-0.5 sm:p-1 bg-surface border border-border-soft/60 rounded-xl shadow-xs select-none"
@@ -6085,7 +6085,9 @@ export default function App() {
                     }
                   }}
                   title={label}
-                  className={`px-2 sm:px-2.5 xl:px-3 py-1 rounded-lg text-xs xl:text-[13px] font-semibold transition-colors duration-150 flex items-center gap-1 sm:gap-1.5 cursor-pointer whitespace-nowrap ${
+                  aria-label={label}
+                  aria-current={isActive ? "page" : undefined}
+                  className={`workspace-tab px-2 sm:px-2.5 xl:px-3 py-1 rounded-lg text-xs xl:text-[13px] font-semibold transition-colors duration-150 flex items-center gap-1 sm:gap-1.5 cursor-pointer whitespace-nowrap ${
                     isActive 
                       ? 'bg-bg text-fg shadow-xs border border-border-soft/60' 
                       : 'text-fg-2 hover:text-fg hover:bg-surface-hover/60 border border-transparent'
@@ -6097,8 +6099,8 @@ export default function App() {
                   {tab === 'notes' && <Edit size={13} className={isActive ? 'text-accent' : ''} />}
                   {tab === 'chats' && <Sparkles size={13} className={isActive ? 'text-accent' : ''} />}
                   {tab === 'tracker' && <Target size={13} className={isActive ? 'text-accent' : ''} />}
-                  <span className="capitalize hidden lg:inline">{label}</span>
-                  <span className="capitalize lg:hidden">{shortLabel}</span>
+                  <span className="workspace-tab-full capitalize">{label}</span>
+                  <span className="workspace-tab-short capitalize">{shortLabel}</span>
                 </button>
               );
             })}
