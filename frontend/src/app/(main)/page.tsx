@@ -262,13 +262,35 @@ const TypewriterTitle = ({ title }: { title: string }) => {
 const TypewriterMessage = ({
   content,
   onVerseClick,
+  isStreaming = false,
 }: {
   content: string;
   onVerseClick?: VerseClickHandler;
   onScrollToBottom?: () => void;
+  isStreaming?: boolean;
 }) => {
   const { imageBase64, textContent } = parseAiMessage(content);
-  const displayed = textContent;
+  const [displayed, setDisplayed] = useState(isStreaming ? '' : textContent);
+  const wasStreaming = useRef(isStreaming);
+  useEffect(() => {
+    if (isStreaming) wasStreaming.current = true;
+    if (!wasStreaming.current || imageBase64) {
+      setDisplayed(textContent);
+      return;
+    }
+    const timer = setInterval(() => {
+      setDisplayed(previous => {
+        if (!textContent.startsWith(previous)) return textContent;
+        const remaining = textContent.length - previous.length;
+        if (remaining <= 0) {
+          clearInterval(timer);
+          return previous;
+        }
+        return textContent.slice(0, previous.length + Math.max(2, Math.ceil(remaining / 8)));
+      });
+    }, 30);
+    return () => clearInterval(timer);
+  }, [textContent, imageBase64, isStreaming]);
   const mdComponents = useMemo(() => createMarkdownComponents(onVerseClick), [onVerseClick]);
 
   return (
@@ -608,6 +630,7 @@ const AiChatMessageView = ({
     content: string; 
     imagePreview?: string; 
     attachedFile?: { name: string; size: number; type: string };
+    isStreaming?: boolean;
   };
   index: number;
   totalMessages: number;
@@ -702,16 +725,16 @@ const AiChatMessageView = ({
       )}
 
       {/* ChatGPT-Style Source Tracker */}
-      <ChatSourceTracker
+      {!message.isStreaming && <ChatSourceTracker
         sources={sources}
         content={textContent}
         lens={effectiveLens}
         isCompact={!isFullView}
-      />
+      />}
 
       <div className={`w-full ${isFullView ? 'text-[15px] leading-[1.75]' : 'text-[14px] leading-relaxed'} text-fg overflow-x-hidden break-words markdown-body`}>
         {isLast ? (
-          <TypewriterMessage content={message.content} onVerseClick={onVerseClick} onScrollToBottom={onScrollToBottom} />
+          <TypewriterMessage content={message.content} isStreaming={message.isStreaming} onVerseClick={onVerseClick} onScrollToBottom={onScrollToBottom} />
         ) : (
           <>
             {imageBase64 && (
@@ -735,7 +758,7 @@ const AiChatMessageView = ({
         )}
       </div>
 
-      <AiMessageActions
+      {!message.isStreaming && <AiMessageActions
         content={message.content}
         chatTitle={chatTitle}
         chatId={chatId}
@@ -743,10 +766,10 @@ const AiChatMessageView = ({
         translation={translation}
         onSendToCanvas={onSendToCanvas}
         onSaveToNotes={onSaveToNotes}
-      />
+      />}
 
       {/* Tailored Follow-Ups */}
-      {isLast && onSelectPrompt && (
+      {isLast && !message.isStreaming && onSelectPrompt && (
         <ChatFollowUps
           questions={suggestedFollowUps}
           messageContent={textContent}
@@ -1565,7 +1588,7 @@ export default function App() {
   }, [activeBook.name, activeChapter, notes, highlights]);
 
   // Chats State
-  const [chats, setChats] = useState<{id: number, title: string, messages: {role: string, content: string}[]}[]>([]);
+  const [chats, setChats] = useState<{id: number, title: string, messages: {role: string, content: string, isStreaming?: boolean}[]}[]>([]);
   const [activeChatId, setActiveChatId] = useState<number | null>(null);
   const [mobileChatView, setMobileChatView] = useState<'chat' | 'list'>('chat');
   const [isChatInputFocused, setIsChatInputFocused] = useState(false);
@@ -5615,6 +5638,15 @@ export default function App() {
                     setAiActivityStatus(payload.status);
                   } else if (payload.type === 'thought' && payload.thought) {
                     setAiThinkingText(payload.thought);
+                  } else if (payload.type === 'text' && payload.text) {
+                    setChats(prev => prev.map(c => {
+                      if (c.id !== targetChatId) return c;
+                      const messages = [...c.messages];
+                      const last = messages[messages.length - 1];
+                      if (last?.isStreaming) messages[messages.length - 1] = { ...last, content: payload.text };
+                      else messages.push({ role: 'model', content: payload.text, isStreaming: true });
+                      return { ...c, messages };
+                    }));
                   } else if (payload.type === 'result') {
                     streamResult = payload;
                   } else if (payload.type === 'error') {
@@ -5649,7 +5681,7 @@ export default function App() {
             };
             setChats(prev => prev.map(c => {
               if (c.id === targetChatId) {
-                return { ...c, messages: [...c.messages, errorMsg] };
+                return { ...c, messages: [...c.messages.filter(m => !m.isStreaming), errorMsg] };
               }
               return c;
             }));
@@ -5689,7 +5721,7 @@ export default function App() {
         };
         setChats(prev => prev.map(c => {
           if (c.id === targetChatId) {
-            return { ...c, messages: [...c.messages, errorMsg] };
+            return { ...c, messages: [...c.messages.filter(m => !m.isStreaming), errorMsg] };
           }
           return c;
         }));
@@ -5704,7 +5736,7 @@ export default function App() {
       };
       setChats(prev => prev.map(c => {
         if (c.id === targetChatId) {
-          return { ...c, messages: [...c.messages, errorMsg] };
+          return { ...c, messages: [...c.messages.filter(m => !m.isStreaming), errorMsg] };
         }
         return c;
       }));
@@ -7010,7 +7042,7 @@ export default function App() {
                       />
                     ))
                   )}
-                  {isAiTyping && (
+                  {isAiTyping && !activeChat.messages[activeChat.messages.length - 1]?.isStreaming && (
                     <AiThinkingIndicator status={aiActivityStatus} thinkingText={aiThinkingText} />
                   )}
                 </div>
@@ -8893,7 +8925,7 @@ export default function App() {
                     />
                   ))
                 )}
-                {isAiTyping && (
+                {isAiTyping && !activeChat.messages[activeChat.messages.length - 1]?.isStreaming && (
                   <AiThinkingIndicator status={aiActivityStatus} thinkingText={aiThinkingText} />
                 )}
               </div>
@@ -9978,7 +10010,7 @@ export default function App() {
                     />
                   ))
                 )}
-                {isAiTyping && (
+                {isAiTyping && !activeChat.messages[activeChat.messages.length - 1]?.isStreaming && (
                   <AiThinkingIndicator status={aiActivityStatus} thinkingText={aiThinkingText} isFullView />
                 )}
               </div>

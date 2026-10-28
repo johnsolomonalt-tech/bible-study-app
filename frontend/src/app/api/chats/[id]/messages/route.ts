@@ -253,6 +253,7 @@ interface ProcessAiMessageParams {
   includeOriginalRoots?: boolean;
   onStatusUpdate?: (status: string) => void;
   onThoughtUpdate?: (thought: string) => void;
+  onTextUpdate?: (text: string) => void;
 }
 
 async function processAiMessage({
@@ -266,6 +267,7 @@ async function processAiMessage({
   includeOriginalRoots = false,
   onStatusUpdate,
   onThoughtUpdate,
+  onTextUpdate,
 }: ProcessAiMessageParams) {
   const userMessage = await saveOrMockMessage({
     content: content || '',
@@ -538,6 +540,10 @@ Do NOT guess or answer about a random chapter! Politely ask the user which book 
       const text = chunk.text || '';
       accumulated += text;
 
+      // Hold back the tail so partial metadata markers never flash in the answer.
+      const body = accumulated.split(/__(?:SOURCES|SUGGESTED_FOLLOW_UPS|LENS|THOUGHT)__|(?:^|\n)\s*(?:#{1,6}\s*)?(?:\*\*)?Suggested Follow[- ]?Ups/i)[0];
+      onTextUpdate?.(body.slice(0, Math.max(0, body.length - 32)));
+
       // Extract real-time thoughts as they stream in
       if (accumulated.includes('__THOUGHT__')) {
         const thoughtStart = accumulated.indexOf('__THOUGHT__') + '__THOUGHT__'.length;
@@ -685,6 +691,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             },
             onThoughtUpdate: (thought) => {
               send({ type: 'thought', thought });
+            },
+            onTextUpdate: (text) => {
+              send({ type: 'text', text });
             },
           });
 
