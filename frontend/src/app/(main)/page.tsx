@@ -6106,11 +6106,11 @@ export default function App() {
           </div>
         </div>
 
-        {/* Tabs share the available header space with the controls on every workspace. */}
+        {/* Center the tabs when they fit; auto margins collapse as space gets tight. */}
         <div className="flex min-w-0 flex-1 items-center justify-start mx-2 lg:mx-4 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <nav 
             aria-label="Navigation Tabs"
-            className="flex w-max shrink-0 items-center gap-0.5 sm:gap-1 p-0.5 sm:p-1 bg-surface border border-border-soft/60 rounded-xl shadow-xs select-none"
+            className="mx-auto flex w-max shrink-0 items-center gap-0.5 sm:gap-1 p-0.5 sm:p-1 bg-surface border border-border-soft/60 rounded-xl shadow-xs select-none"
           >
             {['study', 'canvas', 'devotional', 'notes', 'chats', 'tracker'].map(tab => {
               const label = tab === 'chats' ? 'AI Chats' : tab.charAt(0).toUpperCase() + tab.slice(1);
