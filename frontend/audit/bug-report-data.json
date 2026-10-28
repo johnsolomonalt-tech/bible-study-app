@@ -1,0 +1,886 @@
+{
+  "date": "October 26, 2026",
+  "timezone": "America/Chicago",
+  "baseCommit": "e82d6c82ca8ab30f7e85900e8c7f5e6b174ece49",
+  "lint": {
+    "errors": 0,
+    "warnings": 437,
+    "rules": {
+      "@typescript-eslint/no-unused-vars": 145,
+      "@typescript-eslint/no-explicit-any": 168,
+      "react-hooks/set-state-in-effect": 47,
+      "@next/next/no-img-element": 10,
+      "react-hooks/exhaustive-deps": 12,
+      "react-hooks/immutability": 12,
+      "react-hooks/refs": 17,
+      "react-hooks/purity": 6,
+      "react-hooks/preserve-manual-memoization": 11,
+      "prefer-const": 3,
+      "null": 1,
+      "@next/next/no-html-link-for-pages": 5
+    }
+  },
+  "dependencies": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 7,
+      "high": 10,
+      "critical": 1,
+      "total": 18
+    },
+    "dependencies": {
+      "prod": 572,
+      "dev": 177,
+      "optional": 93,
+      "peer": 41,
+      "peerOptional": 0,
+      "total": 859
+    }
+  },
+  "findings": [
+    {
+      "id": "F01",
+      "status": "Fixed",
+      "severity": "Critical",
+      "area": "Backend \u00b7 Chat",
+      "title": "Chat ownership checks granted access to arbitrary IDs",
+      "trigger": "A signed-in user requests another account\u2019s numeric chat ID. ownsChat attempted to create that ID, then registered an owner-scoped memory chat when the database rejected the duplicate.",
+      "impact": "The message writer and history loader subsequently used chatId without an owner filter. This allowed cross-account message injection and exposure of prior messages to AI processing. An ordinary missing-ID read also created records.",
+      "action": "Ownership lookup is now read-only. An existing database record determines ownership; memory collisions cannot override it. Only previously registered memory chats are accepted. Message writes connect through the authenticated owner filter, and database history queries also filter the related chat owner.",
+      "verification": "Behavior tests reject foreign, nonexistent, fractional and colliding IDs and verify no authorization-time writes.",
+      "refs": [
+        {
+          "file": "src/lib/chatIdentity.ts",
+          "line": 69
+        },
+        {
+          "file": "src/app/api/chats/[id]/messages/route.ts",
+          "line": 208
+        }
+      ]
+    },
+    {
+      "id": "F02",
+      "status": "Fixed",
+      "severity": "High",
+      "area": "Backend \u00b7 Guest identity",
+      "title": "Guest sessions were grouped by IP and had a public signing fallback",
+      "trigger": "Two browsers share an IP, or send no forwarded address. resolveChatIdentity always returned a guest owner key, so the cookie-creation branch in POST /api/chats never ran.",
+      "impact": "Unrelated guests could use the same server-side chat namespace. The literal signing fallback also made cookie signatures forgeable in an unconfigured environment.",
+      "action": "Unverified guests have no owner key. Chat creation issues a unique signed HttpOnly cookie. Signing requires GUEST_CHAT_SECRET or CLERK_SECRET_KEY. Malformed cookie encoding and invalid signature formats are rejected safely.",
+      "verification": "Behavior tests create two guests on the same IP, verify separate cookies and denied cross-access, exercise malformed cookies, and check 503 when signing is unconfigured. Existing IP-based guest sessions are intentionally invalidated.",
+      "refs": [
+        {
+          "file": "src/lib/chatIdentity.ts",
+          "line": 12
+        },
+        {
+          "file": "src/app/api/chats/route.ts",
+          "line": 58
+        }
+      ]
+    },
+    {
+      "id": "F03",
+      "status": "Fixed",
+      "severity": "High",
+      "area": "Backend \u00b7 Legal administration",
+      "title": "Any signed-in user could publish legal text",
+      "trigger": "An ordinary Clerk user calls PUT /api/legal/terms with replacement content.",
+      "impact": "The route checked authentication but did not require admin authorization or the developer unlock cookie.",
+      "action": "The route now enforces the same developer authorization guard as console APIs after the sign-in check.",
+      "verification": "Behavior test denies a signed-in non-admin and verifies that the content store is never called.",
+      "refs": [
+        {
+          "file": "src/app/api/legal/[slug]/route.ts",
+          "line": 35
+        }
+      ]
+    },
+    {
+      "id": "F04",
+      "status": "Fixed",
+      "severity": "High",
+      "area": "Backend \u00b7 Canvas sharing",
+      "title": "Revoked public canvas links remained readable from server memory",
+      "trigger": "A guest or non-owner reads a public board. The owner makes it private, then the reader requests the same ID again on that process.",
+      "impact": "The old public payload survived under the reader\u2019s cache key and was returned after the public database lookup stopped matching.",
+      "action": "Only owner records are cached. A memory fallback requires an authenticated owner lookup that actually failed, rather than a successful lookup returning no record.",
+      "verification": "Behavior test verifies public read followed by 404 after revocation for both anonymous and signed-in non-owners. Copies already downloaded cannot be recalled.",
+      "refs": [
+        {
+          "file": "src/app/api/canvas/route.ts",
+          "line": 143
+        }
+      ]
+    },
+    {
+      "id": "F05",
+      "status": "Fixed",
+      "severity": "High",
+      "area": "Frontend \u00b7 Notes export",
+      "title": "Note titles could inject HTML into the PDF print window",
+      "trigger": "Give a note a title containing a closing title tag or HTML, then export it as PDF.",
+      "impact": "Content was escaped, but the title was interpolated directly into document.write in both the title and heading. Imported or synced note titles could execute markup in the print window.",
+      "action": "Escape ampersands, angle brackets and quotes before inserting the title into the print document.",
+      "verification": "Behavior test executes the actual export handler with an HTML/script title and verifies escaped title and content.",
+      "refs": [
+        {
+          "file": "src/components/notes/NotesWorkspace.tsx",
+          "line": 855
+        }
+      ]
+    },
+    {
+      "id": "F06",
+      "status": "Fixed",
+      "severity": "Medium",
+      "area": "Backend \u00b7 Resource IDs",
+      "title": "Oversized chat IDs were silently mapped onto other chats",
+      "trigger": "Call a chat message, rename or delete endpoint with an ID outside PostgreSQL Int32 bounds.",
+      "impact": "Modulo arithmetic converted the requested resource into a different valid ID. Partial numeric note IDs were also accepted by parseInt.",
+      "action": "Reject invalid chat IDs without remapping. Note updates/deletes require positive safe integer strings.",
+      "verification": "Behavior tests verify oversized chat rejection without an ownership lookup and rejection of partial/negative note IDs.",
+      "refs": [
+        {
+          "file": "src/app/api/chats/[id]/route.ts",
+          "line": 10
+        },
+        {
+          "file": "src/app/api/chats/[id]/messages/route.ts",
+          "line": 236
+        },
+        {
+          "file": "src/app/api/notes/[id]/route.ts",
+          "line": 15
+        }
+      ]
+    },
+    {
+      "id": "F07",
+      "status": "Fixed",
+      "severity": "Medium",
+      "area": "Backend \u00b7 Chat validation",
+      "title": "Malformed chat payloads reached AI processing",
+      "trigger": "Submit invalid JSON, non-string content, an unsupported attachment type or an invalid theological lens.",
+      "impact": "Request handling could throw before producing a useful response; invalid or excessive field data could reach storage/provider code.",
+      "action": "Return 400 for invalid JSON and message structure. Validate content, attachment MIME/type/length and context fields; report an unconfigured AI service as 503.",
+      "verification": "Behavior test checks malformed JSON and non-string messages. Validation limits are field-level checks after JSON parsing, not an ingress byte limit.",
+      "refs": [
+        {
+          "file": "src/app/api/chats/[id]/messages/route.ts",
+          "line": 655
+        }
+      ]
+    },
+    {
+      "id": "F08",
+      "status": "Fixed",
+      "severity": "High",
+      "area": "Frontend \u00b7 Notes saving",
+      "title": "Editing one note cancelled another note\u2019s cloud save",
+      "trigger": "Edit note A, then edit note B within the one-second parent debounce; deleting B could also cancel A\u2019s save.",
+      "impact": "One shared timer meant only the latest note was sent to the server. Local storage could conceal the missing cloud update until another device was used.",
+      "action": "Track pending save timers by note ID. Updating or deleting a note only cancels that note\u2019s timer.",
+      "verification": "Behavior test executes the real updateNote function, edits two notes and observes two independent cloud saves.",
+      "refs": [
+        {
+          "file": "src/app/(main)/page.tsx",
+          "line": 1559
+        },
+        {
+          "file": "src/app/(main)/page.tsx",
+          "line": 5355
+        }
+      ]
+    },
+    {
+      "id": "F09",
+      "status": "Fixed",
+      "severity": "High",
+      "area": "Frontend \u00b7 Quick notes",
+      "title": "Failed quick-note creation could replace a draft with an error object",
+      "trigger": "Create a chapter quick note as a guest or while the notes API returns a non-2xx response.",
+      "impact": "The old handler parsed an error response as a new note and replaced the optimistic entry, losing its title/ID. Temporary drafts were not consistently saved locally.",
+      "action": "Create and persist a valid local draft first. Guests stay local. Signed-in creation replaces the temporary ID only after a successful response; later edits are carried forward.",
+      "verification": "Behavior tests verify guest creation without a cloud request and retention of a signed-in draft after HTTP 503.",
+      "refs": [
+        {
+          "file": "src/app/(main)/page.tsx",
+          "line": 5745
+        }
+      ]
+    },
+    {
+      "id": "F10",
+      "status": "Fixed",
+      "severity": "Medium",
+      "area": "Backend \u00b7 Notes",
+      "title": "Missing notes and malformed writes were reported as successful records",
+      "trigger": "PUT an absent memory-note ID, or POST a malformed JSON/non-string note.",
+      "impact": "An update could return a fabricated saved-note response. Invalid creates could become blank notes or store non-string data in memory.",
+      "action": "Missing memory updates return 404. Note creates and updates validate JSON object shape and title/content types.",
+      "verification": "Behavior tests check missing updates, malformed creates, non-string titles and zero persistence calls for rejected input.",
+      "refs": [
+        {
+          "file": "src/app/api/notes/[id]/route.ts",
+          "line": 44
+        },
+        {
+          "file": "src/app/api/notes/route.ts",
+          "line": 54
+        }
+      ]
+    },
+    {
+      "id": "F11",
+      "status": "Fixed",
+      "severity": "Medium",
+      "area": "Frontend / Backend \u00b7 Legal editor",
+      "title": "Repeated legal saves duplicated generated attribution sections",
+      "trigger": "Open Legal & Attributions in the developer editor, save, reopen and save again.",
+      "impact": "GET returned the source plus generated registry attributions, which the editor saved back as source; the public renderer appended them again.",
+      "action": "Add a raw-source option to the legal store/API and load that source in the editor. Public rendering continues to append current attributions.",
+      "verification": "Behavior test checks that raw legal source excludes generated notices while public content includes them.",
+      "refs": [
+        {
+          "file": "src/lib/legalContentStore.ts",
+          "line": 189
+        },
+        {
+          "file": "src/components/dev/DevLegalEditor.tsx",
+          "line": 32
+        }
+      ]
+    },
+    {
+      "id": "F12",
+      "status": "Fixed",
+      "severity": "Medium",
+      "area": "Backend \u00b7 Legal publication",
+      "title": "Filesystem publication failure was shown as success",
+      "trigger": "Save legal content on a read-only or otherwise unwritable application filesystem.",
+      "impact": "The API returned success after mutating only process memory. The published text could differ across instances or disappear on restart.",
+      "action": "Write the new document successfully before replacing the in-process cache. Write errors propagate to a failed API response.",
+      "verification": "Behavior test injects a read-only filesystem error and verifies both the exception and unchanged published cache. Durable multi-instance storage remains R08.",
+      "refs": [
+        {
+          "file": "src/lib/legalContentStore.ts",
+          "line": 224
+        }
+      ]
+    },
+    {
+      "id": "F13",
+      "status": "Fixed",
+      "severity": "High",
+      "area": "Backend \u00b7 Scripture integrity",
+      "title": "Verse cleanup deleted legitimate three-to-five-digit numbers",
+      "trigger": "A Bolls-source verse contains a legitimate numeric value, such as an age or count.",
+      "impact": "The blanket numeric-removal regex could alter Scripture text after markup cleanup.",
+      "action": "Remove the blanket numeric deletion while retaining explicit Strong\u2019s-tag and markup cleanup.",
+      "verification": "Behavior test requests a mocked Bolls passage and verifies that \u201c969 years\u201d survives while its Strong\u2019s tag is removed.",
+      "refs": [
+        {
+          "file": "src/app/api/bible/[version]/[book]/[chapter]/route.ts",
+          "line": 12
+        }
+      ]
+    },
+    {
+      "id": "F14",
+      "status": "Fixed",
+      "severity": "Low",
+      "area": "Frontend \u00b7 Bible provider",
+      "title": "Local translation loading bypassed registry source and attribution",
+      "trigger": "Add a new local source to the central translation registry, or request an invalid chapter through getPassage.",
+      "impact": "The client recognized only four hardcoded local IDs, omitted copyright fields from local payloads and returned empty chapter arrays for invalid chapter numbers.",
+      "action": "Resolve local directories and attributions from the registry, retain the special Strong\u2019s dataset path, and validate chapter bounds before cache lookup.",
+      "verification": "Behavior test checks Genesis bounds and registry-based BSB loading with attribution. No copyrighted text or licensing terms were modified.",
+      "refs": [
+        {
+          "file": "src/lib/bibleProvider.ts",
+          "line": 104
+        },
+        {
+          "file": "src/lib/bibleProvider.ts",
+          "line": 80
+        }
+      ]
+    },
+    {
+      "id": "F15",
+      "status": "Fixed",
+      "severity": "Medium",
+      "area": "Frontend \u00b7 Navigation",
+      "title": "Initial URL synchronization could erase a deep link before restoration",
+      "trigger": "Load /?tab=canvas or refresh with a saved non-study tab.",
+      "impact": "An earlier effect wrote the initial study state to both URL and storage before the later restore effect read them.",
+      "action": "Gate tab persistence until the initial URL and preference restoration has completed.",
+      "verification": "Behavior test invokes the actual synchronization callback before restoration and verifies zero preference writes.",
+      "refs": [
+        {
+          "file": "src/app/(main)/page.tsx",
+          "line": 834
+        },
+        {
+          "file": "src/app/(main)/page.tsx",
+          "line": 2130
+        }
+      ]
+    },
+    {
+      "id": "F16",
+      "status": "Fixed",
+      "severity": "Medium",
+      "area": "Frontend \u00b7 Devotionals",
+      "title": "Day navigation used a different calendar mapping than initial load",
+      "trigger": "In a non-leap year, navigate to a devotional on or after March 1.",
+      "impact": "Initial loading aligned to the 366-entry source, but day navigation passed an ordinary day number. The same displayed date could show different content after navigation.",
+      "action": "Map navigation day numbers onto the source\u2019s leap-day-aligned index, using the existing Chicago calendar convention.",
+      "verification": "Behavior test checks February 28, March 1 and December 31 in an ordinary year and February 29 in a leap year.",
+      "refs": [
+        {
+          "file": "src/lib/devotionals.ts",
+          "line": 78
+        },
+        {
+          "file": "src/app/(main)/page.tsx",
+          "line": 915
+        }
+      ]
+    },
+    {
+      "id": "F17",
+      "status": "Fixed",
+      "severity": "Medium",
+      "area": "Frontend \u00b7 Chat requests",
+      "title": "Repeated submits and stale recursive recovery could corrupt conversation state",
+      "trigger": "Press Enter repeatedly while chat creation/answering is pending, or receive a chat-not-found response.",
+      "impact": "The handler had no request lock; its recovery recursively called a closure that still held the old activeChatId and discarded attachment context. A truncated stream without a result could fail silently.",
+      "action": "Add an immediate in-flight ref guard, remove the stale recursive retry, and display an interruption error when a stream ends without a result.",
+      "verification": "Source review and TypeScript/build validation. Live chat/attachment/retry interactions remain blocked by local auth configuration; no automatic cold-start restoration is claimed.",
+      "refs": [
+        {
+          "file": "src/app/(main)/page.tsx",
+          "line": 3123
+        },
+        {
+          "file": "src/app/(main)/page.tsx",
+          "line": 5667
+        }
+      ]
+    },
+    {
+      "id": "F18",
+      "status": "Fixed",
+      "severity": "High",
+      "area": "Frontend \u00b7 Offline storage",
+      "title": "Private API caching and invalid offline responses",
+      "trigger": "An old service worker serves cached account API data, or an uncached Bible request fails offline.",
+      "impact": "Account-agnostic cached responses could survive session changes. A Bible fetch could resolve undefined rather than a valid Response.",
+      "action": "Final shared tree uses a single custom worker, bypasses private APIs/auth, purges known legacy private caches and returns 503 for missing offline passages. This audit added the explicit fallback regression; concurrent frontend work consolidated worker ownership.",
+      "verification": "This audit\u2019s worker test plus three concurrent worker tests pass. This does not resolve localStorage account isolation (R02) or certify an installed-device upgrade.",
+      "refs": [
+        {
+          "file": "public/sw.js",
+          "line": 52
+        },
+        {
+          "file": "public/sw.js",
+          "line": 71
+        },
+        {
+          "file": "next.config.ts",
+          "line": 2
+        }
+      ]
+    },
+    {
+      "id": "F19",
+      "status": "Fixed",
+      "severity": "Medium",
+      "area": "Backend \u00b7 Canvas inputs",
+      "title": "Truthy strings could enable sharing and import IDs could collide",
+      "trigger": "PATCH a board with isPublic: \"false\", or import two boards in the same millisecond.",
+      "impact": "Boolean(\"false\") evaluates true and could publish a board unexpectedly. Timestamp-only imported board IDs were collision-prone.",
+      "action": "Require an actual boolean and nonempty string board ID for sharing. Generate imported board IDs using crypto.randomUUID and reject non-string share codes.",
+      "verification": "Behavior test verifies string \u201cfalse\u201d returns 400 with no sharing write. UUID and code validation were checked in source and build.",
+      "refs": [
+        {
+          "file": "src/app/api/canvas/route.ts",
+          "line": 330
+        },
+        {
+          "file": "src/app/api/canvas/import/route.ts",
+          "line": 80
+        }
+      ]
+    },
+    {
+      "id": "F20",
+      "status": "Fixed",
+      "severity": "High",
+      "area": "Backend \u00b7 Account sync",
+      "title": "Streak and prayer sync returned success after Clerk failures",
+      "trigger": "Clerk user lookup or metadata update fails during GET/POST /api/streak.",
+      "impact": "The API could present default or merged data as synchronized even though nothing was saved. Clients could not distinguish an outage from a successful account update.",
+      "action": "Return 503 on account reads/writes that fail, so clients retain local progress and can retry.",
+      "verification": "Behavior tests inject read and write failures and verify 503 responses rather than a successful sync result. Merge/deletion semantics remain R04\u2013R05.",
+      "refs": [
+        {
+          "file": "src/app/api/streak/route.ts",
+          "line": 98
+        },
+        {
+          "file": "src/app/api/streak/route.ts",
+          "line": 254
+        }
+      ]
+    },
+    {
+      "id": "R01",
+      "status": "Needs review",
+      "severity": "Critical",
+      "area": "Dependencies",
+      "title": "Installed dependencies have unresolved security advisories",
+      "trigger": "npm audit on the current lockfile reports 18 vulnerable packages: 1 critical, 10 high and 7 moderate. next is pinned to 16.2.10.",
+      "impact": "Registry advisories include image-optimization code-execution risks and a conditional Turbopack middleware bypass. Advisory severity is not proof that each issue is reachable in this app; the app has no matching single-locale config in the inspected next.config.",
+      "action": "Review and test a coordinated Next.js / eslint-config-next upgrade. npm audit currently proposes Next 16.4.3. Review transitive patches separately; some suggested PWA/typography fixes are major-version/downgrade resolutions. Do not run audit fix --force blindly.",
+      "verification": "Registry scan completed; two advisory pages were independently checked. No exploit was run, dependency upgrade performed or lockfile changed. See dependency-audit.json for complete ranges and paths.",
+      "refs": [
+        {
+          "file": "package.json",
+          "line": 29
+        },
+        {
+          "file": "package-lock.json",
+          "line": 9178
+        }
+      ]
+    },
+    {
+      "id": "R02",
+      "status": "Needs review",
+      "severity": "High",
+      "area": "Frontend \u00b7 Account privacy",
+      "title": "Local study data is not isolated by account",
+      "trigger": "Use account A on a browser, sign out, then sign into B or use guest mode. Notes/highlights/canvas/prayers/streaks use shared localStorage keys.",
+      "impact": "The next session can display prior private content. Some loaders merge local data into cloud state, creating a risk of copying A\u2019s data into B\u2019s account. Fixing the service worker alone does not fix this.",
+      "action": "Choose an explicit guest-to-account migration policy. Namespace account data, clear in-memory state on identity change, cancel in-flight work, and require a deliberate decision before importing legacy unscoped records. Add two-account browser tests.",
+      "verification": "Source-confirmed shared keys and merge flows; no real account-switch test was possible. Existing private data was not deleted or reassigned.",
+      "refs": [
+        {
+          "file": "src/app/(main)/page.tsx",
+          "line": 1538
+        },
+        {
+          "file": "src/components/canvas/CanvasBoard.tsx",
+          "line": 347
+        },
+        {
+          "file": "src/lib/prayerService.ts",
+          "line": 42
+        },
+        {
+          "file": "src/lib/streakService.ts",
+          "line": 69
+        }
+      ]
+    },
+    {
+      "id": "R03",
+      "status": "Needs review",
+      "severity": "High",
+      "area": "Backend \u00b7 Durability",
+      "title": "Cloud save/delete APIs still acknowledge volatile memory fallbacks",
+      "trigger": "A database operation fails in canvas, notes or chat routes; a later request lands on another serverless instance or the process restarts.",
+      "impact": "Several writes/deletes still return successful responses after only memory changes. Data may disappear, deletions may reappear, or a cloud list may omit a memory-only record. Random Int32 memory-chat IDs can collide with future DB IDs.",
+      "action": "Define a durable offline/outbox protocol and a visible local-versus-cloud save state. Return explicit degraded status or 503 for failed durable writes, retry through owner-scoped storage, and decide how to migrate existing fallback IDs.",
+      "verification": "Source-confirmed catch/success paths. The F20/F12 fixes address streak and legal false success only; they do not certify all persistence routes.",
+      "refs": [
+        {
+          "file": "src/app/api/canvas/route.ts",
+          "line": 259
+        },
+        {
+          "file": "src/app/api/notes/route.ts",
+          "line": 70
+        },
+        {
+          "file": "src/app/api/chats/[id]/route.ts",
+          "line": 25
+        },
+        {
+          "file": "src/lib/memoryChatStore.ts",
+          "line": 23
+        }
+      ]
+    },
+    {
+      "id": "R04",
+      "status": "Needs review",
+      "severity": "High",
+      "area": "Frontend / Backend \u00b7 Prayer sync",
+      "title": "Deleted prayers can reappear and later prayers are silently capped",
+      "trigger": "Delete a previously synced prayer, then pull or push account state. Or accumulate more than 50 server-side prayers.",
+      "impact": "Both client and server union by ID without deletion tombstones, so absence cannot express deletion. The server slices the merged map to 50 entries, potentially discarding new prayers after older server entries.",
+      "action": "Choose deletion retention and conflict rules. Add tombstones or an explicit delete endpoint and move journals to a suitable durable store rather than silently truncating account metadata.",
+      "verification": "Source-confirmed merge algorithm; no private prayers were inspected or changed.",
+      "refs": [
+        {
+          "file": "src/lib/prayerService.ts",
+          "line": 136
+        },
+        {
+          "file": "src/lib/prayerService.ts",
+          "line": 191
+        },
+        {
+          "file": "src/app/api/streak/route.ts",
+          "line": 230
+        }
+      ]
+    },
+    {
+      "id": "R05",
+      "status": "Needs review",
+      "severity": "High",
+      "area": "Frontend / Backend \u00b7 Daily progress",
+      "title": "Daily habits have no date and merges prevent undo",
+      "trigger": "Sync yesterday\u2019s nonempty todayGoals after midnight, or unmark a chapter and sync again.",
+      "impact": "Server metadata stores todayGoals without a date; clients merge it into their current local day. Boolean OR and max(count) restore removed progress. Browser/server/Chicago day boundaries differ, and repeated subtraction of 24 hours is unsafe around daylight-saving changes.",
+      "action": "Define the user\u2019s calendar/timezone and per-day event model. Persist dated activity, support removals, and migrate old undated metadata deliberately. Test midnight, DST and cross-device undo.",
+      "verification": "Source-confirmed date-free merge and OR/max behavior; midnight/DST integration was not executed.",
+      "refs": [
+        {
+          "file": "src/app/api/streak/route.ts",
+          "line": 203
+        },
+        {
+          "file": "src/lib/streakService.ts",
+          "line": 494
+        },
+        {
+          "file": "src/lib/streakSyncClient.ts",
+          "line": 39
+        }
+      ]
+    },
+    {
+      "id": "R06",
+      "status": "Needs review",
+      "severity": "High",
+      "area": "Frontend \u00b7 Canvas loading",
+      "title": "A slow board load can clear dirty state for newer edits",
+      "trigger": "Edit a board while its remote request is pending, or switch boards before a previous load finishes.",
+      "impact": "loadBoardData leaves loading true during the request; finally unconditionally clears isDirtyRef and sets saved. The autosave effect can skip the edit while loading and never rerun when only refs change. A previous load can also reset the new board\u2019s status.",
+      "action": "Use cancellable, generation-scoped loads and a per-board edit revision. Enable local edits independently of remote loading; clear dirty only after saving the exact revision. Decide conflict resolution for remote versus local edits.",
+      "verification": "Source-confirmed ref/effect sequence; slow-network UI reproduction remains pending.",
+      "refs": [
+        {
+          "file": "src/components/canvas/CanvasBoard.tsx",
+          "line": 1097
+        },
+        {
+          "file": "src/components/canvas/CanvasBoard.tsx",
+          "line": 1229
+        },
+        {
+          "file": "src/components/canvas/CanvasBoard.tsx",
+          "line": 1433
+        }
+      ]
+    },
+    {
+      "id": "R07",
+      "status": "Needs review",
+      "severity": "High",
+      "area": "Frontend \u00b7 Sharing UX",
+      "title": "Opening Share automatically publishes the board",
+      "trigger": "Open the sharing modal for a private board.",
+      "impact": "The effect immediately PATCHes isPublic=true, suppresses errors, and offers a share link even if publication failed. No matching unpublish control was found in that modal. Users may expose a board merely by inspecting sharing options.",
+      "action": "Choose an explicit publish/private control and publication confirmation UX. Show server-confirmed status and failures before copying a link; expose revocation. Preserve F04\u2019s backend authorization checks.",
+      "verification": "Source-confirmed automatic effect. No board was published during this audit.",
+      "refs": [
+        {
+          "file": "src/components/canvas/ShareCanvasModal.tsx",
+          "line": 39
+        }
+      ]
+    },
+    {
+      "id": "R08",
+      "status": "Needs review",
+      "severity": "High",
+      "area": "Backend \u00b7 Legal storage",
+      "title": "Legal publishing still relies on the application filesystem",
+      "trigger": "Publish legal text on Vercel or across multiple application instances.",
+      "impact": "The source path is a local file and the read cache is process-local. Even if a write succeeds on one writable host, other instances may retain defaults or old content. Public cache headers also delay visibility.",
+      "action": "Choose a database/CMS-backed versioned document store or a repository-driven publishing flow. Include revision history and cache invalidation. The new fail-on-write behavior avoids false success but does not provide distributed durability.",
+      "verification": "Source-confirmed filesystem and memory architecture; production publishing was not attempted.",
+      "refs": [
+        {
+          "file": "src/lib/legalContentStore.ts",
+          "line": 141
+        },
+        {
+          "file": "src/app/api/legal/[slug]/route.ts",
+          "line": 21
+        }
+      ]
+    },
+    {
+      "id": "R09",
+      "status": "Needs review",
+      "severity": "Medium",
+      "area": "AI \u00b7 Research integrity",
+      "title": "Research/analysis can be labelled verified without retrieval",
+      "trigger": "Ask for a theological answer whose provider output omits thought or source tags.",
+      "impact": "The route manufactures a fallback thought narrative and builds source links heuristically; the inspected provider calls do not use a retrieval/grounding tool. Status messages claim consultation or verification that is not evidenced by those calls.",
+      "action": "Choose product wording and research guarantees. Distinguish suggested reading from retrieved citations, remove manufactured claims, and add actual retrieval/provenance if \u201cverified\u201d is promised. The theological stance itself was left unchanged.",
+      "verification": "Source-confirmed provider configuration and fallback construction; no paid AI request was sent.",
+      "refs": [
+        {
+          "file": "src/app/api/chats/[id]/messages/route.ts",
+          "line": 599
+        },
+        {
+          "file": "src/lib/chatSources.ts",
+          "line": 129
+        }
+      ]
+    },
+    {
+      "id": "R10",
+      "status": "Needs review",
+      "severity": "Medium",
+      "area": "AI \u00b7 Scripture grounding",
+      "title": "Client-supplied passage text is declared authoritative",
+      "trigger": "Send a custom scriptureContext.text with a valid-looking reference and translation.",
+      "impact": "The backend accepts the caller\u2019s text as verified ground truth and instructs the model to treat it as authoritative. A modified client or a bad local cache can cause a false quotation to be treated as Scripture.",
+      "action": "Resolve recognized references from trusted translation data server-side. Decide how to label user excerpts and unsupported translations instead of calling them verified Scripture.",
+      "verification": "Source-confirmed trust boundary. The added shape checks reject malformed fields but do not verify semantic accuracy.",
+      "refs": [
+        {
+          "file": "src/app/api/chats/[id]/messages/route.ts",
+          "line": 419
+        }
+      ]
+    },
+    {
+      "id": "R11",
+      "status": "Needs review",
+      "severity": "Medium",
+      "area": "Backend \u00b7 Copyrighted translations",
+      "title": "API.Bible parsing and usage integration need provider fixtures",
+      "trigger": "Enable a copyrighted translation with a real API key and receive a nested chapter AST, empty content or required usage token.",
+      "impact": "The fallback may assign the content AST itself to a verse text string. There are no provider contract fixtures. The reader\u2019s fums.api.bible usage fetch is absent from connect-src, so that existing beacon is blocked by the current CSP.",
+      "action": "Validate a real licensed provider response, add AST fixtures and fail clearly on unusable content. Reconcile the beacon domain, caching periods and permission claims with the actual integration agreement.",
+      "verification": "Source-confirmed fallback/type inconsistency and CSP/domain mismatch. No licensed response or publisher agreement was available; no legal conclusion is asserted.",
+      "refs": [
+        {
+          "file": "src/app/api/bible/[version]/[book]/[chapter]/route.ts",
+          "line": 217
+        },
+        {
+          "file": "src/app/(main)/page.tsx",
+          "line": 5052
+        },
+        {
+          "file": "next.config.ts",
+          "line": 11
+        }
+      ]
+    },
+    {
+      "id": "R12",
+      "status": "Needs review",
+      "severity": "Medium",
+      "area": "Backend \u00b7 Request contracts",
+      "title": "Validation and resource limits are uneven outside the fixed paths",
+      "trigger": "Send non-string/oversized values to canvas/AI routes, a fake but regex-matching tracker chapter, or repeated writes to persistent CRUD APIs.",
+      "impact": "Several handlers trust TypeScript annotations at runtime, accept permissive chapter IDs, have no ingress size limit, or classify parse/type errors as server failures. Costly history/provider requests have no explicit total context bound or timeout.",
+      "action": "Choose common API size/rate budgets and schema/error conventions. Validate canonical tracker references and all graph fields, bound history, add provider timeouts and use platform request limits. Avoid silently dropping legitimate large study boards.",
+      "verification": "Source-confirmed incomplete contracts; no load/abuse test or destructive request was run.",
+      "refs": [
+        {
+          "file": "src/app/api/tracker/route.ts",
+          "line": 30
+        },
+        {
+          "file": "src/app/api/canvas/route.ts",
+          "line": 193
+        },
+        {
+          "file": "src/app/api/canvas/ai/route.ts",
+          "line": 136
+        },
+        {
+          "file": "src/app/api/canvas/export-guide/route.ts",
+          "line": 149
+        }
+      ]
+    },
+    {
+      "id": "R13",
+      "status": "Needs review",
+      "severity": "Medium",
+      "area": "Backend \u00b7 Admin policy",
+      "title": "Unmatched admin identities are allowed when environment allowlists are absent",
+      "trigger": "Configure database admin identities but leave ADMIN_USER_IDS/ADMIN_EMAILS empty; another signed-in user reaches isAuthorizedAdmin.",
+      "impact": "The final fallback returns true even when the database config did not match. The developer passcode remains required, so this is a policy weakness rather than an unauthenticated console bypass. Removed emails may still match adminEmail or allowedUserIds.",
+      "action": "Decide whether possession of the passcode intentionally permits any authenticated user to become an admin. If identity allowlists are mandatory, fail closed once configured and make revocation consistent across IDs, emails and sessions.",
+      "verification": "Source-confirmed deliberate fallback/comment. Policy was not silently changed and no credentials were inspected.",
+      "refs": [
+        {
+          "file": "src/lib/devAuth.ts",
+          "line": 167
+        },
+        {
+          "file": "src/app/api/console-7d8f9e6b4a3c21d0/settings/route.ts",
+          "line": 63
+        }
+      ]
+    },
+    {
+      "id": "R14",
+      "status": "Needs review",
+      "severity": "Medium",
+      "area": "Backend \u00b7 Admin metrics",
+      "title": "User list and platform streak metrics stop at 100 accounts",
+      "trigger": "The platform grows past the first 100 newest Clerk users.",
+      "impact": "Console user listing and streak metrics use one getUserList page with limit:100. Metrics named platform totals/counts and leaderboard can omit older active users even while totalCount suggests more users exist.",
+      "action": "Add paginated user listing and decide a scalable aggregation strategy for platform metrics; avoid fetching all private metadata synchronously on every dashboard load.",
+      "verification": "Source-confirmed pagination omission; not tested against a 101-user account.",
+      "refs": [
+        {
+          "file": "src/app/api/console-7d8f9e6b4a3c21d0/users/route.ts",
+          "line": 110
+        },
+        {
+          "file": "src/app/api/console-7d8f9e6b4a3c21d0/stats/route.ts",
+          "line": 156
+        }
+      ]
+    },
+    {
+      "id": "R15",
+      "status": "Needs review",
+      "severity": "Medium",
+      "area": "Content \u00b7 Canon and attribution",
+      "title": "Packaged texts include chapters outside the app\u2019s declared canon",
+      "trigger": "Compare the packaged books with the central 66-book chapter registry.",
+      "impact": "WEB Psalms contains 151 chapters while navigation permits 150. KJV Esther contains 16 chapters while navigation permits 10. These source texts are inaccessible through the canonical reader. KJV short copyright wording also conflicts with the longer registry notice\u2019s UK exception.",
+      "action": "Have a content owner decide which source editions/canon to support and whether extended material should be discoverable. Reconcile notices with the source and permissions. Do not delete or rewrite these chapters automatically.",
+      "verification": "All 264 packaged book JSON files were parsed; the two chapter-count differences are recorded in scripture-chapter-anomalies.json. Structural checks do not certify translation fidelity.",
+      "refs": [
+        {
+          "file": "src/lib/bibleCanon.ts",
+          "line": 30
+        },
+        {
+          "file": "src/lib/bibleTranslations.ts",
+          "line": 107
+        },
+        {
+          "file": "public/bibles/web/PSA.json",
+          "line": 1
+        },
+        {
+          "file": "public/bibles/kjv/EST.json",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "R16",
+      "status": "Needs review",
+      "severity": "Low",
+      "area": "Quality \u00b7 Maintainability",
+      "title": "Passing checks do not provide broad runtime regression coverage",
+      "trigger": "Run npm test and lint on the baseline.",
+      "impact": "The original 18 tests largely inspect strings or recreate simplified logic rather than executing production handlers. Lint accepts many hooks/type warnings; the main page exceeds 500 KB of source. Individual warnings are not all confirmed runtime bugs.",
+      "action": "Keep the new behavioral tests, add authenticated browser/database tests and a warning budget, and extract persistence/reader/chat responsibilities gradually. Review middleware-to-proxy migration during the framework upgrade.",
+      "verification": "Baseline: 18 tests passed, TypeScript passed, lint had 443 warnings/0 errors, and production build passed. Final measured results are below; a clean build is not a production certification.",
+      "refs": [
+        {
+          "file": "scripts/verify-security.mjs",
+          "line": 58
+        },
+        {
+          "file": "eslint.config.mjs",
+          "line": 22
+        },
+        {
+          "file": "src/app/(main)/page.tsx",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "R17",
+      "status": "Needs review",
+      "severity": "Medium",
+      "area": "Deployment \u00b7 Database baseline",
+      "title": "Migration baseline assumes schema completeness from only two tables",
+      "trigger": "Run baseline-database.mjs against a legacy database that has Note and Chat but lacks other initial-migration tables or columns.",
+      "impact": "The script can mark the entire initial migration applied after checking only Note/Chat existence. Later migrations or application queries can fail against missing schema. The migration runner also rewrites pooled URLs using string substitutions.",
+      "action": "Compare the actual legacy schema with the complete baseline before marking it applied. Define a supported pooler/direct URL policy and test upgrade paths on an isolated copy. Do not repair the live database without inspecting it.",
+      "verification": "Source-confirmed baseline predicate. No migration or production database write was performed.",
+      "refs": [
+        {
+          "file": "scripts/baseline-database.mjs",
+          "line": 12
+        },
+        {
+          "file": "scripts/run-migrations.mjs",
+          "line": 18
+        }
+      ]
+    },
+    {
+      "id": "B01",
+      "status": "Blocked verification",
+      "severity": "High",
+      "area": "Environment \u00b7 Browser QA",
+      "title": "Local app cannot render without the Clerk publishable key",
+      "trigger": "Start the production server on localhost:3107 and open the workspace.",
+      "impact": "The page returns Internal Server Error. The server logs explicitly report @clerk/nextjs: Missing publishableKey, so desktop/mobile interactions cannot be certified in this environment.",
+      "action": "Configure a valid local/test NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY and matching Clerk settings, rebuild if necessary, then run the UI acceptance checklist. No fake credentials or authentication bypass were introduced.",
+      "verification": "Observed in the in-app browser and server log. Startup/build success did not reveal this runtime configuration problem.",
+      "refs": [
+        {
+          "file": "src/app/layout.tsx",
+          "line": 86
+        },
+        {
+          "file": ".env.example",
+          "line": 21
+        }
+      ]
+    },
+    {
+      "id": "B02",
+      "status": "Blocked verification",
+      "severity": "Medium",
+      "area": "Integrations \u00b7 Acceptance",
+      "title": "Live database, AI and authenticated cross-device workflows remain unverified",
+      "trigger": "Full acceptance requires separate test accounts, an isolated database and configured provider integrations.",
+      "impact": "Mocked regression checks cannot establish actual Clerk cookie behavior, database outage recovery, model availability, provider quotas, canvas sharing across devices or mobile/PWA behavior.",
+      "action": "Use dedicated test services and the acceptance checklist below. Verify configured AI model IDs, authorized fallback behavior and deployment settings. Do not treat the health endpoint\u2019s key-presence checks or hardcoded all_passing status as a live service probe.",
+      "verification": "No production mutations, AI charges, deployment or schema migration were performed.",
+      "refs": [
+        {
+          "file": "src/app/api/console-7d8f9e6b4a3c21d0/health/route.ts",
+          "line": 58
+        },
+        {
+          "file": "src/app/api/chats/[id]/messages/route.ts",
+          "line": 15
+        }
+      ]
+    }
+  ]
+}

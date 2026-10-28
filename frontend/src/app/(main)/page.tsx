@@ -205,17 +205,26 @@ function parseAiMessage(content: string): {
     text = text.replace(/__LENS__[\s\S]*?__END_LENS__/, '').trim();
   }
 
-  const followUpsMatch = text.match(/__SUGGESTED_FOLLOW_UPS__([\s\S]*?)__END_SUGGESTED_FOLLOW_UPS__/);
+  const followUpsMatch = text.match(/__SUGGESTED_FOLLOW_UPS__([\s\S]*?)(?:__END_SUGGESTED_FOLLOW_UPS__|$)/);
   if (followUpsMatch) {
+    const raw = followUpsMatch[1].trim();
     try {
-      const parsed = JSON.parse(followUpsMatch[1].trim());
-      if (Array.isArray(parsed)) {
-        suggestedFollowUps = parsed.map(String);
-      }
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) suggestedFollowUps = parsed.filter((item): item is string => typeof item === 'string' && !!item.trim()).map(item => item.trim()).slice(0, 3);
     } catch {
-      // ignore parsing error
+      suggestedFollowUps = raw.split('\n').map(line => line.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim()).filter(Boolean).slice(0, 3);
     }
-    text = text.replace(/__SUGGESTED_FOLLOW_UPS__[\s\S]*?__END_SUGGESTED_FOLLOW_UPS__/, '').trim();
+    text = text.replace(followUpsMatch[0], '').trim();
+  } else {
+    // Models sometimes use a Markdown heading instead of the requested markers.
+    const section = text.match(/(?:^|\n)\s*(?:#{1,6}\s*)?(?:\*\*)?Suggested Follow[- ]?Ups(?:\*\*)?\s*:?\s*\n([\s\S]*)$/i);
+    if (section) {
+      const questions = section[1].split('\n').map(line => line.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim()).filter(line => line.endsWith('?'));
+      if (questions.length) {
+        suggestedFollowUps = questions.slice(0, 3);
+        text = text.slice(0, section.index).trim();
+      }
+    }
   }
 
   return { imageBase64, textContent: text, theologicalLens, suggestedFollowUps, thoughtContent, sources };
@@ -259,41 +268,8 @@ const TypewriterMessage = ({
   onScrollToBottom?: () => void;
 }) => {
   const { imageBase64, textContent } = parseAiMessage(content);
-  const [displayed, setDisplayed] = useState(() => seenMessages.has(content) ? textContent : '');
+  const displayed = textContent;
   const mdComponents = useMemo(() => createMarkdownComponents(onVerseClick), [onVerseClick]);
-  
-  useEffect(() => {
-    if (seenMessages.has(content)) {
-      setDisplayed(textContent);
-      return;
-    }
-    if (imageBase64) {
-      // Images don't need typewriter — just mark as seen
-      seenMessages.add(content);
-      setDisplayed(textContent);
-      return;
-    }
-    
-    let index = 0;
-    // Smooth streaming chunk updates at 20fps (~50ms intervals) to prevent main-thread AST re-parsing churn
-    const interval = setInterval(() => {
-      if (seenMessages.has(content)) {
-        clearInterval(interval);
-        setDisplayed(textContent);
-        return;
-      }
-      index += 22;
-      if (index > textContent.length) index = textContent.length;
-      setDisplayed(textContent.slice(0, index));
-      
-      if (index >= textContent.length) {
-        clearInterval(interval);
-        seenMessages.add(content);
-      }
-    }, 48);
-    
-    return () => clearInterval(interval);
-  }, [content, textContent, imageBase64]);
 
   return (
     <>
@@ -6098,11 +6074,11 @@ export default function App() {
           </div>
         </div>
 
-        {/* Center: Tabs (Desktop & Tablet) — Anchored strictly in the viewport middle at all times */}
-        <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10 px-3">
+        {/* Tabs share the available header space with the controls on every workspace. */}
+        <div className="flex min-w-0 flex-1 items-center justify-start mx-2 lg:mx-4 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <nav 
             aria-label="Navigation Tabs"
-            className="pointer-events-auto flex items-center gap-0.5 sm:gap-1 p-0.5 sm:p-1 bg-surface border border-border-soft/60 rounded-xl shadow-xs select-none"
+            className="flex w-max shrink-0 items-center gap-0.5 sm:gap-1 p-0.5 sm:p-1 bg-surface border border-border-soft/60 rounded-xl shadow-xs select-none"
           >
             {['study', 'canvas', 'devotional', 'notes', 'chats', 'tracker'].map(tab => {
               const label = tab === 'chats' ? 'AI Chats' : tab.charAt(0).toUpperCase() + tab.slice(1);

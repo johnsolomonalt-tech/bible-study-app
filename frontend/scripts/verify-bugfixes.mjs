@@ -273,3 +273,17 @@ test('Malformed note creates do not persist blank or non-string records', async 
   assert.equal((await route.POST(new Request('https://example.test/api/notes', { method: 'POST', body: '{invalid' }))).status, 400);
   assert.equal(writes, 0);
 });
+
+test('Database message writes connect through the authenticated owner filter', async () => {
+  const source = fs.readFileSync('src/app/api/chats/[id]/messages/route.ts', 'utf8');
+  const start = source.indexOf('async function saveOrMockMessage');
+  const snippet = source.slice(start, source.indexOf('\nexport async function GET', start));
+  const compiled = ts.transpileModule(snippet + '\nexports.fn = saveOrMockMessage;', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
+  let write;
+  const exports = {};
+  vm.runInNewContext(compiled, { exports, process: { env: { DATABASE_URL: 'mock' } }, isValidDbId: () => true, prisma: { message: { create: async input => { write = input; return { id: 1 }; } } } });
+  await exports.fn({ content: 'A message', role: 'user', chatId: 12, identity: { kind: 'user', userId: 'owner' } });
+  assert.equal(write.data.chat.connect.id, 12);
+  assert.equal(write.data.chat.connect.userId, 'owner');
+  assert.equal(write.data.chatId, undefined);
+});

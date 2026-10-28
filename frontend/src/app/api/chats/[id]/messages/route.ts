@@ -32,19 +32,6 @@ If the user asks about "this chapter", "the chapter", "this passage", "the story
   "Which book and chapter would you like to explore? (For example: **Genesis 1**, **Psalm 23**, or **Romans 8**). Tell me the passage you're reading, and I will be glad to walk through it with you!"
 - Only provide an exegesis or chapter breakdown when the specific biblical book and chapter are clearly identified either in the prompt or in the attached Scripture ground truth context.
 
-MANDATORY THEOLOGICAL REASONING PROCESS (THINKING TRACE):
-At the very beginning of every study response, before providing your final answer, you MUST conduct your internal theological thinking and exegetical analysis enclosed strictly within __THOUGHT__ and __END_THOUGHT__ tags:
-
-__THOUGHT__
-- Query Analysis: [Analyze the user's inquiry, theological themes, and intent]
-- Scripture Canon & Ground Truth: [Primary scriptures, key verses across OT/NT, and cross-references]
-- Linguistic Analysis: [Analyze textual meaning, grammar, and literary context]
-- Hermeneutical & Lens Synthesis: [Doctrinal reasoning through the active theological lens]
-- Pastoral Application Outline: [Core spiritual takeaways and outline for the believer]
-__END_THOUGHT__
-
-Immediately following __END_THOUGHT__, provide your full, beautifully written biblical answer for the user.
-
 SCRIPTURE CITATION FORMATTING:
 Whenever citing or referencing Bible passages or verses in your response, always cite them clearly in standard canonical book and chapter/verse notation (for example: **John 14:27**, **Romans 8:28**, **Genesis 1:1**, **Psalm 23:1**, **1 Corinthians 13:4-7**). Standard references are automatically converted into interactive links for the user to open and read directly in the application's Bible reader.
 
@@ -208,7 +195,13 @@ You are guiding the user with a gentle, prayerful, contemplative heart focused o
 async function saveOrMockMessage(data: { content: string; role: string; chatId: number; identity: ChatIdentity }) {
   if (data.identity.kind === 'user' && process.env.DATABASE_URL && isValidDbId(data.chatId)) {
     try {
-      return await prisma.message.create({ data: { content: data.content, role: data.role, chatId: data.chatId } });
+      return await prisma.message.create({
+        data: {
+          content: data.content,
+          role: data.role,
+          chat: { connect: { id: data.chatId, userId: data.identity.userId } },
+        },
+      });
     } catch (e) {
       console.warn('Prisma message write skipped:', e);
     }
@@ -238,7 +231,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       });
       if (chat) {
         const messages = await prisma.message.findMany({
-          where: { chatId },
+          where: { chatId, chat: { userId: identity.userId } },
           orderBy: { createdAt: 'asc' },
         });
         return NextResponse.json(messages);
@@ -389,7 +382,7 @@ async function processAiMessage({
   if (identity.kind === 'user' && process.env.DATABASE_URL && isValidDbId(chatId)) {
     try {
       pastMessages = await prisma.message.findMany({
-        where: { chatId },
+        where: { chatId, chat: { userId: identity.userId } },
         orderBy: { createdAt: 'asc' },
       });
     } catch (err) {
@@ -585,14 +578,6 @@ Do NOT guess or answer about a random chapter! Politely ask the user which book 
 
     return accumulated;
   });
-
-  // Guarantee authentic theological reasoning thought trace if the model omitted tags
-  if (!aiResponseText.includes('__THOUGHT__')) {
-    const canonRef = resolvedGroundTruth?.reference || 'Scripture Canon';
-    const lensName = lensLabels[theologicalLens]?.replace('Applying ', '') || theologicalLens;
-    const fallbackThought = `- Query Analysis: Evaluated user question concerning ${canonRef} with focus on orthodox Christian doctrine.\n- Canonical Grounding: Anchored in verified biblical revelation and cross-canonical witness.\n- Linguistic Analysis: ${includeOriginalRoots ? 'Examined original biblical root concepts and Strong\'s concordances.' : 'Examined biblical context and plain textual meaning.'}\n- Theological Hermeneutics: Filtered through ${lensName}.`;
-    aiResponseText = `__THOUGHT__\n${fallbackThought}\n__END_THOUGHT__\n\n${aiResponseText}`;
-  }
 
   // Permanently tag the theological lens in the message
   if (!aiResponseText.includes('__LENS__')) {

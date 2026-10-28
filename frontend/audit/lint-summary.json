@@ -1,9 +1,8 @@
 {
-  "errors": 1,
+  "errors": 0,
   "warnings": 437,
   "rules": {
     "@typescript-eslint/no-unused-vars": 145,
-    "@next/next/no-assign-module-variable": 1,
     "@typescript-eslint/no-explicit-any": 168,
     "react-hooks/set-state-in-effect": 47,
     "@next/next/no-img-element": 10,

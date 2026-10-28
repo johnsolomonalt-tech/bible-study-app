@@ -68,6 +68,7 @@ import type { Viewport } from 'next';
 import { ClerkProvider } from '@clerk/nextjs';
 
 import { theologicaClerkAppearance } from '@/lib/clerkTheme';
+import { DisableBrowserContextMenu } from '@/components/DisableBrowserContextMenu';
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -149,6 +150,7 @@ export default function RootLayout({
         />
       </head>
       <body className={`${inter.variable} ${merriweather.variable} antialiased`}>
+        <DisableBrowserContextMenu />
         {children}
       </body>
     </html>

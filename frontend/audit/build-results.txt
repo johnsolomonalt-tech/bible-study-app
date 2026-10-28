@@ -4,26 +4,26 @@
 
 Prisma schema loaded from prisma/schema.prisma
 
-✔ Generated Prisma Client (v5.22.0) to ./node_modules/@prisma/client in 69ms
+✔ Generated Prisma Client (v5.22.0) to ./node_modules/@prisma/client in 72ms
 
 Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
 
-Tip: Want to turn off tips and other hints? https://pris.ly/tip-4-nohints
+Tip: Curious about the SQL queries Prisma ORM generates? Optimize helps you enhance your visibility: https://pris.ly/tip-2-optimize
 
 ▲ Next.js 16.2.10 (Turbopack)
 - Environments: .env.local
 
 ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
   Creating an optimized production build ...
-✓ Compiled successfully in 4.7s
+✓ Compiled successfully in 4.8s
   Running TypeScript ...
-  Finished TypeScript in 10.7s ...
+  Finished TypeScript in 9.8s ...
   Collecting page data using 15 workers ...
   Generating static pages using 15 workers (0/27) ...
   Generating static pages using 15 workers (6/27) 
   Generating static pages using 15 workers (13/27) 
   Generating static pages using 15 workers (20/27) 
-✓ Generating static pages using 15 workers (27/27) in 341ms
+✓ Generating static pages using 15 workers (27/27) in 352ms
   Finalizing page optimization ...
 
 Route (app)
