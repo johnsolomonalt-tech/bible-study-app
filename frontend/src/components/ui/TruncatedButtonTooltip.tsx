@@ -133,7 +133,7 @@ export function TruncatedButtonTooltip() {
 
   if (!tip) return null;
   return (
-    <div role="tooltip" className="fixed z-[100] pointer-events-none max-w-[min(360px,calc(100vw-24px))] max-h-[min(50vh,320px)] overflow-hidden rounded-lg bg-fg text-bg px-3 py-2 text-sm leading-snug shadow-lg break-words" style={{ left: tip.left, top: tip.top, bottom: tip.bottom }}>
+    <div role="tooltip" className="fixed z-[100] pointer-events-none max-w-[min(360px,calc(100vw-24px))] max-h-[min(50vh,320px)] overflow-hidden rounded-lg border border-border-soft bg-surface text-fg px-3 py-2 text-sm leading-relaxed shadow-lg break-words" style={{ left: tip.left, top: tip.top, bottom: tip.bottom }}>
       {tip.text}
     </div>
   );

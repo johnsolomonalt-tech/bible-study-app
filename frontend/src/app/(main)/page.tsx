@@ -1193,7 +1193,7 @@ export default function App() {
       if (isInputElement(e.target as Element)) {
         setIsMobileTyping(true);
         const target = e.target as HTMLElement;
-        const isChatInput = target.getAttribute('placeholder')?.includes('Ask anything') || target.getAttribute('placeholder')?.includes('Study AI');
+        const isChatInput = target.classList.contains('chat-composer-input');
         if (isChatInput && isHomeSuggestionsActiveRef.current) {
           return;
         }
@@ -3783,8 +3783,12 @@ export default function App() {
   const activeNote = notes.find(n => n.id === activeNoteId) || { id: 0, title: 'No Note Selected', content: '' };
   const activeChat = (activeChatId ? chats.find(c => c.id === activeChatId) : null) || { id: 0, title: 'New Conversation', messages: [] };
 
-  const isChatEmptyHome = activeChat.messages.length === 0;
-  isHomeSuggestionsActiveRef.current = isChatEmptyHome;
+  const recentStudyMessages = useMemo(() => chats.slice(0, 6).flatMap(chat =>
+    chat.messages.filter(message => message.role === 'user')
+      .slice(-2).reverse().map(message => message.content.slice(0, 600))
+  ).slice(0, 12), [chats]);
+
+  isHomeSuggestionsActiveRef.current = activeChat.messages.length === 0;
 
   const LOCAL_HIGHLIGHTS_KEY = 'theologica_local_highlights_v1';
 
@@ -6915,7 +6919,7 @@ export default function App() {
                   <button onClick={() => setMobileStudyView('reader')} className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2.5 -ml-1 text-fg-2 hover:text-fg rounded-xl hover:bg-surface shrink-0 cursor-pointer" title="Back to reader">
                     <ChevronLeft size={22} />
                   </button>
-                  <Sparkles size={16} className="text-accent shrink-0" />
+                  <Sparkles size={16} className="text-muted shrink-0" />
                   <span className="truncate">Study AI</span>
                 </div>
                 <TheologicalLensSelector 
@@ -6929,11 +6933,13 @@ export default function App() {
               <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                 <div
                   ref={mobileStudyChatScrollRef}
-                  className={`flex-1 min-h-0 ${isChatEmptyHome ? 'overflow-hidden' : 'overflow-y-auto custom-scroll'} ${activeChat.messages.length === 0 && !isAiTyping ? 'flex flex-col' : 'space-y-4'} p-3 sm:p-4`}
+                  className={`flex-1 min-h-0 overflow-y-auto custom-scroll ${activeChat.messages.length === 0 && !isAiTyping ? 'flex flex-col' : 'space-y-4'} p-3 sm:p-4`}
                 >
                   {activeChat.messages.length === 0 ? (
                     <ChatEmptyState
                       activeBook={activeBook}
+                      recentMessages={recentStudyMessages}
+                      quotedReference={chatQuotes.at(-1)?.reference}
                       activeChapter={activeChapter}
                       translation={translation}
                       theologicalLens={theologicalLens}
@@ -7068,7 +7074,7 @@ export default function App() {
                           </span>
                           <span className="text-[10px] text-muted flex items-center gap-1">
                             {attachedFile?.size ? formatFileSize(attachedFile.size) : 'Ready'}
-                            <span className="text-emerald-400 font-medium">· Added</span>
+                            <span className="text-muted">· Added</span>
                           </span>
                         </div>
                         <button 
@@ -7099,13 +7105,14 @@ export default function App() {
                     <div 
                       onTouchStart={(e) => e.stopPropagation()}
                       onTouchEnd={(e) => e.stopPropagation()}
-                      className="relative flex items-end bg-surface border border-border-soft/80 rounded-2xl shadow-sm focus-within:border-accent/60 focus-within:ring-2 focus-within:ring-accent/20 transition-all p-1.5"
+                      className="chat-composer"
                     >
                       <button 
                         type="button" 
                         onClick={() => imageFileRef.current?.click()} 
                         disabled={!isOnline} 
-                        className="flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center p-2.5 text-muted hover:text-fg disabled:opacity-40 transition-colors mr-0.5 cursor-pointer"
+                        className="chat-composer-action"
+                        aria-label="Attach file or image"
                         title="Attach file or image"
                       >
                         <Paperclip size={18} />
@@ -7114,8 +7121,9 @@ export default function App() {
                         ref={chatInputRef}
                         minRows={1}
                         maxRows={5}
-                        className="flex-1 bg-transparent text-fg pl-1 pr-12 py-2.5 text-[16px] placeholder:text-meta focus:outline-none resize-none" 
-                        placeholder={!isOnline ? "Study AI is unavailable offline" : "Ask anything (type / for commands)..."} 
+                        className="chat-composer-input"
+                        aria-label="Message Study AI"
+                        placeholder={!isOnline ? "Study AI is unavailable offline" : "Ask about Scripture…"}
                         value={chatInput}
                         onFocus={() => setIsChatInputFocused(true)}
                         onBlur={() => setTimeout(() => setIsChatInputFocused(false), 150)}
@@ -7133,7 +7141,8 @@ export default function App() {
                       <button 
                         type="submit" 
                         disabled={isAiTyping || (!chatInput.trim() && !chatImage && !attachedFile && chatQuotes.length === 0) || !isOnline}
-                        className="min-w-[44px] min-h-[44px] flex items-center justify-center absolute right-1.5 bottom-1.5 p-2.5 bg-accent hover:bg-[#b5583b] text-white rounded-xl disabled:opacity-30 disabled:hover:bg-accent transition-all shadow-sm shrink-0 cursor-pointer"
+                        className="chat-composer-action chat-composer-send"
+                        aria-label="Send message"
                         title="Send message"
                       >
                         <Send size={16} />
@@ -8760,7 +8769,7 @@ export default function App() {
                   <button onClick={() => setMobileStudyView('reader')} className="md:hidden p-1.5 -ml-1 text-fg-2 hover:text-fg shrink-0 cursor-pointer" title="Back to reader">
                     <ChevronLeft size={20} />
                   </button>
-                  <Sparkles size={16} className="study-ai-heading-icon hidden md:block text-accent shrink-0" />
+                  <Sparkles size={16} className="study-ai-heading-icon hidden md:block text-muted shrink-0" />
                   <span className="whitespace-nowrap">Study AI</span>
                 </div>
                 <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
@@ -8784,11 +8793,13 @@ export default function App() {
               </header>
               <div
                 ref={desktopStudyChatScrollRef}
-                className={`flex-1 min-h-0 ${isChatEmptyHome ? 'overflow-hidden' : 'overflow-y-auto custom-scroll'} ${activeChat.messages.length === 0 && !isAiTyping ? 'flex flex-col' : isTabletMode ? 'space-y-4' : 'space-y-6'} ${isTabletMode ? 'p-3' : 'p-4'}`}
+                className={`flex-1 min-h-0 overflow-y-auto custom-scroll ${activeChat.messages.length === 0 && !isAiTyping ? 'flex flex-col' : isTabletMode ? 'space-y-4' : 'space-y-6'} ${isTabletMode ? 'p-3' : 'p-4'}`}
               >
                 {activeChat.messages.length === 0 ? (
                   <ChatEmptyState
                     activeBook={activeBook}
+                    recentMessages={recentStudyMessages}
+                    quotedReference={chatQuotes.at(-1)?.reference}
                     activeChapter={activeChapter}
                     translation={translation}
                     theologicalLens={theologicalLens}
@@ -8924,7 +8935,7 @@ export default function App() {
                           </span>
                           <span className="text-[10px] text-muted flex items-center gap-1">
                             {attachedFile?.size ? formatFileSize(attachedFile.size) : 'Ready'}
-                            <span className="text-emerald-400 font-medium">· Added</span>
+                            <span className="text-muted">· Added</span>
                           </span>
                         </div>
                         <button 
@@ -8955,13 +8966,14 @@ export default function App() {
                     <div 
                       onTouchStart={(e) => e.stopPropagation()}
                       onTouchEnd={(e) => e.stopPropagation()}
-                      className="relative flex items-end bg-surface border border-border-soft/80 rounded-2xl shadow-sm focus-within:border-accent/60 focus-within:ring-2 focus-within:ring-accent/20 transition-all p-1.5"
+                      className="chat-composer"
                     >
                       <button 
                         type="button" 
                         onClick={() => imageFileRef.current?.click()} 
                         disabled={!isOnline} 
-                        className="flex-shrink-0 p-2 text-muted hover:text-fg disabled:opacity-40 transition-colors mr-1 cursor-pointer"
+                        className="chat-composer-action"
+                        aria-label="Attach file or image"
                         title="Attach file or image"
                       >
                         <Paperclip size={16} />
@@ -8983,13 +8995,15 @@ export default function App() {
                         }}
                         onKeyDown={handleChatKeyDown}
                         disabled={!isOnline}
-                        placeholder={!isOnline ? "Study AI is unavailable offline" : "Message Study AI (type / for commands)..."}
-                        className="flex-1 bg-transparent text-fg pl-1 pr-10 py-2 text-[14px] focus:outline-none disabled:opacity-50 transition-all placeholder:text-meta resize-none"
+                        placeholder={!isOnline ? "Study AI is unavailable offline" : "Ask about Scripture…"}
+                        className="chat-composer-input"
+                        aria-label="Message Study AI"
                       />
                       <button 
                         type="submit" 
                         disabled={isAiTyping || (!chatInput.trim() && !chatImage && !attachedFile && chatQuotes.length === 0) || !isOnline} 
-                        className="absolute right-2 bottom-2 p-2 bg-accent hover:bg-[#b5583b] text-white rounded-xl disabled:opacity-40 disabled:hover:bg-accent transition-all shadow-sm cursor-pointer"
+                        className="chat-composer-action chat-composer-send"
+                        aria-label="Send message"
                         title="Send message"
                       >
                         <Send size={15} />
@@ -9863,11 +9877,13 @@ export default function App() {
               </header>
               <div
                 ref={fullChatScrollRef}
-                className={`flex-1 min-h-0 ${isChatEmptyHome ? 'overflow-hidden' : 'overflow-y-auto custom-scroll'} ${activeChat.messages.length === 0 && !isAiTyping ? 'flex flex-col p-3 sm:p-4' : 'space-y-6 sm:space-y-8 p-2.5 sm:p-8 lg:p-12'}`}
+                className={`flex-1 min-h-0 overflow-y-auto custom-scroll ${activeChat.messages.length === 0 && !isAiTyping ? 'flex flex-col p-3 sm:p-4' : 'space-y-6 sm:space-y-8 p-2.5 sm:p-8 lg:p-12'}`}
               >
                 {activeChat.messages.length === 0 ? (
                   <ChatEmptyState
                     activeBook={activeBook}
+                    recentMessages={recentStudyMessages}
+                    quotedReference={chatQuotes.at(-1)?.reference}
                     activeChapter={activeChapter}
                     translation={translation}
                     theologicalLens={theologicalLens}
@@ -10003,7 +10019,7 @@ export default function App() {
                         </span>
                         <span className="text-[11px] text-muted flex items-center gap-1.5">
                           {attachedFile?.size ? formatFileSize(attachedFile.size) : 'Ready'}
-                          <span className="text-emerald-400 font-medium">· Attached to conversation</span>
+                          <span className="text-muted">· Attached to conversation</span>
                         </span>
                       </div>
                       <button 
@@ -10034,14 +10050,15 @@ export default function App() {
                   <div 
                     onTouchStart={(e) => e.stopPropagation()}
                     onTouchEnd={(e) => e.stopPropagation()}
-                    className="relative flex items-end bg-surface border border-border-soft/80 rounded-2xl shadow-md focus-within:border-accent/60 focus-within:ring-2 focus-within:ring-accent/20 transition-all p-2"
+                    className="chat-composer"
                   >
                     <button 
                       type="button" 
                       onClick={() => imageFileRef.current?.click()} 
                       disabled={!isOnline} 
-                      className="flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center p-2.5 text-muted hover:text-fg disabled:opacity-40 transition-colors mr-1 cursor-pointer"
-                      title="Attach file or image"
+                      className="chat-composer-action"
+                        aria-label="Attach file or image"
+                        title="Attach file or image"
                     >
                       <Paperclip size={18} />
                     </button>
@@ -10062,14 +10079,16 @@ export default function App() {
                       }}
                       onKeyDown={handleChatKeyDown}
                       disabled={!isOnline}
-                      placeholder={!isOnline ? "Study AI is unavailable offline" : "Ask anything (type / for commands)..."}
-                      className="flex-1 bg-transparent text-fg pl-1 pr-14 py-2.5 text-[16px] focus:outline-none disabled:opacity-50 transition-all placeholder:text-meta resize-none"
+                      placeholder={!isOnline ? "Study AI is unavailable offline" : "Ask about Scripture…"}
+                      className="chat-composer-input"
+                        aria-label="Message Study AI"
                     />
                     <button 
                       type="submit" 
                       disabled={isAiTyping || (!chatInput.trim() && !chatImage && !attachedFile && chatQuotes.length === 0) || !isOnline} 
-                      className="min-w-[44px] min-h-[44px] flex items-center justify-center absolute right-2 bottom-2 p-2.5 bg-accent hover:bg-[#b5583b] text-white rounded-xl disabled:opacity-40 disabled:hover:bg-accent transition-all shadow-sm cursor-pointer"
-                      title="Send message"
+                      className="chat-composer-action chat-composer-send"
+                        aria-label="Send message"
+                        title="Send message"
                     >
                       <Send size={16} />
                     </button>

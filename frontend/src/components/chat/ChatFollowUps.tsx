@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { Sparkles, ArrowRight } from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
 import { TheologicalLensType } from './TheologicalLensSelector';
 import { BIBLE_VERSE_REGEX } from '@/lib/bibleReferences';
 
@@ -16,7 +16,7 @@ interface ChatFollowUpsProps {
 
 /**
  * Fallback generator that inspects the AI response content
- * and constructs 3 hyper-tailored follow-up prompts if none were provided by the model.
+ * and constructs two contextual follow-up prompts if none were provided by the model.
  */
 export function extractTailoredFollowUps(content: string, currentLens: TheologicalLensType = 'canonical'): string[] {
   if (!content) return [];
@@ -74,8 +74,8 @@ export function extractTailoredFollowUps(content: string, currentLens: Theologic
     results.push(`How does this passage fundamentally reshape our daily prayer and Christian living?`);
   }
 
-  // Ensure we have at least 3 distinct questions
-  if (results.length < 3) {
+  // Ensure we have at least two distinct questions
+  if (results.length < 2) {
     if (primaryVerse) {
       results.push(`What are the key cross-references in Scripture that illuminate ${primaryVerse}?`);
     } else {
@@ -83,7 +83,7 @@ export function extractTailoredFollowUps(content: string, currentLens: Theologic
     }
   }
 
-  return results.slice(0, 3);
+  return results.slice(0, 2);
 }
 
 export const ChatFollowUps: React.FC<ChatFollowUpsProps> = ({
@@ -92,43 +92,19 @@ export const ChatFollowUps: React.FC<ChatFollowUpsProps> = ({
   currentLens = 'standard',
   onSelectQuestion,
 }) => {
-  const followUps = (questions && questions.length > 0)
-    ? questions.slice(0, 3)
-    : extractTailoredFollowUps(messageContent, currentLens);
+  const followUps = Array.from(new Set([
+    ...(questions || []), ...extractTailoredFollowUps(messageContent, currentLens),
+  ].map(question => question.trim()).filter(Boolean))).slice(0, 2);
 
   if (followUps.length === 0) return null;
-
   return (
-    <div className="w-full mt-3 pt-2.5 border-t border-border/30 animate-in fade-in duration-200">
-      {/* Follow-up question links in ChatGPT unboxed style */}
-      <div className="flex items-center gap-1.5 mb-2 select-none">
-        <Sparkles size={11} className="text-accent/80 shrink-0" />
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted">
-          Suggested Follow-Ups
-        </span>
-      </div>
-
-      <div className="flex flex-col items-start gap-1 sm:gap-1.5">
-        {followUps.map((q, idx) => (
-          <button
-            key={idx}
-            type="button"
-            onClick={() => onSelectQuestion(q)}
-            title={q}
-            className="group text-left text-xs sm:text-[13px] text-muted hover:text-fg transition-colors duration-150 cursor-pointer py-1 px-0 bg-transparent border-0 shadow-none rounded-none max-w-full touch-manipulation focus-visible:outline-none focus-visible:text-fg"
-          >
-            <span className="leading-snug break-words">
-              {q}
-              <span className="inline-block ml-1.5 align-middle select-none">
-                <ArrowRight 
-                  size={12} 
-                  className="inline-block -translate-y-px opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 text-muted group-hover:text-fg transition-all duration-150 shrink-0" 
-                />
-              </span>
-            </span>
-          </button>
-        ))}
-      </div>
+    <div className="w-full mt-5" role="group" aria-label="Suggested follow-up questions">
+      {followUps.map(question => (
+        <button key={question} type="button" onClick={() => onSelectQuestion(question)} className="chat-suggestion">
+          <ArrowUpRight size={14} strokeWidth={1.5} className="shrink-0 mt-1" aria-hidden="true" />
+          <span>{question}</span>
+        </button>
+      ))}
     </div>
   );
 };

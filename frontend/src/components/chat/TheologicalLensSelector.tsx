@@ -190,15 +190,16 @@ export function TheologicalLensSelector({
           if (!isOpen) updatePosition();
           setIsOpen(!isOpen);
         }}
-        className={`flex items-center gap-1 sm:gap-1.5 rounded-lg border transition-all cursor-pointer font-sans select-none shrink-0 ${
+        aria-expanded={isOpen}
+        className={`flex min-h-9 items-center gap-1 sm:gap-1.5 rounded-lg border hover:bg-surface transition-colors cursor-pointer font-sans select-none shrink-0 ${
           compact
             ? 'px-2 py-1 text-[11px]'
             : 'px-2.5 py-1.5 text-[12px]'
         }`}
         style={{
-          backgroundColor: selected.bgLight,
-          borderColor: selected.borderLight,
-          color: selected.accentColor,
+          backgroundColor: 'transparent',
+          borderColor: 'var(--border)',
+          color: 'var(--fg-2)',
         }}
         title={`Theological Perspective: ${selected.id === 'standard' ? 'General' : selected.name} (${includeOriginalRoots ? 'Roots On' : 'Roots Off'})`}
         aria-label={`Theological Perspective: ${selected.id === 'standard' ? 'General' : selected.name} (${includeOriginalRoots ? 'Roots On' : 'Roots Off'})`}
@@ -291,15 +292,15 @@ export function TheologicalLensSelector({
                   }}
                   className={`w-full text-left px-2.5 py-2 rounded-xl flex items-start gap-2.5 transition-colors cursor-pointer ${
                     isCurrent
-                      ? 'bg-accent/10 text-fg ring-1 ring-accent/25'
+                      ? 'bg-surface-hover text-fg ring-1 ring-border-soft'
                       : 'hover:bg-bg/80 text-fg/80 hover:text-fg'
                   }`}
                 >
                   <div
                     className="p-1.5 rounded-lg mt-0.5 shrink-0 flex items-center justify-center shadow-xs"
                     style={{
-                      backgroundColor: lens.bgLight,
-                      color: lens.accentColor,
+                      backgroundColor: 'var(--surface-hover)',
+                      color: 'var(--fg-2)',
                     }}
                   >
                     {lens.icon}

@@ -287,3 +287,35 @@ test('Database message writes connect through the authenticated owner filter', a
   assert.equal(write.data.chat.connect.userId, 'owner');
   assert.equal(write.data.chatId, undefined);
 });
+
+
+test('Chat starters are deterministic, bounded, and follow the current passage', () => {
+  const { buildChatSuggestions } = loader()('src/lib/chatSuggestions.ts');
+  const context = { book: 'Genesis', chapter: 1 };
+  const result = buildChatSuggestions(context);
+  assert.equal(result.questions.length, 2);
+  assert.equal(new Set(result.questions).size, 2);
+  assert.deepEqual(result, buildChatSuggestions(context));
+  const changed = buildChatSuggestions({ book: 'John', chapter: 3 });
+  assert.ok(changed.questions.every(q => q.includes('John 3')));
+  const quote = buildChatSuggestions({ ...context, quotedReference: 'Romans 8:28–30' });
+  assert.ok(quote.questions.every(q => q.includes('Romans 8:28–30')));
+});
+
+test('Chat starters use recent interests without carrying an old passage or language assumption', () => {
+  const { buildChatSuggestions } = loader()('src/lib/chatSuggestions.ts');
+  const result = buildChatSuggestions({ book: 'John', chapter: 1, recentMessages: ['Hebrew words in Genesis 1'] });
+  assert.match(result.questions[1], /original-language.*John 1/);
+  assert.doesNotMatch(result.questions[1], /Hebrew|Genesis/);
+  assert.match(result.source, /recent study interests/);
+  const prayer = buildChatSuggestions({ book: 'Psalms', chapter: 23, recentMessages: ['Help me pray', 'Greek words'] });
+  assert.match(prayer.questions[1], /pray through Psalms 23/);
+});
+
+test('Chat starters fall back safely for unknown interests and empty quoted references', () => {
+  const { buildChatSuggestions } = loader()('src/lib/chatSuggestions.ts');
+  const result = buildChatSuggestions({ book: 'Romans', chapter: 8, quotedReference: ' ', recentMessages: ['unrelated topic'], lens: 'patristic' });
+  assert.equal(result.reference, 'Romans 8');
+  assert.match(result.questions[1], /early Christians/);
+  assert.equal(result.questions.length, 2);
+});

@@ -702,3 +702,73 @@ sup.verse-number {
   .workspace-tab-short { display: none; }
   .workspace-tab { min-width: 32px; justify-content: center; padding-inline: 8px; }
 }
+
+/* Chat hierarchy: readable answers, quiet suggestions, one primary action. */
+.chat-suggestion {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--fg-2);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.6;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  transition: color 150ms ease;
+}
+.chat-suggestion:hover { color: var(--fg); }
+.chat-suggestion:hover span { text-decoration: underline; text-underline-offset: 4px; }
+.chat-composer {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--border-soft);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--surface) 60%, var(--bg));
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.chat-composer:focus-within {
+  border-color: var(--muted);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--muted) 18%, transparent);
+}
+.chat-composer-input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 4px;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 24px;
+  resize: none;
+}
+.chat-composer-input::placeholder { color: var(--meta); }
+.chat-composer-input:focus { outline: none; }
+.chat-composer-action {
+  display: flex;
+  flex: 0 0 44px;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 12px;
+  color: var(--fg-2);
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.chat-composer-action:hover { background: var(--surface-hover); color: var(--fg); }
+.chat-composer-send { background: var(--accent); color: #fff; }
+.chat-composer-send:hover { background: color-mix(in srgb, var(--accent) 85%, #000); color: #fff; }
+.chat-composer-send:disabled { background: var(--surface-hover); color: var(--muted); cursor: default; }
+.chat-composer-action:disabled:not(.chat-composer-send) { opacity: .5; cursor: default; }
