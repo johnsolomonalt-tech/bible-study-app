@@ -1645,8 +1645,51 @@ export default function App() {
   const chatDrawerTouchTimeRef = useRef<number>(0);
   const chatDrawerDragLockedRef = useRef<'horizontal' | 'vertical' | null>(null);
   const chatDrawerInitialViewRef = useRef<'chat' | 'list'>('chat');
+  const chatDrawerTouchActiveRef = useRef(false);
+  const chatDrawerSuppressClickRef = useRef(false);
+
+  const settleChatDrawer = (view: 'chat' | 'list') => {
+    setMobileChatView(view);
+    setIsChatDrawerDragging(false);
+    setChatDrawerOffset(0);
+    chatDrawerTouchActiveRef.current = false;
+    chatDrawerDragLockedRef.current = null;
+  };
+
+  const openChatConversations = () => {
+    (document.activeElement as HTMLElement | null)?.blur();
+    setIsChatInputFocused(false);
+    chatDrawerSuppressClickRef.current = false;
+    settleChatDrawer('list');
+  };
+
+  const closeChatConversationsFromBackdrop = () => {
+    if (chatDrawerSuppressClickRef.current) {
+      chatDrawerSuppressClickRef.current = false;
+      return;
+    }
+    settleChatDrawer('chat');
+  };
+
+  const cancelChatDrawerGesture = () => settleChatDrawer(mobileChatView);
+
+  useEffect(() => {
+    if (activeTab !== 'chats' || mobileChatView !== 'list') return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMobileChatView('chat');
+        setIsChatDrawerDragging(false);
+        setChatDrawerOffset(0);
+        chatDrawerTouchActiveRef.current = false;
+        chatDrawerDragLockedRef.current = null;
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [activeTab, mobileChatView]);
 
   const handleChatTouchStart = (e: React.TouchEvent) => {
+    chatDrawerTouchActiveRef.current = false;
     // Prevent opening conversations drawer if user is typing, text box is focused, or input is active
     const activeEl = typeof document !== 'undefined' ? document.activeElement : null;
     const isInputActive = activeEl && (activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'INPUT' || (activeEl as HTMLElement).isContentEditable);
@@ -1656,6 +1699,7 @@ export default function App() {
       return;
     }
     if (e.touches.length === 1) {
+      chatDrawerTouchActiveRef.current = true;
       chatDrawerTouchStartXRef.current = e.touches[0].clientX;
       chatDrawerTouchStartYRef.current = e.touches[0].clientY;
       chatDrawerTouchTimeRef.current = Date.now();
@@ -1665,7 +1709,7 @@ export default function App() {
   };
 
   const handleChatTouchMove = (e: React.TouchEvent) => {
-    if (mobileChatView !== 'chat' || e.touches.length !== 1) return;
+    if (!chatDrawerTouchActiveRef.current || mobileChatView !== 'chat' || e.touches.length !== 1) return;
     const currentX = e.touches[0].clientX;
     const currentY = e.touches[0].clientY;
     const dx = currentX - chatDrawerTouchStartXRef.current;
@@ -1700,22 +1744,21 @@ export default function App() {
       const velocity = dx / Math.max(1, dt);
       const shouldOpen = dx > chatDrawerWidth * 0.38 || (velocity > 0.32 && dx > 30);
 
-      setIsChatDrawerDragging(false);
-      if (shouldOpen) {
-        setChatDrawerOffset(chatDrawerWidth);
-        setTimeout(() => {
-          setMobileChatView('list');
-          setChatDrawerOffset(0);
-        }, 280);
-      } else {
-        setChatDrawerOffset(0);
-      }
+      e.preventDefault();
+      chatDrawerSuppressClickRef.current = true;
+      // Commit the destination immediately; CSS animates from the finger's position.
+      settleChatDrawer(shouldOpen ? 'list' : 'chat');
+    } else {
+      chatDrawerTouchActiveRef.current = false;
+      chatDrawerDragLockedRef.current = null;
     }
-    chatDrawerDragLockedRef.current = null;
   };
 
   const handleConversationTouchStart = (e: React.TouchEvent) => {
+    chatDrawerTouchActiveRef.current = false;
+    chatDrawerSuppressClickRef.current = false;
     if (e.touches.length === 1) {
+      chatDrawerTouchActiveRef.current = true;
       chatDrawerTouchStartXRef.current = e.touches[0].clientX;
       chatDrawerTouchStartYRef.current = e.touches[0].clientY;
       chatDrawerTouchTimeRef.current = Date.now();
@@ -1725,7 +1768,7 @@ export default function App() {
   };
 
   const handleConversationTouchMove = (e: React.TouchEvent) => {
-    if (mobileChatView !== 'list' || e.touches.length !== 1) return;
+    if (!chatDrawerTouchActiveRef.current || mobileChatView !== 'list' || e.touches.length !== 1) return;
     const currentX = e.touches[0].clientX;
     const currentY = e.touches[0].clientY;
     const dx = currentX - chatDrawerTouchStartXRef.current;
@@ -1754,20 +1797,15 @@ export default function App() {
       const dx = e.changedTouches[0].clientX - chatDrawerTouchStartXRef.current;
       const dt = Date.now() - chatDrawerTouchTimeRef.current;
       const velocity = dx / Math.max(1, dt);
-      const shouldClose = Math.abs(dx) > chatDrawerWidth * 0.35 || (velocity < -0.32 && dx < -30);
+      const shouldClose = dx < -chatDrawerWidth * 0.35 || (velocity < -0.32 && dx < -30);
 
-      setIsChatDrawerDragging(false);
-      if (shouldClose) {
-        setChatDrawerOffset(-chatDrawerWidth);
-        setTimeout(() => {
-          setMobileChatView('chat');
-          setChatDrawerOffset(0);
-        }, 280);
-      } else {
-        setChatDrawerOffset(0);
-      }
+      e.preventDefault();
+      chatDrawerSuppressClickRef.current = true;
+      settleChatDrawer(shouldClose ? 'chat' : 'list');
+    } else {
+      chatDrawerTouchActiveRef.current = false;
+      chatDrawerDragLockedRef.current = null;
     }
-    chatDrawerDragLockedRef.current = null;
   };
 
   // Auto-hide mobile top header and bottom nav bar on downward scroll in Scripture reader
@@ -9842,14 +9880,13 @@ export default function App() {
               <div className="lg:hidden">
                 {isChatDrawerActive && chatBackdropOpacity > 0 && (
                   <div 
-                    onClick={() => {
-                      setMobileChatView('chat');
-                      setIsChatDrawerDragging(false);
-                      setChatDrawerOffset(0);
-                    }}
+                    onClick={closeChatConversationsFromBackdrop}
+                    onPointerDown={() => { chatDrawerSuppressClickRef.current = false; }}
+                    data-testid="chat-conversations-backdrop"
                     onTouchStart={handleConversationTouchStart}
                     onTouchMove={handleConversationTouchMove}
                     onTouchEnd={handleConversationTouchEnd}
+                    onTouchCancel={cancelChatDrawerGesture}
                     className="absolute inset-0 z-20 bg-black/45 will-change-[opacity]"
                     style={{
                       opacity: chatBackdropOpacity,
@@ -9859,10 +9896,14 @@ export default function App() {
                   />
                 )}
 
-                <aside 
+                <aside
+                  id="chat-conversations-drawer"
+                  aria-label="Conversations"
+                  aria-hidden={!isChatDrawerActive}
                   onTouchStart={handleConversationTouchStart}
                   onTouchMove={handleConversationTouchMove}
                   onTouchEnd={handleConversationTouchEnd}
+                  onTouchCancel={cancelChatDrawerGesture}
                   style={{
                     transform: chatDrawerTransform,
                     transition: isChatDrawerDragging ? 'none' : 'transform 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
@@ -9879,6 +9920,7 @@ export default function App() {
                 onTouchStart={handleChatTouchStart}
                 onTouchMove={handleChatTouchMove}
                 onTouchEnd={handleChatTouchEnd}
+                onTouchCancel={cancelChatDrawerGesture}
                 className="relative flex-1 h-full min-h-0 flex flex-col bg-bg overflow-hidden"
               onDragEnter={handleChatDragEnter}
               onDragOver={handleChatDragOver}
@@ -9904,19 +9946,10 @@ export default function App() {
               >
                 <div className="flex items-center min-w-0 mr-2 flex-1">
                   <button 
-                    onClick={() => {
-                      const activeEl = typeof document !== 'undefined' ? document.activeElement : null;
-                      const isInputActive = activeEl && (activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'INPUT');
-                      if (isChatInputFocused || isInputActive || isMobileTyping) {
-                        (activeEl as HTMLElement)?.blur();
-                        return;
-                      }
-                      setMobileChatView('list');
-                    }} 
-                    disabled={isChatInputFocused || isMobileTyping}
-                    className={`lg:hidden w-9 h-9 p-1.5 mr-2 text-fg-2 hover:text-fg hover:bg-surface rounded-full transition-all shrink-0 cursor-pointer flex items-center justify-center active:scale-95 ${
-                      (isChatInputFocused || isMobileTyping) ? 'opacity-30 pointer-events-none' : ''
-                    }`}
+                    onClick={openChatConversations}
+                    aria-controls="chat-conversations-drawer"
+                    aria-expanded={mobileChatView === 'list'}
+                    className="lg:hidden w-9 h-9 p-1.5 mr-2 text-fg-2 hover:text-fg hover:bg-surface rounded-full transition-all shrink-0 cursor-pointer flex items-center justify-center active:scale-95"
                     title="Open Conversations"
                     aria-label="Open Conversations"
                   >

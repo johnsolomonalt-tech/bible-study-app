@@ -521,3 +521,78 @@ test('Expired guest sessions renew once and carry prior context to the replaceme
   assert.equal(chats[0].messages.at(-1).content, 'Psalm 23');
   assert.equal(globals.chatRequestInFlightRef.current, false);
 });
+
+function chatDrawerHarness() {
+  const source = fs.readFileSync('src/app/(main)/page.tsx', 'utf8');
+  const block = source.slice(source.indexOf('  const settleChatDrawer ='), source.indexOf('  // Auto-hide mobile top header'));
+  const timers = [];
+  const globals = {
+    activeTab: 'chats', mobileChatView: 'chat', isChatInputFocused: false, isMobileTyping: false,
+    isChatDrawerDragging: false, chatDrawerOffset: 0,
+    window: { innerWidth: 390 }, document: { activeElement: null }, useEffect() {},
+    setTimeout: fn => timers.push(fn),
+  };
+  for (const name of ['chatDrawerTouchStartXRef', 'chatDrawerTouchStartYRef', 'chatDrawerTouchTimeRef']) globals[name] = { current: 0 };
+  globals.chatDrawerDragLockedRef = { current: null };
+  globals.chatDrawerInitialViewRef = { current: 'chat' };
+  globals.chatDrawerTouchActiveRef = { current: false };
+  globals.chatDrawerSuppressClickRef = { current: false };
+  globals.setMobileChatView = view => { globals.mobileChatView = view; };
+  globals.setIsChatDrawerDragging = value => { globals.isChatDrawerDragging = value; };
+  globals.setChatDrawerOffset = value => { globals.chatDrawerOffset = value; };
+  globals.setIsChatInputFocused = value => { globals.isChatInputFocused = value; };
+  const names = ['openChatConversations', 'closeChatConversationsFromBackdrop', 'cancelChatDrawerGesture', 'handleChatTouchStart', 'handleChatTouchMove', 'handleChatTouchEnd', 'handleConversationTouchStart', 'handleConversationTouchMove', 'handleConversationTouchEnd'];
+  vm.runInNewContext(ts.transpileModule(block + '\nthis.handlers = {' + names.join(',') + '};', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, globals);
+  const touch = (x, y = 100) => ({ touches: [{ clientX: x, clientY: y }], changedTouches: [{ clientX: x, clientY: y }], preventDefault() {} });
+  return { globals, handlers: globals.handlers, timers, touch };
+}
+
+test('Conversation swipes settle immediately without closing then reopening or backdrop click-through', () => {
+  const { globals: state, handlers: h, timers, touch } = chatDrawerHarness();
+  h.handleChatTouchStart(touch(10));
+  h.handleChatTouchMove(touch(180));
+  assert.equal(state.isChatDrawerDragging, true);
+  h.handleChatTouchEnd(touch(180));
+  assert.equal(state.mobileChatView, 'list');
+  assert.equal(state.isChatDrawerDragging, false);
+  assert.equal(timers.length, 0, 'no delayed open can race with another action');
+  h.closeChatConversationsFromBackdrop();
+  assert.equal(state.mobileChatView, 'list', 'synthetic click from the swipe must not close the drawer');
+  h.handleConversationTouchStart(touch(160));
+  h.handleConversationTouchMove(touch(140));
+  h.handleConversationTouchEnd(touch(300));
+  assert.equal(state.mobileChatView, 'list', 'reversing a closing swipe must leave the drawer open');
+  h.handleConversationTouchStart(touch(240));
+  h.handleConversationTouchMove(touch(50));
+  h.handleConversationTouchEnd(touch(50));
+  assert.equal(state.mobileChatView, 'chat');
+  assert.equal(timers.length, 0, 'close must not snap open before a timer finishes');
+});
+
+test('Conversation menu opens on the first press while typing; scroll and cancelled touches do not reopen it', () => {
+  const { globals: state, handlers: h, touch } = chatDrawerHarness();
+  let blurred = false;
+  state.isChatInputFocused = true;
+  state.document.activeElement = { tagName: 'TEXTAREA', blur() { blurred = true; } };
+  h.handleChatTouchStart(touch(10));
+  h.handleChatTouchMove(touch(180));
+  h.handleChatTouchEnd(touch(180));
+  assert.equal(state.mobileChatView, 'chat', 'typing must not arm an edge swipe');
+  h.openChatConversations();
+  assert.equal(blurred, true);
+  assert.equal(state.mobileChatView, 'list');
+  assert.equal(state.isChatInputFocused, false);
+  h.closeChatConversationsFromBackdrop();
+  state.document.activeElement = null;
+  h.handleChatTouchStart(touch(10));
+  h.handleChatTouchMove(touch(30, 180));
+  h.handleChatTouchEnd(touch(30, 180));
+  assert.equal(state.mobileChatView, 'chat', 'vertical scrolling must not open conversations');
+  h.handleChatTouchStart(touch(10));
+  h.handleChatTouchMove(touch(100));
+  h.cancelChatDrawerGesture();
+  h.handleChatTouchEnd(touch(180));
+  assert.equal(state.mobileChatView, 'chat');
+  assert.equal(state.isChatDrawerDragging, false);
+  assert.equal(state.chatDrawerOffset, 0);
+});
