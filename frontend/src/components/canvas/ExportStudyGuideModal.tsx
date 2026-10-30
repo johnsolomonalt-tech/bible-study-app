@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { 
@@ -19,6 +19,7 @@ import {
   BookOpen
 } from 'lucide-react';
 import { SerializableNode, SerializableEdge } from '@/types/canvas';
+import { useModalFocus } from '@/components/ui/useModalFocus';
 
 interface ExportStudyGuideModalProps {
   isOpen: boolean;
@@ -76,10 +77,17 @@ export function ExportStudyGuideModal({
   const [isGenerating, setIsGenerating] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [error, setError] = useState('');
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const generatedSourceRef = useRef('');
+  const generationPendingRef = useRef(false);
+  const sourceSignature = JSON.stringify([boardTitle, nodes, edges]);
+  useModalFocus(isOpen, dialogRef, closeRef, onClose);
 
-  // Auto-generate initial guide on modal open if empty
+  // Reuse the guide until the source cards change; never reuse another board's guide.
   useEffect(() => {
-    if (isOpen && !generatedMarkdown && nodes.length > 0) {
+    if (isOpen && generatedSourceRef.current !== sourceSignature && nodes.length > 0) {
       handleGenerate();
     }
   }, [isOpen]);
@@ -87,7 +95,12 @@ export function ExportStudyGuideModal({
   if (!isOpen) return null;
 
   const handleGenerate = async (format = selectedFormat, lens = selectedLens) => {
+    if (generationPendingRef.current) return;
+    generationPendingRef.current = true;
     setIsGenerating(true);
+    setError('');
+    setCopied(false);
+    setGeneratedMarkdown('');
     try {
       const res = await fetch('/api/canvas/export-guide', {
         method: 'POST',
@@ -106,19 +119,31 @@ export function ExportStudyGuideModal({
       }
 
       const data = await res.json();
-      setGeneratedMarkdown(data.content || '');
+      if (typeof data.content !== 'string' || !data.content.trim()) {
+        throw new Error('Empty study guide');
+      }
+      setGeneratedMarkdown(data.content);
+      generatedSourceRef.current = sourceSignature;
     } catch (err) {
       console.error(err);
+      setError('The study guide could not be generated. Please try Regenerate.');
     } finally {
+      generationPendingRef.current = false;
       setIsGenerating(false);
     }
   };
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     if (!generatedMarkdown) return;
-    navigator.clipboard.writeText(generatedMarkdown);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopied(false);
+    setError('');
+    try {
+      await navigator.clipboard.writeText(generatedMarkdown);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setError('Copy was blocked by your browser. Download the guide or select its text in Edit Text.');
+    }
   };
 
   const handleDownload = () => {
@@ -143,6 +168,11 @@ export function ExportStudyGuideModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center modal-safe-overlay bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div 
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Export study guide"
+        tabIndex={-1}
         className="w-full max-w-4xl max-h-[90vh] flex flex-col rounded-2xl shadow-2xl border border-border bg-surface text-fg overflow-hidden backdrop-blur-xl transition-all"
       >
         {/* Header */}
@@ -165,6 +195,8 @@ export function ExportStudyGuideModal({
           </div>
 
           <button
+            ref={closeRef}
+            aria-label="Close study guide"
             type="button"
             onClick={onClose}
             className="p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface-hover transition-colors cursor-pointer"
@@ -184,6 +216,7 @@ export function ExportStudyGuideModal({
                 <button
                   key={fmt.id}
                   type="button"
+                  disabled={isGenerating}
                   onClick={() => {
                     setSelectedFormat(fmt.id);
                     handleGenerate(fmt.id, selectedLens);
@@ -206,6 +239,8 @@ export function ExportStudyGuideModal({
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted font-medium">Lens:</span>
             <select
+              aria-label="Study guide theological lens"
+              disabled={isGenerating}
               value={selectedLens}
               onChange={(e) => {
                 const lens = e.target.value as LensType;
@@ -236,6 +271,7 @@ export function ExportStudyGuideModal({
 
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto p-5 sm:p-6 custom-scroll">
+          {error && <p role="alert" className="mb-4 text-sm text-red-500">{error}</p>}
           {isGenerating ? (
             <div className="h-64 flex flex-col items-center justify-center gap-3">
               <Loader2 size={32} className="animate-spin text-accent" />

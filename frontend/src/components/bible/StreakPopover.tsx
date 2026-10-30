@@ -388,9 +388,9 @@ export function StreakPopover({
                     </div>
 
                     {/* Daily Scripture Quote */}
-                    <div 
+                    <button type="button" aria-label={`Read daily verse: ${currentQuote.reference}`}
                       onClick={() => setIsDailyVerseOpen(true)}
-                      className="p-3.5 sm:p-4 rounded-2xl bg-surface/60 hover:bg-surface border border-border/60 hover:border-accent/40 space-y-2 relative cursor-pointer transition-all active:scale-[0.99] group/scripture"
+                      className="w-full text-left p-3.5 sm:p-4 rounded-2xl bg-surface/60 hover:bg-surface border border-border/60 hover:border-accent/40 space-y-2 relative cursor-pointer transition-all active:scale-[0.99] group/scripture"
                     >
                       <div className="flex items-center justify-between text-muted pb-1 border-b border-border/40">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-muted flex items-center gap-1.5">
@@ -406,7 +406,7 @@ export function StreakPopover({
                           {currentQuote.reference}
                         </cite>
                       </blockquote>
-                    </div>
+                    </button>
                   </>
                 ) : (
                   /* Milestones Tab */
@@ -539,7 +539,7 @@ export function StreakPopover({
           if (onNavigateToVerse) {
             onNavigateToVerse(book, chapter, verse);
           } else {
-            onNavigateToTab('reader');
+            onNavigateToTab('study');
           }
         }}
       />

@@ -88,6 +88,8 @@ export async function getPassage(
   // 1. Tier 1: Check Memory Cache (0ms)
   if (MEMORY_CACHE.has(cacheKey)) {
     const chapterData = MEMORY_CACHE.get(cacheKey)!;
+    // Pre-warmed chapters become available offline once actually viewed.
+    saveToPersistentCache(cacheKey, chapterData);
     const singleVerse = verse ? chapterData.verses.find((v) => v.verse === verse) : undefined;
     return { chapter: chapterData, verse: singleVerse };
   }

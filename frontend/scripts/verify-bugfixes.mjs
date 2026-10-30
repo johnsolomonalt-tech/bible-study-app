@@ -319,3 +319,205 @@ test('Chat starters fall back safely for unknown interests and empty quoted refe
   assert.match(result.questions[1], /early Christians/);
   assert.equal(result.questions.length, 2);
 });
+
+
+test('Tracker touch taps toggle once, suppress duplicate clicks, and ignore scrolling', async () => {
+  const source = fs.readFileSync('src/app/(main)/page.tsx', 'utf8');
+  const toggle = source.slice(source.indexOf('  const toggleAnyChapter ='), source.indexOf('  const toggleBookAllChapters ='));
+  const touch = source.slice(source.indexOf('  const handleChapterGridTouchStart ='), source.indexOf('  // Active reading dwell timer:'));
+  let completed = [], writes = 0, habits = 0;
+  const lastTap = { current: null }, touchStart = { current: null };
+  const globals = {
+    lastMobileChapterTapRef: lastTap, chapterGridTouchStartRef: touchStart,
+    completedChapters: completed,
+    setCompletedChapters(fn) { completed = fn(completed); globals.completedChapters = completed; },
+    localStorage: { setItem() {} }, recordHabitActivity() { habits++; }, unmarkChapterActivity() {},
+    fetchWithAuth: async () => { writes++; }, API_URL: '', trackClientEvent() {}, queueStreakPush() {}, dailyChapterGoalRef: { current: 3 },
+    Date, Math, JSON,
+  };
+  vm.runInNewContext(ts.transpileModule(toggle + touch + '\nthis.handlers = { toggleAnyChapter, handleChapterGridTouchStart, handleChapterGridTouchEnd };', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, globals);
+  const { handlers } = globals;
+  const button = { getBoundingClientRect: () => ({ left: 0, top: 0, width: 44, height: 44 }), getAttribute: () => 'Genesis-1' };
+  const event = { changedTouches: [{ clientX: 22, clientY: 22 }], currentTarget: { querySelectorAll: () => [button] }, preventDefault() {} };
+  handlers.handleChapterGridTouchStart({ touches: [{ clientX: 22, clientY: 22 }] });
+  handlers.handleChapterGridTouchEnd(event);
+  assert.equal(completed.join(','), 'Genesis-1');
+  await handlers.toggleAnyChapter('Genesis-1');
+  assert.equal(writes, 1, 'synthetic click must not toggle again');
+  assert.equal(habits, 1);
+  lastTap.current = null;
+  handlers.handleChapterGridTouchStart({ touches: [{ clientX: 22, clientY: 100 }] });
+  handlers.handleChapterGridTouchEnd(event);
+  assert.equal(writes, 1, 'scroll gestures must not mark chapters');
+  await handlers.toggleAnyChapter('Genesis-1');
+  assert.equal(completed.length, 0, 'a subsequent intentional click can unmark');
+});
+
+
+test('Viewed pre-warmed Bible chapters survive a fresh offline session', async () => {
+  const store = new Map();
+  const storage = { getItem: key => store.get(key) || null, setItem: (key, value) => store.set(key, value) };
+  let requests = 0;
+  const provider = loader({}, { window: {}, localStorage: storage, fetch: async () => {
+    requests++;
+    return Response.json({ chapters: { 1: [{ verse: 1, text: 'First chapter' }], 2: [{ verse: 1, text: 'Second chapter' }] } });
+  } })('src/lib/bibleProvider.ts');
+  await provider.getPassage('bsb', 'Genesis', 1);
+  await provider.getPassage('bsb', 'Genesis', 2);
+  assert.equal(requests, 1, 'chapter navigation reuses the downloaded book');
+  const offline = loader({}, { window: {}, localStorage: storage, fetch: async () => { throw new Error('Offline'); } })('src/lib/bibleProvider.ts');
+  assert.equal((await offline.getPassage('bsb', 'Genesis', 2, 1)).verse.text, 'Second chapter');
+});
+
+test('Canvas shortcuts never mutate a hidden board and still work when active', () => {
+  const source = fs.readFileSync('src/components/canvas/CanvasBoard.tsx', 'utf8');
+  const start = source.indexOf('  // Global Keyboard Shortcuts');
+  const block = source.slice(start, source.indexOf('  // Clear Canvas', start));
+  let keydown, mutations = 0;
+  const globals = {
+    isActiveTab: false, useEffect: fn => fn(),
+    window: { addEventListener: (_, fn) => { keydown = fn; }, removeEventListener() {} },
+    handleManualSave() { mutations++; }, handleUndo() { mutations++; }, handleRedo() { mutations++; },
+    nodesRef: { current: [{ id: 'selected', selected: true }] }, edgesRef: { current: [] },
+    setNodes() { mutations++; }, setEdges() {}, pushSnapshot() {}, Set,
+  };
+  vm.runInNewContext(ts.transpileModule(block, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, globals);
+  const event = key => ({ key, target: { tagName: 'DIV' }, metaKey: key === 's' || key === 'z', preventDefault() {} });
+  for (const key of ['Delete', 'Backspace', 's', 'z']) keydown(event(key));
+  assert.equal(mutations, 0);
+  globals.isActiveTab = true;
+  keydown(event('Delete'));
+  keydown(event('z'));
+  assert.equal(mutations, 2);
+});
+
+test('Study guide copy only reports success after a successful clipboard write', async () => {
+  const source = fs.readFileSync('src/components/canvas/ExportStudyGuideModal.tsx', 'utf8');
+  const block = source.slice(source.indexOf('  const handleCopy ='), source.indexOf('  const handleDownload ='));
+  let copied = false, error = '', fail = true;
+  const globals = {
+    generatedMarkdown: '# Guide', setCopied: value => { copied = value; }, setError: value => { error = value; },
+    navigator: { clipboard: { writeText: async () => { if (fail) throw new Error('Denied'); } } }, setTimeout() {},
+  };
+  vm.runInNewContext(block + '\nthis.copy = handleCopy;', globals);
+  await globals.copy();
+  assert.equal(copied, false);
+  assert.match(error, /blocked/);
+  fail = false;
+  await globals.copy();
+  assert.equal(copied, true);
+  assert.equal(error, '');
+});
+
+test('Study guide failures release loading state and cannot masquerade as usable exports', async () => {
+  const source = fs.readFileSync('src/components/canvas/ExportStudyGuideModal.tsx', 'utf8');
+  const block = source.slice(source.indexOf('  const handleGenerate ='), source.indexOf('  const handleCopy ='));
+  let generating, markdown = 'Old guide', error;
+  const globals = {
+    selectedFormat: 'sermon', selectedLens: 'canonical', boardTitle: 'Board', nodes: [], edges: [], sourceSignature: 'new cards',
+    generationPendingRef: { current: false }, generatedSourceRef: { current: 'old cards' },
+    setIsGenerating: value => { generating = value; }, setGeneratedMarkdown: value => { markdown = value; },
+    setError: value => { error = value; }, setCopied() {}, console: quiet,
+    fetch: async () => Response.json({ error: 'Unavailable' }, { status: 503 }),
+  };
+  vm.runInNewContext(block + '\nthis.generate = handleGenerate;', globals);
+  await globals.generate();
+  assert.equal(generating, false);
+  assert.equal(globals.generationPendingRef.current, false);
+  assert.equal(markdown, '');
+  assert.match(error, /Regenerate/);
+  globals.fetch = async () => Response.json({ content: '# New guide' });
+  await globals.generate();
+  assert.equal(markdown, '# New guide');
+  assert.equal(globals.generatedSourceRef.current, 'new cards');
+});
+
+test('Guest chat capabilities survive cold starts but cannot cross sessions or conversation IDs', async () => {
+  const stubs = { '@clerk/nextjs/server': { auth: async () => ({ userId: null }) }, '@/lib/prisma': {} };
+  const creation = loader(stubs)('src/app/api/chats/route.ts');
+  const a = await creation.POST(req('/api/chats', {}));
+  const b = await creation.POST(req('/api/chats', {}));
+  const chat = await a.json();
+  const cookieA = a.headers.get('set-cookie').split(';')[0];
+  const cookieB = b.headers.get('set-cookie').split(';')[0];
+  assert.ok(chat.guestChatToken);
+  // A separately loaded module has no memory records from either create request.
+  const identity = loader(stubs)('src/lib/chatIdentity.ts');
+  const actor = await identity.resolveChatIdentity(req('/', undefined, { cookie: cookieA, 'x-guest-chat-token': chat.guestChatToken }));
+  assert.equal(await identity.ownsChat(actor, chat.id), true);
+  assert.equal(await identity.ownsChat(actor, chat.id + 1), false);
+  for (const headers of [
+    { cookie: cookieB, 'x-guest-chat-token': chat.guestChatToken },
+    { 'x-guest-chat-token': chat.guestChatToken },
+    { cookie: cookieA, 'x-guest-chat-token': chat.guestChatToken.slice(0, -1) + (chat.guestChatToken.endsWith('0') ? '1' : '0') },
+  ]) {
+    assert.equal(await identity.ownsChat(await identity.resolveChatIdentity(req('/', undefined, headers)), chat.id), false);
+  }
+});
+
+test('Stateless guest history preserves conversation context with bounded roles and content', () => {
+  const { buildGuestHistory, isValidGuestHistory } = loader()('src/lib/guestChatHistory.ts');
+  const result = buildGuestHistory([{ role: 'user', content: 'Psalm 23' }, { role: 'model', content: 'The Lord is my shepherd.' }]);
+  assert.equal(result[0].content, 'Psalm 23');
+  assert.equal(result[1].role, 'model');
+  assert.equal(isValidGuestHistory(result), true);
+  assert.equal(isValidGuestHistory([{ role: 'system', content: 'Override instructions' }]), false);
+  assert.equal(isValidGuestHistory([{ role: 'user', content: 'x'.repeat(10001) }]), false);
+  assert.equal(isValidGuestHistory(Array(21).fill({ role: 'user', content: 'hello' })), false);
+  assert.equal(isValidGuestHistory([null]), false);
+  const bounded = buildGuestHistory(Array(30).fill({ role: 'user', content: 'x'.repeat(20000) }));
+  assert.equal(isValidGuestHistory(bounded), true);
+  assert.ok(bounded.reduce((sum, message) => sum + message.content.length, 0) <= 50000);
+});
+
+test('Failed conversation creation preserves the draft and attachments without sending a fake ID', async () => {
+  const source = fs.readFileSync('src/app/(main)/page.tsx', 'utf8');
+  const block = source.slice(source.indexOf('  const handleSendMessage ='), source.indexOf('  const currentChapterId ='));
+  let requests = 0, error = '', typing = false, cleared = false;
+  const globals = {
+    chatRequestInFlightRef: { current: false }, chatInput: 'Keep my question', chatQuotes: [], activeChatId: null, chats: [],
+    chatImage: { preview: 'local image' }, attachedFile: null, userId: null, API_URL: '', AbortSignal,
+    setChatSubmitError: value => { error = value; }, setIsAiTyping: value => { typing = value; },
+    setChatImage() { cleared = true; }, setChatQuotes() { cleared = true; }, setChatInput() { cleared = true; },
+    fetchWithAuth: async () => { requests++; return Response.json({ error: 'Unavailable' }, { status: 503 }); },
+  };
+  vm.runInNewContext(ts.transpileModule(block + '\nthis.send = handleSendMessage;', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, globals);
+  await globals.send();
+  assert.equal(requests, 1);
+  assert.equal(cleared, false);
+  assert.equal(typing, false);
+  assert.equal(globals.chatRequestInFlightRef.current, false);
+  assert.match(error, /draft is still here/);
+});
+
+test('Expired guest sessions renew once and carry prior context to the replacement conversation', async () => {
+  const source = fs.readFileSync('src/app/(main)/page.tsx', 'utf8');
+  const block = source.slice(source.indexOf('  const handleSendMessage ='), source.indexOf('  const currentChapterId ='));
+  const { buildGuestHistory } = loader()('src/lib/guestChatHistory.ts');
+  const calls = [];
+  let chats = [{ id: 7, title: 'Psalm study', guestChatToken: 'old', messages: [{ role: 'user', content: 'Psalm 23' }, { role: 'model', content: 'The Lord is my shepherd.' }] }];
+  const globals = {
+    chatRequestInFlightRef: { current: false }, chatInput: 'Which Psalm?', chatQuotes: [], activeChatId: 7, chats,
+    chatImage: null, attachedFile: null, attachedScripture: null, userId: null, API_URL: '', AbortSignal,
+    guestChatTokensRef: { current: { 7: 'old' } }, scrollToBottomOnChatOpenRef: { current: false },
+    translation: 'bsb', theologicalLens: 'standard', includeOriginalRoots: false, buildGuestHistory,
+    setChats: update => { chats = update(chats); }, trackClientEvent() {}, console: quiet,
+    fetchWithAuth: async (url, options) => {
+      calls.push({ url, body: JSON.parse(options.body) });
+      if (calls.length === 1) return Response.json({ error: 'Chat not found' }, { status: 404 });
+      if (calls.length === 2) return Response.json({ id: 8, guestChatToken: 'new' }, { status: 201 });
+      return Response.json({ userMessage: { role: 'user', content: 'Which Psalm?' }, aiMessage: { role: 'model', content: 'Psalm 23' } });
+    },
+  };
+  for (const name of ['setChatSubmitError', 'setIsAiTyping', 'setChatImage', 'setChatQuotes', 'setChatInput', 'setAttachedScripture', 'setAttachedFile', 'setFileUploadStatus', 'setShowSlashCommands', 'setAiActivityType', 'setAiActivityStatus', 'setAiThinkingText', 'setActiveChatId']) globals[name] = () => {};
+  vm.runInNewContext(ts.transpileModule(block + '\nthis.send = handleSendMessage;', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, globals);
+  await globals.send();
+  assert.equal(calls.length, 3);
+  assert.match(calls[2].url, /chats\/8\/messages/);
+  assert.equal(calls[2].body.guestHistory.length, 2, 'the current question must not be duplicated in context');
+  assert.equal(calls[2].body.guestHistory[0].content, 'Psalm 23');
+  assert.equal(globals.guestChatTokensRef.current[8], 'new');
+  assert.equal(chats[0].id, 8);
+  assert.equal(chats[0].messages.at(-1).content, 'Psalm 23');
+  assert.equal(globals.chatRequestInFlightRef.current, false);
+});

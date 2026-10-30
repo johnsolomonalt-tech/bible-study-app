@@ -91,9 +91,11 @@ export function NoteFormattingToolbar({
   }
 
   return (
-    <div className="border-b border-border bg-surface/30 px-2.5 sm:px-3 py-1.5 flex items-center justify-between gap-1.5 sm:gap-2 shrink-0 select-none overflow-x-auto no-scrollbar sm:flex-wrap">
+    <div className="border-b border-border bg-surface/30 px-2.5 sm:px-3 py-1.5 flex items-center justify-between gap-1.5 sm:gap-2 shrink-0 select-none overflow-x-auto sm:overflow-visible no-scrollbar sm:flex-wrap">
       {/* Left Formatting Group */}
-      <div className="flex items-center gap-1 flex-nowrap sm:flex-wrap shrink-0">
+      <fieldset disabled={viewMode === 'preview'} aria-label="Text formatting"
+        className="flex items-center gap-1 flex-nowrap sm:flex-wrap shrink-0 disabled:opacity-40"
+        title={viewMode === 'preview' ? 'Switch to Write or Split to format your note' : undefined}>
         {/* Headings */}
         <button
           type="button"
@@ -210,6 +212,7 @@ export function NoteFormattingToolbar({
             type="button"
             onClick={() => setCalloutsOpen(!calloutsOpen)}
             title="Insert Theological Callout"
+            aria-expanded={calloutsOpen}
             className="flex items-center gap-1 min-h-[40px] sm:min-h-0 p-2 sm:p-1.5 rounded-xl text-muted hover:text-fg hover:bg-surface transition-colors cursor-pointer text-[12px]"
           >
             <Lightbulb size={17} className="text-amber-500" />
@@ -217,7 +220,7 @@ export function NoteFormattingToolbar({
             <ChevronDown size={12} />
           </button>
 
-          {calloutsOpen && (
+          {calloutsOpen && viewMode !== 'preview' && (
             <div 
               className="absolute left-0 top-full mt-1.5 w-56 bg-bg border border-border rounded-xl shadow-xl z-30 p-1.5 space-y-1 animate-in fade-in"
               onClick={() => setCalloutsOpen(false)}
@@ -257,7 +260,8 @@ export function NoteFormattingToolbar({
             </div>
           )}
         </div>
-      </div>
+      </fieldset>
+      {viewMode === 'preview' && <span className="text-xs text-muted">Switch to Write to format</span>}
 
       {/* Right Tools Group (Insert Verse, Templates, AI, View Mode) */}
       <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">

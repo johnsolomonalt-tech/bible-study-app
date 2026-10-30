@@ -62,7 +62,7 @@ export function TrackerStreakHero({
   const goalProgressPercent = Math.min(100, Math.round((chaptersToday / Math.max(1, dailyChapterGoal)) * 100));
   const isGoalMet = chaptersToday >= dailyChapterGoal;
 
-  const estimatedDaysLeft = Math.max(1, Math.round((totalBibleChapters - totalChaptersCompleted) / Math.max(1, dailyChapterGoal)));
+  const estimatedDaysLeft = Math.max(0, Math.ceil((totalBibleChapters - totalChaptersCompleted) / Math.max(1, dailyChapterGoal)));
   const estimatedYearsLeft = (estimatedDaysLeft / 365).toFixed(1);
 
   return (
@@ -70,7 +70,10 @@ export function TrackerStreakHero({
       {/* Top 3-Card Grid: Streak Flame + Today's Chapter Goal + Longest Record */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Card 1: Streak Card */}
-        <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-amber-500/10 via-surface to-surface border border-border/80 ring-shadow relative overflow-hidden flex flex-col justify-between">
+        <button type="button" onClick={() => setIsCalendarOpen(true)}
+          aria-label={`Reading streak: ${streakData.currentStreak} days. Open streak calendar`}
+          aria-haspopup="dialog" aria-expanded={isCalendarOpen}
+          className="text-left cursor-pointer hover:border-accent/50 transition-colors p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-amber-500/10 via-surface to-surface border border-border/80 ring-shadow relative overflow-hidden flex flex-col justify-between">
           <div className="flex items-start justify-between">
             <div className="space-y-1">
               <span className="text-[11px] font-bold uppercase tracking-wider text-muted">
@@ -112,7 +115,8 @@ export function TrackerStreakHero({
               </span>
             )}
           </div>
-        </div>
+          <span className="mt-3 flex items-center gap-1 text-xs text-fg-2">View calendar <ChevronRight size={13} /></span>
+        </button>
 
         {/* Card 2: Today's Chapter Goal */}
         <div className="p-5 sm:p-6 rounded-3xl bg-surface border border-border/80 ring-shadow flex flex-col justify-between">
@@ -304,9 +308,9 @@ export function TrackerStreakHero({
         </div>
 
         {/* Scripture Encouragement Bar - Full verse displayed at all times */}
-        <div 
+        <button type="button" aria-label={`Read daily verse: ${quote.reference}`}
           onClick={() => setIsDailyVerseOpen(true)}
-          className="mt-4 pt-4 border-t border-border/50 flex items-start gap-3 text-xs cursor-pointer hover:opacity-95 transition-opacity group/tracker-quote"
+          className="w-full text-left mt-4 pt-4 border-t border-border/50 flex items-start gap-3 text-xs cursor-pointer hover:opacity-95 transition-opacity group/tracker-quote"
         >
           <div className="w-7 h-7 rounded-xl bg-accent/10 group-hover/tracker-quote:bg-accent/20 border border-accent/20 flex items-center justify-center shrink-0 text-accent transition-colors mt-0.5">
             <Sparkles size={13} />
@@ -321,7 +325,7 @@ export function TrackerStreakHero({
               </span>
             </div>
           </div>
-        </div>
+        </button>
       </div>
 
       {/* Reading Calendar Modal */}
@@ -358,7 +362,7 @@ export function TrackerStreakHero({
           if (onNavigateToVerse) {
             onNavigateToVerse(book, chapter, verse);
           } else {
-            onNavigateToTab('reader');
+            onNavigateToTab('study');
           }
         }}
       />

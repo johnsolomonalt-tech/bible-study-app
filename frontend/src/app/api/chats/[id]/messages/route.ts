@@ -8,6 +8,7 @@ import { BIBLE_VERSE_REGEX } from '@/lib/bibleReferences';
 import { isValidDbId, getMemoryMessages, addMemoryMessage, MemoryMessage } from '@/lib/memoryChatStore';
 import { ChatIdentity, ownsChat, resolveChatIdentity } from '@/lib/chatIdentity';
 import { extractVerifiedSources } from '@/lib/chatSources';
+import { GuestHistoryMessage, isValidGuestHistory } from '@/lib/guestChatHistory';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
@@ -251,6 +252,7 @@ interface ProcessAiMessageParams {
   translation?: string;
   theologicalLens?: string;
   includeOriginalRoots?: boolean;
+  guestHistory?: GuestHistoryMessage[];
   onStatusUpdate?: (status: string) => void;
   onThoughtUpdate?: (thought: string) => void;
   onTextUpdate?: (text: string) => void;
@@ -265,6 +267,7 @@ async function processAiMessage({
   translation,
   theologicalLens = 'standard',
   includeOriginalRoots = false,
+  guestHistory,
   onStatusUpdate,
   onThoughtUpdate,
   onTextUpdate,
@@ -381,7 +384,9 @@ async function processAiMessage({
 
   // --- Route: Normal Text / Vision Response ---
   let pastMessages: { id: number; content: string; role: string }[] = [];
-  if (identity.kind === 'user' && process.env.DATABASE_URL && isValidDbId(chatId)) {
+  if (identity.kind === 'guest' && guestHistory) {
+    pastMessages = guestHistory.map((message, index) => ({ ...message, id: -index - 1 }));
+  } else if (identity.kind === 'user' && process.env.DATABASE_URL && isValidDbId(chatId)) {
     try {
       pastMessages = await prisma.message.findMany({
         where: { chatId, chat: { userId: identity.userId } },
@@ -642,7 +647,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return NextResponse.json({ error: 'Invalid message.' }, { status: 400 });
   }
-  const { content = '', image, scriptureContext, translation, theologicalLens, includeOriginalRoots } = body;
+  const { content = '', image, scriptureContext, translation, theologicalLens, includeOriginalRoots, guestHistory } = body;
+  if (guestHistory !== undefined && !isValidGuestHistory(guestHistory)) {
+    return NextResponse.json({ error: 'Invalid conversation history.' }, { status: 400 });
+  }
   if (typeof content !== 'string' || content.length > 100_000 || (!content.trim() && !image) ||
       (translation !== undefined && typeof translation !== 'string') ||
       (theologicalLens !== undefined && (typeof theologicalLens !== 'string' || !Object.hasOwn(THEOLOGICAL_LENSES, theologicalLens))) ||
@@ -686,6 +694,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             translation,
             theologicalLens,
             includeOriginalRoots: Boolean(includeOriginalRoots),
+            guestHistory: identity.kind === 'guest' ? guestHistory : undefined,
             onStatusUpdate: (status) => {
               send({ type: 'status', status });
             },
@@ -726,6 +735,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     translation,
     theologicalLens,
     includeOriginalRoots: Boolean(includeOriginalRoots),
+    guestHistory: identity.kind === 'guest' ? guestHistory : undefined,
   });
 
   return NextResponse.json(result, { status: 201 });

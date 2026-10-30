@@ -97,12 +97,21 @@ export function EditPaceModal({
     }
   }, [isOpen, currentGoal]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const totalBibleChapters = 1189;
   const remainingChapters = Math.max(0, totalBibleChapters - totalChaptersCompleted);
   const effectiveGoal = Math.max(1, selectedGoal);
-  const daysToFinish = Math.max(1, Math.ceil(remainingChapters / effectiveGoal));
+  const daysToFinish = Math.max(0, Math.ceil(remainingChapters / effectiveGoal));
 
   // Compute estimated finish date
   const projectedFinishDate = new Date();
@@ -141,6 +150,7 @@ export function EditPaceModal({
         onClick={onClose}
       >
         <motion.div
+          role="dialog" aria-modal="true" aria-label="Reading pace and goals"
           initial={{ opacity: 0, scale: 0.95, y: 12 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 12 }}

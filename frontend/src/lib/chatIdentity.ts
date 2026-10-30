@@ -7,7 +7,24 @@ export const GUEST_CHAT_COOKIE = 'theologica_guest_chat';
 
 export type ChatIdentity =
   | { kind: 'user'; ownerKey: string; userId: string }
-  | { kind: 'guest'; ownerKey: string; userId: null };
+  | { kind: 'guest'; ownerKey: string; userId: null; authorizedChatId?: number };
+
+// A cookie-bound capability preserves guest ownership across serverless cold starts.
+// History stays on the device; this token contains only the conversation ID.
+export function createGuestChatToken(ownerKey: string, chatId: number) {
+  const secret = guestSecret();
+  if (!secret || !ownerKey.startsWith('guest:') || !isValidDbId(chatId)) return null;
+  const signature = createHmac('sha256', secret).update(`chat:v1:${ownerKey}:${chatId}`).digest('hex');
+  return `${chatId}.${signature}`;
+}
+
+function readAuthorizedChat(req: Request, ownerKey: string): number | undefined {
+  const token = req.headers.get('x-guest-chat-token') || '';
+  if (!/^\d{1,10}\.[a-f0-9]{64}$/.test(token)) return;
+  const id = Number(token.split('.')[0]);
+  const expected = createGuestChatToken(ownerKey, id);
+  if (expected && token.length === expected.length && timingSafeEqual(Buffer.from(token), Buffer.from(expected))) return id;
+}
 
 function guestSecret() {
   return (
@@ -57,7 +74,8 @@ export async function resolveChatIdentity(req: Request): Promise<ChatIdentity> {
       const actualBytes = Buffer.from(signature, 'hex');
       const expectedBytes = Buffer.from(expected, 'hex');
       if (/^[a-f0-9]{48}$/.test(id) && /^[a-f0-9]{64}$/.test(signature) && actualBytes.length === expectedBytes.length && timingSafeEqual(actualBytes, expectedBytes)) {
-        return { kind: 'guest', userId: null, ownerKey: `guest:${id}` };
+        const ownerKey = `guest:${id}`;
+        return { kind: 'guest', userId: null, ownerKey, authorizedChatId: readAuthorizedChat(req, ownerKey) };
       }
     }
   }
@@ -68,6 +86,7 @@ export async function resolveChatIdentity(req: Request): Promise<ChatIdentity> {
 
 export async function ownsChat(identity: ChatIdentity, chatId: number): Promise<boolean> {
   if (!identity.ownerKey || !isValidDbId(chatId)) return false;
+  if (identity.kind === 'guest' && identity.authorizedChatId === chatId) return true;
   if (identity.kind === 'user' && process.env.DATABASE_URL) {
     try {
       const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { userId: true } });

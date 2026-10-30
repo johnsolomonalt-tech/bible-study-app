@@ -116,11 +116,12 @@ export function ReadingCalendarModal({
 
           {/* Modal Container */}
           <motion.div
+            role="dialog" aria-modal="true" aria-label="Streak calendar"
             initial={{ opacity: 0, scale: 0.94, y: 15 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-            className="relative w-full max-w-lg bg-surface border border-border/80 rounded-3xl shadow-2xl overflow-hidden z-10 my-auto modal-safe-content"
+            className="relative w-full max-w-lg bg-surface border border-border/80 rounded-3xl shadow-2xl overflow-y-auto z-10 my-auto modal-safe-content"
           >
             {/* Header */}
             <div className="p-5 sm:p-6 pb-4 border-b border-border/60">

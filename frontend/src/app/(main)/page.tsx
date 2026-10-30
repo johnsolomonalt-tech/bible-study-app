@@ -18,6 +18,7 @@ import { InterlinearModeRibbon } from '@/components/bible/InterlinearModeRibbon'
 import { findInterlinearWord, getOrGenerateInterlinearWord, fetchInterlinearWord, getVerseInterlinearTokens, preloadChapterLexicon, CLIENT_LEXICON_CACHE, STOPWORDS, InterlinearWord } from '@/lib/interlinearData';
 import { getScriptureBacklinks, BacklinksResult } from '@/lib/backlinks';
 import { TheologicalLensSelector, TheologicalLensType, THEOLOGICAL_LENS_OPTIONS } from '@/components/chat/TheologicalLensSelector';
+import { buildGuestHistory } from '@/lib/guestChatHistory';
 import { ChatEmptyState } from '@/components/chat/ChatEmptyState';
 import { ChatSlashCommands, SLASH_COMMANDS, SlashCommand } from '@/components/chat/ChatSlashCommands';
 import { ChatFollowUps } from '@/components/chat/ChatFollowUps';
@@ -812,6 +813,7 @@ export default function App() {
     }
   }, []);
   
+  const guestChatTokensRef = useRef<Record<number, string>>({});
   const fetchWithAuth = useCallback(async (url: string, options: RequestInit = {}) => {
     let token: string | null = null;
     if (userId) {
@@ -822,6 +824,10 @@ export default function App() {
     const headers: Record<string, string> = {
       ...((options.headers as Record<string, string>) || {}),
     };
+    const chatIdMatch = url.match(/\/api\/chats\/(\d+)(?:[/?]|$)/);
+    if (!userId && chatIdMatch && guestChatTokensRef.current[Number(chatIdMatch[1])]) {
+      headers['x-guest-chat-token'] = guestChatTokensRef.current[Number(chatIdMatch[1])];
+    }
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
@@ -1595,9 +1601,40 @@ export default function App() {
   }, [activeBook.name, activeChapter, notes, highlights]);
 
   // Chats State
-  const [chats, setChats] = useState<{id: number, title: string, messages: {role: string, content: string, isStreaming?: boolean}[]}[]>([]);
+  const [chats, setChats] = useState<{id: number, title: string, guestChatToken?: string, messages: {role: string, content: string, isStreaming?: boolean}[]}[]>([]);
   const [activeChatId, setActiveChatId] = useState<number | null>(null);
   const [mobileChatView, setMobileChatView] = useState<'chat' | 'list'>('chat');
+  const [guestChatsLoaded, setGuestChatsLoaded] = useState(false);
+  useEffect(() => {
+    if (!isLoaded) return;
+    setGuestChatsLoaded(false);
+    guestChatTokensRef.current = {};
+    if (userId) return;
+    try {
+      const stored = JSON.parse(localStorage.getItem('theologica_guest_chats') || '[]');
+      if (Array.isArray(stored)) {
+        const restored = stored.filter(chat => Number.isInteger(chat?.id) && typeof chat.title === 'string' &&
+          typeof chat.guestChatToken === 'string' && Array.isArray(chat.messages) &&
+          chat.messages.every((message: any) => message && ['user', 'model'].includes(message.role) && typeof message.content === 'string'));
+        setChats(restored);
+        for (const chat of restored) guestChatTokensRef.current[chat.id] = chat.guestChatToken;
+        const savedId = Number(getPreference(PREF_KEYS.ACTIVE_CHAT_ID));
+        setActiveChatId(restored.some(chat => chat.id === savedId) ? savedId : null);
+      }
+    } catch { /* A damaged local cache must not prevent starting a new conversation. */ }
+    setGuestChatsLoaded(true);
+  }, [isLoaded, userId]);
+
+  useEffect(() => {
+    if (!isLoaded || userId || !guestChatsLoaded) return;
+    try {
+      localStorage.setItem('theologica_guest_chats', JSON.stringify(chats.filter(chat => chat.guestChatToken).map(chat => ({
+        id: chat.id, title: chat.title, guestChatToken: chat.guestChatToken,
+        messages: chat.messages.filter(message => !message.isStreaming).map(({ role, content }) => ({ role, content })),
+      }))));
+    } catch { console.warn('Guest chat history could not be saved on this device.'); }
+  }, [chats, isLoaded, userId, guestChatsLoaded]);
+
   const [isChatInputFocused, setIsChatInputFocused] = useState(false);
 
   // Real-time touch dragging for Mobile AI Chats conversation drawer (smooth slide-out with finger)
@@ -2370,6 +2407,7 @@ export default function App() {
 
   // Persist active chat ID
   useEffect(() => {
+    if (!isLoaded || (!userId && !guestChatsLoaded)) return;
     if (typeof window !== 'undefined') {
       if (activeChatId !== null) {
         setPreference(PREF_KEYS.ACTIVE_CHAT_ID, String(activeChatId));
@@ -2377,7 +2415,7 @@ export default function App() {
         removePreference(PREF_KEYS.ACTIVE_CHAT_ID);
       }
     }
-  }, [activeChatId]);
+  }, [activeChatId, isLoaded, userId, guestChatsLoaded]);
 
   // Synchronous flush on tab close / background
   useEffect(() => {
@@ -2964,6 +3002,7 @@ export default function App() {
     handleToggleBottomNotes(true);
   };
   const [chatInput, setChatInput] = useState('');
+  const [chatSubmitError, setChatSubmitError] = useState('');
   const [chatQuotes, setChatQuotes] = useState<{id: string, text: string, reference: string}[]>([]);
   const [chatImage, setChatImage] = useState<{base64: string, mimeType: string, preview: string, name?: string} | null>(null);
   const [attachedFile, setAttachedFile] = useState<{
@@ -3338,7 +3377,7 @@ export default function App() {
 
     // 2. High-speed cross-device sync: trigger pull whenever tab gains focus or becomes visible
     const handleAccountSyncOnActive = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'visible' && navigator.onLine) {
+      if (userId && typeof document !== 'undefined' && document.visibilityState === 'visible' && navigator.onLine) {
         pullStreakFromAccount(fetchWithAuth, dailyChapterGoalRef.current).then(res => {
           if (res?.dailyChapterGoal && typeof res.dailyChapterGoal === 'number' && res.dailyChapterGoal > 0) {
             setDailyChapterGoal(res.dailyChapterGoal);
@@ -5423,14 +5462,10 @@ export default function App() {
     const isFirstMessage = !activeChatId || (currentChat && currentChat.messages.length === 0);
     if (!textToSend.trim() && !chatImage && !attachedFile) return;
     chatRequestInFlightRef.current = true;
-    
-    setChatQuotes([]);
-    setAttachedScripture(null);
+    setChatSubmitError('');
+    setIsAiTyping(true);
     const currentImage = chatImage;
     const currentAttached = attachedFile;
-    setChatImage(null);
-    setAttachedFile(null);
-    setFileUploadStatus(null);
 
     // If attached document has textContent, prefix it into textToSend
     if (currentAttached?.textContent) {
@@ -5447,30 +5482,26 @@ export default function App() {
     } : undefined;
 
     // Create a new chat automatically if none exists
-    if (!targetChatId) {
-      let createdChatId = Math.floor(Math.random() * 2000000000) + 1;
-      let newChat: any = {
-        id: createdChatId,
-        title: 'New Conversation',
-        messages: []
-      };
-
+    if (!targetChatId || (!userId && !currentChat?.guestChatToken)) {
+      let newChat: any;
       try {
         const res = await fetchWithAuth(`${API_URL}/api/chats`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title: 'New Conversation' })
+          body: JSON.stringify({ title: 'New Conversation' }),
+          signal: AbortSignal.timeout(20000),
         });
-        if (res.ok) {
-          const serverChat = await res.json();
-          if (serverChat && serverChat.id) {
-            newChat = serverChat;
-            createdChatId = serverChat.id;
-          }
-        }
-      } catch (err) {
-        console.warn('Chat initialized locally:', err);
+        if (!res.ok) throw new Error('Chat creation failed');
+        newChat = await res.json();
+        if (!newChat?.id) throw new Error('Invalid chat response');
+      } catch {
+        setChatSubmitError('Unable to start this conversation. Your draft is still here. Please retry or sign in.');
+        chatRequestInFlightRef.current = false;
+        setIsAiTyping(false);
+        return;
       }
+      const createdChatId = newChat.id;
+      if (newChat.guestChatToken) guestChatTokensRef.current[createdChatId] = newChat.guestChatToken;
 
       targetChatId = createdChatId;
       
@@ -5480,9 +5511,9 @@ export default function App() {
         imagePreview: currentAttached?.preview || currentImage?.preview,
         attachedFile: optimisticAttached,
       };
-      const chatWithOptimisticMsg = { ...newChat, messages: [newMsg] };
+      const chatWithOptimisticMsg = { ...newChat, title: currentChat?.title || newChat.title, messages: [...(currentChat?.messages || []), newMsg] };
       
-      setChats(prev => [chatWithOptimisticMsg, ...prev]);
+      setChats(prev => [chatWithOptimisticMsg, ...prev.filter(chat => chat.id !== activeChatId)]);
       setActiveChatId(createdChatId);
     } else {
       const newMsg = { 
@@ -5499,6 +5530,11 @@ export default function App() {
       }));
     }
     
+    setChatQuotes([]);
+    setAttachedScripture(null);
+    setChatImage(null);
+    setAttachedFile(null);
+    setFileUploadStatus(null);
     const currentInput = textToSend;
     if (!overrideText) setChatInput(''); else setChatInput('');
     setShowSlashCommands(false);
@@ -5539,35 +5575,58 @@ export default function App() {
       mimeType: currentImage.mimeType,
     } : undefined);
 
-    const messagePromise = fetchWithAuth(`${API_URL}/api/chats/${targetChatId}/messages?stream=true`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Accept': 'text/event-stream'
-      },
-      body: JSON.stringify({ 
-        content: currentInput,
-        image: filePayload,
-        scriptureContext: scriptureContextToSend,
-        translation: translation.toUpperCase(),
-        theologicalLens,
-        includeOriginalRoots,
-      })
+    const messageBody = JSON.stringify({
+      content: currentInput,
+      ...(!userId ? { guestHistory: buildGuestHistory(currentChat?.messages || []) } : {}),
+      image: filePayload,
+      scriptureContext: scriptureContextToSend,
+      translation: translation.toUpperCase(),
+      theologicalLens,
+      includeOriginalRoots,
     });
+    const sendToConversation = () => fetchWithAuth(`${API_URL}/api/chats/${targetChatId}/messages?stream=true`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
+      body: messageBody,
+    });
+    const messagePromise = sendToConversation();
 
     // Fire auto-naming concurrently so it doesn't block the UI and types simultaneously
-    let namePromise: Promise<Response> | null = null;
+    let namePromise: Promise<Response | null> | null = null;
     if (isFirstMessage && targetChatId) {
       namePromise = fetchWithAuth(`${API_URL}/api/chats/${targetChatId}/name`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userMessage: currentInput })
-      });
+      }).catch(() => null);
     }
 
     try {
-      const res = await messagePromise;
-      
+      let res = await messagePromise;
+      if (res.status === 404 && !userId) {
+        // A cleared/expired guest cookie must not strand locally saved conversations.
+        const renewed = await fetchWithAuth(`${API_URL}/api/chats`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: currentChat?.title || 'New Conversation' }),
+          signal: AbortSignal.timeout(20000),
+        }).then(response => response.ok ? response.json() : null).catch(() => null);
+        if (!renewed?.id || !renewed.guestChatToken) {
+          setChatInput(chatInput);
+          setChatQuotes(chatQuotes);
+          setChatImage(currentImage);
+          setAttachedFile(currentAttached);
+          setAttachedScripture(attachedScripture);
+          setChatSubmitError('Unable to reconnect this conversation. Your draft is still here. Please retry or sign in.');
+          setChats(prev => prev.map(chat => chat.id === targetChatId ? { ...chat, messages: chat.messages.slice(0, currentChat?.messages.length || 0) } : chat));
+          return;
+        }
+        const previousId = targetChatId;
+        targetChatId = renewed.id;
+        guestChatTokensRef.current[renewed.id] = renewed.guestChatToken;
+        setChats(prev => prev.map(chat => chat.id === previousId ? { ...chat, id: renewed.id, guestChatToken: renewed.guestChatToken } : chat));
+        setActiveChatId(renewed.id);
+        res = await sendToConversation();
+      }
       if (res.ok) {
         const isStream = res.headers.get('content-type')?.includes('text/event-stream');
         if (isStream && res.body) {
@@ -5655,7 +5714,7 @@ export default function App() {
 
         if (namePromise) {
           namePromise.then(async (nameRes) => {
-            if (nameRes.ok) {
+            if (nameRes?.ok) {
               const { title } = await nameRes.json();
               setChats(prev => prev.map(c => c.id === targetChatId ? { ...c, title } : c));
             }
@@ -5889,8 +5948,8 @@ export default function App() {
     // Proximity threshold: within 56px of the button center (covers the 44px button, plus the gap between buttons and edges)
     if (closestId && closestDistSq <= 56 * 56) {
       e.preventDefault();
+      void toggleAnyChapter(closestId);
       lastMobileChapterTapRef.current = { id: closestId, time: Date.now() };
-      toggleAnyChapter(closestId);
     }
   };
 
@@ -7044,7 +7103,8 @@ export default function App() {
                         </div>
                       </div>
                     )}
-                    {fileUploadStatus && (
+                    {chatSubmitError && <p role="alert" className="mb-2 text-sm text-red-500">{chatSubmitError}</p>}
+                  {fileUploadStatus && (
                       <div className="mb-2 flex items-center gap-2 px-3 py-1.5 rounded-xl bg-accent/10 border border-accent/20 text-accent text-[12px] font-medium animate-in fade-in slide-in-from-bottom-1 duration-150 shadow-2xs self-start">
                         <div className="w-2 h-2 rounded-full bg-accent animate-pulse shrink-0" />
                         <span className="truncate">{fileUploadStatus}</span>
@@ -8905,7 +8965,8 @@ export default function App() {
                       </div>
                     )}
 
-                    {fileUploadStatus && (
+                    {chatSubmitError && <p role="alert" className="mb-2 text-sm text-red-500">{chatSubmitError}</p>}
+                  {fileUploadStatus && (
                       <div className="mb-2 flex items-center gap-2 px-3 py-1.5 rounded-xl bg-accent/10 border border-accent/20 text-accent text-[12px] font-medium animate-in fade-in slide-in-from-bottom-1 duration-150 shadow-2xs self-start">
                         <div className="w-2 h-2 rounded-full bg-accent animate-pulse shrink-0" />
                         <span className="truncate">{fileUploadStatus}</span>
@@ -9989,6 +10050,7 @@ export default function App() {
                       </div>
                     </div>
                   )}
+                  {chatSubmitError && <p role="alert" className="mb-2 text-sm text-red-500">{chatSubmitError}</p>}
                   {fileUploadStatus && (
                     <div className="mb-2.5 flex items-center gap-2 px-3.5 py-2 rounded-xl bg-accent/10 border border-accent/20 text-accent text-[13px] font-medium animate-in fade-in slide-in-from-bottom-1 duration-150 shadow-2xs self-start">
                       <div className="w-2 h-2 rounded-full bg-accent animate-pulse shrink-0" />
@@ -10188,26 +10250,19 @@ export default function App() {
                         const allRead = comp === book.chapters;
                         return (
                           <div key={book.name} className="bg-surface rounded-[16px] overflow-hidden ring-1 ring-border">
-                            <button 
-                              onClick={() => toggleBook(book.name)}
-                              className="w-full min-h-[48px] flex items-center justify-between p-3.5 sm:p-4 hover:bg-surface transition-colors cursor-pointer"
-                            >
-                              <h3 className="font-medium text-[15px] text-fg">{book.name}</h3>
+                            <div className="w-full min-h-[48px] flex items-center justify-between gap-2 px-3.5 sm:px-4">
+                              <button type="button" onClick={() => toggleBook(book.name)} aria-expanded={isBookExpanded}
+                                aria-label={`${isBookExpanded ? 'Collapse' : 'Expand'} ${book.name} chapters`}
+                                className="flex-1 min-w-0 min-h-[48px] flex items-center gap-2 text-left cursor-pointer hover:text-accent">
+                                <ChevronRight size={14} className={isBookExpanded ? 'rotate-90' : ''} />
+                                <span className="font-medium text-[15px]">{book.name}</span>
+                              </button>
                               
                               <div className="flex items-center gap-2">
-                                <span
-                                  role="button"
-                                  tabIndex={0}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleBookAllChapters(book);
-                                  }}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                      e.stopPropagation();
-                                      toggleBookAllChapters(book);
-                                    }
-                                  }}
+                                <button
+                                  type="button"
+                                  aria-label={`${allRead ? 'Unmark' : 'Mark'} all ${book.name} chapters`}
+                                  onClick={() => toggleBookAllChapters(book)}
                                   title={allRead ? `Unmark all ${book.chapters} chapters of ${book.name}` : `Mark all ${book.chapters} chapters of ${book.name} as read in one click`}
                                   className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[12px] font-medium transition-all cursor-pointer ${
                                     allRead
@@ -10216,13 +10271,13 @@ export default function App() {
                                   }`}
                                 >
                                   {allRead ? <CheckCheck size={13} strokeWidth={2.4} /> : <Check size={13} strokeWidth={2} />}
-                                  <span>Mark All</span>
-                                </span>
+                                  <span>{allRead ? 'Unmark All' : 'Mark All'}</span>
+                                </button>
                                 <span className="text-[13px] text-muted font-mono bg-bg px-2 py-1 rounded-md">
                                   {trackerFormat === 'percent' ? `${Math.round((comp / book.chapters) * 100) || 0}%` : `${comp}/${book.chapters}`}
                                 </span>
                               </div>
-                            </button>
+                            </div>
                             
                             {isBookExpanded && (
                               <div className="p-4 pt-0 border-t border-border bg-bg">
@@ -10244,6 +10299,8 @@ export default function App() {
                                       <button
                                         key={i}
                                         data-chapter-id={id}
+                                        aria-pressed={isChecked}
+                                        aria-label={`${book.name} ${i + 1}: ${isChecked ? 'read' : 'not read'}`}
                                         onClick={() => toggleAnyChapter(id)}
                                         className={`w-11 h-11 lg:w-9 lg:h-9 rounded-xl text-xs font-semibold flex items-center justify-center transition-all cursor-pointer ${
                                           isChecked 
@@ -10296,26 +10353,19 @@ export default function App() {
                         const allRead = comp === book.chapters;
                         return (
                           <div key={book.name} className="bg-surface rounded-[16px] overflow-hidden ring-1 ring-border">
-                            <button 
-                              onClick={() => toggleBook(book.name)}
-                              className="w-full min-h-[48px] flex items-center justify-between p-3.5 sm:p-4 hover:bg-surface transition-colors cursor-pointer"
-                            >
-                              <h3 className="font-medium text-[15px] text-fg">{book.name}</h3>
+                            <div className="w-full min-h-[48px] flex items-center justify-between gap-2 px-3.5 sm:px-4">
+                              <button type="button" onClick={() => toggleBook(book.name)} aria-expanded={isBookExpanded}
+                                aria-label={`${isBookExpanded ? 'Collapse' : 'Expand'} ${book.name} chapters`}
+                                className="flex-1 min-w-0 min-h-[48px] flex items-center gap-2 text-left cursor-pointer hover:text-accent">
+                                <ChevronRight size={14} className={isBookExpanded ? 'rotate-90' : ''} />
+                                <span className="font-medium text-[15px]">{book.name}</span>
+                              </button>
                               
                               <div className="flex items-center gap-2">
-                                <span
-                                  role="button"
-                                  tabIndex={0}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleBookAllChapters(book);
-                                  }}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                      e.stopPropagation();
-                                      toggleBookAllChapters(book);
-                                    }
-                                  }}
+                                <button
+                                  type="button"
+                                  aria-label={`${allRead ? 'Unmark' : 'Mark'} all ${book.name} chapters`}
+                                  onClick={() => toggleBookAllChapters(book)}
                                   title={allRead ? `Unmark all ${book.chapters} chapters of ${book.name}` : `Mark all ${book.chapters} chapters of ${book.name} as read in one click`}
                                   className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[12px] font-medium transition-all cursor-pointer ${
                                     allRead
@@ -10324,13 +10374,13 @@ export default function App() {
                                   }`}
                                 >
                                   {allRead ? <CheckCheck size={13} strokeWidth={2.4} /> : <Check size={13} strokeWidth={2} />}
-                                  <span>Mark All</span>
-                                </span>
+                                  <span>{allRead ? 'Unmark All' : 'Mark All'}</span>
+                                </button>
                                 <span className="text-[13px] text-muted font-mono bg-bg px-2 py-1 rounded-md">
                                   {trackerFormat === 'percent' ? `${Math.round((comp / book.chapters) * 100) || 0}%` : `${comp}/${book.chapters}`}
                                 </span>
                               </div>
-                            </button>
+                            </div>
                             
                             {isBookExpanded && (
                               <div className="p-4 pt-0 border-t border-border bg-bg">
@@ -10352,6 +10402,8 @@ export default function App() {
                                       <button
                                         key={i}
                                         data-chapter-id={id}
+                                        aria-pressed={isChecked}
+                                        aria-label={`${book.name} ${i + 1}: ${isChecked ? 'read' : 'not read'}`}
                                         onClick={() => toggleAnyChapter(id)}
                                         className={`w-11 h-11 lg:w-9 lg:h-9 rounded-xl text-xs font-semibold flex items-center justify-center transition-all cursor-pointer ${
                                           isChecked 

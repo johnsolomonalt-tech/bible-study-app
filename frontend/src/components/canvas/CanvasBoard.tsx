@@ -2015,11 +2015,13 @@ function InnerCanvasBoard({
   // Global Keyboard Shortcuts (Cmd+Z, Cmd+Shift+Z, Cmd+S, Delete)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isActiveTab || e.defaultPrevented) return;
       const target = e.target as HTMLElement;
       if (
         target.tagName === 'INPUT' ||
         target.tagName === 'TEXTAREA' ||
-        target.isContentEditable
+        target.isContentEditable ||
+        target.closest?.('[role="dialog"], [role="alertdialog"]')
       ) {
         return;
       }
@@ -2059,7 +2061,7 @@ function InnerCanvasBoard({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleUndo, handleRedo, handleManualSave, pushSnapshot, setEdges, setNodes]);
+  }, [isActiveTab, handleUndo, handleRedo, handleManualSave, pushSnapshot, setEdges, setNodes]);
 
   // Clear Canvas
   const handleClear = useCallback(() => {
@@ -2928,6 +2930,7 @@ function InnerCanvasBoard({
 
       {/* Export Study Guide & Sermon Outline Modal */}
       <ExportStudyGuideModal
+        key={activeBoardId}
         isOpen={isExportGuideOpen}
         onClose={() => setIsExportGuideOpen(false)}
         boardTitle={boardTitle}

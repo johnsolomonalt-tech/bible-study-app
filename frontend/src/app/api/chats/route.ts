@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getMemoryChats, addMemoryChat } from '@/lib/memoryChatStore';
-import { createGuestChatSession, GUEST_CHAT_COOKIE, resolveChatIdentity } from '@/lib/chatIdentity';
+import { createGuestChatSession, createGuestChatToken, GUEST_CHAT_COOKIE, resolveChatIdentity } from '@/lib/chatIdentity';
 import { randomInt } from 'node:crypto';
 
 export async function GET(req: Request) {
@@ -77,7 +77,10 @@ export async function POST(req: Request) {
 
   addMemoryChat(ownerKey || `user:${userId}`, clientChat);
 
-  const response = NextResponse.json(clientChat, { status: 201 });
+  const response = NextResponse.json({
+    ...clientChat,
+    ...(!userId ? { guestChatToken: createGuestChatToken(ownerKey!, clientChat.id) } : {}),
+  }, { status: 201 });
   if (guestSession) {
     response.cookies.set(GUEST_CHAT_COOKIE, guestSession, {
       httpOnly: true,
