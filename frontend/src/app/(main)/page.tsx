@@ -943,6 +943,7 @@ export default function App() {
   // Bible State
   const [highlights, setHighlights] = useState<{id: number, book: string, chapter: number, verse: number, text: string, color: string}[]>([]);
   const [selectionRange, setSelectionRange] = useState<Range | null>(null);
+  const selectedVersePartsRef = useRef<{ verse: number; text: string }[]>([]);
   const [selectionVerse, setSelectionVerse] = useState<number | null>(null);
   const [endVerseNumber, setEndVerseNumber] = useState<number | null>(null);
   const [selectedText, setSelectedText] = useState<string>('');
@@ -3578,6 +3579,7 @@ export default function App() {
       Number(h.verse) === Number(verseNum)
     );
 
+    selectedVersePartsRef.current = [];
     setSelectionVerse(verseNum);
     setEndVerseNumber(verseNum);
     setSelectedText(cleanText);
@@ -3715,6 +3717,17 @@ export default function App() {
 
       const sanitizedSel = cleanVerseText(rawText, actualStart, actualEnd);
 
+      // Preserve the selected text in each verse before the toolbar changes selection.
+      selectedVersePartsRef.current = Array.from(readerRoot?.querySelectorAll<HTMLElement>('[data-verse] .verse-text') || [])
+        .filter(el => range.intersectsNode(el))
+        .map(el => {
+          const part = document.createRange();
+          part.selectNodeContents(el);
+          if (el.contains(range.startContainer)) part.setStart(range.startContainer, range.startOffset);
+          if (el.contains(range.endContainer)) part.setEnd(range.endContainer, range.endOffset);
+          return { verse: Number(el.closest('[data-verse]')?.getAttribute('data-verse')), text: part.toString().trim() };
+        })
+        .filter(part => part.verse >= actualStart && part.verse <= actualEnd && part.text.length > 0);
       setSelectionRange(range.cloneRange());
       setSelectionVerse(actualStart);
       setEndVerseNumber(actualEnd);
@@ -4084,18 +4097,8 @@ export default function App() {
         versesToHighlight.push({ verse: startVerse, text: cleanText });
       }
     } else {
-      // Multi-verse selection across verses startVerse to endVerse
-      const minV = Math.min(startVerse, endVerse);
-      const maxV = Math.max(startVerse, endVerse);
-      for (let v = minV; v <= maxV; v++) {
-        const vObj = bibleVerses.find(bv => bv.verse === v);
-        if (vObj) {
-          const fullVText = parseVerseFootnote(vObj.text).mainText;
-          if (fullVText) {
-            versesToHighlight.push({ verse: v, text: fullVText });
-          }
-        }
-      }
+      // Keep partial first and last verses exactly as selected.
+      versesToHighlight.push(...selectedVersePartsRef.current);
     }
 
     if (versesToHighlight.length === 0) {
@@ -6357,7 +6360,7 @@ export default function App() {
                 className={`rounded-md font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1 p-1.5 2xl:px-2 2xl:py-1 2xl:text-[11px] ${
                   isSplitView
                     ? 'bg-accent/15 text-accent font-bold hover:bg-accent/25'
-                    : 'text-muted hover:text-fg hover:bg-border-soft'
+                    : 'text-fg hover:bg-border-soft'
                 }`}
                 title={
                   isSplitView
@@ -6365,8 +6368,9 @@ export default function App() {
                     : 'Parallel Split View: Read two chapters side by side'
                 }
                 aria-label="Toggle Parallel Split View"
+                aria-pressed={isSplitView}
               >
-                <Columns2 size={13} className={isSplitView ? "text-accent" : "opacity-70"} />
+                <Columns2 size={13} />
                 <span className="hidden 2xl:inline">Split</span>
               </button>
             </div>
@@ -7714,6 +7718,7 @@ export default function App() {
             <PanelGroup 
               orientation="horizontal" 
               id="theologica-layout-v2" 
+              resizeTargetMinimumSize={{ coarse: 40, fine: 12 }}
               className="flex w-full h-full min-h-0 overflow-hidden"
               onLayoutChange={() => measureWidths()}
               onLayoutChanged={() => measureWidths()}
@@ -7945,17 +7950,17 @@ export default function App() {
             )}
 
             {showLeftSidebar && (
-              <PanelResizeHandle className="hidden md:flex w-1 bg-transparent hover:bg-accent active:bg-accent transition-colors cursor-col-resize shrink-0 z-10 relative" />
+              <PanelResizeHandle className="hidden md:flex w-1.5 bg-border/60 hover:bg-accent active:bg-accent transition-colors cursor-col-resize shrink-0 z-10 relative touch-none items-center justify-center"><span className="w-0.5 h-8 rounded-full bg-muted/60 pointer-events-none" /></PanelResizeHandle>
             )}
 
             {/* Center: Bible Reader */}
             <Panel defaultSize={isTabletMode ? "61" : "60"} minSize="30" className={`w-full md:w-auto flex-col h-full bg-bg min-w-0 ${mobileStudyView === 'reader' ? 'flex' : 'hidden md:flex'}`}>
               <div ref={readerContainerRef} className="w-full h-full flex flex-col min-h-0 min-w-0 overflow-hidden relative">
-                <PanelGroup orientation="vertical" id="theologica-layout-vertical-v2" className="flex-1 min-h-0">
+                <PanelGroup orientation="vertical" id="theologica-layout-vertical-v2" resizeTargetMinimumSize={{ coarse: 40, fine: 12 }} className="flex-1 min-h-0">
                 <Panel defaultSize={isTabletMode ? "80" : "75"} minSize="30" className="flex flex-col relative min-w-0">
                   <div className="w-full h-full flex flex-col min-h-0 min-w-0 overflow-hidden relative">
                     {isSplitView ? (
-                      <PanelGroup orientation="horizontal" id="theologica-split-reader" className="flex-1 min-h-0 w-full flex">
+                      <PanelGroup orientation="horizontal" id="theologica-split-reader" resizeTargetMinimumSize={{ coarse: 40, fine: 12 }} className="flex-1 min-h-0 w-full flex">
                         {/* Primary Reader Pane (Pane 1) */}
                         <Panel defaultSize="50" minSize="30" className="flex flex-col h-full min-w-0 relative">
                           <div className="w-full h-full flex flex-col min-h-0 min-w-0 overflow-hidden relative">
@@ -8047,7 +8052,7 @@ export default function App() {
                                                 {v.verse}
                                               </sup>
                                             )}
-                                            {renderVerseContent(v.verse, v.text, activeBook.name, activeChapter)}
+                                            <span className="verse-text select-text">{renderVerseContent(v.verse, v.text, activeBook.name, activeChapter)}</span>
                                             {' '}
                                           </span>
                                         ))}
@@ -8067,7 +8072,7 @@ export default function App() {
                                                 {v.verse}
                                               </span>
                                             )}
-                                            <span className="flex-1">
+                                            <span className="verse-text flex-1 select-text">
                                               {renderVerseContent(v.verse, v.text, activeBook.name, activeChapter)}
                                             </span>
                                           </p>
@@ -8115,7 +8120,7 @@ export default function App() {
                         </Panel>
 
                         {/* Resizable Divider */}
-                        <PanelResizeHandle className="w-1.5 bg-border/60 hover:bg-accent active:bg-accent transition-colors cursor-col-resize shrink-0 z-10 relative flex items-center justify-center">
+                        <PanelResizeHandle className="w-1.5 bg-border/60 hover:bg-accent active:bg-accent transition-colors cursor-col-resize shrink-0 z-10 relative flex items-center justify-center touch-none">
                           <div className="w-0.5 h-7 bg-muted/40 rounded-full" />
                         </PanelResizeHandle>
 
@@ -8870,12 +8875,12 @@ export default function App() {
                 </Panel>
                 
                 {showBottomNotes && (
-                  <PanelResizeHandle className="h-1 bg-surface hover:bg-accent active:bg-accent transition-colors cursor-row-resize shrink-0 z-10 w-full" />
+                  <PanelResizeHandle className="h-1 bg-surface hover:bg-accent active:bg-accent transition-colors cursor-row-resize shrink-0 z-10 w-full touch-none" />
                 )}
 
               {/* Quick Note Split */}
                 {showBottomNotes && (
-                <Panel panelRef={bottomPanelRef} defaultSize={isTabletMode ? "20" : "25"} minSize={isTabletMode ? "15" : "20"} className="hidden md:flex border-t border-border bg-bg flex-col shrink-0">
+                <Panel panelRef={bottomPanelRef} defaultSize={isTabletMode ? "20" : "25"} minSize={isTabletMode ? "15" : "20"} maxSize="50" className="hidden md:flex border-t border-border bg-bg flex-col shrink-0">
                 <div className="w-full h-full flex flex-col min-h-0 overflow-hidden">
                   <div className={`${isTabletMode ? 'h-8 px-4 text-[10px]' : 'h-10 px-6 text-[11px]'} border-b border-border flex items-center justify-between font-bold text-muted uppercase tracking-widest shrink-0`}>
                     <span>Quick Note — {chapterTitle}</span>
@@ -8899,7 +8904,7 @@ export default function App() {
             </Panel>
 
             {showRightSidebar && (
-              <PanelResizeHandle className="hidden md:flex w-1 bg-transparent hover:bg-accent active:bg-accent transition-colors cursor-col-resize shrink-0 z-10 relative" />
+              <PanelResizeHandle className="hidden md:flex w-1.5 bg-border/60 hover:bg-accent active:bg-accent transition-colors cursor-col-resize shrink-0 z-10 relative touch-none items-center justify-center"><span className="w-0.5 h-8 rounded-full bg-muted/60 pointer-events-none" /></PanelResizeHandle>
             )}
 
             {/* Right Sidebar: Study AI */}
@@ -9332,9 +9337,9 @@ export default function App() {
                   }
                 }
               }}
-              className="hidden md:flex floating-verse-toolbar fixed z-50 items-center gap-1 sm:gap-1.5 bg-surface/95 border border-border-soft p-1.5 rounded-xl shadow-xl backdrop-blur-md max-w-[calc(100vw-24px)] overflow-x-auto no-scrollbar custom-scroll transition-opacity"
+              className="hidden md:flex floating-verse-toolbar fixed z-50 items-center gap-1 sm:gap-1.5 bg-surface/95 border border-border-soft p-1.5 rounded-xl shadow-xl backdrop-blur-md w-max max-w-[calc(100vw-24px)] overflow-x-auto no-scrollbar custom-scroll transition-opacity"
               style={{ 
-                left: Math.max(12, Math.min(typeof window !== 'undefined' ? window.innerWidth - 12 : 360, toolbarPosition.x)), 
+                left: '50%', 
                 top: toolbarPosition.y,
                 transform: toolbarPosition.isBelow ? 'translate(-50%, 8px)' : 'translate(-50%, calc(-100% - 8px))'
               }}
