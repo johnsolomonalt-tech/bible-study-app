@@ -6533,7 +6533,7 @@ export default function App() {
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div className={`w-5 h-5 rounded-md flex items-center justify-center transition-all duration-200 shrink-0 ${
                           isOtExpanded 
-                            ? (isOldTestament ? 'bg-accent/15 text-accent' : 'bg-surface-hover text-fg')
+                            ? 'bg-surface-hover text-fg'
                             : 'bg-surface text-muted group-hover:text-fg'
                         }`}>
                           <ChevronDown
@@ -6541,7 +6541,7 @@ export default function App() {
                             className={`transition-transform duration-200 ${isOtExpanded ? 'rotate-0' : '-rotate-90'}`}
                           />
                         </div>
-                        <span className={`text-[12px] font-bold tracking-wider uppercase truncate ${isOldTestament ? 'text-accent' : 'text-muted group-hover:text-fg'}`}>
+                        <span className={`text-[12px] font-bold tracking-wider uppercase truncate ${isOldTestament ? 'text-fg' : 'text-muted group-hover:text-fg'}`}>
                           Old Testament
                         </span>
                       </div>
@@ -6564,13 +6564,13 @@ export default function App() {
                                 onClick={(e) => handleBookAccordionToggle(e, b.name, mobileBookListScrollRef.current)}
                                 className={`w-full min-h-[44px] text-left px-3.5 py-2.5 rounded-xl text-[15px] cursor-pointer list-none flex justify-between items-center transition-colors ${
                                   isCurrentBook
-                                    ? 'bg-accent/10 text-accent font-semibold'
+                                    ? 'bg-surface-hover text-fg font-semibold'
                                     : 'text-fg-2 hover:bg-surface hover:text-fg'
                                 }`}
                               >
                                 <div className="flex items-center gap-2 min-w-0">
                                   {isCurrentBook && (
-                                    <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
+                                    <span className="w-1.5 h-1.5 rounded-full bg-fg-2 shrink-0" />
                                   )}
                                   <span className="truncate">{b.name}</span>
                                 </div>
@@ -6580,7 +6580,7 @@ export default function App() {
                                       Ch. {activeChapter}
                                     </span>
                                   )}
-                                  <ChevronRight size={14} className={`transition-transform duration-150 shrink-0 ${expandedBook === b.name ? 'rotate-90 text-accent' : 'opacity-40 text-muted'}`} />
+                                  <ChevronRight size={14} className={`transition-transform duration-150 shrink-0 ${expandedBook === b.name ? 'rotate-90 text-fg' : 'opacity-40 text-muted'}`} />
                                 </div>
                               </summary>
                               <div className="grid grid-cols-5 gap-2 p-2.5 bg-surface/40 rounded-xl my-1.5 border border-border/30">
@@ -6597,7 +6597,7 @@ export default function App() {
                                       }}
                                       className={`min-h-[44px] h-11 rounded-xl text-sm font-medium transition-all flex items-center justify-center cursor-pointer touch-manipulation ${
                                         isCurrentChapter 
-                                          ? 'bg-accent text-accent-on font-bold shadow-xs' 
+                                          ? 'bg-fg text-bg font-bold shadow-xs'
                                           : 'text-fg-2 hover:bg-surface hover:text-fg bg-bg/50'
                                       }`}
                                     >
@@ -6626,7 +6626,7 @@ export default function App() {
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div className={`w-5 h-5 rounded-md flex items-center justify-center transition-all duration-200 shrink-0 ${
                           isNtExpanded 
-                            ? (!isOldTestament ? 'bg-accent/15 text-accent' : 'bg-surface-hover text-fg')
+                            ? 'bg-surface-hover text-fg'
                             : 'bg-surface text-muted group-hover:text-fg'
                         }`}>
                           <ChevronDown
@@ -6634,7 +6634,7 @@ export default function App() {
                             className={`transition-transform duration-200 ${isNtExpanded ? 'rotate-0' : '-rotate-90'}`}
                           />
                         </div>
-                        <span className={`text-[12px] font-bold tracking-wider uppercase truncate ${!isOldTestament ? 'text-accent' : 'text-muted group-hover:text-fg'}`}>
+                        <span className={`text-[12px] font-bold tracking-wider uppercase truncate ${!isOldTestament ? 'text-fg' : 'text-muted group-hover:text-fg'}`}>
                           New Testament
                         </span>
                       </div>
@@ -6657,13 +6657,13 @@ export default function App() {
                                 onClick={(e) => handleBookAccordionToggle(e, b.name, mobileBookListScrollRef.current)}
                                 className={`w-full min-h-[44px] text-left px-3.5 py-2.5 rounded-xl text-[15px] cursor-pointer list-none flex justify-between items-center transition-colors ${
                                   isCurrentBook
-                                    ? 'bg-accent/10 text-accent font-semibold'
+                                    ? 'bg-surface-hover text-fg font-semibold'
                                     : 'text-fg-2 hover:bg-surface hover:text-fg'
                                 }`}
                               >
                                 <div className="flex items-center gap-2 min-w-0">
                                   {isCurrentBook && (
-                                    <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
+                                    <span className="w-1.5 h-1.5 rounded-full bg-fg-2 shrink-0" />
                                   )}
                                   <span className="truncate">{b.name}</span>
                                 </div>
@@ -6673,7 +6673,7 @@ export default function App() {
                                       Ch. {activeChapter}
                                     </span>
                                   )}
-                                  <ChevronRight size={14} className={`transition-transform duration-150 shrink-0 ${expandedBook === b.name ? 'rotate-90 text-accent' : 'opacity-40 text-muted'}`} />
+                                  <ChevronRight size={14} className={`transition-transform duration-150 shrink-0 ${expandedBook === b.name ? 'rotate-90 text-fg' : 'opacity-40 text-muted'}`} />
                                 </div>
                               </summary>
                               <div className="grid grid-cols-5 gap-2 p-2.5 bg-surface/40 rounded-xl my-1.5 border border-border/30">
@@ -6690,7 +6690,7 @@ export default function App() {
                                       }}
                                       className={`min-h-[44px] h-11 rounded-xl text-sm font-medium transition-all flex items-center justify-center cursor-pointer touch-manipulation ${
                                         isCurrentChapter 
-                                          ? 'bg-accent text-accent-on font-bold shadow-xs' 
+                                          ? 'bg-fg text-bg font-bold shadow-xs'
                                           : 'text-fg-2 hover:bg-surface hover:text-fg bg-bg/50'
                                       }`}
                                     >
@@ -7787,7 +7787,7 @@ export default function App() {
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div className={`w-5 h-5 rounded-md flex items-center justify-center transition-all duration-200 shrink-0 ${
                           isOtExpanded 
-                            ? (isOldTestament ? 'bg-accent/15 text-accent' : 'bg-surface-hover text-fg')
+                            ? 'bg-surface-hover text-fg'
                             : 'bg-surface text-muted group-hover:text-fg'
                         }`}>
                           <ChevronDown
@@ -7795,7 +7795,7 @@ export default function App() {
                             className={`transition-transform duration-200 ${isOtExpanded ? 'rotate-0' : '-rotate-90'}`}
                           />
                         </div>
-                        <span className={`text-[11px] font-bold tracking-wider uppercase truncate ${isOldTestament ? 'text-accent' : 'text-muted group-hover:text-fg'}`}>
+                        <span className={`text-[11px] font-bold tracking-wider uppercase truncate ${isOldTestament ? 'text-fg' : 'text-muted group-hover:text-fg'}`}>
                           Old Testament
                         </span>
                       </div>
@@ -7818,13 +7818,13 @@ export default function App() {
                                 onClick={(e) => handleBookAccordionToggle(e, b.name, desktopBookListScrollRef.current)}
                                 className={`w-full text-left px-3 py-2 rounded-xl text-[13px] cursor-pointer list-none flex justify-between items-center transition-colors ${
                                   isCurrentBook
-                                    ? 'bg-accent/10 text-accent font-semibold'
+                                    ? 'bg-surface-hover text-fg font-semibold'
                                     : 'text-fg-2 hover:bg-surface hover:text-fg'
                                 }`}
                               >
                                 <div className="flex items-center gap-2 min-w-0">
                                   {isCurrentBook && (
-                                    <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
+                                    <span className="w-1.5 h-1.5 rounded-full bg-fg-2 shrink-0" />
                                   )}
                                   <span className="truncate">{b.name}</span>
                                 </div>
@@ -7834,7 +7834,7 @@ export default function App() {
                                       Ch. {activeChapter}
                                     </span>
                                   )}
-                                  <ChevronRight size={13} className={`transition-transform duration-150 shrink-0 ${expandedBook === b.name ? 'rotate-90 text-accent' : 'opacity-40 text-muted'}`} />
+                                  <ChevronRight size={13} className={`transition-transform duration-150 shrink-0 ${expandedBook === b.name ? 'rotate-90 text-fg' : 'opacity-40 text-muted'}`} />
                                 </div>
                               </summary>
                               <div className="grid grid-cols-5 gap-1.5 p-2 bg-surface/40 rounded-xl my-1 border border-border/30">
@@ -7846,7 +7846,7 @@ export default function App() {
                                       onClick={() => { setActiveBook(b); setActiveChapter(i + 1); setExpandedBook(b.name); }}
                                       className={`h-7.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center cursor-pointer ${
                                         isCurrentChapter
-                                          ? 'bg-accent text-accent-on font-bold shadow-xs'
+                                          ? 'bg-fg text-bg font-bold shadow-xs'
                                           : 'text-fg-2 hover:bg-surface hover:text-fg bg-bg/50'
                                       }`}
                                     >
@@ -7875,7 +7875,7 @@ export default function App() {
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div className={`w-5 h-5 rounded-md flex items-center justify-center transition-all duration-200 shrink-0 ${
                           isNtExpanded 
-                            ? (!isOldTestament ? 'bg-accent/15 text-accent' : 'bg-surface-hover text-fg')
+                            ? 'bg-surface-hover text-fg'
                             : 'bg-surface text-muted group-hover:text-fg'
                         }`}>
                           <ChevronDown
@@ -7883,7 +7883,7 @@ export default function App() {
                             className={`transition-transform duration-200 ${isNtExpanded ? 'rotate-0' : '-rotate-90'}`}
                           />
                         </div>
-                        <span className={`text-[11px] font-bold tracking-wider uppercase truncate ${!isOldTestament ? 'text-accent' : 'text-muted group-hover:text-fg'}`}>
+                        <span className={`text-[11px] font-bold tracking-wider uppercase truncate ${!isOldTestament ? 'text-fg' : 'text-muted group-hover:text-fg'}`}>
                           New Testament
                         </span>
                       </div>
@@ -7906,13 +7906,13 @@ export default function App() {
                                 onClick={(e) => handleBookAccordionToggle(e, b.name, desktopBookListScrollRef.current)}
                                 className={`w-full text-left px-3 py-2 rounded-xl text-[13px] cursor-pointer list-none flex justify-between items-center transition-colors ${
                                   isCurrentBook
-                                    ? 'bg-accent/10 text-accent font-semibold'
+                                    ? 'bg-surface-hover text-fg font-semibold'
                                     : 'text-fg-2 hover:bg-surface hover:text-fg'
                                 }`}
                               >
                                 <div className="flex items-center gap-2 min-w-0">
                                   {isCurrentBook && (
-                                    <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
+                                    <span className="w-1.5 h-1.5 rounded-full bg-fg-2 shrink-0" />
                                   )}
                                   <span className="truncate">{b.name}</span>
                                 </div>
@@ -7922,7 +7922,7 @@ export default function App() {
                                       Ch. {activeChapter}
                                     </span>
                                   )}
-                                  <ChevronRight size={13} className={`transition-transform duration-150 shrink-0 ${expandedBook === b.name ? 'rotate-90 text-accent' : 'opacity-40 text-muted'}`} />
+                                  <ChevronRight size={13} className={`transition-transform duration-150 shrink-0 ${expandedBook === b.name ? 'rotate-90 text-fg' : 'opacity-40 text-muted'}`} />
                                 </div>
                               </summary>
                               <div className="grid grid-cols-5 gap-1.5 p-2 bg-surface/40 rounded-xl my-1 border border-border/30">
@@ -7934,7 +7934,7 @@ export default function App() {
                                       onClick={() => { setActiveBook(b); setActiveChapter(i + 1); setExpandedBook(b.name); }}
                                       className={`h-7.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center cursor-pointer ${
                                         isCurrentChapter
-                                          ? 'bg-accent text-accent-on font-bold shadow-xs'
+                                          ? 'bg-fg text-bg font-bold shadow-xs'
                                           : 'text-fg-2 hover:bg-surface hover:text-fg bg-bg/50'
                                       }`}
                                     >
@@ -8209,7 +8209,7 @@ export default function App() {
                                                       }}
                                                       className={`h-7 rounded-md text-[11px] font-semibold transition-all cursor-pointer flex items-center justify-center ${
                                                         splitBook.name === b.name && splitChapter === ch
-                                                          ? 'bg-accent text-accent-on font-bold shadow-xs'
+                                                          ? 'bg-fg text-bg font-bold shadow-xs'
                                                           : 'bg-surface hover:bg-surface-hover text-fg border border-border/50'
                                                       }`}
                                                     >
@@ -8256,7 +8256,7 @@ export default function App() {
                                                       }}
                                                       className={`h-7 rounded-md text-[11px] font-semibold transition-all cursor-pointer flex items-center justify-center ${
                                                         splitBook.name === b.name && splitChapter === ch
-                                                          ? 'bg-accent text-accent-on font-bold shadow-xs'
+                                                          ? 'bg-fg text-bg font-bold shadow-xs'
                                                           : 'bg-surface hover:bg-surface-hover text-fg border border-border/50'
                                                       }`}
                                                     >

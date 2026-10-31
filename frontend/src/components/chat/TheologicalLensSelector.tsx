@@ -191,7 +191,7 @@ export function TheologicalLensSelector({
           setIsOpen(!isOpen);
         }}
         aria-expanded={isOpen}
-        className={`flex min-h-9 items-center gap-1 sm:gap-1.5 rounded-lg border hover:bg-surface transition-colors cursor-pointer font-sans select-none shrink-0 ${
+        className={`inline-flex min-h-9 items-center justify-center leading-none gap-1 sm:gap-1.5 rounded-lg border hover:bg-surface transition-colors cursor-pointer font-sans select-none shrink-0 ${
           compact
             ? 'px-2 py-1 text-[11px]'
             : 'px-2.5 py-1.5 text-[12px]'

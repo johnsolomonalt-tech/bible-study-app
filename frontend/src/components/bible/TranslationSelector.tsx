@@ -62,12 +62,12 @@ export function TranslationSelector({
           e.stopPropagation();
           setIsOpen(!isOpen);
         }}
-        className="flex items-center gap-0.5 px-2 py-1 h-8.5 min-h-[44px] md:min-h-[34px] rounded-full bg-surface/80 hover:bg-surface border border-border-soft/60 hover:border-border-soft transition-all text-xs font-semibold text-fg cursor-pointer active:scale-95 shadow-2xs select-none shrink-0"
+        className="inline-flex items-center justify-center gap-0.5 px-2 py-0 h-8.5 min-h-[44px] md:min-h-[34px] rounded-full bg-surface/80 hover:bg-surface border border-border-soft/60 hover:border-border-soft transition-all text-xs font-semibold text-fg cursor-pointer active:scale-95 shadow-2xs select-none shrink-0"
         title="Choose Bible Translation"
         aria-haspopup="true"
         aria-expanded={isOpen}
       >
-        <span className="text-accent font-mono tracking-wider text-[11.5px] font-bold">
+        <span className="text-accent font-mono tracking-wider text-[11.5px] leading-none font-bold">
           {activeTranslation.abbreviation}
         </span>
         <ChevronDown

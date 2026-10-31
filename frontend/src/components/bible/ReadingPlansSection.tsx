@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  BookOpen, ChevronRight, CheckCircle2, Play, Flame, Search, 
+  BookOpen, ChevronRight, ChevronDown, CheckCircle2, Play, Flame, Search,
   RotateCcw, Sparkles, Filter, Check, Trophy, Calendar, Compass
 } from 'lucide-react';
 import { 
@@ -35,6 +35,7 @@ export function ReadingPlansSection({
     return ['gospels']; // Default starter plan
   });
 
+  const [mobileExpanded, setMobileExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
@@ -90,7 +91,11 @@ export function ReadingPlansSection({
   }, [completedChapters, startedPlanIds, searchQuery, selectedCategory]);
 
   return (
-    <section className="mb-10 sm:mb-16 space-y-6">
+    <section className="mb-10 sm:mb-16">
+      <button type="button" className="md:hidden w-full flex min-h-[52px] items-center justify-between rounded-xl bg-surface px-4 text-left text-fg font-semibold" aria-expanded={mobileExpanded} aria-controls="reading-plans-content" onClick={() => setMobileExpanded(value => !value)}>
+        <span>Reading plans</span><ChevronDown size={18} className={mobileExpanded ? 'rotate-180 transition-transform' : 'transition-transform'} />
+      </button>
+      <div id="reading-plans-content" className={`${mobileExpanded ? 'block mt-5' : 'hidden'} md:block md:mt-0 space-y-6`}>
       {/* Header and Controls */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 px-1">
         <div>
@@ -364,6 +369,7 @@ export function ReadingPlansSection({
           </div>
         </div>
       )}
+      </div>
     </section>
   );
 }

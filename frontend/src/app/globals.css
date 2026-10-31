@@ -3,7 +3,7 @@
 :root {
   /* Default to Dark Mode if no theme is set */
   --bg: #141413;
-  --surface: #30302e;
+  --surface: #292927;
   --surface-warm: #3d3d3a;
   --surface-hover: #3a3a38;
   --fg: #faf9f5;
@@ -736,14 +736,13 @@ sup.verse-number {
   align-items: center;
   gap: 4px;
   padding: 6px;
-  border: 1px solid var(--border-soft);
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--surface) 60%, var(--bg));
-  transition: border-color 150ms ease, box-shadow 150ms ease;
+  border: 0;
+  border-radius: 20px;
+  background: var(--surface);
+  transition: background-color 150ms ease;
 }
 .chat-composer:focus-within {
-  border-color: color-mix(in srgb, #c96442 55%, var(--border-soft));
-  box-shadow: 0 0 0 2px color-mix(in srgb, #c96442 10%, transparent);
+  background: color-mix(in srgb, var(--surface) 92%, var(--fg));
 }
 .chat-composer-input {
   flex: 1;
@@ -752,7 +751,7 @@ sup.verse-number {
   border: 0;
   background: transparent;
   color: var(--fg);
-  font-family: var(--font-inter), system-ui, sans-serif;
+  font-family: var(--font-merriweather), Georgia, serif;
   font-size: 16px;
   font-weight: 400;
   line-height: 24px;
