@@ -20,6 +20,7 @@ import { getScriptureBacklinks, BacklinksResult } from '@/lib/backlinks';
 import { TheologicalLensSelector, TheologicalLensType, THEOLOGICAL_LENS_OPTIONS } from '@/components/chat/TheologicalLensSelector';
 import { buildGuestHistory } from '@/lib/guestChatHistory';
 import { ChatSendButton } from '@/components/chat/ChatSendButton';
+import { selectionSheetEdgeForRect } from '@/lib/mobileSelection';
 import { ChatEmptyState } from '@/components/chat/ChatEmptyState';
 import { ChatSlashCommands, SLASH_COMMANDS, SlashCommand } from '@/components/chat/ChatSlashCommands';
 import { ChatFollowUps } from '@/components/chat/ChatFollowUps';
@@ -944,7 +945,7 @@ export default function App() {
   const [selectionVerse, setSelectionVerse] = useState<number | null>(null);
   const [endVerseNumber, setEndVerseNumber] = useState<number | null>(null);
   const [selectedText, setSelectedText] = useState<string>('');
-  const [toolbarPosition, setToolbarPosition] = useState<{x: number, y: number, highlightId?: number, highlightIds?: number[], isBelow?: boolean} | null>(null);
+  const [toolbarPosition, setToolbarPosition] = useState<{x: number, y: number, highlightId?: number, highlightIds?: number[], isBelow?: boolean, mobileEdge?: 'top' | 'bottom'} | null>(null);
   const [copiedHighlightToast, setCopiedHighlightToast] = useState(false);
   const [activeHighlightMenu, setActiveHighlightMenu] = useState<{id: number, x: number, y: number} | null>(null);
   
@@ -1428,6 +1429,9 @@ export default function App() {
     const verseEl = target.closest('[data-verse]');
     if (!verseEl) return;
 
+    // Let mobile browsers start their native text-selection gesture on scripture.
+    if (window.innerWidth < 768 && target.closest('.verse-text')) return;
+
     const verseNumAttr = verseEl.getAttribute('data-verse');
     if (!verseNumAttr) return;
     const verseNum = parseInt(verseNumAttr, 10);
@@ -1464,6 +1468,7 @@ export default function App() {
     setToolbarPosition({
       x,
       y,
+      mobileEdge: selectionSheetEdgeForRect({ top: e.clientY, bottom: e.clientY }),
       highlightId: wholeVerseHl?.id,
       isBelow: isNearTop,
     });
@@ -3628,6 +3633,7 @@ export default function App() {
     setToolbarPosition({
       x,
       y,
+      mobileEdge: rect ? selectionSheetEdgeForRect(rect) : 'bottom',
       highlightId: verseHighlights.length > 0 ? verseHighlights[0].id : undefined,
       highlightIds: verseHighlights.map(h => h.id),
       isBelow
@@ -3794,6 +3800,7 @@ export default function App() {
       setToolbarPosition({
         x,
         y,
+        mobileEdge: selectionSheetEdgeForRect(rect),
         highlightId: overlappingHighlights.length > 0 ? overlappingHighlights[0].id : undefined,
         highlightIds: overlappingHighlights.map(h => h.id),
         isBelow
@@ -3846,6 +3853,7 @@ export default function App() {
   // Trigger floating toolbar on left-click drag mouseup and mobile selectionchange
   useEffect(() => {
     let timeout: NodeJS.Timeout;
+    let touchingReader = false;
 
     const checkAndTriggerSelection = () => {
       const sel = window.getSelection();
@@ -3869,15 +3877,42 @@ export default function App() {
 
     const onSelectionChange = () => {
       clearTimeout(timeout);
+      if (touchingReader) return;
       timeout = setTimeout(checkAndTriggerSelection, 150);
     };
 
+    const onTouchStart = (event: TouchEvent) => {
+      if (!(event.target instanceof Element) || event.target.closest('.floating-verse-toolbar, button, a, input, textarea, select')) return;
+      const selection = window.getSelection();
+      const anchor = selection?.anchorNode;
+      const anchorElement = anchor?.nodeType === Node.ELEMENT_NODE ? anchor as Element : anchor?.parentElement;
+      // Native selection handles can start outside the verse element itself.
+      if (!event.target.closest('.bible-reader-content') && !anchorElement?.closest('.bible-reader-content')) return;
+      touchingReader = true;
+      clearTimeout(timeout);
+      // A previous sheet must not cover the selection handles when adjusting text.
+      if (selection?.toString().trim()) setToolbarPosition(null);
+    };
+    const onTouchEnd = () => {
+      if (!touchingReader) return;
+      touchingReader = false;
+      clearTimeout(timeout);
+      timeout = setTimeout(checkAndTriggerSelection, 80);
+    };
+    const onTouchCancel = () => { touchingReader = false; };
+
     document.addEventListener('mouseup', onMouseUp);
     document.addEventListener('selectionchange', onSelectionChange);
+    document.addEventListener('touchstart', onTouchStart, true);
+    document.addEventListener('touchend', onTouchEnd, true);
+    document.addEventListener('touchcancel', onTouchCancel, true);
     return () => {
       clearTimeout(timeout);
       document.removeEventListener('mouseup', onMouseUp);
       document.removeEventListener('selectionchange', onSelectionChange);
+      document.removeEventListener('touchstart', onTouchStart, true);
+      document.removeEventListener('touchend', onTouchEnd, true);
+      document.removeEventListener('touchcancel', onTouchCancel, true);
     };
   }, [handleSelection]);
 
@@ -4890,6 +4925,7 @@ export default function App() {
                 setToolbarPosition({
                   x: winWidth <= 640 ? winWidth / 2 : Math.max(toolbarHalfWidth + 12, Math.min(winWidth - toolbarHalfWidth - 12, verseCenterX)),
                   y,
+                  mobileEdge: selectionSheetEdgeForRect(rect),
                   highlightId: seg.highlight!.id,
                   highlightIds: [seg.highlight!.id],
                   isBelow
@@ -4937,6 +4973,7 @@ export default function App() {
                 setToolbarPosition({
                   x: winWidth <= 640 ? winWidth / 2 : Math.max(toolbarHalfWidth + 12, Math.min(winWidth - toolbarHalfWidth - 12, verseCenterX)),
                   y,
+                  mobileEdge: selectionSheetEdgeForRect(rect),
                   highlightId: seg.highlight!.id,
                   highlightIds: [seg.highlight!.id],
                   isBelow
@@ -6180,7 +6217,7 @@ export default function App() {
 
   return (
     <>
-      <div className="fixed inset-0 w-full h-full flex flex-col bg-bg text-fg overflow-hidden select-none">
+      <div className="app-viewport fixed inset-0 w-full flex flex-col bg-bg text-fg overflow-hidden select-none">
         {/* Top Navbar (Desktop & Tablet) */}
         <header 
           className="hidden md:flex sticky top-0 z-40 w-full max-w-full min-h-14 h-[calc(3.5rem+var(--app-safe-top))] border-b border-border items-center justify-between px-3 sm:px-4 lg:px-6 bg-bg shrink-0 relative overflow-hidden select-none"
@@ -6727,10 +6764,10 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => setIsLectioModalOpen(true)}
-                    className="min-h-[44px] px-2 flex items-center gap-1 text-xs font-medium text-accent shrink-0 rounded-lg hover:bg-surface"
+                    className="min-w-[44px] min-h-[44px] px-2 flex items-center justify-center gap-1 text-xs font-medium text-accent shrink-0 rounded-lg hover:bg-surface"
                     aria-label="Lectio Divina"
                   >
-                    <Heart size={15} /> <span>Lectio</span>
+                    <Heart size={15} /> <span className="hidden min-[380px]:inline">Lectio</span>
                   </button>
                 </div>
 
@@ -7649,7 +7686,7 @@ export default function App() {
             </aside>
 
             {/* Mobile Study Floating Quick Actions (Ask AI & Quick Note) */}
-            {mobileStudyView === 'reader' && (
+            {mobileStudyView === 'reader' && !toolbarPosition && (
               <aside 
                 aria-label="Study quick actions"
                 className="fixed bottom-[calc(56px+var(--mobile-nav-bottom-padding))] right-3.5 z-30 flex md:hidden items-center gap-1.5 p-1 rounded-full bg-surface/90 backdrop-blur-xl border border-border shadow-xl pointer-events-auto"
@@ -7661,7 +7698,7 @@ export default function App() {
                     scrollToBottomOnChatOpenRef.current = true;
                     scrollChatToBottom();
                   }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent text-accent-on text-xs font-semibold shadow-xs hover:opacity-95 active:scale-95 transition-all cursor-pointer"
+                  className="min-h-[44px] flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent text-accent-on text-xs font-semibold shadow-xs hover:opacity-95 active:scale-95 transition-all cursor-pointer"
                   title="Ask Study AI"
                   aria-label="Ask Study AI"
                 >
@@ -7678,7 +7715,7 @@ export default function App() {
                     if (created) setActiveNoteId(created.id);
                     setActiveTab('notes');
                   }}
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-surface text-fg hover:bg-surface-hover text-xs font-medium border border-border-soft active:scale-95 transition-all cursor-pointer"
+                  className="min-h-[44px] flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-surface text-fg hover:bg-surface-hover text-xs font-medium border border-border-soft active:scale-95 transition-all cursor-pointer"
                   title="Create Study Note for this Chapter"
                   aria-label="Create Note"
                 >
@@ -9163,10 +9200,15 @@ export default function App() {
         {/* Floating Toolbar for Highlighting & Referencing */}
         {toolbarPosition && (
           <>
-            {/* Mobile Slide-up Verse Action Bottom Sheet (< 768px) */}
+            {/* Keep the actions clear of the selected scripture on mobile. */}
             <div 
-              className="md:hidden floating-verse-toolbar fixed inset-x-0 bottom-0 z-50 bg-surface/98 border-t border-border/80 rounded-t-[28px] shadow-2xl p-4 animate-in slide-in-from-bottom duration-200 backdrop-blur-2xl"
-              style={{ paddingBottom: 'max(var(--app-safe-bottom), 16px)' }}
+              role="region"
+              aria-label="Scripture actions"
+              className={`md:hidden floating-verse-toolbar fixed inset-x-0 z-50 bg-surface/98 border-border/80 shadow-2xl p-4 animate-in duration-200 backdrop-blur-2xl overflow-y-auto max-h-[calc(100dvh-72px)] ${toolbarPosition.mobileEdge === 'top' ? 'top-0 border-b rounded-b-[24px] slide-in-from-top' : 'bottom-0 border-t rounded-t-[24px] slide-in-from-bottom'}`}
+              style={{
+                paddingTop: toolbarPosition.mobileEdge === 'top' ? 'max(var(--app-safe-top), 16px)' : undefined,
+                paddingBottom: toolbarPosition.mobileEdge === 'top' ? '16px' : 'max(var(--app-safe-bottom), 16px)',
+              }}
             >
               <div className="w-10 h-1 bg-border-soft rounded-full mx-auto mb-3" />
               {/* Header: Verse reference & close button */}
@@ -9182,6 +9224,10 @@ export default function App() {
                   onClick={() => {
                     setToolbarPosition(null);
                     setSelectionVerse(null);
+                    setEndVerseNumber(null);
+                    setSelectedText('');
+                    setSelectionRange(null);
+                    window.getSelection()?.removeAllRanges();
                   }}
                   className="min-w-[44px] min-h-[44px] flex items-center justify-center text-muted hover:text-fg rounded-full cursor-pointer -mr-2"
                   title="Close toolbar"
@@ -9191,7 +9237,7 @@ export default function App() {
               </div>
 
               {/* Highlight color swatches */}
-              <div className="flex items-center justify-between gap-2 px-1 py-1 mb-3">
+              <div className="flex items-center justify-between gap-1 py-1 mb-3">
                 {[
                   { color: 'yellow', bg: 'bg-yellow-400', label: 'Yellow' },
                   { color: 'green', bg: 'bg-green-500', label: 'Green' },
@@ -9203,7 +9249,7 @@ export default function App() {
                     key={item.color}
                     type="button"
                     onClick={() => saveHighlight(item.color)}
-                    className={`w-10 h-10 rounded-full ${item.bg} hover:scale-110 active:scale-90 transition-transform shadow-xs cursor-pointer ring-2 ring-black/10 dark:ring-white/10 flex items-center justify-center`}
+                    className={`w-11 h-11 rounded-full ${item.bg} hover:scale-110 active:scale-90 transition-transform shadow-xs cursor-pointer ring-2 ring-black/10 dark:ring-white/10 flex items-center justify-center`}
                     title={`Highlight ${item.label}`}
                   />
                 ))}
@@ -9211,7 +9257,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => deleteHighlight(toolbarPosition.highlightId!, toolbarPosition.highlightIds)}
-                    className="w-10 h-10 rounded-full bg-error/10 text-error hover:bg-error hover:text-white transition-all flex items-center justify-center cursor-pointer ring-1 ring-error/30"
+                    className="w-11 h-11 rounded-full bg-error/10 text-error hover:bg-error hover:text-white transition-all flex items-center justify-center cursor-pointer ring-1 ring-error/30"
                     title="Delete Highlight"
                   >
                     <Trash2 size={16} />
@@ -10581,13 +10627,14 @@ export default function App() {
                 className="flex-1 flex flex-col items-center justify-center min-h-[44px] py-0.5 transition-all duration-200 ease-out relative cursor-pointer active:scale-95 touch-manipulation select-none"
                 title={tab.label}
                 aria-label={tab.label}
+                aria-current={isTabActive ? 'page' : undefined}
               >
                 <div className="relative flex items-center justify-center">
                   <tab.icon 
                     size={18} 
                     strokeWidth={isTabActive ? 2.2 : 1.7}
                     className={`transition-all duration-200 ease-out ${
-                      isTabActive ? 'text-accent scale-105' : 'text-muted/70 hover:text-fg scale-100'
+                      isTabActive ? 'text-accent scale-105' : 'text-muted hover:text-fg scale-100'
                     }`}
                   />
                 </div>

@@ -93,6 +93,12 @@ body {
   overflow-x: clip;
 }
 
+/* Match the visible mobile viewport when browser chrome expands or collapses. */
+.app-viewport {
+  height: 100vh;
+  height: 100dvh;
+}
+
 .font-serif { font-family: var(--font-merriweather), serif; }
 .font-display { font-family: var(--font-merriweather), serif; font-weight: 400; }
 .font-sans-reader { font-family: var(--font-inter), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }

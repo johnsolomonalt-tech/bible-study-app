@@ -703,3 +703,66 @@ test('Activating Stop cancels the click default so switching back to Send cannot
   assert.equal(stop.props.type, 'button');
   assert.notEqual(stop.key, send.key, 'the active Stop node must not become a submit button during its click');
 });
+
+test('Mobile scripture actions appear away from selections at both ends of the visible viewport', () => {
+  const { mobileSelectionSheetEdge, selectionSheetEdgeForRect } = loader({}, { window: { innerHeight: 844, visualViewport: { offsetTop: 20, height: 800 } } })('src/lib/mobileSelection.ts');
+  assert.equal(mobileSelectionSheetEdge(560, 615, 0, 844), 'top');
+  assert.equal(mobileSelectionSheetEdge(80, 140, 0, 844), 'bottom');
+  assert.equal(mobileSelectionSheetEdge(320, 360, 0, 568), 'top');
+  assert.equal(selectionSheetEdgeForRect({ top: 410, bottom: 430 }), 'top', 'visual viewport offset must be included');
+});
+
+test('Mobile selection actions wait until the touch gesture ends and hide while handles are adjusted', () => {
+  const source = fs.readFileSync('src/app/(main)/page.tsx', 'utf8');
+  const begin = source.indexOf('  // Trigger floating toolbar on left-click drag mouseup and mobile selectionchange');
+  const block = source.slice(begin, source.indexOf('  const activeNote =', begin));
+  const listeners = {}, timers = new Map();
+  let nextTimer = 0, selections = 0, cleared = 0, cleanup;
+  class FakeElement {
+    constructor(inReader = true) { this.inReader = inReader; }
+    closest(selector) { return selector === '.bible-reader-content' && this.inReader ? this : null; }
+  }
+  const element = new FakeElement();
+  const range = { startContainer: { nodeType: 1, closest: () => element }, toString: () => 'last line' };
+  const selection = { rangeCount: 1, isCollapsed: false, anchorNode: element, toString: () => 'last line', getRangeAt: () => range };
+  element.nodeType = 1;
+  const globals = {
+    useEffect: fn => { cleanup = fn(); }, handleSelection: () => { selections++; },
+    window: { getSelection: () => selection }, Node: { ELEMENT_NODE: 1 }, Element: FakeElement,
+    document: { addEventListener: (name, handler) => { listeners[name] = handler; }, removeEventListener: name => { delete listeners[name]; } },
+    setToolbarPosition(value) { if (value === null) cleared++; },
+    setTimeout(fn) { const id = ++nextTimer; timers.set(id, fn); return id; }, clearTimeout(id) { timers.delete(id); },
+  };
+  vm.runInNewContext(ts.transpileModule(block, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, globals);
+  listeners.touchstart({ target: element });
+  listeners.selectionchange();
+  assert.equal(cleared, 1);
+  assert.equal(timers.size, 0, 'no action sheet may open while a finger is adjusting the selection');
+  assert.equal(selections, 0);
+  listeners.touchend();
+  assert.equal(timers.size, 1);
+  [...timers.values()][0]();
+  assert.equal(selections, 1);
+  timers.clear();
+  listeners.touchstart({ target: new FakeElement(false) });
+  listeners.selectionchange();
+  assert.equal(cleared, 2, 'native selection handles outside the verse must also dismiss the sheet');
+  assert.equal(timers.size, 0);
+  listeners.touchend();
+  [...timers.values()][0]();
+  assert.equal(selections, 2);
+  cleanup();
+  assert.equal(Object.keys(listeners).length, 0);
+});
+
+test('Mobile long-press keeps the native text-selection menu available', () => {
+  const source = fs.readFileSync('src/app/(main)/page.tsx', 'utf8');
+  const begin = source.indexOf('  const handleReaderContextMenu =');
+  const block = source.slice(begin, source.indexOf('  // Tracker State', begin));
+  let prevented = false;
+  const target = { closest: selector => selector === '[data-verse]' ? {} : selector === '.verse-text' ? target : null };
+  const globals = { useCallback: fn => fn, window: { innerWidth: 393 }, activeBook: { name: 'John' }, activeChapter: 15, bibleVerses: [], highlights: [] };
+  vm.runInNewContext(ts.transpileModule(block + '\nthis.open = handleReaderContextMenu;', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, globals);
+  globals.open({ target, preventDefault() { prevented = true; } });
+  assert.equal(prevented, false);
+});
