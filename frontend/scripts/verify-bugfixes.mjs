@@ -475,7 +475,7 @@ test('Failed conversation creation preserves the draft and attachments without s
   const block = source.slice(source.indexOf('  const handleSendMessage ='), source.indexOf('  const currentChapterId ='));
   let requests = 0, error = '', typing = false, cleared = false;
   const globals = {
-    chatRequestInFlightRef: { current: false }, chatInput: 'Keep my question', chatQuotes: [], activeChatId: null, chats: [],
+    chatResponseRequestRef: { current: null }, AbortController, chatRequestInFlightRef: { current: false }, chatInput: 'Keep my question', chatQuotes: [], activeChatId: null, chats: [],
     chatImage: { preview: 'local image' }, attachedFile: null, userId: null, API_URL: '', AbortSignal,
     setChatSubmitError: value => { error = value; }, setIsAiTyping: value => { typing = value; },
     setChatImage() { cleared = true; }, setChatQuotes() { cleared = true; }, setChatInput() { cleared = true; },
@@ -497,7 +497,7 @@ test('Expired guest sessions renew once and carry prior context to the replaceme
   const calls = [];
   let chats = [{ id: 7, title: 'Psalm study', guestChatToken: 'old', messages: [{ role: 'user', content: 'Psalm 23' }, { role: 'model', content: 'The Lord is my shepherd.' }] }];
   const globals = {
-    chatRequestInFlightRef: { current: false }, chatInput: 'Which Psalm?', chatQuotes: [], activeChatId: 7, chats,
+    chatResponseRequestRef: { current: null }, AbortController, chatRequestInFlightRef: { current: false }, chatInput: 'Which Psalm?', chatQuotes: [], activeChatId: 7, chats,
     chatImage: null, attachedFile: null, attachedScripture: null, userId: null, API_URL: '', AbortSignal,
     guestChatTokensRef: { current: { 7: 'old' } }, scrollToBottomOnChatOpenRef: { current: false },
     translation: 'bsb', theologicalLens: 'standard', includeOriginalRoots: false, buildGuestHistory,
@@ -595,4 +595,111 @@ test('Conversation menu opens on the first press while typing; scroll and cancel
   assert.equal(state.mobileChatView, 'chat');
   assert.equal(state.isChatDrawerDragging, false);
   assert.equal(state.chatDrawerOffset, 0);
+});
+
+function responseControlsHarness(fetchWithAuth, initialChats = [{ id: 7, title: 'Study', guestChatToken: 'token', messages: [] }]) {
+  const source = fs.readFileSync('src/app/(main)/page.tsx', 'utf8');
+  const send = source.slice(source.indexOf('  const handleSendMessage ='), source.indexOf('  const currentChapterId ='));
+  const stop = source.slice(source.indexOf('  const stopChatResponse ='), source.indexOf('  useEffect(() => () => { chatResponseRequestRef'));
+  const { buildGuestHistory } = loader()('src/lib/guestChatHistory.ts');
+  const state = {
+    chats: initialChats, activeChatId: initialChats[0]?.id || null, chatInput: 'Explain Psalm 23.', chatQuotes: [],
+    chatImage: null, attachedFile: null, attachedScripture: null, chatSubmitError: '', isAiTyping: false,
+    chatRequestInFlightRef: { current: false }, chatResponseRequestRef: { current: null },
+    guestChatTokensRef: { current: {} }, scrollToBottomOnChatOpenRef: { current: false },
+    userId: null, API_URL: '', AbortController, AbortSignal, TextDecoder, buildGuestHistory,
+    translation: 'bsb', theologicalLens: 'standard', includeOriginalRoots: false, fetchWithAuth,
+    trackClientEvent() {}, console: quiet,
+  };
+  state.setChats = update => { state.chats = update(state.chats); };
+  for (const property of ['chatSubmitError', 'isAiTyping', 'chatInput', 'chatImage', 'chatQuotes', 'attachedScripture', 'attachedFile', 'fileUploadStatus', 'showSlashCommands', 'aiActivityType', 'aiActivityStatus', 'aiThinkingText', 'activeChatId']) {
+    state['set' + property[0].toUpperCase() + property.slice(1)] = value => { state[property] = value; };
+  }
+  vm.runInNewContext(ts.transpileModule(stop + send + '\nthis.actions = { send: handleSendMessage, stop: stopChatResponse };', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, state);
+  return state;
+}
+
+const eventChunk = data => new TextEncoder().encode('data: ' + JSON.stringify(data) + '\n\n');
+const flushChatUpdates = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
+
+test('Pending responses reject every additional send and stopping keeps partial text without stale updates', async () => {
+  let writes = 0, streamController, requestSignal;
+  const state = responseControlsHarness(async (url, options) => {
+    if (url.endsWith('/name')) return Response.json({ title: 'Study' });
+    writes++;
+    requestSignal = options.signal;
+    return new Response(new ReadableStream({ start(controller) { streamController = controller; } }), { headers: { 'Content-Type': 'text/event-stream' } });
+  });
+  const pending = state.actions.send();
+  await flushChatUpdates();
+  assert.equal(state.isAiTyping, true);
+  await state.actions.send(undefined, 'Suggestion must not send');
+  await state.actions.send({ preventDefault() {} });
+  assert.equal(writes, 1);
+  streamController.enqueue(eventChunk({ type: 'text', text: 'The Lord is my shepherd.' }));
+  await flushChatUpdates();
+  assert.equal(state.chats[0].messages.at(-1).isStreaming, true);
+  state.actions.stop();
+  assert.equal(requestSignal.aborted, true);
+  assert.equal(state.isAiTyping, false);
+  assert.equal(state.chatRequestInFlightRef.current, false);
+  assert.equal(state.chats[0].messages.at(-1).content, 'The Lord is my shepherd.');
+  assert.equal(state.chats[0].messages.at(-1).isStopped, true);
+  // Simulate a provider chunk arriving after cancellation; it must never replace the partial answer.
+  streamController.enqueue(eventChunk({ type: 'text', text: 'Late text must not appear.' }));
+  streamController.close();
+  await pending;
+  assert.equal(state.chats[0].messages.at(-1).content, 'The Lord is my shepherd.');
+  assert.equal(state.chats[0].messages.length, 2);
+  assert.equal(state.chatSubmitError, '');
+});
+
+test('Stopping before chat creation preserves the draft and an old completion cannot unlock a newer request', async () => {
+  let completeOldCreate;
+  const state = responseControlsHarness(() => new Promise(resolve => { completeOldCreate = resolve; }), []);
+  const pending = state.actions.send();
+  await flushChatUpdates();
+  state.actions.stop();
+  assert.equal(state.chatInput, 'Explain Psalm 23.');
+  assert.equal(state.chats.length, 0);
+  const newerRequest = { controller: new AbortController(), chatId: 9 };
+  state.chatResponseRequestRef.current = newerRequest;
+  state.chatRequestInFlightRef.current = true;
+  state.isAiTyping = true;
+  completeOldCreate(Response.json({ id: 8, guestChatToken: 'old' }));
+  await pending;
+  assert.equal(state.chatResponseRequestRef.current, newerRequest);
+  assert.equal(state.chatRequestInFlightRef.current, true);
+  assert.equal(state.isAiTyping, true);
+  assert.equal(state.chats.length, 0);
+});
+
+test('A cancelled model request never falls through to another model', async () => {
+  const source = fs.readFileSync('src/app/api/chats/[id]/messages/route.ts', 'utf8');
+  const block = source.slice(source.indexOf('async function withModelFallback'), source.indexOf('interface ScriptureContext'));
+  const globals = { isRetryable: () => true, console: quiet };
+  vm.runInNewContext(ts.transpileModule(block + '\nthis.fallback = withModelFallback;', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, globals);
+  const controller = new AbortController();
+  let attempts = 0;
+  await assert.rejects(() => globals.fallback(['first', 'second'], async () => {
+    attempts++;
+    controller.abort();
+    throw new Error('Provider stream aborted');
+  }, controller.signal), error => error.name === 'AbortError');
+  assert.equal(attempts, 1);
+});
+
+test('Activating Stop cancels the click default so switching back to Send cannot submit a draft', () => {
+  const source = fs.readFileSync('src/components/chat/ChatSendButton.tsx', 'utf8');
+  const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
+  const module = { exports: {} };
+  vm.runInNewContext(compiled, { exports: module.exports, module, require });
+  let cancelledDefault = false, stops = 0;
+  const stop = module.exports.ChatSendButton({ pending: true, disabled: true, onStop: () => { stops++; } });
+  const send = module.exports.ChatSendButton({ pending: false, disabled: false, onStop() {} });
+  stop.props.onClick({ preventDefault() { cancelledDefault = true; } });
+  assert.equal(cancelledDefault, true);
+  assert.equal(stops, 1);
+  assert.equal(stop.props.type, 'button');
+  assert.notEqual(stop.key, send.key, 'the active Stop node must not become a submit button during its click');
 });

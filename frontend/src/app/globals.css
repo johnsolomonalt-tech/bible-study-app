@@ -736,8 +736,8 @@ sup.verse-number {
   transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 .chat-composer:focus-within {
-  border-color: var(--muted);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--muted) 18%, transparent);
+  border-color: color-mix(in srgb, #c96442 55%, var(--border-soft));
+  box-shadow: 0 0 0 2px color-mix(in srgb, #c96442 10%, transparent);
 }
 .chat-composer-input {
   flex: 1;
@@ -768,7 +768,10 @@ sup.verse-number {
   transition: background-color 150ms ease, color 150ms ease;
 }
 .chat-composer-action:hover { background: var(--surface-hover); color: var(--fg); }
-.chat-composer-send { background: var(--accent); color: #fff; }
-.chat-composer-send:hover { background: color-mix(in srgb, var(--accent) 85%, #000); color: #fff; }
-.chat-composer-send:disabled { background: var(--surface-hover); color: var(--muted); cursor: default; }
+.chat-composer-send { background: #c96442; color: #fff; }
+.chat-composer-send:hover { background: #b25436; color: #fff; }
+.chat-composer-send:disabled { background: color-mix(in srgb, #c96442 14%, var(--surface)); color: var(--muted); cursor: default; }
+.chat-composer-stop { background: color-mix(in srgb, #c96442 16%, var(--surface)); color: #c96442; border: 1px solid color-mix(in srgb, #c96442 35%, transparent); }
+.chat-composer-stop:hover { background: color-mix(in srgb, #c96442 25%, var(--surface)); color: #c96442; }
+.chat-composer-action:focus-visible { outline: 2px solid #c96442; outline-offset: 3px; }
 .chat-composer-action:disabled:not(.chat-composer-send) { opacity: .5; cursor: default; }

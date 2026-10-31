@@ -19,6 +19,7 @@ import { findInterlinearWord, getOrGenerateInterlinearWord, fetchInterlinearWord
 import { getScriptureBacklinks, BacklinksResult } from '@/lib/backlinks';
 import { TheologicalLensSelector, TheologicalLensType, THEOLOGICAL_LENS_OPTIONS } from '@/components/chat/TheologicalLensSelector';
 import { buildGuestHistory } from '@/lib/guestChatHistory';
+import { ChatSendButton } from '@/components/chat/ChatSendButton';
 import { ChatEmptyState } from '@/components/chat/ChatEmptyState';
 import { ChatSlashCommands, SLASH_COMMANDS, SlashCommand } from '@/components/chat/ChatSlashCommands';
 import { ChatFollowUps } from '@/components/chat/ChatFollowUps';
@@ -632,6 +633,7 @@ const AiChatMessageView = ({
     imagePreview?: string; 
     attachedFile?: { name: string; size: number; type: string };
     isStreaming?: boolean;
+    isStopped?: boolean;
   };
   index: number;
   totalMessages: number;
@@ -726,7 +728,7 @@ const AiChatMessageView = ({
       )}
 
       {/* ChatGPT-Style Source Tracker */}
-      {!message.isStreaming && <ChatSourceTracker
+      {!message.isStreaming && !message.isStopped && <ChatSourceTracker
         sources={sources}
         content={textContent}
         lens={effectiveLens}
@@ -759,7 +761,7 @@ const AiChatMessageView = ({
         )}
       </div>
 
-      {!message.isStreaming && <AiMessageActions
+      {!message.isStreaming && textContent && <AiMessageActions
         content={message.content}
         chatTitle={chatTitle}
         chatId={chatId}
@@ -769,8 +771,10 @@ const AiChatMessageView = ({
         onSaveToNotes={onSaveToNotes}
       />}
 
+      {message.isStopped && <p role="status" className="mt-2 text-xs text-muted">Response stopped</p>}
+
       {/* Tailored Follow-Ups */}
-      {isLast && !message.isStreaming && onSelectPrompt && (
+      {isLast && !message.isStreaming && !message.isStopped && onSelectPrompt && (
         <ChatFollowUps
           questions={suggestedFollowUps}
           messageContent={textContent}
@@ -1601,7 +1605,7 @@ export default function App() {
   }, [activeBook.name, activeChapter, notes, highlights]);
 
   // Chats State
-  const [chats, setChats] = useState<{id: number, title: string, guestChatToken?: string, messages: {role: string, content: string, isStreaming?: boolean}[]}[]>([]);
+  const [chats, setChats] = useState<{id: number, title: string, guestChatToken?: string, messages: {role: string, content: string, isStreaming?: boolean, isStopped?: boolean}[]}[]>([]);
   const [activeChatId, setActiveChatId] = useState<number | null>(null);
   const [mobileChatView, setMobileChatView] = useState<'chat' | 'list'>('chat');
   const [guestChatsLoaded, setGuestChatsLoaded] = useState(false);
@@ -1630,7 +1634,7 @@ export default function App() {
     try {
       localStorage.setItem('theologica_guest_chats', JSON.stringify(chats.filter(chat => chat.guestChatToken).map(chat => ({
         id: chat.id, title: chat.title, guestChatToken: chat.guestChatToken,
-        messages: chat.messages.filter(message => !message.isStreaming).map(({ role, content }) => ({ role, content })),
+        messages: chat.messages.filter(message => !message.isStreaming).map(({ role, content, isStopped }) => ({ role, content, ...(isStopped ? { isStopped: true } : {}) })),
       }))));
     } catch { console.warn('Guest chat history could not be saved on this device.'); }
   }, [chats, isLoaded, userId, guestChatsLoaded]);
@@ -3185,6 +3189,26 @@ export default function App() {
   }, [processSelectedFile]);
   const [isAiTyping, setIsAiTyping] = useState(false);
   const chatRequestInFlightRef = useRef(false);
+  const chatResponseRequestRef = useRef<{ controller: AbortController; chatId: number | null } | null>(null);
+  const stopChatResponse = () => {
+    const request = chatResponseRequestRef.current;
+    if (!request) return;
+    request.controller.abort();
+    chatResponseRequestRef.current = null;
+    chatRequestInFlightRef.current = false;
+    setIsAiTyping(false);
+    setAiThinkingText('');
+    setChats(prev => prev.map(chat => {
+      if (chat.id !== request.chatId) return chat;
+      const messages = [...chat.messages];
+      const last = messages[messages.length - 1];
+      if (last?.isStreaming) messages[messages.length - 1] = { ...last, isStreaming: false, isStopped: true };
+      else messages.push({ role: 'model', content: '', isStopped: true });
+      return { ...chat, messages };
+    }));
+  };
+
+  useEffect(() => () => { chatResponseRequestRef.current?.controller.abort(); }, []);
   const [aiActivityStatus, setAiActivityStatus] = useState('Ready');
   const [aiThinkingText, setAiThinkingText] = useState('');
   const [aiActivityType, setAiActivityType] = useState<'study' | 'image'>('study');
@@ -5500,6 +5524,15 @@ export default function App() {
     const isFirstMessage = !activeChatId || (currentChat && currentChat.messages.length === 0);
     if (!textToSend.trim() && !chatImage && !attachedFile) return;
     chatRequestInFlightRef.current = true;
+    const controller = new AbortController();
+    const request = { controller, chatId: null as number | null };
+    chatResponseRequestRef.current = request;
+    const releaseRequest = () => {
+      if (chatResponseRequestRef.current !== request) return;
+      chatResponseRequestRef.current = null;
+      chatRequestInFlightRef.current = false;
+      setIsAiTyping(false);
+    };
     setChatSubmitError('');
     setIsAiTyping(true);
     const currentImage = chatImage;
@@ -5527,21 +5560,24 @@ export default function App() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title: 'New Conversation' }),
-          signal: AbortSignal.timeout(20000),
+          signal: AbortSignal.any([controller.signal, AbortSignal.timeout(20000)]),
         });
+        controller.signal.throwIfAborted();
         if (!res.ok) throw new Error('Chat creation failed');
         newChat = await res.json();
+        controller.signal.throwIfAborted();
         if (!newChat?.id) throw new Error('Invalid chat response');
       } catch {
+        if (controller.signal.aborted) { releaseRequest(); return; }
         setChatSubmitError('Unable to start this conversation. Your draft is still here. Please retry or sign in.');
-        chatRequestInFlightRef.current = false;
-        setIsAiTyping(false);
+        releaseRequest();
         return;
       }
       const createdChatId = newChat.id;
       if (newChat.guestChatToken) guestChatTokensRef.current[createdChatId] = newChat.guestChatToken;
 
       targetChatId = createdChatId;
+      request.chatId = targetChatId;
       
       const newMsg = { 
         role: 'user', 
@@ -5554,6 +5590,7 @@ export default function App() {
       setChats(prev => [chatWithOptimisticMsg, ...prev.filter(chat => chat.id !== activeChatId)]);
       setActiveChatId(createdChatId);
     } else {
+      request.chatId = targetChatId;
       const newMsg = { 
         role: 'user', 
         content: textToSend.trim(), 
@@ -5626,6 +5663,7 @@ export default function App() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
       body: messageBody,
+      signal: controller.signal,
     });
     const messagePromise = sendToConversation();
 
@@ -5635,19 +5673,22 @@ export default function App() {
       namePromise = fetchWithAuth(`${API_URL}/api/chats/${targetChatId}/name`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({ userMessage: currentInput })
       }).catch(() => null);
     }
 
     try {
       let res = await messagePromise;
+      controller.signal.throwIfAborted();
       if (res.status === 404 && !userId) {
         // A cleared/expired guest cookie must not strand locally saved conversations.
         const renewed = await fetchWithAuth(`${API_URL}/api/chats`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title: currentChat?.title || 'New Conversation' }),
-          signal: AbortSignal.timeout(20000),
+          signal: AbortSignal.any([controller.signal, AbortSignal.timeout(20000)]),
         }).then(response => response.ok ? response.json() : null).catch(() => null);
+        controller.signal.throwIfAborted();
         if (!renewed?.id || !renewed.guestChatToken) {
           setChatInput(chatInput);
           setChatQuotes(chatQuotes);
@@ -5660,10 +5701,12 @@ export default function App() {
         }
         const previousId = targetChatId;
         targetChatId = renewed.id;
+        request.chatId = targetChatId;
         guestChatTokensRef.current[renewed.id] = renewed.guestChatToken;
         setChats(prev => prev.map(chat => chat.id === previousId ? { ...chat, id: renewed.id, guestChatToken: renewed.guestChatToken } : chat));
         setActiveChatId(renewed.id);
         res = await sendToConversation();
+        controller.signal.throwIfAborted();
       }
       if (res.ok) {
         const isStream = res.headers.get('content-type')?.includes('text/event-stream');
@@ -5676,6 +5719,7 @@ export default function App() {
 
           while (true) {
             const { done, value } = await reader.read();
+            controller.signal.throwIfAborted();
             if (done) break;
             buffer += decoder.decode(value, { stream: true });
             const lines = buffer.split('\n\n');
@@ -5739,6 +5783,7 @@ export default function App() {
           }
         } else {
           const data = await res.json();
+          controller.signal.throwIfAborted();
           setChats(prev => prev.map(c => {
             if (c.id === targetChatId) {
               const msgs = c.messages;
@@ -5752,8 +5797,9 @@ export default function App() {
 
         if (namePromise) {
           namePromise.then(async (nameRes) => {
-            if (nameRes?.ok) {
+            if (nameRes?.ok && !controller.signal.aborted) {
               const { title } = await nameRes.json();
+              if (controller.signal.aborted) return;
               setChats(prev => prev.map(c => c.id === targetChatId ? { ...c, title } : c));
             }
           }).catch(() => {
@@ -5762,6 +5808,7 @@ export default function App() {
         }
       } else {
         const errorData = await res.json().catch(() => null);
+        controller.signal.throwIfAborted();
         const errMsgText = String(errorData?.details || errorData?.error || '');
 
         const errorMsg = { 
@@ -5778,6 +5825,7 @@ export default function App() {
         }));
       }
     } catch (networkErr: any) {
+      if (controller.signal.aborted) return;
       console.error('Chat request network failure:', networkErr);
       const errorMsg = { 
         id: Math.floor(Math.random() * 2000000000) + 1, 
@@ -5792,8 +5840,7 @@ export default function App() {
         return c;
       }));
     } finally {
-      chatRequestInFlightRef.current = false;
-      setIsAiTyping(false);
+      releaseRequest();
     }
   };
 
@@ -7236,15 +7283,11 @@ export default function App() {
                         onKeyDown={handleChatKeyDown}
                         disabled={!isOnline}
                       />
-                      <button 
-                        type="submit" 
-                        disabled={isAiTyping || (!chatInput.trim() && !chatImage && !attachedFile && chatQuotes.length === 0) || !isOnline}
-                        className="chat-composer-action chat-composer-send"
-                        aria-label="Send message"
-                        title="Send message"
-                      >
-                        <Send size={16} />
-                      </button>
+                      <ChatSendButton
+                        pending={isAiTyping}
+                        disabled={(!chatInput.trim() && !chatImage && !attachedFile && chatQuotes.length === 0) || !isOnline}
+                        onStop={stopChatResponse}
+                      />
                     </div>
                     <p className="text-[10px] text-meta text-center mt-1 px-1 select-none leading-tight">
                       Theologica AI can produce inaccuracies. Always cross-reference with Scripture.
@@ -9098,15 +9141,11 @@ export default function App() {
                         className="chat-composer-input"
                         aria-label="Message Study AI"
                       />
-                      <button 
-                        type="submit" 
-                        disabled={isAiTyping || (!chatInput.trim() && !chatImage && !attachedFile && chatQuotes.length === 0) || !isOnline} 
-                        className="chat-composer-action chat-composer-send"
-                        aria-label="Send message"
-                        title="Send message"
-                      >
-                        <Send size={15} />
-                      </button>
+                      <ChatSendButton
+                        pending={isAiTyping}
+                        disabled={(!chatInput.trim() && !chatImage && !attachedFile && chatQuotes.length === 0) || !isOnline}
+                        onStop={stopChatResponse}
+                      />
                     </div>
                     <p className="text-[10px] sm:text-[11px] text-meta text-center mt-1.5 px-1 select-none leading-tight">
                       Theologica AI can produce inaccuracies. Always cross-reference with Scripture and verify primary sources.
@@ -10178,15 +10217,11 @@ export default function App() {
                       className="chat-composer-input"
                         aria-label="Message Study AI"
                     />
-                    <button 
-                      type="submit" 
-                      disabled={isAiTyping || (!chatInput.trim() && !chatImage && !attachedFile && chatQuotes.length === 0) || !isOnline} 
-                      className="chat-composer-action chat-composer-send"
-                        aria-label="Send message"
-                        title="Send message"
-                    >
-                      <Send size={16} />
-                    </button>
+                    <ChatSendButton
+                        pending={isAiTyping}
+                        disabled={(!chatInput.trim() && !chatImage && !attachedFile && chatQuotes.length === 0) || !isOnline}
+                        onStop={stopChatResponse}
+                      />
                   </div>
                   <p className="text-[10px] sm:text-[12px] text-meta text-center mt-1 sm:mt-2 px-2 select-none leading-tight truncate">
                     Theologica AI can produce inaccuracies. Always cross-reference with Scripture.

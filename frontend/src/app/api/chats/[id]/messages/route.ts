@@ -89,13 +89,16 @@ function isRetryable(e: unknown): boolean {
 /** Run fn against each model in the chain until one succeeds */
 async function withModelFallback<T>(
   models: string[],
-  fn: (model: string) => Promise<T>
+  fn: (model: string) => Promise<T>,
+  signal?: AbortSignal,
 ): Promise<T> {
   let lastError: unknown;
   for (const model of models) {
+    signal?.throwIfAborted();
     try {
       return await fn(model);
     } catch (e) {
+      signal?.throwIfAborted();
       lastError = e;
       if (!isRetryable(e)) throw e; // non-retryable — bubble immediately
       console.warn(`Model ${model} unavailable, trying next...`);
@@ -253,6 +256,7 @@ interface ProcessAiMessageParams {
   theologicalLens?: string;
   includeOriginalRoots?: boolean;
   guestHistory?: GuestHistoryMessage[];
+  signal?: AbortSignal;
   onStatusUpdate?: (status: string) => void;
   onThoughtUpdate?: (thought: string) => void;
   onTextUpdate?: (text: string) => void;
@@ -268,10 +272,12 @@ async function processAiMessage({
   theologicalLens = 'standard',
   includeOriginalRoots = false,
   guestHistory,
+  signal,
   onStatusUpdate,
   onThoughtUpdate,
   onTextUpdate,
 }: ProcessAiMessageParams) {
+  signal?.throwIfAborted();
   const userMessage = await saveOrMockMessage({
     content: content || '',
     role: 'user',
@@ -301,11 +307,12 @@ async function processAiMessage({
         ai.models.generateContent({
           model,
           contents: `Does the following image request relate to the Bible, Christianity, or biblical history/theology? Respond strictly with "YES" or "NO".\n\nRequest: "${content}"`,
-          config: { 
+          config: {
+            abortSignal: signal,
             temperature: 0.1,
             thinkingConfig: { thinkingBudget: 0 }
           }
-        })
+        }), signal
       );
 
       const isBibleRelatedText = (validationResponse.text ?? validationResponse.candidates?.[0]?.content?.parts?.[0]?.text ?? '').trim().toUpperCase();
@@ -326,6 +333,7 @@ async function processAiMessage({
       // 1. Call Pixazo API for image generation
       const prompt = `A beautiful, reverent, artistic Bible-themed image: ${content}`;
       const pixazoRes = await fetch('https://gateway.pixazo.ai/flux-1-schnell/v1/getData', {
+        signal,
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -355,7 +363,7 @@ async function processAiMessage({
       }
 
       // 2. Fetch the actual image from the returned URL to convert to base64
-      const imageFetchRes = await fetch(imageUrl);
+      const imageFetchRes = await fetch(imageUrl, { signal });
       if (!imageFetchRes.ok) {
         throw new Error(`Failed to fetch image from URL: ${imageUrl}`);
       }
@@ -366,6 +374,7 @@ async function processAiMessage({
       const generatedImageBase64 = Buffer.from(imageBuffer).toString('base64');
       const textResponse = "Here is the illuminated biblical image you requested.";
 
+      signal?.throwIfAborted();
       const aiContent = `__GENERATED_IMAGE__${generatedImageBase64}__END_IMAGE__\n\n${textResponse}\n\n__LENS__${theologicalLens}__END_LENS__`;
 
       const aiMessage = await saveOrMockMessage({
@@ -377,6 +386,7 @@ async function processAiMessage({
 
       return { userMessage, aiMessage };
     } catch (err: unknown) {
+      signal?.throwIfAborted();
       console.error('Image generation failed, falling back to text:', err);
       // Fall through to normal text response if anything fails
     }
@@ -526,7 +536,8 @@ Do NOT guess or answer about a random chapter! Politely ask the user which book 
     const chatSession = ai.chats.create({
       model,
       history,
-      config: { 
+      config: {
+        abortSignal: signal,
         systemInstruction: effectiveSystemInstruction,
         thinkingConfig: { thinkingBudget: 0 }
       },
@@ -542,6 +553,7 @@ Do NOT guess or answer about a random chapter! Politely ask the user which book 
     let sentResponseStep = false;
 
     for await (const chunk of stream) {
+      signal?.throwIfAborted();
       const text = chunk.text || '';
       accumulated += text;
 
@@ -588,8 +600,9 @@ Do NOT guess or answer about a random chapter! Politely ask the user which book 
     }
 
     return accumulated;
-  });
+  }, signal);
 
+  signal?.throwIfAborted();
   // Permanently tag the theological lens in the message
   if (!aiResponseText.includes('__LENS__')) {
     aiResponseText = `${aiResponseText.trim()}\n\n__LENS__${theologicalLens}__END_LENS__`;
@@ -674,9 +687,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   if (wantsStream) {
     const encoder = new TextEncoder();
+    const responseAbort = new AbortController();
+    const signal = AbortSignal.any([req.signal, responseAbort.signal]);
     const stream = new ReadableStream({
       async start(controller) {
         const send = (data: any) => {
+          if (signal.aborted) return;
           try {
             controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
           } catch {
@@ -695,6 +711,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             theologicalLens,
             includeOriginalRoots: Boolean(includeOriginalRoots),
             guestHistory: identity.kind === 'guest' ? guestHistory : undefined,
+            signal,
             onStatusUpdate: (status) => {
               send({ type: 'status', status });
             },
@@ -707,13 +724,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           });
 
           send({ type: 'result', userMessage: result.userMessage, aiMessage: result.aiMessage });
-          controller.close();
+          if (!signal.aborted) controller.close();
         } catch (err: any) {
+          if (signal.aborted) return;
           console.error('Error in chat stream:', err);
           send({ type: 'error', error: err?.message || 'Failed to generate response' });
           controller.close();
         }
-      }
+      },
+      cancel() { responseAbort.abort(); },
     });
 
     return new Response(stream, {
@@ -736,6 +755,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     theologicalLens,
     includeOriginalRoots: Boolean(includeOriginalRoots),
     guestHistory: identity.kind === 'guest' ? guestHistory : undefined,
+    signal: req.signal,
   });
 
   return NextResponse.json(result, { status: 201 });
