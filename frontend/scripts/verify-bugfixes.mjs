@@ -475,7 +475,7 @@ test('Failed conversation creation preserves the draft and attachments without s
   const block = source.slice(source.indexOf('  const handleSendMessage ='), source.indexOf('  const currentChapterId ='));
   let requests = 0, error = '', typing = false, cleared = false;
   const globals = {
-    chatResponseRequestRef: { current: null }, AbortController, chatRequestInFlightRef: { current: false }, chatInput: 'Keep my question', chatQuotes: [], activeChatId: null, chats: [],
+    attachmentReadPendingRef: { current: false }, chatResponseRequestRef: { current: null }, AbortController, chatRequestInFlightRef: { current: false }, chatInput: 'Keep my question', chatQuotes: [], activeChatId: null, chats: [],
     chatImage: { preview: 'local image' }, attachedFile: null, userId: null, API_URL: '', AbortSignal,
     setChatSubmitError: value => { error = value; }, setIsAiTyping: value => { typing = value; },
     setChatImage() { cleared = true; }, setChatQuotes() { cleared = true; }, setChatInput() { cleared = true; },
@@ -497,7 +497,7 @@ test('Expired guest sessions renew once and carry prior context to the replaceme
   const calls = [];
   let chats = [{ id: 7, title: 'Psalm study', guestChatToken: 'old', messages: [{ role: 'user', content: 'Psalm 23' }, { role: 'model', content: 'The Lord is my shepherd.' }] }];
   const globals = {
-    chatResponseRequestRef: { current: null }, AbortController, chatRequestInFlightRef: { current: false }, chatInput: 'Which Psalm?', chatQuotes: [], activeChatId: 7, chats,
+    attachmentReadPendingRef: { current: false }, chatResponseRequestRef: { current: null }, AbortController, chatRequestInFlightRef: { current: false }, chatInput: 'Which Psalm?', chatQuotes: [], activeChatId: 7, chats,
     chatImage: null, attachedFile: null, attachedScripture: null, userId: null, API_URL: '', AbortSignal,
     guestChatTokensRef: { current: { 7: 'old' } }, scrollToBottomOnChatOpenRef: { current: false },
     translation: 'bsb', theologicalLens: 'standard', includeOriginalRoots: false, buildGuestHistory,
@@ -605,7 +605,7 @@ function responseControlsHarness(fetchWithAuth, initialChats = [{ id: 7, title: 
   const state = {
     chats: initialChats, activeChatId: initialChats[0]?.id || null, chatInput: 'Explain Psalm 23.', chatQuotes: [],
     chatImage: null, attachedFile: null, attachedScripture: null, chatSubmitError: '', isAiTyping: false,
-    chatRequestInFlightRef: { current: false }, chatResponseRequestRef: { current: null },
+    attachmentReadPendingRef: { current: false }, chatRequestInFlightRef: { current: false }, chatResponseRequestRef: { current: null },
     guestChatTokensRef: { current: {} }, scrollToBottomOnChatOpenRef: { current: false },
     userId: null, API_URL: '', AbortController, AbortSignal, TextDecoder, buildGuestHistory,
     translation: 'bsb', theologicalLens: 'standard', includeOriginalRoots: false, fetchWithAuth,
@@ -765,4 +765,67 @@ test('Mobile long-press keeps the native text-selection menu available', () => {
   vm.runInNewContext(ts.transpileModule(block + '\nthis.open = handleReaderContextMenu;', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, globals);
   globals.open({ target, preventDefault() { prevented = true; } });
   assert.equal(prevented, false);
+});
+
+test('Chat attachments accept only formats the chat can interpret', () => {
+  const { classifyChatAttachment } = loader()('src/lib/chatAttachments.ts');
+  const file = (name, type = '', size = 100) => ({ name, type, size });
+  for (const [name, type, kind] of [['photo.PNG', 'image/png', 'image'], ['photo.jpg', 'image/jpeg', 'image'], ['image.webp', 'image/webp', 'image'], ['image.gif', 'image/gif', 'image'], ['book.pdf', 'application/pdf', 'pdf'], ['note.md', 'text/markdown', 'document'], ['table.csv', 'text/csv', 'document'], ['data.json', 'application/json', 'document']]) {
+    assert.equal(classifyChatAttachment(file(name, type)).kind, kind);
+  }
+  for (const [name, type] of [['install.dmg', 'application/octet-stream'], ['program.EXE', 'application/octet-stream'], ['photo.svg', 'image/svg+xml'], ['photo.heic', 'image/heic'], ['archive.zip', 'application/zip'], ['program.exe', 'text/plain'], ['photo.jpg', 'image/png']]) {
+    assert.match(classifyChatAttachment(file(name, type)).error, /not supported/i);
+  }
+  assert.match(classifyChatAttachment(file('big.pdf', 'application/pdf', 15_000_001)).error, /too large/i);
+  assert.match(classifyChatAttachment(file('big.txt', 'text/plain', 95_001)).error, /too large/i);
+});
+
+test('Attachment processing rejects unsupported files and stale reads without success notifications', () => {
+  const source = fs.readFileSync('src/app/(main)/page.tsx', 'utf8');
+  const start = source.indexOf('  const processSelectedFile =');
+  const block = source.slice(start, source.indexOf('  const removeAttachedFile =', start));
+  const { classifyChatAttachment } = loader()('src/lib/chatAttachments.ts');
+  const readers = [], statuses = [];
+  let attachment = null, image = null;
+  class FakeReader {
+    constructor() { readers.push(this); }
+    readAsText() {}
+    readAsDataURL() {}
+    finish(value) { this.onload({ target: { result: value } }); }
+  }
+  const globals = { useCallback: fn => fn, attachmentReadIdRef: { current: 0 }, attachmentReadPendingRef: { current: false }, setIsReadingAttachment() {}, classifyChatAttachment, FileReader: FakeReader,
+    setFileUploadStatus: value => statuses.push(value), setAttachedFile: value => { attachment = value; }, setChatImage: value => { image = value; } };
+  vm.runInNewContext(ts.transpileModule(block + '\nthis.process = processSelectedFile;', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, globals);
+  const file = (name, type = '') => ({ name, type, size: 100 });
+  globals.process(file('picture.png', 'image/png'));
+  readers[0].finish('data:image/png;base64,aGVsbG8=');
+  assert.equal(attachment.type, 'image');
+  assert.ok(image);
+  globals.process(file('setup.exe', 'application/octet-stream'));
+  assert.equal(statuses.at(-1), 'File type not supported.');
+  assert.equal(attachment.name, 'picture.png', 'rejecting a new file keeps the prior attachment');
+  globals.process(file('note.txt', 'text/plain'));
+  readers[1].finish('Scripture notes');
+  assert.equal(attachment.type, 'document');
+  assert.equal(image, null, 'replacing an image with text must not send the previous image');
+  assert.equal(statuses.at(-1), null);
+  assert.ok(!statuses.some(value => typeof value === 'string' && /added|attached/i.test(value)));
+  globals.process(file('pending.txt', 'text/plain'));
+  globals.process(file('disk.dmg', 'application/octet-stream'));
+  readers[2].finish('late result');
+  assert.equal(attachment.name, 'note.txt', 'a rejected file invalidates an earlier pending read');
+  globals.process(file('fake.txt', 'text/plain'));
+  readers[3].finish('MZ\0binary');
+  assert.equal(statuses.at(-1), 'File type not supported.');
+  assert.equal(attachment.name, 'note.txt');
+});
+
+test('Chat cannot send while a selected attachment is still being read', async () => {
+  let requests = 0;
+  const state = responseControlsHarness(async () => { requests++; return Response.json({}); });
+  state.attachmentReadPendingRef.current = true;
+  await state.actions.send();
+  assert.equal(requests, 0);
+  assert.equal(state.chatInput, 'Explain Psalm 23.');
+  assert.equal(state.chatRequestInFlightRef.current, false);
 });

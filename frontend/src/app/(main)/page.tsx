@@ -19,6 +19,7 @@ import { findInterlinearWord, getOrGenerateInterlinearWord, fetchInterlinearWord
 import { getScriptureBacklinks, BacklinksResult } from '@/lib/backlinks';
 import { TheologicalLensSelector, TheologicalLensType, THEOLOGICAL_LENS_OPTIONS } from '@/components/chat/TheologicalLensSelector';
 import { buildGuestHistory } from '@/lib/guestChatHistory';
+import { CHAT_ATTACHMENT_ACCEPT, classifyChatAttachment } from '@/lib/chatAttachments';
 import { ChatSendButton } from '@/components/chat/ChatSendButton';
 import { selectionSheetEdgeForRect } from '@/lib/mobileSelection';
 import { ChatEmptyState } from '@/components/chat/ChatEmptyState';
@@ -3062,88 +3063,74 @@ export default function App() {
     textContent?: string;
   } | null>(null);
   const [fileUploadStatus, setFileUploadStatus] = useState<string | null>(null);
+  const [isReadingAttachment, setIsReadingAttachment] = useState(false);
+  const attachmentReadPendingRef = useRef(false);
   const [isDraggingOverChat, setIsDraggingOverChat] = useState(false);
   const imageFileRef = useRef<HTMLInputElement>(null);
 
+  const attachmentReadIdRef = useRef(0);
   const processSelectedFile = useCallback((file: File) => {
     if (!file) return;
-
-    if (file.size > 20 * 1024 * 1024) {
-      alert('File is too large. Please select a file under 20MB.');
+    const readId = ++attachmentReadIdRef.current;
+    const classification = classifyChatAttachment(file);
+    if ('error' in classification) {
+      attachmentReadPendingRef.current = false;
+      setIsReadingAttachment(false);
+      setFileUploadStatus(classification.error);
       return;
     }
-
-    setFileUploadStatus(`Adding "${file.name}" to conversation...`);
-
-    const isImage = file.type.startsWith('image/');
-    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-
-    if (isImage) {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const dataUrl = ev.target?.result as string;
-        const base64 = dataUrl.split(',')[1];
-        setChatImage({ base64, mimeType: file.type || 'image/jpeg', preview: dataUrl, name: file.name });
-        setAttachedFile({
-          name: file.name,
-          size: file.size,
-          mimeType: file.type || 'image/jpeg',
-          preview: dataUrl,
-          base64,
-          type: 'image',
-        });
-        setFileUploadStatus(`Added "${file.name}" to conversation`);
-        setTimeout(() => setFileUploadStatus(null), 3500);
-      };
-      reader.onerror = () => {
-        setFileUploadStatus(`Failed to read "${file.name}"`);
-        setTimeout(() => setFileUploadStatus(null), 3500);
-      };
-      reader.readAsDataURL(file);
-    } else if (isPdf) {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const dataUrl = ev.target?.result as string;
-        const base64 = dataUrl.split(',')[1];
-        setChatImage({ base64, mimeType: 'application/pdf', preview: '', name: file.name });
-        setAttachedFile({
-          name: file.name,
-          size: file.size,
-          mimeType: 'application/pdf',
-          base64,
-          type: 'pdf',
-        });
-        setFileUploadStatus(`Added "${file.name}" to conversation`);
-        setTimeout(() => setFileUploadStatus(null), 3500);
-      };
-      reader.onerror = () => {
-        setFileUploadStatus(`Failed to read "${file.name}"`);
-        setTimeout(() => setFileUploadStatus(null), 3500);
-      };
-      reader.readAsDataURL(file);
-    } else {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const text = ev.target?.result as string;
-        setAttachedFile({
-          name: file.name,
-          size: file.size,
-          mimeType: file.type || 'text/plain',
-          textContent: text,
-          type: 'document',
-        });
-        setFileUploadStatus(`Added "${file.name}" to conversation`);
-        setTimeout(() => setFileUploadStatus(null), 3500);
-      };
-      reader.onerror = () => {
-        setFileUploadStatus(`Failed to read "${file.name}"`);
-        setTimeout(() => setFileUploadStatus(null), 3500);
-      };
-      reader.readAsText(file);
+    setFileUploadStatus(null);
+    attachmentReadPendingRef.current = true;
+    setIsReadingAttachment(true);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (readId !== attachmentReadIdRef.current) return;
+      attachmentReadPendingRef.current = false;
+      setIsReadingAttachment(false);
+      const result = event.target?.result;
+      if (typeof result !== 'string') {
+        setFileUploadStatus('Unable to read this file. Please try again.');
+        return;
+      }
+      if (classification.kind === 'document') {
+        if (result.includes('\0') || result.includes('\uFFFD')) {
+          setFileUploadStatus('File type not supported.');
+          return;
+        }
+        setChatImage(null);
+        setAttachedFile({ name: file.name, size: file.size, mimeType: classification.mimeType, textContent: result, type: 'document' });
+      } else {
+        const base64 = result.split(',')[1];
+        if (!base64) {
+          setFileUploadStatus('Unable to read this file. Please try again.');
+          return;
+        }
+        const preview = classification.kind === 'image' ? result : '';
+        setChatImage({ base64, mimeType: classification.mimeType, preview, name: file.name });
+        setAttachedFile({ name: file.name, size: file.size, mimeType: classification.mimeType, preview, base64, type: classification.kind });
+      }
+    };
+    reader.onerror = () => {
+      if (readId === attachmentReadIdRef.current) {
+        attachmentReadPendingRef.current = false;
+        setIsReadingAttachment(false);
+        setFileUploadStatus('Unable to read this file. Please try again.');
+      }
+    };
+    try {
+      if (classification.kind === 'document') reader.readAsText(file);
+      else reader.readAsDataURL(file);
+    } catch {
+      attachmentReadPendingRef.current = false;
+      setIsReadingAttachment(false);
+      setFileUploadStatus('Unable to read this file. Please try again.');
     }
   }, []);
 
   const removeAttachedFile = useCallback(() => {
+    attachmentReadIdRef.current++;
+    attachmentReadPendingRef.current = false;
+    setIsReadingAttachment(false);
     setAttachedFile(null);
     setChatImage(null);
     setFileUploadStatus(null);
@@ -5470,7 +5457,7 @@ export default function App() {
     setChatInput('');
     setChatQuotes([]);
     setAttachedScripture(null);
-    setChatImage(null);
+    removeAttachedFile();
     setShowSlashCommands(false);
     setMobileChatView('chat');
     chatInputRef.current?.focus();
@@ -5549,7 +5536,7 @@ export default function App() {
     explicitScripture?: { reference: string; text: string; translation: string }
   ) => {
     if (e) e.preventDefault();
-    if (chatRequestInFlightRef.current) return;
+    if (chatRequestInFlightRef.current || attachmentReadPendingRef.current) return;
     
     let textToSend = overrideText || chatInput;
     if (chatQuotes.length > 0 && !overrideText) {
@@ -7226,12 +7213,7 @@ export default function App() {
                       </div>
                     )}
                     {chatSubmitError && <p role="alert" className="mb-2 text-sm text-red-500">{chatSubmitError}</p>}
-                  {fileUploadStatus && (
-                      <div className="mb-2 flex items-center gap-2 px-3 py-1.5 rounded-xl bg-accent/10 border border-accent/20 text-accent text-[12px] font-medium animate-in fade-in slide-in-from-bottom-1 duration-150 shadow-2xs self-start">
-                        <div className="w-2 h-2 rounded-full bg-accent animate-pulse shrink-0" />
-                        <span className="truncate">{fileUploadStatus}</span>
-                      </div>
-                    )}
+                  {fileUploadStatus && <p role="alert" className="mb-2 text-sm text-error">{fileUploadStatus}</p>}
 
                     {(attachedFile || chatImage) && (
                       <div className="mb-2 flex items-center gap-2.5 p-2 pr-3 rounded-xl bg-surface border border-border-soft/90 shadow-2xs self-start max-w-full">
@@ -7322,7 +7304,7 @@ export default function App() {
                       />
                       <ChatSendButton
                         pending={isAiTyping}
-                        disabled={(!chatInput.trim() && !chatImage && !attachedFile && chatQuotes.length === 0) || !isOnline}
+                        disabled={isReadingAttachment || (!chatInput.trim() && !chatImage && !attachedFile && chatQuotes.length === 0) || !isOnline}
                         onStop={stopChatResponse}
                       />
                     </div>
@@ -9084,12 +9066,7 @@ export default function App() {
                     )}
 
                     {chatSubmitError && <p role="alert" className="mb-2 text-sm text-red-500">{chatSubmitError}</p>}
-                  {fileUploadStatus && (
-                      <div className="mb-2 flex items-center gap-2 px-3 py-1.5 rounded-xl bg-accent/10 border border-accent/20 text-accent text-[12px] font-medium animate-in fade-in slide-in-from-bottom-1 duration-150 shadow-2xs self-start">
-                        <div className="w-2 h-2 rounded-full bg-accent animate-pulse shrink-0" />
-                        <span className="truncate">{fileUploadStatus}</span>
-                      </div>
-                    )}
+                  {fileUploadStatus && <p role="alert" className="mb-2 text-sm text-error">{fileUploadStatus}</p>}
 
                     {(attachedFile || chatImage) && (
                       <div className="mb-2 flex items-center gap-2.5 p-2 pr-3 rounded-xl bg-surface border border-border-soft/90 shadow-2xs self-start max-w-full">
@@ -9180,7 +9157,7 @@ export default function App() {
                       />
                       <ChatSendButton
                         pending={isAiTyping}
-                        disabled={(!chatInput.trim() && !chatImage && !attachedFile && chatQuotes.length === 0) || !isOnline}
+                        disabled={isReadingAttachment || (!chatInput.trim() && !chatImage && !attachedFile && chatQuotes.length === 0) || !isOnline}
                         onStop={stopChatResponse}
                       />
                     </div>
@@ -10169,12 +10146,7 @@ export default function App() {
                     </div>
                   )}
                   {chatSubmitError && <p role="alert" className="mb-2 text-sm text-red-500">{chatSubmitError}</p>}
-                  {fileUploadStatus && (
-                    <div className="mb-2.5 flex items-center gap-2 px-3.5 py-2 rounded-xl bg-accent/10 border border-accent/20 text-accent text-[13px] font-medium animate-in fade-in slide-in-from-bottom-1 duration-150 shadow-2xs self-start">
-                      <div className="w-2 h-2 rounded-full bg-accent animate-pulse shrink-0" />
-                      <span className="truncate">{fileUploadStatus}</span>
-                    </div>
-                  )}
+                  {fileUploadStatus && <p role="alert" className="mb-2 text-sm text-error">{fileUploadStatus}</p>}
 
                   {(attachedFile || chatImage) && (
                     <div className="mb-3 flex items-center gap-3 p-2.5 pr-3.5 rounded-xl bg-surface border border-border-soft/90 shadow-2xs self-start max-w-full">
@@ -10199,7 +10171,6 @@ export default function App() {
                         </span>
                         <span className="text-[11px] text-muted flex items-center gap-1.5">
                           {attachedFile?.size ? formatFileSize(attachedFile.size) : 'Ready'}
-                          <span className="text-muted">· Attached to conversation</span>
                         </span>
                       </div>
                       <button 
@@ -10265,7 +10236,7 @@ export default function App() {
                     />
                     <ChatSendButton
                         pending={isAiTyping}
-                        disabled={(!chatInput.trim() && !chatImage && !attachedFile && chatQuotes.length === 0) || !isOnline}
+                        disabled={isReadingAttachment || (!chatInput.trim() && !chatImage && !attachedFile && chatQuotes.length === 0) || !isOnline}
                         onStop={stopChatResponse}
                       />
                   </div>
@@ -10784,7 +10755,7 @@ export default function App() {
         <input
           ref={imageFileRef}
           type="file"
-          accept="image/*,application/pdf,text/*,.txt,.md,.json,.csv"
+          accept={CHAT_ATTACHMENT_ACCEPT}
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0];
